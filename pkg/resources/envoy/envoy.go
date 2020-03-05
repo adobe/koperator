@@ -57,7 +57,7 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 	if r.KafkaCluster.Spec.ListenersConfig.ExternalListeners != nil && r.KafkaCluster.Spec.GetIngressController() == envoyutils.IngressControllerName {
 
 		for _, res := range []resources.ResourceWithLogs{
-			r.loadBalancer,
+			//r.loadBalancer,
 			r.configMap,
 			r.deployment,
 		} {

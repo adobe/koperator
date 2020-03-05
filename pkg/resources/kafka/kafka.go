@@ -198,11 +198,11 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 			// first element of slice will be used for external advertised listener
 			lbIPs = append(lbIPs, r.KafkaCluster.Spec.ListenersConfig.ExternalListeners[0].HostnameOverride)
 		}
-		lbIP, err := getLoadBalancerIP(r.Client, r.KafkaCluster.Namespace, r.KafkaCluster.Spec.GetIngressController(), r.KafkaCluster.Name, log)
-		if err != nil {
-			return err
-		}
-		lbIPs = append(lbIPs, lbIP)
+		//lbIP, err := getLoadBalancerIP(r.Client, r.KafkaCluster.Namespace, r.KafkaCluster.Spec.GetIngressController(), r.KafkaCluster.Name, log)
+		//if err != nil {
+		//	return err
+		//}
+		//lbIPs = append(lbIPs, lbIP)
 	}
 	//TODO remove after testing
 	//lBIp := "192.168.0.1"
