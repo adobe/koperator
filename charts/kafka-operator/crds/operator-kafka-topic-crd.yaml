@@ -4,26 +4,25 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.2.5
   labels:
-    app.kubernetes.io/name: {{ include "kafka-operator.name" . }}
-    helm.sh/chart: {{ include "kafka-operator.chart" . }}
-    app.kubernetes.io/instance: {{ .Release.Name }}
-    app.kubernetes.io/managed-by: {{ .Release.Service }}
-    app.kubernetes.io/version: {{ .Chart.AppVersion }}
+    app.kubernetes.io/name: kafka-operator
+    helm.sh/chart: kafka-operator
+    app.kubernetes.io/instance: kafka-operator
+    app.kubernetes.io/managed-by: kafka-operator
     app.kubernetes.io/component: operator
-  name: kafkausers.kafka.banzaicloud.io
+  name: kafkatopics.kafka.banzaicloud.io
 spec:
   group: kafka.banzaicloud.io
   names:
-    kind: KafkaUser
-    listKind: KafkaUserList
-    plural: kafkausers
-    singular: kafkauser
+    kind: KafkaTopic
+    listKind: KafkaTopicList
+    plural: kafkatopics
+    singular: kafkatopic
   scope: Namespaced
   subresources:
     status: {}
   validation:
     openAPIV3Schema:
-      description: KafkaUser is the Schema for the kafka users API
+      description: KafkaTopic is the Schema for the kafkatopics API
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -38,7 +37,7 @@ spec:
         metadata:
           type: object
         spec:
-          description: KafkaUserSpec defines the desired state of KafkaUser
+          description: KafkaTopicSpec defines the desired state of KafkaTopic
           properties:
             clusterRef:
               description: ClusterReference states a reference to a cluster for topic/user
@@ -51,53 +50,29 @@ spec:
               required:
                 - name
               type: object
-            dnsNames:
-              items:
+            config:
+              additionalProperties:
                 type: string
-              type: array
-            includeJKS:
-              type: boolean
-            secretName:
+              type: object
+            name:
               type: string
-            topicGrants:
-              items:
-                description: UserTopicGrant is the desired permissions for the KafkaUser
-                properties:
-                  accessType:
-                    description: KafkaAccessType hold info about Kafka ACL
-                    enum:
-                      - read
-                      - write
-                    type: string
-                  patternType:
-                    description: KafkaPatternType hold the Resource Pattern Type of
-                      kafka ACL
-                    enum:
-                      - literal
-                      - match
-                      - prefixed
-                      - any
-                    type: string
-                  topicName:
-                    type: string
-                required:
-                  - accessType
-                  - topicName
-                type: object
-              type: array
+            partitions:
+              format: int32
+              type: integer
+            replicationFactor:
+              format: int32
+              type: integer
           required:
             - clusterRef
-            - secretName
+            - name
+            - partitions
+            - replicationFactor
           type: object
         status:
-          description: KafkaUserStatus defines the observed state of KafkaUser
+          description: KafkaTopicStatus defines the observed state of KafkaTopic
           properties:
-            acls:
-              items:
-                type: string
-              type: array
             state:
-              description: UserState defines the state of a KafkaUser
+              description: TopicState defines the state of a KafkaTopic
               type: string
           required:
             - state

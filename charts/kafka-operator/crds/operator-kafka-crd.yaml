@@ -4,11 +4,10 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.2.5
   labels:
-    app.kubernetes.io/name: {{ include "kafka-operator.name" . }}
-    helm.sh/chart: {{ include "kafka-operator.chart" . }}
-    app.kubernetes.io/instance: {{ .Release.Name }}
-    app.kubernetes.io/managed-by: {{ .Release.Service }}
-    app.kubernetes.io/version: {{ .Chart.AppVersion }}
+    app.kubernetes.io/name: kafka-operator
+    helm.sh/chart: kafka-operator
+    app.kubernetes.io/instance: kafka-operator
+    app.kubernetes.io/managed-by: kafka-operator
     app.kubernetes.io/component: operator
   name: kafkaclusters.kafka.banzaicloud.io
 spec:

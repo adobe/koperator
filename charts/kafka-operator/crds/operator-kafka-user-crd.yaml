@@ -2,29 +2,27 @@ apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    certmanager.k8s.io/inject-ca-from: {{ .Release.Namespace }}/{{ include "kafka-operator.fullname" . }}-server-cert
     controller-gen.kubebuilder.io/version: v0.2.5
   labels:
-    app.kubernetes.io/name: {{ include "kafka-operator.name" . }}
-    helm.sh/chart: {{ include "kafka-operator.chart" . }}
-    app.kubernetes.io/instance: {{ .Release.Name }}
-    app.kubernetes.io/managed-by: {{ .Release.Service }}
-    app.kubernetes.io/version: {{ .Chart.AppVersion }}
+    app.kubernetes.io/name: kafka-operator
+    helm.sh/chart: kafka-operator
+    app.kubernetes.io/instance: kafka-operator
+    app.kubernetes.io/managed-by: kafka-operator
     app.kubernetes.io/component: operator
-  name: kafkatopics.kafka.banzaicloud.io
+  name: kafkausers.kafka.banzaicloud.io
 spec:
   group: kafka.banzaicloud.io
   names:
-    kind: KafkaTopic
-    listKind: KafkaTopicList
-    plural: kafkatopics
-    singular: kafkatopic
+    kind: KafkaUser
+    listKind: KafkaUserList
+    plural: kafkausers
+    singular: kafkauser
   scope: Namespaced
   subresources:
     status: {}
   validation:
     openAPIV3Schema:
-      description: KafkaTopic is the Schema for the kafkatopics API
+      description: KafkaUser is the Schema for the kafka users API
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -39,7 +37,7 @@ spec:
         metadata:
           type: object
         spec:
-          description: KafkaTopicSpec defines the desired state of KafkaTopic
+          description: KafkaUserSpec defines the desired state of KafkaUser
           properties:
             clusterRef:
               description: ClusterReference states a reference to a cluster for topic/user
@@ -52,29 +50,53 @@ spec:
               required:
                 - name
               type: object
-            config:
-              additionalProperties:
+            dnsNames:
+              items:
                 type: string
-              type: object
-            name:
+              type: array
+            includeJKS:
+              type: boolean
+            secretName:
               type: string
-            partitions:
-              format: int32
-              type: integer
-            replicationFactor:
-              format: int32
-              type: integer
+            topicGrants:
+              items:
+                description: UserTopicGrant is the desired permissions for the KafkaUser
+                properties:
+                  accessType:
+                    description: KafkaAccessType hold info about Kafka ACL
+                    enum:
+                      - read
+                      - write
+                    type: string
+                  patternType:
+                    description: KafkaPatternType hold the Resource Pattern Type of
+                      kafka ACL
+                    enum:
+                      - literal
+                      - match
+                      - prefixed
+                      - any
+                    type: string
+                  topicName:
+                    type: string
+                required:
+                  - accessType
+                  - topicName
+                type: object
+              type: array
           required:
             - clusterRef
-            - name
-            - partitions
-            - replicationFactor
+            - secretName
           type: object
         status:
-          description: KafkaTopicStatus defines the observed state of KafkaTopic
+          description: KafkaUserStatus defines the observed state of KafkaUser
           properties:
+            acls:
+              items:
+                type: string
+              type: array
             state:
-              description: TopicState defines the state of a KafkaTopic
+              description: UserState defines the state of a KafkaUser
               type: string
           required:
             - state
