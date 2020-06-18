@@ -44,6 +44,9 @@ type Resource func() runtime.Object
 // ResourceWithLogs function with log parameter
 type ResourceWithLogs func(log logr.Logger) runtime.Object
 
+// ResourceWithLogsAndEnvoyConfig function with log and envoy config
+type ResourceWithLogsAndEnvoyConfig func(log logr.Logger, envoyConfig *v1beta1.EnvoyConfig) runtime.Object
+
 // ResourceWithLogAndExternalListenerConfig function with log and externalListenerConfig parameter
 type ResourceWithLogAndExternalListenerConfig func(log logr.Logger, externalListenerConfig v1beta1.ExternalListenerConfig) runtime.Object
 

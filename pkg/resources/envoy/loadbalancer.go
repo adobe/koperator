@@ -19,6 +19,7 @@ import (
 
 	"github.com/banzaicloud/kafka-operator/api/v1beta1"
 	"github.com/banzaicloud/kafka-operator/pkg/resources/templates"
+	"github.com/banzaicloud/kafka-operator/pkg/util"
 	envoyutils "github.com/banzaicloud/kafka-operator/pkg/util/envoy"
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -30,7 +31,7 @@ import (
 // loadBalancer return a Loadbalancer service for Envoy
 func (r *Reconciler) loadBalancer(log logr.Logger) runtime.Object {
 
-	exposedPorts := getExposedServicePorts(r.KafkaCluster.Spec.ListenersConfig.ExternalListeners, r.KafkaCluster.Spec.Brokers)
+	exposedPorts := getExposedServicePorts(r.KafkaCluster.Spec)
 
 	service := &corev1.Service{
 		ObjectMeta: templates.ObjectMetaWithAnnotations(envoyutils.EnvoyServiceName, map[string]string{}, r.KafkaCluster.Spec.EnvoyConfig.GetAnnotations(), r.KafkaCluster),
@@ -44,11 +45,15 @@ func (r *Reconciler) loadBalancer(log logr.Logger) runtime.Object {
 	return service
 }
 
-func getExposedServicePorts(extListeners []v1beta1.ExternalListenerConfig, brokers []v1beta1.Broker) []corev1.ServicePort {
+func getExposedServicePorts(clusterSpec v1beta1.KafkaClusterSpec) []corev1.ServicePort {
 	var exposedPorts []corev1.ServicePort
 
-	for _, eListener := range extListeners {
-		for _, broker := range brokers {
+	for _, broker := range clusterSpec.Brokers {
+		brokerConfig, err := util.GetBrokerConfig(broker, clusterSpec)
+		if err != nil {
+			continue
+		}
+		for _, eListener := range brokerConfig.ListenersConfig.ExternalListeners {
 			exposedPorts = append(exposedPorts, corev1.ServicePort{
 				Name:       fmt.Sprintf("broker-%d", broker.Id),
 				Port:       eListener.ExternalStartingPort + broker.Id,

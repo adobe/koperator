@@ -28,72 +28,90 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (r *Reconciler) deployment(log logr.Logger) runtime.Object {
+func deploymentName(envoyConfig *v1beta1.EnvoyConfig) string {
+	if envoyConfig.Id == envoyGlobal {
+		return envoyDeploymentName
+	} else {
+		return fmt.Sprintf("%s-%s", envoyDeploymentName, envoyConfig.Id)
+	}
+}
 
-	exposedPorts := getExposedContainerPorts(r.KafkaCluster.Spec.ListenersConfig.ExternalListeners, r.KafkaCluster.Spec.Brokers)
+func (r *Reconciler) deployment(log logr.Logger, envoyConfig *v1beta1.EnvoyConfig) runtime.Object {
+	return &appsv1.Deployment{
+		ObjectMeta: templates.ObjectMeta(deploymentName(envoyConfig), labelSelector(envoyConfig), r.KafkaCluster),
+		Spec: appsv1.DeploymentSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: labelSelector(envoyConfig),
+			},
+			Replicas: util.Int32Pointer(envoyConfig.GetReplicas()),
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: labelSelector(envoyConfig),
+				},
+				Spec: getPodSpec(log, envoyConfig, r.KafkaCluster),
+			},
+		},
+	}
+}
+
+func getPodSpec(log logr.Logger, envoyConfig *v1beta1.EnvoyConfig, kafkaCluster *v1beta1.KafkaCluster) corev1.PodSpec {
+	exposedPorts := getExposedContainerPorts(envoyConfig, kafkaCluster.Spec.ListenersConfig.ExternalListeners, kafkaCluster.Spec)
+	volumeMounts := []corev1.VolumeMount{
+		{
+			Name:      configName(envoyConfig),
+			MountPath: "/etc/envoy",
+			ReadOnly:  true,
+		},
+	}
 	volumes := []corev1.Volume{
 		{
-			Name: envoyVolumeAndConfigName,
+			Name: configName(envoyConfig),
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{Name: envoyVolumeAndConfigName},
+					LocalObjectReference: corev1.LocalObjectReference{Name: configName(envoyConfig)},
 					DefaultMode:          util.Int32Pointer(0644),
 				},
 			},
 		},
 	}
 
-	volumeMounts := []corev1.VolumeMount{
-		{
-			Name:      envoyVolumeAndConfigName,
-			MountPath: "/etc/envoy",
-			ReadOnly:  true,
-		},
-	}
-
-	return &appsv1.Deployment{
-		ObjectMeta: templates.ObjectMeta(envoyDeploymentName, labelSelector, r.KafkaCluster),
-		Spec: appsv1.DeploymentSpec{
-			Selector: &metav1.LabelSelector{
-				MatchLabels: labelSelector,
-			},
-			Replicas: util.Int32Pointer(r.KafkaCluster.Spec.EnvoyConfig.GetReplicas()),
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: labelSelector,
-				},
-				Spec: corev1.PodSpec{
-					ServiceAccountName: r.KafkaCluster.Spec.EnvoyConfig.GetServiceAccount(r.KafkaCluster.Name),
-					ImagePullSecrets:   r.KafkaCluster.Spec.EnvoyConfig.GetImagePullSecrets(),
-					Tolerations:        r.KafkaCluster.Spec.EnvoyConfig.GetTolerations(),
-					NodeSelector:       r.KafkaCluster.Spec.EnvoyConfig.GetNodeSelector(),
-					Containers: []corev1.Container{
-						{
-							Name:  "envoy",
-							Image: r.KafkaCluster.Spec.EnvoyConfig.GetEnvoyImage(),
-							Ports: append(exposedPorts, []corev1.ContainerPort{
-								{Name: "envoy-admin", ContainerPort: 9901, Protocol: corev1.ProtocolTCP}}...),
-							VolumeMounts: volumeMounts,
-							Resources:    *r.KafkaCluster.Spec.EnvoyConfig.GetResources(),
-						},
-					},
-					Volumes: volumes,
-				},
+	podSpec := corev1.PodSpec{
+		ServiceAccountName: kafkaCluster.Spec.EnvoyConfig.GetServiceAccount(kafkaCluster.Name),
+		ImagePullSecrets:   kafkaCluster.Spec.EnvoyConfig.GetImagePullSecrets(),
+		Tolerations:        kafkaCluster.Spec.EnvoyConfig.GetTolerations(),
+		NodeSelector:       kafkaCluster.Spec.EnvoyConfig.GetNodeSelector(),
+		Containers: []corev1.Container{
+			{
+				Name:  "envoy",
+				Image: kafkaCluster.Spec.EnvoyConfig.GetEnvoyImage(),
+				Ports: append(exposedPorts, []corev1.ContainerPort{
+					{Name: "envoy-admin", ContainerPort: 9901, Protocol: corev1.ProtocolTCP}}...),
+				VolumeMounts: volumeMounts,
+				Resources:    *kafkaCluster.Spec.EnvoyConfig.GetResources(),
 			},
 		},
+		Volumes: volumes,
 	}
+	if envoyConfig.NodeAffinity != nil {
+		podSpec.Affinity = &corev1.Affinity{
+			NodeAffinity: envoyConfig.NodeAffinity,
+		}
+	}
+	return podSpec
 }
 
-func getExposedContainerPorts(extListeners []v1beta1.ExternalListenerConfig, brokers []v1beta1.Broker) []corev1.ContainerPort {
+func getExposedContainerPorts(envoyConfig *v1beta1.EnvoyConfig, extListeners []v1beta1.ExternalListenerConfig, clusterSpec v1beta1.KafkaClusterSpec) []corev1.ContainerPort {
 	var exposedPorts []corev1.ContainerPort
 
 	for _, eListener := range extListeners {
-		for _, broker := range brokers {
-			exposedPorts = append(exposedPorts, corev1.ContainerPort{
-				Name:          fmt.Sprintf("broker-%d", broker.Id),
-				ContainerPort: eListener.ExternalStartingPort + broker.Id,
-				Protocol:      corev1.ProtocolTCP,
-			})
+		for _, broker := range clusterSpec.Brokers {
+			if envoyConfig.Id == envoyGlobal || envoyConfig.Id == broker.BrokerConfigGroup {
+				exposedPorts = append(exposedPorts, corev1.ContainerPort{
+					Name:          fmt.Sprintf("broker-%d", broker.Id),
+					ContainerPort: eListener.ExternalStartingPort + broker.Id,
+					Protocol:      corev1.ProtocolTCP,
+				})
+			}
 		}
 	}
 	return exposedPorts

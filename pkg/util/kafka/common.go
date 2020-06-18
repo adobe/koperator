@@ -19,7 +19,9 @@ import (
 	"strings"
 
 	"github.com/banzaicloud/kafka-operator/api/v1alpha1"
+	"github.com/banzaicloud/kafka-operator/api/v1beta1"
 	"github.com/banzaicloud/kafka-operator/pkg/util"
+	"github.com/imdario/mergo"
 )
 
 const (
@@ -77,4 +79,38 @@ func GrantsToACLStrings(dn string, grants []v1alpha1.UserTopicGrant) []string {
 		}
 	}
 	return acls
+}
+
+// GetExternalDNSNames returns all potential external DNS names for a kafka cluster - including brokers
+func GetExternalDNSNames(cluster *v1beta1.KafkaCluster) (dnsNames []string) {
+	dnsNames = make([]string, 0)
+	for _, brokerConfigGroup := range cluster.Spec.BrokerConfigGroups {
+		dnsNames = append(dnsNames, GetExternalDNSNamesForBroker(&cluster.Spec.ListenersConfig, brokerConfigGroup.ListenersConfig)...)
+	}
+	return
+}
+
+func GetExternalDNSNamesForBroker(globalConfig *v1beta1.ListenersConfig, brokerConfig *v1beta1.ListenersConfig) (dnsNames []string) {
+	dnsNames = make([]string, 0)
+	for _, externalListenerConfig := range MergeListenerConfigs(globalConfig, brokerConfig).ExternalListeners {
+		if externalListenerConfig.HostnameOverride != "" {
+			dnsNames = append(dnsNames, externalListenerConfig.HostnameOverride)
+		}
+	}
+	return
+}
+
+func MergeListenerConfigs(globalConfig *v1beta1.ListenersConfig, brokerConfig *v1beta1.ListenersConfig) *v1beta1.ListenersConfig {
+	if brokerConfig == nil {
+		return globalConfig
+	}
+	if globalConfig == nil {
+		return brokerConfig
+	}
+	mergedConfig := globalConfig.DeepCopy()
+	err := mergo.Merge(mergedConfig, brokerConfig, mergo.WithOverride)
+	if err != nil {
+		return globalConfig
+	}
+	return mergedConfig
 }

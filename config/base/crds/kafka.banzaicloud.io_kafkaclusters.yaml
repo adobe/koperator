@@ -505,6 +505,54 @@ spec:
                           type: string
                       type: object
                     type: array
+                  envoy:
+                    description: Custom properties for the dedicated envoy deployment
+                      for this broker configuration group.
+                      Applicable only if EnvoyConfig.dedicatedEnvoyPerBrokerGroup is
+                      set to true.
+                    properties:
+                      replicas:
+                        format: int32
+                        minimum: 1
+                        type: integer
+                    required:
+                      - replicas
+                    type: object
+                  listenersConfig:
+                    description: ListenersConfig defines the broker specific Kafka
+                      listener types. These will override the global ListenersConfig
+                    properties:
+                      externalListeners:
+                        items:
+                          description: ExternalListenerConfig defines the external listener
+                            config for Kafka
+                          properties:
+                            containerPort:
+                              format: int32
+                              type: integer
+                            externalStartingPort:
+                              format: int32
+                              type: integer
+                              description: The broker port is computed as the sum of the
+                                externalStartingPort and the broker id. For consistence,
+                                it is recommended that externalStartingPort has the same
+                                value across all the brokerConfigGroups.
+                            hostnameOverride:
+                              type: string
+                            name:
+                              type: string
+                            type:
+                              type: string
+                          required:
+                            - containerPort
+                            - externalStartingPort
+                            - name
+                            - type
+                          type: object
+                        type: array
+                    required:
+                      - externalListeners
+                    type: object
                 type: object
               type: object
             brokers:
@@ -520,6 +568,14 @@ spec:
                         type: object
                       config:
                         type: string
+                      dedicatedEnvoyDeployment:
+                        properties:
+                          enabled:
+                            type: boolean
+                          replicas:
+                            format: int32
+                            type: integer
+                        type: object
                       image:
                         type: string
                       imagePullSecrets:
@@ -1126,6 +1182,11 @@ spec:
                   additionalProperties:
                     type: string
                   type: object
+                useExistingLBLoadBalancer:
+                  description: Set this to true if you don't want the operator to create
+                    a LoadBalancer service. This is recommended if you want to use your
+                    own LoadBalancer.
+                  type: boolean
                 image:
                   type: string
                 imagePullSecrets:
@@ -1513,6 +1574,8 @@ spec:
                       externalStartingPort:
                         format: int32
                         type: integer
+                        description: The broker port is computed as the sum of the
+                          externalStartingPort and the broker id.
                       hostnameOverride:
                         type: string
                       name:

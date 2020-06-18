@@ -205,6 +205,34 @@ func GetBrokerConfig(broker v1beta1.Broker, clusterSpec v1beta1.KafkaClusterSpec
 	return bConfig, nil
 }
 
+// GetEnvoyConfig compose the Envoy config from a specific broker config and the global config
+func GetEnvoyConfig(configId string, brokerConfig v1beta1.BrokerConfig, clusterSpec v1beta1.KafkaClusterSpec) *v1beta1.EnvoyConfig {
+	envoyConfig := clusterSpec.EnvoyConfig.DeepCopy()
+
+	if envoyConfig == nil {
+		return nil
+	}
+
+	envoyConfig.Id = configId
+
+	if !clusterSpec.EnvoyConfig.EnvoyPerBrokerGroup {
+		return envoyConfig
+	}
+
+	// Broker config level overrides
+	if brokerConfig.Envoy != nil && brokerConfig.Envoy.Replicas > 0 {
+		envoyConfig.Replicas = brokerConfig.Envoy.Replicas
+	}
+	if brokerConfig.NodeSelector != nil {
+		envoyConfig.NodeSelector = brokerConfig.NodeSelector
+	}
+	if brokerConfig.NodeAffinity != nil {
+		envoyConfig.NodeAffinity = brokerConfig.NodeAffinity
+	}
+
+	return envoyConfig
+}
+
 // GetBrokerImage returns the used broker image
 func GetBrokerImage(brokerConfig *v1beta1.BrokerConfig, clusterImage string) string {
 	if brokerConfig.Image != "" {
@@ -224,4 +252,18 @@ func GetRandomString(length int) (string, error) {
 		b.WriteRune(chars[rand.Intn(len(chars))])
 	}
 	return b.String(), nil
+}
+
+func HasExternalListeners(kafkaClusterSpec v1beta1.KafkaClusterSpec) bool {
+	// Has global External Listener
+	if kafkaClusterSpec.ListenersConfig.ExternalListeners != nil {
+		return true
+	}
+	// No global External Listener. All BrokerGroups must declare at least 1 ExternalListener
+	for _, brokerConfigGroup := range kafkaClusterSpec.BrokerConfigGroups {
+		if brokerConfigGroup.ListenersConfig == nil || brokerConfigGroup.ListenersConfig.ExternalListeners == nil {
+			return false
+		}
+	}
+	return true
 }
