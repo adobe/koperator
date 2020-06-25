@@ -102,16 +102,13 @@ fi
 	}
 
 	pod := &corev1.Pod{
-		ObjectMeta: templates.ObjectMetaWithGeneratedNameAndAnnotations(
+		ObjectMeta: templates.ObjectMetaWithGeneratedName(
 			fmt.Sprintf("%s-%d-", r.KafkaCluster.Name, id),
 			util.MergeLabels(
 				LabelsForKafka(r.KafkaCluster.Name),
 				map[string]string{"brokerId": fmt.Sprintf("%d", id)},
 			),
-			util.MergeAnnotations(
-				brokerConfig.GetBrokerAnnotations(),
-				util.MonitoringAnnotations(metricsPort),
-			), r.KafkaCluster,
+			r.KafkaCluster,
 		),
 		Spec: corev1.PodSpec{
 			InitContainers: append(initContainers, []corev1.Container{
