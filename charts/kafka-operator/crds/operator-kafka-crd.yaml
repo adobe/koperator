@@ -65,6 +65,16 @@ spec:
                     type: object
                   config:
                     type: string
+                  envoy:
+                    description: Custom properties for the dedicated envoy deployment
+                      for this broker configuration group. Applicable only if envoy.dedicatedEnvoyPerBrokerGroup
+                      is set to true.
+                    properties:
+                      replicas:
+                        format: int32
+                        minimum: 1
+                        type: integer
+                    type: object
                   image:
                     type: string
                   imagePullSecrets:
@@ -82,6 +92,105 @@ spec:
                     type: string
                   kafkaJvmPerfOpts:
                     type: string
+                  listenersConfig:
+                    description: ListenersConfig defines the broker specific Kafka
+                      listener types. These will override the global ListenersConfig
+                    properties:
+                      externalListeners:
+                        items:
+                          description: ExternalListenerConfig defines the external
+                            listener config for Kafka
+                          properties:
+                            containerPort:
+                              format: int32
+                              type: integer
+                            externalStartingPort:
+                              description: The broker port is computed as the sum
+                                of the externalStartingPort and the broker id. For
+                                consistence, it is recommended that externalStartingPort
+                                has the same value across all the brokerConfigGroups.
+                              format: int32
+                              type: integer
+                            hostnameOverride:
+                              type: string
+                            name:
+                              type: string
+                            serviceAnnotations:
+                              additionalProperties:
+                                type: string
+                              type: object
+                            type:
+                              type: string
+                          required:
+                          - containerPort
+                          - externalStartingPort
+                          - name
+                          - type
+                          type: object
+                        type: array
+                      internalListeners:
+                        items:
+                          description: InternalListenerConfig defines the internal
+                            listener config for Kafka
+                          properties:
+                            containerPort:
+                              format: int32
+                              type: integer
+                            name:
+                              type: string
+                            type:
+                              type: string
+                            usedForControllerCommunication:
+                              type: boolean
+                            usedForInnerBrokerCommunication:
+                              type: boolean
+                          required:
+                          - containerPort
+                          - name
+                          - type
+                          - usedForInnerBrokerCommunication
+                          type: object
+                        type: array
+                      serviceAnnotations:
+                        additionalProperties:
+                          type: string
+                        type: object
+                      sslSecrets:
+                        description: SSLSecrets defines the Kafka SSL secrets
+                        properties:
+                          create:
+                            type: boolean
+                          issuerRef:
+                            description: ObjectReference is a reference to an object
+                              with a given name, kind and group.
+                            properties:
+                              group:
+                                type: string
+                              kind:
+                                type: string
+                              name:
+                                type: string
+                            required:
+                            - name
+                            type: object
+                          jksPasswordName:
+                            type: string
+                          pkiBackend:
+                            description: PKIBackend represents an interface implementing
+                              the PKIManager
+                            enum:
+                            - cert-manager
+                            - vault
+                            type: string
+                          tlsSecretName:
+                            type: string
+                        required:
+                        - jksPasswordName
+                        - tlsSecretName
+                        type: object
+                    required:
+                    - internalListeners
+                    type: object
                   nodeAffinity:
                     description: Node affinity is a group of node affinity scheduling
                       rules.
@@ -337,16 +446,21 @@ spec:
                                 type: string
                               type: array
                             dataSource:
-                              description: This field requires the VolumeSnapshotDataSource
-                                alpha feature gate to be enabled and currently VolumeSnapshot
-                                is the only supported data source. If the provisioner
-                                can support VolumeSnapshot data source, it will create
-                                a new volume and data will be restored to the volume
-                                at the same time. If the provisioner does not support
-                                VolumeSnapshot data source, volume will not be created
-                                and the failure will be reported as an event. In the
-                                future, we plan to support more data source types
-                                and the behavior of the provisioner may change.
+                              description: 'This field can be used to specify either:
+                                * An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot
+                                - Beta) * An existing PVC (PersistentVolumeClaim)
+                                * An existing custom resource/object that implements
+                                data population (Alpha) In order to use VolumeSnapshot
+                                object types, the appropriate feature gate must be
+                                enabled (VolumeSnapshotDataSource or AnyVolumeDataSource)
+                                If the provisioner or an external controller can support
+                                the specified data source, it will create a new volume
+                                based on the contents of the specified data source.
+                                If the specified data source is not supported, the
+                                volume will not be created and the failure will be
+                                reported as an event. In the future, we plan to support
+                                more data source types and the behavior of the provisioner
+                                may change.'
                               properties:
                                 apiGroup:
                                   description: APIGroup is the group for the resource
@@ -448,7 +562,7 @@ spec:
                             volumeMode:
                               description: volumeMode defines what type of volume
                                 is required by the claim. Value of Filesystem is implied
-                                when not included in claim spec. This is a beta feature.
+                                when not included in claim spec.
                               type: string
                             volumeName:
                               description: VolumeName is the binding reference to
@@ -500,54 +614,6 @@ spec:
                           type: string
                       type: object
                     type: array
-                  envoy:
-                    description: Custom properties for the dedicated envoy deployment
-                      for this broker configuration group.
-                      Applicable only if EnvoyConfig.dedicatedEnvoyPerBrokerGroup is
-                      set to true.
-                    properties:
-                      replicas:
-                        format: int32
-                        minimum: 1
-                        type: integer
-                    required:
-                      - replicas
-                    type: object
-                  listenersConfig:
-                    description: ListenersConfig defines the broker specific Kafka
-                     listener types. These will override the global ListenersConfig
-                    properties:
-                      externalListeners:
-                        items:
-                          description: ExternalListenerConfig defines the external listener
-                            config for Kafka
-                          properties:
-                            containerPort:
-                              format: int32
-                              type: integer
-                            externalStartingPort:
-                              format: int32
-                              type: integer
-                              description: The broker port is computed as the sum of the
-                                externalStartingPort and the broker id. For consistence,
-                                it is recommended that externalStartingPort has the same
-                                value across all the brokerConfigGroups.
-                            hostnameOverride:
-                              type: string
-                            name:
-                              type: string
-                            type:
-                              type: string
-                          required:
-                            - containerPort
-                            - externalStartingPort
-                            - name
-                            - type
-                          type: object
-                        type: array
-                    required:
-                      - externalListeners
-                    type: object
                 type: object
               type: object
             brokers:
@@ -563,6 +629,16 @@ spec:
                         type: object
                       config:
                         type: string
+                      envoy:
+                        description: Custom properties for the dedicated envoy deployment
+                          for this broker configuration group. Applicable only if
+                          envoy.dedicatedEnvoyPerBrokerGroup is set to true.
+                        properties:
+                          replicas:
+                            format: int32
+                            minimum: 1
+                            type: integer
+                        type: object
                       image:
                         type: string
                       imagePullSecrets:
@@ -581,6 +657,105 @@ spec:
                         type: string
                       kafkaJvmPerfOpts:
                         type: string
+                      listenersConfig:
+                        description: ListenersConfig defines the broker specific Kafka
+                          listener types. These will override the global ListenersConfig
+                        properties:
+                          externalListeners:
+                            items:
+                              description: ExternalListenerConfig defines the external
+                                listener config for Kafka
+                              properties:
+                                containerPort:
+                                  format: int32
+                                  type: integer
+                                externalStartingPort:
+                                  description: The broker port is computed as the
+                                    sum of the externalStartingPort and the broker
+                                    id. For consistence, it is recommended that externalStartingPort
+                                    has the same value across all the brokerConfigGroups.
+                                  format: int32
+                                  type: integer
+                                hostnameOverride:
+                                  type: string
+                                name:
+                                  type: string
+                                serviceAnnotations:
+                                  additionalProperties:
+                                    type: string
+                                  type: object
+                                type:
+                                  type: string
+                              required:
+                              - containerPort
+                              - externalStartingPort
+                              - name
+                              - type
+                              type: object
+                            type: array
+                          internalListeners:
+                            items:
+                              description: InternalListenerConfig defines the internal
+                                listener config for Kafka
+                              properties:
+                                containerPort:
+                                  format: int32
+                                  type: integer
+                                name:
+                                  type: string
+                                type:
+                                  type: string
+                                usedForControllerCommunication:
+                                  type: boolean
+                                usedForInnerBrokerCommunication:
+                                  type: boolean
+                              required:
+                              - containerPort
+                              - name
+                              - type
+                              - usedForInnerBrokerCommunication
+                              type: object
+                            type: array
+                          serviceAnnotations:
+                            additionalProperties:
+                              type: string
+                            type: object
+                          sslSecrets:
+                            description: SSLSecrets defines the Kafka SSL secrets
+                            properties:
+                              create:
+                                type: boolean
+                              issuerRef:
+                                description: ObjectReference is a reference to an
+                                  object with a given name, kind and group.
+                                properties:
+                                  group:
+                                    type: string
+                                  kind:
+                                    type: string
+                                  name:
+                                    type: string
+                                required:
+                                - name
+                                type: object
+                              jksPasswordName:
+                                type: string
+                              pkiBackend:
+                                description: PKIBackend represents an interface implementing
+                                  the PKIManager
+                                enum:
+                                - cert-manager
+                                - vault
+                                type: string
+                              tlsSecretName:
+                                type: string
+                            required:
+                            - jksPasswordName
+                            - tlsSecretName
+                            type: object
+                        required:
+                        - internalListeners
+                        type: object
                       nodeAffinity:
                         description: Node affinity is a group of node affinity scheduling
                           rules.
@@ -846,17 +1021,21 @@ spec:
                                     type: string
                                   type: array
                                 dataSource:
-                                  description: This field requires the VolumeSnapshotDataSource
-                                    alpha feature gate to be enabled and currently
-                                    VolumeSnapshot is the only supported data source.
-                                    If the provisioner can support VolumeSnapshot
-                                    data source, it will create a new volume and data
-                                    will be restored to the volume at the same time.
-                                    If the provisioner does not support VolumeSnapshot
-                                    data source, volume will not be created and the
-                                    failure will be reported as an event. In the future,
-                                    we plan to support more data source types and
-                                    the behavior of the provisioner may change.
+                                  description: 'This field can be used to specify
+                                    either: * An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot
+                                    - Beta) * An existing PVC (PersistentVolumeClaim)
+                                    * An existing custom resource/object that implements
+                                    data population (Alpha) In order to use VolumeSnapshot
+                                    object types, the appropriate feature gate must
+                                    be enabled (VolumeSnapshotDataSource or AnyVolumeDataSource)
+                                    If the provisioner or an external controller can
+                                    support the specified data source, it will create
+                                    a new volume based on the contents of the specified
+                                    data source. If the specified data source is not
+                                    supported, the volume will not be created and
+                                    the failure will be reported as an event. In the
+                                    future, we plan to support more data source types
+                                    and the behavior of the provisioner may change.'
                                   properties:
                                     apiGroup:
                                       description: APIGroup is the group for the resource
@@ -964,8 +1143,7 @@ spec:
                                 volumeMode:
                                   description: volumeMode defines what type of volume
                                     is required by the claim. Value of Filesystem
-                                    is implied when not included in claim spec. This
-                                    is a beta feature.
+                                    is implied when not included in claim spec.
                                   type: string
                                 volumeName:
                                   description: VolumeName is the binding reference
@@ -1166,6 +1344,12 @@ spec:
                   additionalProperties:
                     type: string
                   type: object
+                dedicatedEnvoyPerBrokerGroup:
+                  description: When set to true operator creates one envoy deployment
+                    for each broker group.
+                  type: boolean
+                id:
+                  type: string
                 image:
                   type: string
                 imagePullSecrets:
@@ -1179,20 +1363,205 @@ spec:
                         type: string
                     type: object
                   type: array
-                useExistingLoadBalancer:
-                  description: Set this to true if you don't want the operator to create
-                    a LoadBalancer service. This is recommended if you want to use your
-                    own LoadBalancer.
-                  type: boolean
-                dedicatedEnvoyPerBrokerGroup:
-                  description: Set this to true if you don't want the operator to create
-                    one Envoy deployment for each BrokerConifgGrop. This is recommended
-                    if you want to keep the brokers and the envoy in the same group/rack.
-                  type: boolean
                 loadBalancerSourceRanges:
                   items:
                     type: string
                   type: array
+                nodeAffinity:
+                  description: Node affinity is a group of node affinity scheduling
+                    rules.
+                  properties:
+                    preferredDuringSchedulingIgnoredDuringExecution:
+                      description: The scheduler will prefer to schedule pods to nodes
+                        that satisfy the affinity expressions specified by this field,
+                        but it may choose a node that violates one or more of the
+                        expressions. The node that is most preferred is the one with
+                        the greatest sum of weights, i.e. for each node that meets
+                        all of the scheduling requirements (resource request, requiredDuringScheduling
+                        affinity expressions, etc.), compute a sum by iterating through
+                        the elements of this field and adding "weight" to the sum
+                        if the node matches the corresponding matchExpressions; the
+                        node(s) with the highest sum are the most preferred.
+                      items:
+                        description: An empty preferred scheduling term matches all
+                          objects with implicit weight 0 (i.e. it's a no-op). A null
+                          preferred scheduling term matches no objects (i.e. is also
+                          a no-op).
+                        properties:
+                          preference:
+                            description: A node selector term, associated with the
+                              corresponding weight.
+                            properties:
+                              matchExpressions:
+                                description: A list of node selector requirements
+                                  by node's labels.
+                                items:
+                                  description: A node selector requirement is a selector
+                                    that contains values, a key, and an operator that
+                                    relates the key and values.
+                                  properties:
+                                    key:
+                                      description: The label key that the selector
+                                        applies to.
+                                      type: string
+                                    operator:
+                                      description: Represents a key's relationship
+                                        to a set of values. Valid operators are In,
+                                        NotIn, Exists, DoesNotExist. Gt, and Lt.
+                                      type: string
+                                    values:
+                                      description: An array of string values. If the
+                                        operator is In or NotIn, the values array
+                                        must be non-empty. If the operator is Exists
+                                        or DoesNotExist, the values array must be
+                                        empty. If the operator is Gt or Lt, the values
+                                        array must have a single element, which will
+                                        be interpreted as an integer. This array is
+                                        replaced during a strategic merge patch.
+                                      items:
+                                        type: string
+                                      type: array
+                                  required:
+                                  - key
+                                  - operator
+                                  type: object
+                                type: array
+                              matchFields:
+                                description: A list of node selector requirements
+                                  by node's fields.
+                                items:
+                                  description: A node selector requirement is a selector
+                                    that contains values, a key, and an operator that
+                                    relates the key and values.
+                                  properties:
+                                    key:
+                                      description: The label key that the selector
+                                        applies to.
+                                      type: string
+                                    operator:
+                                      description: Represents a key's relationship
+                                        to a set of values. Valid operators are In,
+                                        NotIn, Exists, DoesNotExist. Gt, and Lt.
+                                      type: string
+                                    values:
+                                      description: An array of string values. If the
+                                        operator is In or NotIn, the values array
+                                        must be non-empty. If the operator is Exists
+                                        or DoesNotExist, the values array must be
+                                        empty. If the operator is Gt or Lt, the values
+                                        array must have a single element, which will
+                                        be interpreted as an integer. This array is
+                                        replaced during a strategic merge patch.
+                                      items:
+                                        type: string
+                                      type: array
+                                  required:
+                                  - key
+                                  - operator
+                                  type: object
+                                type: array
+                            type: object
+                          weight:
+                            description: Weight associated with matching the corresponding
+                              nodeSelectorTerm, in the range 1-100.
+                            format: int32
+                            type: integer
+                        required:
+                        - preference
+                        - weight
+                        type: object
+                      type: array
+                    requiredDuringSchedulingIgnoredDuringExecution:
+                      description: If the affinity requirements specified by this
+                        field are not met at scheduling time, the pod will not be
+                        scheduled onto the node. If the affinity requirements specified
+                        by this field cease to be met at some point during pod execution
+                        (e.g. due to an update), the system may or may not try to
+                        eventually evict the pod from its node.
+                      properties:
+                        nodeSelectorTerms:
+                          description: Required. A list of node selector terms. The
+                            terms are ORed.
+                          items:
+                            description: A null or empty node selector term matches
+                              no objects. The requirements of them are ANDed. The
+                              TopologySelectorTerm type implements a subset of the
+                              NodeSelectorTerm.
+                            properties:
+                              matchExpressions:
+                                description: A list of node selector requirements
+                                  by node's labels.
+                                items:
+                                  description: A node selector requirement is a selector
+                                    that contains values, a key, and an operator that
+                                    relates the key and values.
+                                  properties:
+                                    key:
+                                      description: The label key that the selector
+                                        applies to.
+                                      type: string
+                                    operator:
+                                      description: Represents a key's relationship
+                                        to a set of values. Valid operators are In,
+                                        NotIn, Exists, DoesNotExist. Gt, and Lt.
+                                      type: string
+                                    values:
+                                      description: An array of string values. If the
+                                        operator is In or NotIn, the values array
+                                        must be non-empty. If the operator is Exists
+                                        or DoesNotExist, the values array must be
+                                        empty. If the operator is Gt or Lt, the values
+                                        array must have a single element, which will
+                                        be interpreted as an integer. This array is
+                                        replaced during a strategic merge patch.
+                                      items:
+                                        type: string
+                                      type: array
+                                  required:
+                                  - key
+                                  - operator
+                                  type: object
+                                type: array
+                              matchFields:
+                                description: A list of node selector requirements
+                                  by node's fields.
+                                items:
+                                  description: A node selector requirement is a selector
+                                    that contains values, a key, and an operator that
+                                    relates the key and values.
+                                  properties:
+                                    key:
+                                      description: The label key that the selector
+                                        applies to.
+                                      type: string
+                                    operator:
+                                      description: Represents a key's relationship
+                                        to a set of values. Valid operators are In,
+                                        NotIn, Exists, DoesNotExist. Gt, and Lt.
+                                      type: string
+                                    values:
+                                      description: An array of string values. If the
+                                        operator is In or NotIn, the values array
+                                        must be non-empty. If the operator is Exists
+                                        or DoesNotExist, the values array must be
+                                        empty. If the operator is Gt or Lt, the values
+                                        array must have a single element, which will
+                                        be interpreted as an integer. This array is
+                                        replaced during a strategic merge patch.
+                                      items:
+                                        type: string
+                                      type: array
+                                  required:
+                                  - key
+                                  - operator
+                                  type: object
+                                type: array
+                            type: object
+                          type: array
+                      required:
+                      - nodeSelectorTerms
+                      type: object
+                  type: object
                 nodeSelector:
                   additionalProperties:
                     type: string
@@ -1269,7 +1638,114 @@ spec:
                         type: string
                     type: object
                   type: array
+                useExistingLoadBalancer:
+                  description: Set this to true if you don't want the operator to
+                    create a LoadBalancer service. This is recommended if you want
+                    to use your own LoadBalancer created externally in your infrastructure.
+                  type: boolean
               type: object
+            envs:
+              items:
+                description: EnvVar represents an environment variable present in
+                  a Container.
+                properties:
+                  name:
+                    description: Name of the environment variable. Must be a C_IDENTIFIER.
+                    type: string
+                  value:
+                    description: 'Variable references $(VAR_NAME) are expanded using
+                      the previous defined environment variables in the container
+                      and any service environment variables. If a variable cannot
+                      be resolved, the reference in the input string will be unchanged.
+                      The $(VAR_NAME) syntax can be escaped with a double $$, ie:
+                      $$(VAR_NAME). Escaped references will never be expanded, regardless
+                      of whether the variable exists or not. Defaults to "".'
+                    type: string
+                  valueFrom:
+                    description: Source for the environment variable's value. Cannot
+                      be used if value is not empty.
+                    properties:
+                      configMapKeyRef:
+                        description: Selects a key of a ConfigMap.
+                        properties:
+                          key:
+                            description: The key to select.
+                            type: string
+                          name:
+                            description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                              TODO: Add other useful fields. apiVersion, kind, uid?'
+                            type: string
+                          optional:
+                            description: Specify whether the ConfigMap or its key
+                              must be defined
+                            type: boolean
+                        required:
+                        - key
+                        type: object
+                      fieldRef:
+                        description: 'Selects a field of the pod: supports metadata.name,
+                          metadata.namespace, metadata.labels, metadata.annotations,
+                          spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP,
+                          status.podIPs.'
+                        properties:
+                          apiVersion:
+                            description: Version of the schema the FieldPath is written
+                              in terms of, defaults to "v1".
+                            type: string
+                          fieldPath:
+                            description: Path of the field to select in the specified
+                              API version.
+                            type: string
+                        required:
+                        - fieldPath
+                        type: object
+                      resourceFieldRef:
+                        description: 'Selects a resource of the container: only resources
+                          limits and requests (limits.cpu, limits.memory, limits.ephemeral-storage,
+                          requests.cpu, requests.memory and requests.ephemeral-storage)
+                          are currently supported.'
+                        properties:
+                          containerName:
+                            description: 'Container name: required for volumes, optional
+                              for env vars'
+                            type: string
+                          divisor:
+                            anyOf:
+                            - type: integer
+                            - type: string
+                            description: Specifies the output format of the exposed
+                              resources, defaults to "1"
+                            pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                            x-kubernetes-int-or-string: true
+                          resource:
+                            description: 'Required: resource to select'
+                            type: string
+                        required:
+                        - resource
+                        type: object
+                      secretKeyRef:
+                        description: Selects a key of a secret in the pod's namespace
+                        properties:
+                          key:
+                            description: The key of the secret to select from.  Must
+                              be a valid secret key.
+                            type: string
+                          name:
+                            description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                              TODO: Add other useful fields. apiVersion, kind, uid?'
+                            type: string
+                          optional:
+                            description: Specify whether the Secret or its key must
+                              be defined
+                            type: boolean
+                        required:
+                        - key
+                        type: object
+                    type: object
+                required:
+                - name
+                type: object
+              type: array
             headlessServiceEnabled:
               type: boolean
             ingressController:
@@ -1445,6 +1921,8 @@ spec:
                     type: string
                   type: object
               type: object
+            kubernetesClusterDomain:
+              type: string
             listenersConfig:
               description: ListenersConfig defines the Kafka listener types
               properties:
@@ -1457,10 +1935,12 @@ spec:
                         format: int32
                         type: integer
                       externalStartingPort:
+                        description: The broker port is computed as the sum of the
+                          externalStartingPort and the broker id. For consistence,
+                          it is recommended that externalStartingPort has the same
+                          value across all the brokerConfigGroups.
                         format: int32
                         type: integer
-                        description: The broker port is computed as the sum of the
-                          externalStartingPort and the broker id.
                       hostnameOverride:
                         type: string
                       name:
