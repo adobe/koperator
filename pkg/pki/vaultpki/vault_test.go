@@ -163,7 +163,7 @@ func TestAll(t *testing.T) {
 		t.Fatal("Failed to convert test cert to JKS")
 	}
 
-	if err := mock.ReconcilePKI(ctx, log, scheme.Scheme, []string{}); err == nil {
+	if err := mock.ReconcilePKI(ctx, log, scheme.Scheme); err == nil {
 		t.Error("Expected resource not ready, got nil")
 	} else if reflect.TypeOf(err) != reflect.TypeOf(errorfactory.ResourceNotReady{}) {
 		t.Error("Expected resource not ready, got:", err)
@@ -187,7 +187,7 @@ func TestAll(t *testing.T) {
 	}))
 
 	// Should be safe to do multiple times
-	if err := mock.ReconcilePKI(ctx, log, scheme.Scheme, []string{}); err != nil {
+	if err := mock.ReconcilePKI(ctx, log, scheme.Scheme); err != nil {
 		t.Error("Expected no error, got:", err)
 	}
 
@@ -196,7 +196,7 @@ func TestAll(t *testing.T) {
 		t.Error("Expected no error, got:", err)
 	}
 
-	if err := mock.ReconcilePKI(ctx, log, scheme.Scheme, []string{}); err != nil {
+	if err := mock.ReconcilePKI(ctx, log, scheme.Scheme); err != nil {
 		t.Error("Expected no error, got:", err)
 	}
 

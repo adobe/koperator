@@ -34,6 +34,42 @@ import (
 	runtimeClient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+func Delete(log logr.Logger, client runtimeClient.Client, target runtime.Object) error {
+	targetType := reflect.TypeOf(target)
+	current := target.DeepCopyObject()
+
+	key, err := runtimeClient.ObjectKeyFromObject(current)
+	if err != nil {
+		return errors.WithDetails(err, "kind", targetType)
+	}
+	log = log.WithValues("kind", targetType, "name", key.Name)
+
+	err = client.Get(context.TODO(), key, current)
+	if err == nil {
+		err = client.Delete(context.TODO(), current)
+		if err != nil {
+			return errorfactory.New(
+				errorfactory.APIFailure{},
+				err,
+				"delete resource failed",
+				"kind", targetType, "name", key.Name,
+			)
+		}
+	} else if apierrors.IsNotFound(err) {
+		log.V(1).Info("resource not found for delete")
+		return nil
+	} else {
+		return errorfactory.New(
+			errorfactory.APIFailure{},
+			err,
+			"getting resource failed",
+			"kind", targetType, "name", key.Name,
+		)
+	}
+	log.Info("resource deleted")
+	return nil
+}
+
 // Reconcile reconciles K8S resources
 func Reconcile(log logr.Logger, client runtimeClient.Client, desired runtime.Object, cr *v1beta1.KafkaCluster) error {
 	desiredType := reflect.TypeOf(desired)
