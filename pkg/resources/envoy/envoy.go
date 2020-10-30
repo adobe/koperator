@@ -91,23 +91,31 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 	if r.KafkaCluster.Spec.GetIngressController() == envoyutils.IngressControllerName {
 		var objectsMarkedForDelete []runtime.Object
 		var objectsMarkedForReconcile []runtime.Object
-		// We must address the case in which the `EnvoyPerBrokerGroup` is updated on an existing cluster.
-		// As a consequence, depending on the `EnvoyPerBrokerGroup` flag, we reconcile some Envoy resources (global or group specific),
-		// while we try to delete the other set.
-		if r.KafkaCluster.Spec.EnvoyConfig.EnvoyPerBrokerGroup {
+
+		if r.KafkaCluster.Spec.ListenersConfig.ExternalListeners == nil {
+			// if there is no externalListener defined, delete ingress resources
 			objectsMarkedForDelete = r.getGlobalObjects(log)
-			objectsMarkedForReconcile = r.getBrokerConfigSpecificObjects(log)
+			objectsMarkedForDelete = append(objectsMarkedForDelete, r.getBrokerConfigSpecificObjects(log)...)
+			if !r.KafkaCluster.Spec.EnvoyConfig.UseExistingLB {
+				objectsMarkedForDelete = append(objectsMarkedForDelete, r.loadBalancer(log))
+			}
 		} else {
-			objectsMarkedForDelete = r.getBrokerConfigSpecificObjects(log)
-			objectsMarkedForReconcile = r.getGlobalObjects(log)
+			// We must address the case in which the `EnvoyPerBrokerGroup` is updated on an existing cluster.
+			// As a consequence, depending on the `EnvoyPerBrokerGroup` flag, we reconcile some Envoy resources (global or group specific),
+			// while we try to delete the other set.
+			if r.KafkaCluster.Spec.EnvoyConfig.EnvoyPerBrokerGroup {
+				objectsMarkedForDelete = r.getGlobalObjects(log)
+				objectsMarkedForReconcile = r.getBrokerConfigSpecificObjects(log)
+			} else {
+				objectsMarkedForDelete = r.getBrokerConfigSpecificObjects(log)
+				objectsMarkedForReconcile = r.getGlobalObjects(log)
+			}
+			if !r.KafkaCluster.Spec.EnvoyConfig.UseExistingLB {
+				objectsMarkedForReconcile = append(objectsMarkedForReconcile, r.loadBalancer(log))
+			} else {
+				objectsMarkedForDelete = append(objectsMarkedForDelete, r.loadBalancer(log))
+			}
 		}
-
-		if !r.KafkaCluster.Spec.EnvoyConfig.UseExistingLB {
-			objectsMarkedForReconcile = append(objectsMarkedForReconcile, r.loadBalancer(log))
-		} else {
-			objectsMarkedForDelete = append(objectsMarkedForDelete, r.loadBalancer(log))
-		}
-
 		for _, o := range objectsMarkedForReconcile {
 			err := k8sutil.Reconcile(log, r.Client, o, r.KafkaCluster)
 			if err != nil {
