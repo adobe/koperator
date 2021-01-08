@@ -40,7 +40,7 @@ func (r *Reconciler) deployment(log logr.Logger, envoyConfig *v1beta1.EnvoyConfi
 			Replicas: util.Int32Pointer(envoyConfig.GetReplicas()),
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels:      labelSelector(envoyConfig),
+					Labels:      util.MergeLabels(labelSelector(envoyConfig), r.KafkaCluster.Labels),
 					Annotations: generatePodAnnotations(r.KafkaCluster, envoyConfig, log),
 				},
 				Spec: getPodSpec(log, envoyConfig, r.KafkaCluster),
