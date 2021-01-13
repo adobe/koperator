@@ -794,7 +794,7 @@ func (r *Reconciler) createExternalListenerStatuses() (map[string]v1beta1.Listen
 
 		if eListener.HostnameOverride != "" {
 			host = eListener.HostnameOverride
-		} else if eListener.GetAccessMethod() == corev1.ServiceTypeLoadBalancer {
+		} else if eListener.GetAccessMethod() == v1beta1.LoadBalancer {
 			foundLBService, err = getServiceFromExternalListener(r.Client, r.KafkaCluster, eListener.Name)
 			if err != nil {
 				return nil, errors.WrapIfWithDetails(err, "could not get service corresponding to the external listener", "externalListenerName", eListener.Name)
@@ -808,7 +808,7 @@ func (r *Reconciler) createExternalListenerStatuses() (map[string]v1beta1.Listen
 		listenerStatusList := make(v1beta1.ListenerStatusList, 0, len(r.KafkaCluster.Spec.Brokers)+1)
 
 		// optionally add all brokers service to the top of the list
-		if eListener.GetAccessMethod() != corev1.ServiceTypeNodePort {
+		if eListener.GetAccessMethod() != v1beta1.NodePort {
 			if foundLBService == nil {
 				foundLBService, err = getServiceFromExternalListener(r.Client, r.KafkaCluster, eListener.Name)
 				if err != nil {
@@ -836,7 +836,7 @@ func (r *Reconciler) createExternalListenerStatuses() (map[string]v1beta1.Listen
 			brokerHost := host
 			portNumber := eListener.ExternalStartingPort + broker.Id
 
-			if eListener.GetAccessMethod() != corev1.ServiceTypeLoadBalancer {
+			if eListener.GetAccessMethod() != v1beta1.LoadBalancer {
 				bConfig, err := util.GetBrokerConfig(broker, r.KafkaCluster.Spec)
 				if err != nil {
 					return nil, err

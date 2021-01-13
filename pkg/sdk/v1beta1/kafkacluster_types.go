@@ -268,9 +268,9 @@ func (c ListenersConfig) GetServiceAnnotations() map[string]string {
 	return annotations
 }
 
-func (c ExternalListenerConfig) GetAccessMethod() corev1.ServiceType {
+func (c ExternalListenerConfig) GetAccessMethod() ExternalListenerType {
 	if c.AccessMethod == "" {
-		return corev1.ServiceTypeLoadBalancer
+		return LoadBalancer
 	}
 	return c.AccessMethod
 }
@@ -348,7 +348,7 @@ type ExternalListenerConfig struct {
 	// The recommended and default is the LoadBalancer.
 	// NodePort should be used in Kubernetes environments with no support for provisioning Load Balancers.
 	// +optional
-	AccessMethod corev1.ServiceType `json:"accessMethod,omitempty"`
+	AccessMethod ExternalListenerType `json:"accessMethod,omitempty"`
 
 	// externalTrafficPolicy denotes if this Service desires to route external
 	// traffic to node-local or cluster-wide endpoints. "Local" preserves the
@@ -359,6 +359,13 @@ type ExternalListenerConfig struct {
 	// +optional
 	ExternalTrafficPolicy corev1.ServiceExternalTrafficPolicyType `json:"externalTrafficPolicy,omitempty"`
 }
+
+type ExternalListenerType string
+
+const (
+	NodePort     ExternalListenerType = "NodePort"
+	LoadBalancer ExternalListenerType = "LoadBalancer"
+)
 
 // InternalListenerConfig defines the internal listener config for Kafka
 type InternalListenerConfig struct {

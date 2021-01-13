@@ -103,7 +103,7 @@ var _ = Describe("KafkaClusterNodeportExternalAccess", func() {
 						ContainerPort: 9733,
 					},
 					ExternalStartingPort: 31123,
-					AccessMethod:         corev1.ServiceTypeNodePort,
+					AccessMethod:         v1beta1.NodePort,
 				},
 			}
 			kafkaCluster.Spec.BrokerConfigGroups = map[string]v1beta1.BrokerConfig{
@@ -235,7 +235,7 @@ var _ = Describe("KafkaClusterNodeportExternalAccess", func() {
 					},
 					ExternalStartingPort: 30100,
 					HostnameOverride:     ".external.nodeport.com",
-					AccessMethod:         corev1.ServiceTypeNodePort,
+					AccessMethod:         v1beta1.NodePort,
 				},
 			}
 		})
@@ -298,7 +298,7 @@ var _ = Describe("KafkaClusterNodeportExternalAccess", func() {
 					},
 					ExternalStartingPort: 31100,
 					HostnameOverride:     ".external.nodeport.com",
-					AccessMethod:         corev1.ServiceTypeNodePort,
+					AccessMethod:         v1beta1.NodePort,
 				},
 			}
 			kafkaCluster.Spec.BrokerConfigGroups = map[string]v1beta1.BrokerConfig{

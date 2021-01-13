@@ -19,8 +19,6 @@ import (
 	"github.com/banzaicloud/kafka-operator/pkg/k8sutil"
 	"github.com/banzaicloud/kafka-operator/pkg/resources"
 	envoyutils "github.com/banzaicloud/kafka-operator/pkg/util/envoy"
-	corev1 "k8s.io/api/core/v1"
-
 	"github.com/go-logr/logr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -63,7 +61,7 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 	if r.KafkaCluster.Spec.ListenersConfig.ExternalListeners != nil && r.KafkaCluster.Spec.GetIngressController() == envoyutils.IngressControllerName {
 
 		for _, eListener := range r.KafkaCluster.Spec.ListenersConfig.ExternalListeners {
-			if eListener.GetAccessMethod() == corev1.ServiceTypeLoadBalancer {
+			if eListener.GetAccessMethod() == v1beta1.LoadBalancer {
 				for _, res := range []resources.ResourceWithLogAndExternalListenerConfig{
 					r.loadBalancer,
 					r.configMap,

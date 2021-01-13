@@ -47,7 +47,7 @@ func createMinimalKafkaClusterCR(name, namespace string) *v1beta1.KafkaCluster {
 						},
 						ExternalStartingPort: 19090,
 						HostnameOverride:     "test-host",
-						AccessMethod:         corev1.ServiceTypeLoadBalancer,
+						AccessMethod:         v1beta1.LoadBalancer,
 					},
 				},
 				InternalListeners: []v1beta1.InternalListenerConfig{
