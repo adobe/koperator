@@ -155,6 +155,42 @@ func Reconcile(log logr.Logger, client runtimeClient.Client, desired runtime.Obj
 	return nil
 }
 
+func Delete(log logr.Logger, client runtimeClient.Client, target runtime.Object) error {
+	targetType := reflect.TypeOf(target)
+	current := target.DeepCopyObject()
+
+	key, err := runtimeClient.ObjectKeyFromObject(current)
+	if err != nil {
+		return errors.WithDetails(err, "kind", targetType)
+	}
+	log = log.WithValues("kind", targetType, "name", key.Name)
+
+	err = client.Get(context.TODO(), key, current)
+	if err == nil {
+		err = client.Delete(context.TODO(), current)
+		if err != nil {
+			return errorfactory.New(
+				errorfactory.APIFailure{},
+				err,
+				"delete resource failed",
+				"kind", targetType, "name", key.Name,
+			)
+		}
+	} else if apierrors.IsNotFound(err) {
+		log.V(1).Info("resource not found for delete")
+		return nil
+	} else {
+		return errorfactory.New(
+			errorfactory.APIFailure{},
+			err,
+			"getting resource failed",
+			"kind", targetType, "name", key.Name,
+		)
+	}
+	log.Info("resource deleted")
+	return nil
+}
+
 // CheckIfObjectUpdated checks if the given object is updated using K8sObjectMatcher
 func CheckIfObjectUpdated(log logr.Logger, desiredType reflect.Type, current, desired runtime.Object) bool {
 	patchResult, err := patch.DefaultPatchMaker.Calculate(current, desired)

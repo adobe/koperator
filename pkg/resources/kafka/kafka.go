@@ -808,7 +808,7 @@ func (r *Reconciler) createExternalListenerStatuses() (map[string]v1beta1.Listen
 		listenerStatusList := make(v1beta1.ListenerStatusList, 0, len(r.KafkaCluster.Spec.Brokers)+1)
 
 		// optionally add all brokers service to the top of the list
-		if eListener.GetAccessMethod() != v1beta1.NodePort {
+		if eListener.GetAccessMethod() == v1beta1.LoadBalancer {
 			if foundLBService == nil {
 				foundLBService, err = getServiceFromExternalListener(r.Client, r.KafkaCluster, eListener.Name)
 				if err != nil {

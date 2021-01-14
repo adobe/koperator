@@ -5564,13 +5564,16 @@ spec:
                     properties:
                       accessMethod:
                         description: accessMethod defines the method which the external
-                          listener is exposed through. Two types are supported LoadBalancer
-                          and NodePort. The recommended and default is the LoadBalancer.
-                          NodePort should be used in Kubernetes environments with
-                          no support for provisioning Load Balancers.
+                          listener is exposed through. Three types are supported LoadBalancer,
+                          NodePort an ingress only The recommended and default is
+                          the LoadBalancer. NodePort should be used in Kubernetes
+                          environments with no support for provisioning Load Balancers.
+                          IngressOnly should be used if you want the operator to manage
+                          the ingress without deploying a LoadBalancer service
                         enum:
                         - LoadBalancer
                         - NodePort
+                        - IngressOnly
                         type: string
                       anyCastPort:
                         description: configuring AnyCastPort allows kafka cluster

@@ -342,11 +342,12 @@ type ExternalListenerConfig struct {
 	// If hostnamePrefix is missing (or empty) the advertised address will have the following format: <kafka-cluster-name>-<broker-id>-<listener-name>.<namespace><value-specified-in-hostnameOverride-field>
 	HostnameOverride   string            `json:"hostnameOverride,omitempty"`
 	ServiceAnnotations map[string]string `json:"serviceAnnotations,omitempty"`
-	// +kubebuilder:validation:Enum=LoadBalancer;NodePort
+	// +kubebuilder:validation:Enum=LoadBalancer;NodePort;IngressOnly
 	// accessMethod defines the method which the external listener is exposed through.
-	// Two types are supported LoadBalancer and NodePort.
+	// Three types are supported LoadBalancer, NodePort an ingress only
 	// The recommended and default is the LoadBalancer.
 	// NodePort should be used in Kubernetes environments with no support for provisioning Load Balancers.
+	// IngressOnly should be used if you want the operator to manage the ingress without deploying a LoadBalancer service
 	// +optional
 	AccessMethod ExternalListenerType `json:"accessMethod,omitempty"`
 
@@ -365,6 +366,7 @@ type ExternalListenerType string
 const (
 	NodePort     ExternalListenerType = "NodePort"
 	LoadBalancer ExternalListenerType = "LoadBalancer"
+	IngressOnly  ExternalListenerType = "IngressOnly"
 )
 
 // InternalListenerConfig defines the internal listener config for Kafka

@@ -20,6 +20,7 @@ import (
 	"github.com/banzaicloud/kafka-operator/pkg/resources"
 	envoyutils "github.com/banzaicloud/kafka-operator/pkg/util/envoy"
 	"github.com/go-logr/logr"
+	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -59,16 +60,26 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 	log.V(1).Info("Reconciling")
 
 	if r.KafkaCluster.Spec.ListenersConfig.ExternalListeners != nil && r.KafkaCluster.Spec.GetIngressController() == envoyutils.IngressControllerName {
-
 		for _, eListener := range r.KafkaCluster.Spec.ListenersConfig.ExternalListeners {
-			if eListener.GetAccessMethod() == v1beta1.LoadBalancer {
-				for _, res := range []resources.ResourceWithLogAndExternalListenerConfig{
-					r.loadBalancer,
-					r.configMap,
-					r.deployment,
-				} {
-					o := res(log, eListener)
+			if eListener.GetAccessMethod() == v1beta1.LoadBalancer || eListener.GetAccessMethod() == v1beta1.IngressOnly {
+				var objectsMarkedForReconcile []runtime.Object
+				var objectsMarkedForDelete []runtime.Object
+
+				objectsMarkedForReconcile = r.getResources(log, eListener)
+				if eListener.AccessMethod == v1beta1.LoadBalancer {
+					objectsMarkedForReconcile = append(objectsMarkedForReconcile, r.loadBalancer(log, eListener))
+				} else {
+					objectsMarkedForDelete = append(objectsMarkedForDelete, r.loadBalancer(log, eListener))
+				}
+
+				for _, o := range objectsMarkedForReconcile {
 					err := k8sutil.Reconcile(log, r.Client, o, r.KafkaCluster)
+					if err != nil {
+						return err
+					}
+				}
+				for _, o := range objectsMarkedForDelete {
+					err := k8sutil.Delete(log, r.Client, o)
 					if err != nil {
 						return err
 					}
@@ -80,4 +91,15 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 	log.V(1).Info("Reconciled")
 
 	return nil
+}
+
+func (r *Reconciler) getResources(log logr.Logger, eListener v1beta1.ExternalListenerConfig) []runtime.Object {
+	var objects []runtime.Object
+	for _, res := range []resources.ResourceWithLogAndExternalListenerConfig{
+		r.configMap,
+		r.deployment,
+	} {
+		objects = append(objects, res(log, eListener))
+	}
+	return objects
 }

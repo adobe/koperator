@@ -20,6 +20,7 @@ import (
 	"github.com/banzaicloud/kafka-operator/pkg/resources"
 	"github.com/banzaicloud/kafka-operator/pkg/util/istioingress"
 	"github.com/go-logr/logr"
+	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -56,16 +57,27 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 
 	log.V(1).Info("Reconciling")
 	if r.KafkaCluster.Spec.ListenersConfig.ExternalListeners != nil && r.KafkaCluster.Spec.GetIngressController() == istioingress.IngressControllerName {
+		for _, eListener := range r.KafkaCluster.Spec.ListenersConfig.ExternalListeners {
+			if eListener.GetAccessMethod() == v1beta1.LoadBalancer || eListener.AccessMethod == v1beta1.IngressOnly {
+				var objectsMarkedForReconcile []runtime.Object
+				var objectsMarkedForDelete []runtime.Object
 
-		for _, externalListenerConfig := range r.KafkaCluster.Spec.ListenersConfig.ExternalListeners {
-			if externalListenerConfig.GetAccessMethod() == v1beta1.LoadBalancer {
-				for _, res := range []resources.ResourceWithLogAndExternalListenerConfig{
-					r.meshgateway,
-					r.gateway,
-					r.virtualService,
-				} {
-					o := res(log, externalListenerConfig)
+				objectsMarkedForReconcile = r.getResources(log, eListener)
+
+				if eListener.AccessMethod == v1beta1.LoadBalancer {
+					objectsMarkedForReconcile = append(objectsMarkedForReconcile, r.meshgateway(log, eListener))
+				} else {
+					objectsMarkedForDelete = append(objectsMarkedForDelete, r.meshgateway(log, eListener))
+				}
+
+				for _, o := range objectsMarkedForReconcile {
 					err := k8sutil.Reconcile(log, r.Client, o, r.KafkaCluster)
+					if err != nil {
+						return err
+					}
+				}
+				for _, o := range objectsMarkedForDelete {
+					err := k8sutil.Delete(log, r.Client, o)
 					if err != nil {
 						return err
 					}
@@ -77,4 +89,15 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 	log.V(1).Info("Reconciled")
 
 	return nil
+}
+
+func (r *Reconciler) getResources(log logr.Logger, eListener v1beta1.ExternalListenerConfig) []runtime.Object {
+	var objects []runtime.Object
+	for _, res := range []resources.ResourceWithLogAndExternalListenerConfig{
+		r.gateway,
+		r.virtualService,
+	} {
+		objects = append(objects, res(log, eListener))
+	}
+	return objects
 }
