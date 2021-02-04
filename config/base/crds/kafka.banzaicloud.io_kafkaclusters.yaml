@@ -4185,10 +4185,26 @@ spec:
                       containerPort:
                         format: int32
                         type: integer
+                      ingressForwarded:
+                        description: If set to true, Envoy will create routes for
+                          the internal listener ports. Required if `ingressForwarded`
+                          or `useExternalHostname` is set.
+                        type: boolean
+                      internalStartingPort:
+                        description: This following options are helpful when you want
+                          to run a Kafka cluster over multiple Kubernetes clusters.
+                          The broker internal ports are computed as the sum of the
+                          internalStartingPort and the broker id.
+                        format: int32
+                        type: integer
                       name:
                         type: string
                       type:
                         type: string
+                      useExternalHostname:
+                        description: If set to true, the Kafka brokers will use the
+                          external hostname for inter broker communication.
+                        type: boolean
                       usedForControllerCommunication:
                         type: boolean
                       usedForInnerBrokerCommunication:

@@ -324,6 +324,17 @@ type InternalListenerConfig struct {
 	CommonListenerSpec              `json:",inline"`
 	UsedForInnerBrokerCommunication bool `json:"usedForInnerBrokerCommunication"`
 	UsedForControllerCommunication  bool `json:"usedForControllerCommunication,omitempty"`
+	// This following options are helpful when you want to run a Kafka cluster over multiple Kubernetes clusters.
+	// The broker internal ports are computed as the sum of the internalStartingPort and the broker id.
+	// +optional
+	InternalStartingPort int32 `json:"internalStartingPort"`
+	// If set to true, Envoy will create routes for the internal listener ports.
+	// Required if `ingressForwarded` or `useExternalHostname` is set.
+	// +optional
+	IngressForwarded bool `json:"ingressForwarded,omitempty"`
+	// If set to true, the Kafka brokers will use the external hostname for inter broker communication.
+	// +optional
+	UseExternalHostname bool `json:"useExternalHostname,omitempty"`
 }
 
 // CommonListenerSpec defines the common building block for Listener type
