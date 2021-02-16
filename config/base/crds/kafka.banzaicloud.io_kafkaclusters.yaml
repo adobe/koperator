@@ -4155,6 +4155,12 @@ spec:
                       containerPort:
                         format: int32
                         type: integer
+                      discoveryPort:
+                        description: The port used to expose the headless service.
+                          If not set, the headless service won't be available outside
+                          the Kubernetes cluster
+                        format: int32
+                        type: integer
                       externalStartingPort:
                         description: The broker port is computed as the sum of the
                           externalStartingPort and the broker id.

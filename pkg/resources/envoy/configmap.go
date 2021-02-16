@@ -44,14 +44,6 @@ func (r *Reconciler) configMap(log logr.Logger, envoyConfig *v1beta1.EnvoyConfig
 	return configMap
 }
 
-func generateAddressValue(kc *v1beta1.KafkaCluster, brokerId int) string {
-	if kc.Spec.HeadlessServiceEnabled {
-		return fmt.Sprintf("%s-%d.%s-headless.%s.svc.%s", kc.Name, brokerId, kc.Name, kc.Namespace, kc.Spec.GetKubernetesClusterDomain())
-	}
-	//ClusterIP services are in use
-	return fmt.Sprintf("%s-%d.%s.svc.%s", kc.Name, brokerId, kc.Namespace, kc.Spec.GetKubernetesClusterDomain())
-}
-
 func GenerateEnvoyConfig(kc *v1beta1.KafkaCluster, envoyConfig *v1beta1.EnvoyConfig, log logr.Logger) string {
 	//TODO support multiple external listener by removing [0] (baluchicken)
 	adminConfig := envoybootstrap.Admin{
@@ -99,18 +91,35 @@ func GenerateEnvoyConfig(kc *v1beta1.KafkaCluster, envoyConfig *v1beta1.EnvoyCon
 		}
 
 		if kc.Spec.ListenersConfig.ExternalListeners != nil {
-			clusters = append(clusters, envoyCluster(kc, fmt.Sprintf("broker-%d-external", brokerId), uint32(brokerId),
-				uint32(kc.Spec.ListenersConfig.ExternalListeners[0].ContainerPort)))
+			clusters = append(clusters, envoyCluster(fmt.Sprintf("broker-%d-external", brokerId),
+				serviceName(kc, uint32(brokerId)), uint32(kc.Spec.ListenersConfig.ExternalListeners[0].ContainerPort)))
 		}
 
 		for _, internalListener := range kc.Spec.ListenersConfig.InternalListeners {
 			if internalListener.IngressForwarded && internalListener.InternalStartingPort > 0 {
 				if internalListener.UsedForInnerBrokerCommunication {
-					clusters = append(clusters, envoyCluster(kc, fmt.Sprintf("broker-%d-internal", brokerId), uint32(brokerId),
-						uint32(internalListener.ContainerPort)))
+					clusters = append(clusters, envoyCluster(fmt.Sprintf("broker-%d-controller", brokerId),
+						serviceName(kc, uint32(brokerId)), uint32(internalListener.ContainerPort)))
 				} else {
-					clusters = append(clusters, envoyCluster(kc, fmt.Sprintf("broker-%d-controller", brokerId), uint32(brokerId),
-						uint32(internalListener.ContainerPort)))
+					clusters = append(clusters, envoyCluster(fmt.Sprintf("broker-%d-controller", brokerId),
+						serviceName(kc, uint32(brokerId)), uint32(internalListener.ContainerPort)))
+				}
+			}
+		}
+	}
+
+	if kc.Spec.ListenersConfig.ExternalListeners != nil {
+		for _, externalListener := range kc.Spec.ListenersConfig.ExternalListeners {
+			if externalListener.DiscoveryPort > 0 {
+				name := fmt.Sprintf("%s-%s", "kafka-headless", externalListener.Name)
+				listeners = append(listeners, envoyListener(name, uint32(externalListener.DiscoveryPort)))
+				for _, internalListener := range kc.Spec.ListenersConfig.InternalListeners {
+					if internalListener.UsedForInnerBrokerCommunication {
+						clusters = append(clusters, envoyCluster(name,
+							fmt.Sprintf("%s-headless.%s.svc.%s", kc.Name, kc.Namespace, kc.Spec.GetKubernetesClusterDomain()),
+							uint32(internalListener.ContainerPort)))
+						break // Stop at the first internal listener (no support for multiple internal listeners)
+					}
 				}
 			}
 		}
@@ -171,7 +180,11 @@ func envoyListener(name string, containerPort uint32) *envoyapi.Listener {
 	}
 }
 
-func envoyCluster(kc *v1beta1.KafkaCluster, name string, brokerId, containerPort uint32) *envoyapi.Cluster {
+func serviceName(kc *v1beta1.KafkaCluster, brokerId uint32) string {
+	return fmt.Sprintf("%s-%d.%s-headless.%s.svc.%s", kc.Name, brokerId, kc.Name, kc.Namespace, kc.Spec.GetKubernetesClusterDomain())
+}
+
+func envoyCluster(name, address string, containerPort uint32) *envoyapi.Cluster {
 	return &envoyapi.Cluster{
 		Name:                 name,
 		ConnectTimeout:       &duration.Duration{Seconds: 1},
@@ -182,7 +195,7 @@ func envoyCluster(kc *v1beta1.KafkaCluster, name string, brokerId, containerPort
 			{
 				Address: &envoycore.Address_SocketAddress{
 					SocketAddress: &envoycore.SocketAddress{
-						Address: fmt.Sprintf("%s-%d.%s-headless.%s.svc.%s", kc.Name, brokerId, kc.Name, kc.Namespace, kc.Spec.GetKubernetesClusterDomain()),
+						Address: address,
 						PortSpecifier: &envoycore.SocketAddress_PortValue{
 							PortValue: containerPort,
 						},

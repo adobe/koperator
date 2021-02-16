@@ -312,11 +312,14 @@ type AlertManagerConfig struct {
 
 // ExternalListenerConfig defines the external listener config for Kafka
 type ExternalListenerConfig struct {
-	CommonListenerSpec `json:",inline"`
+	CommonListenerSpec    `json:",inline"`
 	// The broker port is computed as the sum of the externalStartingPort and the broker id.
-	ExternalStartingPort int32             `json:"externalStartingPort"`
-	HostnameOverride     string            `json:"hostnameOverride,omitempty"`
-	ServiceAnnotations   map[string]string `json:"serviceAnnotations,omitempty"`
+	ExternalStartingPort  int32             `json:"externalStartingPort"`
+	// The port used to expose the headless service.
+	// If not set, the headless service won't be available outside the Kubernetes cluster
+	DiscoveryPort      int32             `json:"discoveryPort,omitempty"`
+	HostnameOverride   string            `json:"hostnameOverride,omitempty"`
+	ServiceAnnotations map[string]string `json:"serviceAnnotations,omitempty"`
 }
 
 // InternalListenerConfig defines the internal listener config for Kafka
