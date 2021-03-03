@@ -6,6 +6,8 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.3.0
+    strategy.spinnaker.io/versioned: 'false'
+    strategy.spinnaker.io/replace: 'true'
   creationTimestamp: null
   name: kafkaclusters.kafka.banzaicloud.io
 spec:
@@ -31,7 +33,6 @@ spec:
     listKind: KafkaClusterList
     plural: kafkaclusters
     singular: kafkacluster
-  preserveUnknownFields: false
   scope: Namespaced
   subresources:
     status: {}
@@ -11177,6 +11178,8 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.3.0
+    strategy.spinnaker.io/versioned: 'false'
+    strategy.spinnaker.io/replace: 'true'
   creationTimestamp: null
   name: kafkatopics.kafka.banzaicloud.io
 spec:
@@ -11186,7 +11189,6 @@ spec:
     listKind: KafkaTopicList
     plural: kafkatopics
     singular: kafkatopic
-  preserveUnknownFields: false
   scope: Namespaced
   subresources:
     status: {}
@@ -11266,6 +11268,8 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.3.0
+    strategy.spinnaker.io/versioned: 'false'
+    strategy.spinnaker.io/replace: 'true'
   creationTimestamp: null
   name: kafkausers.kafka.banzaicloud.io
 spec:
@@ -11275,7 +11279,6 @@ spec:
     listKind: KafkaUserList
     plural: kafkausers
     singular: kafkauser
-  preserveUnknownFields: false
   scope: Namespaced
   subresources:
     status: {}
