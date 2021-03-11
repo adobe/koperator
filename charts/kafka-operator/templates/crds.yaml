@@ -33,6 +33,7 @@ spec:
     listKind: KafkaClusterList
     plural: kafkaclusters
     singular: kafkacluster
+  preserveUnknownFields: true
   scope: Namespaced
   subresources:
     status: {}
@@ -11279,6 +11280,7 @@ spec:
     listKind: KafkaUserList
     plural: kafkausers
     singular: kafkauser
+  preserveUnknownFields: true
   scope: Namespaced
   subresources:
     status: {}

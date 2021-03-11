@@ -16,6 +16,7 @@ spec:
     listKind: KafkaTopicList
     plural: kafkatopics
     singular: kafkatopic
+  preserveUnknownFields: true
   scope: Namespaced
   subresources:
     status: {}
