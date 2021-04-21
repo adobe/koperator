@@ -72,3 +72,28 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
+
+## Whether to create the LogForwarding or not.
+## In this usecase, we are using splunk as destination for logs using fluent-bit sidecar.
+## For enabling LogForwarding feature, set the logForward:create to true, then provide the splunk and fluent-bit details.
+logForward:
+  create: false
+
+## splunk host,index,source,logParser,sourceType,port and fluent-bit image details .
+splunk: {}
+  ## host:
+  ## source:
+  ## index:
+  ## logParser:
+  ## sourceType:
+  ## port:
+  ## token:
+  ## fluentBit:
+  ##   name:
+  ##   resources: {}
+  ##   port:
+  ##   image:
+  ##     repository:
+  ##     tag:
+  ##     pullPolicy:
+  ##     imagePullSecrets:
