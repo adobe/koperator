@@ -82,3 +82,18 @@ Parameter | Description | Default
 `webhook.enabled` | Operator will activate the admission webhooks for custom resources | `true`
 `webhook.certs.generate` | Helm chart will generate cert for the webhook | `true`
 `webhook.certs.secret` | Helm chart will use the secret name applied here for the cert | `kafka-operator-serving-cert`
+`logForward:create` | If true, operator logs forward to Splunk | `false`
+`splunk.host` | Splunk server can be set | `""`
+`splunk.source` | Source of logs can be set | `kafka-operator`
+`splunk.index` | Splunk index can be set | `""`
+`splunk.logParser` | Splunk logParser can be set | `docker`
+`splunk.sourceType` | Log SourceType can be set | `pod`
+`splunk.port` | Splunk port can be set | `443`
+`splunk.token` | Splunk secret token can be set | `""`
+`splunk.fluentBit.name` | fluent-bit container name can be set | `fluent-bit`
+`splunk.fluentBit.resources`| CPU/Memory resource requests/limits (YAML) | Memory: `128Mi/512Mi`, CPU: `50m/250m`
+`splunk.fluentBit.port` | fluent-bit container port can be set | `2020`
+`splunk.fluentBit.image.repository` | fluent-bit container image repository | `""`
+`splunk.fluentBit.image.tag` | fluent-bit container image tag | `""`
+`splunk.fluentBit.image.pullPolicy` | fluent-bit container image pull policy | `IfNotPresent`
+`splunk.fluentBit.image.imagePullSecrets` | Image pull secrets can be set | `[]`
