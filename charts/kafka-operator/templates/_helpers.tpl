@@ -52,14 +52,3 @@ Compute operator prometheus metrics auth proxy service account
 {{ default "default" .Values.prometheusMetrics.authProxy.serviceAccount.name }}
 {{- end -}}
 {{- end -}}
-
-{{/*
-Compute operator splunk fluentBit name
-*/}}
-{{- define "splunk.fluentBit.name" -}}
-{{- if .Values.logForward.create -}}
-{{ default "fluent-bit" .Values.splunk.fluentBit.name }}
-{{- else -}}
-{{ default "fluent-bit" .Values.splunk.fluentBit.name }}
-{{- end -}}
-{{- end -}}

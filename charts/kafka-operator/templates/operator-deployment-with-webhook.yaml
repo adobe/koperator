@@ -125,13 +125,10 @@ spec:
             secretName: {{ .Values.operator.vaultSecret }}
       {{- end }}
       {{- if .Values.logForward.create }}
-        - name: fluent-bit-config
-          configMap:
-            name: {{ include "splunk.fluentBit.name" .}}-sidecar-configmap
-        - name: logging-volume
-          emptyDir: {}
-        - name: fluent-data
-          emptyDir: {}
+      {{- include "fluent-bit-sidecar-volume" . | indent 8 }}
+      {{- end }}
+      {{- if .Values.logForward.create }}
+      {{- include "fluent-bit-sidecar-imagePullSecrets" . | indent 6 }}
       {{- end }}
       containers:
       {{- if and .Values.prometheusMetrics.enabled .Values.prometheusMetrics.authProxy.enabled }}
@@ -174,10 +171,7 @@ spec:
                 fieldRef:
                   fieldPath: metadata.namespace
           {{- if .Values.logForward.create }}
-            - name: POD_UID
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.uid
+          {{- include "fluent-bit-sidecar-pod-uid" . | indent 12 }}
           {{- end }}
           {{- if .Values.operator.vaultAddress }}
             - name: VAULT_ADDR
@@ -212,73 +206,8 @@ spec:
           {{- end }}
           resources:
 {{ toYaml .Values.operator.resources | indent 12 }}
-        {{- if .Values.logForward.create }}
-        - name: {{ include "splunk.fluentBit.name" .}}
-          image: "{{ .Values.splunk.fluentBit.image.repository }}:{{ .Values.splunk.fluentBit.image.tag }}"
-          imagePullPolicy: {{ .Values.splunk.fluentBit.image.pullPolicy }}
-          {{- if .Values.splunk.fluentBit.resources }}
-          resources:
-{{ toYaml .Values.splunk.fluentBit.resources | indent 12 }}
-          {{- end }}
-          ports:
-            - containerPort: {{ .Values.splunk.fluentBit.port }} # metrics endpoint is ${POD_IP}:2020/api/v1/metrics/prometheus
-          volumeMounts:
-            - name: fluent-bit-config
-              mountPath: /fluent-bit/etc
-            - name: logging-volume
-              mountPath: /logging-volume
-            - name: fluent-data
-              mountPath: /var/fluent-bit
-          env:
-          - name: SPLUNK_HOST
-            value: "{{ .Values.splunk.host }}"
-          - name: SPLUNK_PORT
-            value: "{{ .Values.splunk.port }}"
-          - name: SPLUNK_INDEX
-            value: "{{ .Values.splunk.index }}"
-          - name: SPLUNK_TOKEN
-            valueFrom:
-              secretKeyRef:
-                name: {{ .Values.splunk.token }}
-                key: token
-          - name: SPLUNK_SOURCE
-            value: {{ .Values.splunk.source }}
-          - name: POD_UID_FLUENT_BIT
-            valueFrom:
-              fieldRef:
-                fieldPath: metadata.uid
-          - name: POD_NAME
-            valueFrom:
-              fieldRef:
-                fieldPath: metadata.name
-          - name: POD_NAMESPACE
-            valueFrom:
-              fieldRef:
-                fieldPath: metadata.namespace
-          - name: POD_IP
-            valueFrom:
-              fieldRef:
-                apiVersion: v1
-                fieldPath: status.podIP
-          - name: NODE_NAME
-            valueFrom:
-              fieldRef:
-                fieldPath: spec.nodeName
-          - name: NODE_IP
-            valueFrom:
-              fieldRef:
-                fieldPath: status.hostIP
-          - name: SPLUNK_SOURCETYPE
-            value: {{ .Values.splunk.sourceType }}
-          - name: LOG_PARSER
-            value: {{ .Values.splunk.logParser }}
-      imagePullSecrets:
-{{- range ( .Values.imagePullSecrets ) }}
-      - name: {{ . }}
-{{- end }}
-{{- range (  .Values.splunk.fluentBit.image.imagePullSecrets ) }}
-      - name: {{ . }}
-{{- end }}
+{{- if .Values.logForward.create -}}
+{{- include "fluent-bit-sidecar" . | indent 8 }}
 {{- end }}
 {{- with .Values.nodeSelector }}
       nodeSelector:

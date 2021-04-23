@@ -74,26 +74,28 @@ tolerations: []
 affinity: {}
 
 ## Whether to create the LogForwarding or not.
+## Sidecars can be fluent-bit or vector.
+## Destinations can be any log analysis and analyzer tools like spluk,Logstash,Datadog etc.
 ## In this usecase, we are using splunk as destination for logs using fluent-bit sidecar.
-## For enabling LogForwarding feature, set the logForward:create to true, then provide the splunk and fluent-bit details.
+## For enabling LogForwarding feature, set the logForward.create to true, then provide the destination splunk and sidecar fluent-bit details.
 logForward:
   create: false
 
-## splunk host,index,source,logParser,sourceType,port and fluent-bit image details .
-splunk: {}
-  ## host:
-  ## source:
-  ## index:
-  ## logParser:
-  ## sourceType:
-  ## port:
-  ## token:
-  ## fluentBit:
-  ##   name:
-  ##   resources: {}
-  ##   port:
-  ##   image:
-  ##     repository:
-  ##     tag:
-  ##     pullPolicy:
-  ##     imagePullSecrets:
+## Configuration for the sidecars like fluent-bit or vector with image repository,tag and imagePullSecrets details.
+## Configuration for the log analysis and analyzer destinations like pluk,Logstash,Datadog etc
+## with host,index,source,logParser,sourceType,port details .
+logSidecars: {}
+    ## fluentBit: {}
+    ##   name: ""
+    ##   resources: {}
+    ##   port: ""
+    ##   image: {}
+    ##   destinations: {}
+    ##     splunk:
+    ##       host: "s"
+    ##       source: ""
+    ##       index: ""
+    ##       logParser: ""
+    ##       sourceType: ""
+    ##       port: ""
+    ##       token: ""
