@@ -124,12 +124,7 @@ spec:
           secret:
             secretName: {{ .Values.operator.vaultSecret }}
       {{- end }}
-      {{- if .Values.logForward.create }}
-      {{- include "fluent-bit-sidecar-volume" . | indent 8 }}
-      {{- end }}
-      {{- if .Values.logForward.create }}
-      {{- include "fluent-bit-sidecar-imagePullSecrets" . | indent 6 }}
-      {{- end }}
+      {{- include "chart.AdditionalVolumes" . | indent 8 }}
       containers:
       {{- if and .Values.prometheusMetrics.enabled .Values.prometheusMetrics.authProxy.enabled }}
         - name: kube-rbac-proxy
@@ -170,8 +165,9 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-          {{- if .Values.logForward.create }}
-          {{- include "fluent-bit-sidecar-pod-uid" . | indent 12 }}
+          {{- if .Values.additionalSidecars.POD_UID }}
+            - name: POD_UID
+{{ toYaml .Values.additionalSidecars.POD_UID | indent 14 }}
           {{- end }}
           {{- if .Values.operator.vaultAddress }}
             - name: VAULT_ADDR
@@ -207,7 +203,7 @@ spec:
           resources:
 {{ toYaml .Values.operator.resources | indent 12 }}
 {{- if .Values.logForward.create -}}
-{{- include "fluent-bit-sidecar" . | indent 8 }}
+{{- include "chart.additionalSidecars" . | indent 8 }}
 {{- end }}
 {{- with .Values.nodeSelector }}
       nodeSelector:

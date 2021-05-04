@@ -52,3 +52,15 @@ Compute operator prometheus metrics auth proxy service account
 {{ default "default" .Values.prometheusMetrics.authProxy.serviceAccount.name }}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Sidecar implementation details
+*/}}
+{{- define "chart.additionalSidecars"}}
+{{- end}}
+
+{{/*
+Sidecar volume implementation details
+*/}}
+{{- define "chart.AdditionalVolumes"}}
+{{- end}}
