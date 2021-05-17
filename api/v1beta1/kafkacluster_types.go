@@ -425,9 +425,8 @@ type IngressConfig struct {
 
 // InternalListenerConfig defines the internal listener config for Kafka
 type InternalListenerConfig struct {
-	CommonListenerSpec              `json:",inline"`
-	UsedForInnerBrokerCommunication bool `json:"usedForInnerBrokerCommunication"`
-	UsedForControllerCommunication  bool `json:"usedForControllerCommunication,omitempty"`
+	CommonListenerSpec             `json:",inline"`
+	UsedForControllerCommunication bool `json:"usedForControllerCommunication,omitempty"`
 	// This following options are helpful when you want to run a Kafka cluster over multiple Kubernetes clusters.
 	// The broker internal ports are computed as the sum of the internalStartingPort and the broker id.
 	// +optional
@@ -441,10 +440,12 @@ type InternalListenerConfig struct {
 // CommonListenerSpec defines the common building block for Listener type
 type CommonListenerSpec struct {
 	// +kubebuilder:validation:Enum=ssl;plaintext;sasl_ssl;sasl_plaintext
-	Type SecurityProtocol `json:"type"`
-	// +kubebuilder:validation:Pattern=^[a-z0-9\-]+
-	Name          string `json:"name"`
-	ContainerPort int32  `json:"containerPort"`
+	Type          SecurityProtocol `json:"type"`
+	Name          string           `json:"name"`
+	ContainerPort int32            `json:"containerPort"`
+	// At least one of the listeners should have this flag enabled
+	// +optional
+	UsedForInnerBrokerCommunication bool `json:"usedForInnerBrokerCommunication"`
 }
 
 // ListenerStatuses holds information about the statuses of the configured listeners.
