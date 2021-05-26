@@ -72,3 +72,18 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
+
+## AdditionalSidecar configuration details.
+additionalSidecars: {}
+# - name: nginx
+#   image: nginx:latest
+
+## AdditionalSidecarEnvironment configuration details.
+additionalEnv: {}
+
+## AdditionalSidecarVolumes configuration details.
+additionalVolumes: {}
+# - name: volume1
+#   emptyDir: {}
+# - name: volume2
+#   emptyDir: {}
