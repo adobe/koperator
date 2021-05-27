@@ -73,15 +73,15 @@ tolerations: []
 
 affinity: {}
 
-## AdditionalSidecar configuration details.
+## Additional Sidecars Configuration.
 additionalSidecars: {}
 # - name: nginx
 #   image: nginx:latest
 
-## AdditionalSidecarEnvironment configuration details.
+## Additional Environment Variables.
 additionalEnv: {}
 
-## AdditionalSidecarVolumes configuration details.
+## Additional volumes required for sidecars.
 additionalVolumes: {}
 # - name: volume1
 #   emptyDir: {}
