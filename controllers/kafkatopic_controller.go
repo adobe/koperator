@@ -39,7 +39,7 @@ import (
 var topicFinalizer = "finalizer.kafkatopics.kafka.banzaicloud.io"
 
 // SetupKafkaTopicWithManager registers kafka topic controller with manager
-func SetupKafkaTopicWithManager(mgr ctrl.Manager) error {
+func SetupKafkaTopicWithManager(mgr ctrl.Manager, maxConcurrentReconciles int) error {
 	// Create a new controller
 	r := &KafkaTopicReconciler{
 		Client: mgr.GetClient(),
@@ -47,7 +47,7 @@ func SetupKafkaTopicWithManager(mgr ctrl.Manager) error {
 		Log:    ctrl.Log.WithName("controllers").WithName("KafkaTopic"),
 	}
 
-	c, err := controller.New("kafkatopic", mgr, controller.Options{Reconciler: r})
+	c, err := controller.New("kafkatopic", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: maxConcurrentReconciles})
 	if err != nil {
 		return err
 	}
@@ -170,17 +170,17 @@ func (r *KafkaTopicReconciler) Reconcile(request reconcile.Request) (reconcile.R
 	if !util.StringSliceContains(instance.GetFinalizers(), topicFinalizer) {
 		reqLogger.Info("Adding Finalizer for the KafkaTopic")
 		instance.SetFinalizers(append(instance.GetFinalizers(), topicFinalizer))
-	}
-
-	// push any changes
-	if instance, err = r.updateAndFetchLatest(ctx, instance); err != nil {
-		return requeueWithError(reqLogger, "failed to update KafkaTopic", err)
+		if instance, err = r.updateAndFetchLatest(ctx, instance); err != nil {
+			return requeueWithError(reqLogger, "failed to add Finalizer to KafkaTopic", err)
+		}
 	}
 
 	// set topic status as created
-	instance.Status = v1alpha1.KafkaTopicStatus{State: v1alpha1.TopicStateCreated}
-	if err := r.Client.Status().Update(ctx, instance); err != nil {
-		return requeueWithError(reqLogger, "failed to update kafkatopic status", err)
+	if instance.Status.State != v1alpha1.TopicStateCreated {
+		instance.Status = v1alpha1.KafkaTopicStatus{State: v1alpha1.TopicStateCreated}
+		if err := r.Client.Status().Update(ctx, instance); err != nil {
+			return requeueWithError(reqLogger, "failed to update kafkatopic status", err)
+		}
 	}
 
 	reqLogger.Info("Ensured topic")
