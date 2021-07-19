@@ -28,6 +28,9 @@ metadata:
     app.kubernetes.io/managed-by: {{ .Release.Service }}
     app.kubernetes.io/version: {{ .Chart.AppVersion }}
     app.kubernetes.io/component: webhook
+    {{- range $k, $v := .Values.labels }}
+    {{ $k }}: {{ $v | quote }}
+    {{- end }}
   name: {{ include "kafka-operator.name" . }}-validating-webhook
 webhooks:
 - admissionReviewVersions:
@@ -84,6 +87,9 @@ metadata:
     app.kubernetes.io/managed-by: {{ .Release.Service }}
     app.kubernetes.io/version: {{ .Chart.AppVersion }}
     app.kubernetes.io/component: operator
+    {{- range $k, $v := .Values.labels }}
+    {{ $k }}: {{ $v | quote }}
+    {{- end }}
   {{- with .Values.operator.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}

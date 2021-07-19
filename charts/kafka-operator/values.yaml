@@ -8,6 +8,9 @@ replicaCount: 1
 imagePullSecrets: []
   # - private-registry-key
 
+# Additional labels to be added to all resources
+labels: {}
+
 operator:
   annotations: {}
   image:
