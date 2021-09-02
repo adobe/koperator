@@ -167,13 +167,14 @@ func (r *Reconciler) configMap(id int32, brokerConfig *v1beta1.BrokerConfig, ext
 
 func generateAdvertisedListenerConfig(id int32, l v1beta1.ListenersConfig,
 	extListenerStatuses, intListenerStatuses, controllerIntListenerStatuses map[string]v1beta1.ListenerStatusList) []string {
-	advertisedListenerConfig := make([]string, 0, len(l.ExternalListeners)+len(l.InternalListeners))
+	externalListenerConfig := make([]string, 0, len(l.ExternalListeners))
+	internalListenerConfig := make([]string, 0, len(l.InternalListeners))
 
-	advertisedListenerConfig = appendListenerConfigs(advertisedListenerConfig, id, extListenerStatuses)
-	advertisedListenerConfig = appendListenerConfigs(advertisedListenerConfig, id, intListenerStatuses)
-	advertisedListenerConfig = appendListenerConfigs(advertisedListenerConfig, id, controllerIntListenerStatuses)
+	externalListenerConfig = appendListenerConfigs(externalListenerConfig, id, extListenerStatuses)
+	internalListenerConfig = appendListenerConfigs(internalListenerConfig, id, intListenerStatuses)
+	internalListenerConfig = appendListenerConfigs(internalListenerConfig, id, controllerIntListenerStatuses)
 
-	return advertisedListenerConfig
+	return append(externalListenerConfig, internalListenerConfig...)
 }
 
 func appendListenerConfigs(advertisedListenerConfig []string, id int32,
@@ -217,19 +218,6 @@ func generateListenerSpecificConfig(l *v1beta1.ListenersConfig, log logr.Logger)
 	var securityProtocolMapConfig []string
 	var listenerConfig []string
 
-	for _, iListener := range l.InternalListeners {
-		if iListener.UsedForInnerBrokerCommunication {
-			if interBrokerListenerName == "" {
-				interBrokerListenerName = strings.ToUpper(iListener.Name)
-			} else {
-				log.Error(errors.New("inter broker listener name already set"), "config error")
-			}
-		}
-		UpperedListenerType := iListener.Type.ToUpperString()
-		UpperedListenerName := strings.ToUpper(iListener.Name)
-		securityProtocolMapConfig = append(securityProtocolMapConfig, fmt.Sprintf("%s:%s", UpperedListenerName, UpperedListenerType))
-		listenerConfig = append(listenerConfig, fmt.Sprintf("%s://:%d", UpperedListenerName, iListener.ContainerPort))
-	}
 	for _, eListener := range l.ExternalListeners {
 		if eListener.UsedForInnerBrokerCommunication {
 			if interBrokerListenerName == "" {
@@ -242,6 +230,20 @@ func generateListenerSpecificConfig(l *v1beta1.ListenersConfig, log logr.Logger)
 		UpperedListenerName := strings.ToUpper(eListener.Name)
 		securityProtocolMapConfig = append(securityProtocolMapConfig, fmt.Sprintf("%s:%s", UpperedListenerName, UpperedListenerType))
 		listenerConfig = append(listenerConfig, fmt.Sprintf("%s://:%d", UpperedListenerName, eListener.ContainerPort))
+	}
+
+	for _, iListener := range l.InternalListeners {
+		if iListener.UsedForInnerBrokerCommunication {
+			if interBrokerListenerName == "" {
+				interBrokerListenerName = strings.ToUpper(iListener.Name)
+			} else {
+				log.Error(errors.New("inter broker listener name already set"), "config error")
+			}
+		}
+		UpperedListenerType := iListener.Type.ToUpperString()
+		UpperedListenerName := strings.ToUpper(iListener.Name)
+		securityProtocolMapConfig = append(securityProtocolMapConfig, fmt.Sprintf("%s:%s", UpperedListenerName, UpperedListenerType))
+		listenerConfig = append(listenerConfig, fmt.Sprintf("%s://:%d", UpperedListenerName, iListener.ContainerPort))
 	}
 
 	config := properties.NewProperties()
