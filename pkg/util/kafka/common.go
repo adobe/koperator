@@ -209,9 +209,9 @@ func GetBootstrapServersService(cluster *v1beta1.KafkaCluster) (string, error) {
 	return getBootstrapServers(cluster, true)
 }
 
-func getBootstrapServers(cluster *v1beta1.KafkaCluster, useService bool) (string, error) {
+// GetBrokerContainerPort return broker container port
+func GetBrokerContainerPort(cluster *v1beta1.KafkaCluster) (int32, error) {
 	containerPort := int32(0)
-	var bootstrapServersList []string
 
 	for _, lc := range cluster.Spec.ListenersConfig.InternalListeners {
 		if lc.UsedForInnerBrokerCommunication && !lc.UsedForControllerCommunication {
@@ -228,8 +228,17 @@ func getBootstrapServers(cluster *v1beta1.KafkaCluster, useService bool) (string
 	}
 
 	if containerPort <= 0 {
-		return "", errors.New("no suitable listener found for using as Kafka bootstrap server configuration")
+		return -1, errors.New("no suitable listener found for using as Kafka bootstrap server configuration")
 	}
+	return containerPort, nil
+}
+
+func getBootstrapServers(cluster *v1beta1.KafkaCluster, useService bool) (string, error) {
+	containerPort, err := GetBrokerContainerPort(cluster)
+	if err != nil {
+		return "", err
+	}
+	var bootstrapServersList []string
 
 	if useService {
 		bootstrapServersList = append(bootstrapServersList,
