@@ -15778,6 +15778,13 @@ spec:
                     description: Annotations defines the annotations placed on the
                       envoy ingress controller deployment
                     type: object
+                  concurrency:
+                    description: Concurrency defines the number of worker threads
+                      envoy pod should run. If not specified defaults to the number
+                      of hardware threads on the underlying kubernetes node.
+                    format: int32
+                    minimum: 1
+                    type: integer
                   disruptionBudget:
                     description: DisruptionBudget is the pod disruption budget attached
                       to Envoy Deployment(s)
@@ -17588,6 +17595,15 @@ spec:
                                         description: Annotations defines the annotations
                                           placed on the envoy ingress controller deployment
                                         type: object
+                                      concurrency:
+                                        description: Concurrency defines the number
+                                          of worker threads envoy pod should run.
+                                          If not specified defaults to the number
+                                          of hardware threads on the underlying kubernetes
+                                          node.
+                                        format: int32
+                                        minimum: 1
+                                        type: integer
                                       disruptionBudget:
                                         description: DisruptionBudget is the pod disruption
                                           budget attached to Envoy Deployment(s)
