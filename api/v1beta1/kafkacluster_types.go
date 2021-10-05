@@ -237,6 +237,10 @@ type TopicConfig struct {
 type EnvoyConfig struct {
 	Image     string                       `json:"image,omitempty"`
 	Resources *corev1.ResourceRequirements `json:"resourceRequirements,omitempty"`
+	// Concurrency defines the number of worker threads envoy pod should run.
+	// If not specified defaults to the number of hardware threads on the underlying kubernetes node.
+	// +kubebuilder:validation:Minimum=1
+	Concurrency int32 `json:"concurrency,omitempty"`
 	// +kubebuilder:validation:Minimum=1
 	Replicas           int32                         `json:"replicas,omitempty"`
 	ServiceAccountName string                        `json:"serviceAccountName,omitempty"`
@@ -704,6 +708,11 @@ func (eConfig *EnvoyConfig) GetResources() *corev1.ResourceRequirements {
 			"memory": resource.MustParse("100Mi"),
 		},
 	}
+}
+
+// GetConcurrency returns envoy concurrency
+func (eConfig *EnvoyConfig) GetConcurrency() int32 {
+	return eConfig.Concurrency
 }
 
 // GetResources returns the CC specific Kubernetes resource
