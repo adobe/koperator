@@ -15798,6 +15798,10 @@ spec:
                         - maxUnavailable
                         type: string
                     type: object
+                  healthCheckPort:
+                    description: Envoy health-check port
+                    format: int32
+                    type: integer
                   image:
                     type: string
                   imagePullSecrets:
@@ -17606,6 +17610,10 @@ spec:
                                             - maxUnavailable
                                             type: string
                                         type: object
+                                      healthCheckPort:
+                                        description: Envoy health-check port
+                                        format: int32
+                                        type: integer
                                       image:
                                         type: string
                                       imagePullSecrets:
