@@ -7,10 +7,12 @@ require (
 	github.com/banzaicloud/istio-client-go v0.0.10
 	github.com/google/go-cmp v0.5.6 // indirect
 	github.com/imdario/mergo v0.3.12
-	github.com/jetstack/cert-manager v1.4.1
-	golang.org/x/net v0.0.0-20210726213435-c6fcb2dbf985 // indirect
+	github.com/jetstack/cert-manager v1.4.4
+	github.com/json-iterator/go v1.1.12 // indirect
+	golang.org/x/net v0.0.0-20211007125505-59d4e928ea9d // indirect
+	golang.org/x/text v0.3.7 // indirect
 	gotest.tools v2.2.0+incompatible
-	k8s.io/api v0.21.3
-	k8s.io/apimachinery v0.21.3
-	sigs.k8s.io/controller-runtime v0.9.3
+	k8s.io/api v0.22.2
+	k8s.io/apimachinery v0.22.2
+	sigs.k8s.io/controller-runtime v0.9.7
 )
