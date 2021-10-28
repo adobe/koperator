@@ -3519,6 +3519,8 @@ spec:
                     log4jConfig:
                       description: Override for the default log4j configuration
                       type: string
+                    metricsReporterImage:
+                      type: string
                     networkConfig:
                       description: Network throughput information in kB/s used by
                         Cruise Control to determine broker network capacity. By default
@@ -9351,6 +9353,8 @@ spec:
                           type: string
                         log4jConfig:
                           description: Override for the default log4j configuration
+                          type: string
+                        metricsReporterImage:
                           type: string
                         networkConfig:
                           description: Network throughput information in kB/s used
