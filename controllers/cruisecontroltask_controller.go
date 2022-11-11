@@ -30,7 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	kafkav1beta1 "github.com/banzaicloud/koperator/api/v1beta1"
-	"github.com/banzaicloud/koperator/pkg/scale"
+	"github.com/banzaicloud/koperator/pkg/ccutil"
 )
 
 const (
@@ -70,7 +70,7 @@ func (r *CruiseControlTaskReconciler) Reconcile(ctx context.Context, request ctr
 		return reconciled()
 	}
 
-	scaler, err := scale.NewCruiseControlScaler(ctx, scale.CruiseControlURLFromKafkaCluster(instance))
+	scaler, err := ccutil.NewCruiseControlScaler(ctx, ccutil.CruiseControlURLFromKafkaCluster(instance))
 	if err != nil {
 		return requeueWithError(log, "failed to create Cruise Control Scaler instance", err)
 	}
@@ -145,7 +145,7 @@ func (r *CruiseControlTaskReconciler) Reconcile(ctx context.Context, request ctr
 			if task == nil || task.IsDone() {
 				continue
 			}
-			if onlineDirs, ok := logDirsByBroker[task.BrokerID][scale.LogDirStateOnline]; ok {
+			if onlineDirs, ok := logDirsByBroker[task.BrokerID][ccutil.LogDirStateOnline]; ok {
 				found := true
 				for _, dir := range onlineDirs {
 					if !strings.HasPrefix(strings.TrimSpace(dir), strings.TrimSpace(task.Volume)) {
@@ -293,13 +293,13 @@ func getActiveTasksFromCluster(instance *kafkav1beta1.KafkaCluster) *CruiseContr
 
 // updateActiveTasks updates the state of the tasks from the CruiseControlTasksAndStates instance by getting their
 // status from CruiseControl using the provided scale.CruiseControlScaler.
-func updateActiveTasks(scaler scale.CruiseControlScaler, tasksAndStates *CruiseControlTasksAndStates) error {
+func updateActiveTasks(scaler ccutil.CruiseControlScaler, tasksAndStates *CruiseControlTasksAndStates) error {
 	tasks, err := scaler.GetUserTasks()
 	if err != nil {
 		return err
 	}
 
-	taskResultsByID := make(map[string]*scale.Result, len(tasks))
+	taskResultsByID := make(map[string]*ccutil.Result, len(tasks))
 	for _, task := range tasks {
 		taskResultsByID[task.TaskID] = task
 	}

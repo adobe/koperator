@@ -16,7 +16,7 @@ package controllers
 
 import (
 	kafkav1beta1 "github.com/banzaicloud/koperator/api/v1beta1"
-	"github.com/banzaicloud/koperator/pkg/scale"
+	"github.com/banzaicloud/koperator/pkg/ccutil"
 )
 
 type CruiseControlOperation int8
@@ -86,7 +86,7 @@ func (t *CruiseControlTask) Apply(instance *kafkav1beta1.KafkaCluster) {
 }
 
 // FromResult takes a scale.Result instance returned by scale.CruiseControlScaler and updates its own state accordingly.
-func (t *CruiseControlTask) FromResult(result *scale.Result) {
+func (t *CruiseControlTask) FromResult(result *ccutil.Result) {
 	if t == nil || result == nil {
 		return
 	}

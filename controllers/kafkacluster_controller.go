@@ -36,6 +36,7 @@ import (
 
 	"github.com/banzaicloud/koperator/api/v1alpha1"
 	"github.com/banzaicloud/koperator/api/v1beta1"
+	"github.com/banzaicloud/koperator/pkg/ccutil"
 	"github.com/banzaicloud/koperator/pkg/errorfactory"
 	"github.com/banzaicloud/koperator/pkg/k8sutil"
 	"github.com/banzaicloud/koperator/pkg/kafkaclient"
@@ -105,7 +106,15 @@ func (r *KafkaClusterReconciler) Reconcile(ctx context.Context, request ctrl.Req
 		return r.checkFinalizers(ctx, instance)
 	}
 
+	cruiseControlHealer, err := ccutil.NewCruiseControlHealer(ctx, instance)
+	if err != nil {
+		return requeueWithError(log, err.Error(), err)
+	}
+
 	if instance.Status.State != v1beta1.KafkaClusterRollingUpgrading {
+		if err := cruiseControlHealer.DisableSelfHealing(); err != nil {
+			return requeueWithError(log, err.Error(), err)
+		}
 		if err := k8sutil.UpdateCRStatus(r.Client, instance, v1beta1.KafkaClusterReconciling, log); err != nil {
 			return requeueWithError(log, err.Error(), err)
 		}
@@ -181,6 +190,10 @@ func (r *KafkaClusterReconciler) Reconcile(ctx context.Context, request ctrl.Req
 		if err := k8sutil.UpdateRollingUpgradeState(r.Client, instance, time.Now(), log); err != nil {
 			return requeueWithError(log, err.Error(), err)
 		}
+	}
+
+	if err := cruiseControlHealer.EnableSelfHealing(); err != nil {
+		return requeueWithError(log, err.Error(), err)
 	}
 
 	if err := k8sutil.UpdateCRStatus(r.Client, instance, v1beta1.KafkaClusterRunning, log); err != nil {

@@ -29,9 +29,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/banzaicloud/koperator/api/v1beta1"
+	"github.com/banzaicloud/koperator/pkg/ccutil"
 	"github.com/banzaicloud/koperator/pkg/k8sutil"
 	"github.com/banzaicloud/koperator/pkg/resources/kafka"
-	"github.com/banzaicloud/koperator/pkg/scale"
 	"github.com/banzaicloud/koperator/pkg/util"
 )
 
@@ -314,9 +314,9 @@ func downScale(log logr.Logger, labels model.LabelSet, client client.Client) err
 	if broker, ok := labels[v1beta1.BrokerIdLabelKey]; ok {
 		brokerID = string(broker)
 	} else {
-		cruiseControlURL := scale.CruiseControlURLFromKafkaCluster(cr)
+		cruiseControlURL := ccutil.CruiseControlURLFromKafkaCluster(cr)
 		// FIXME: we should reuse the context of passed to AController.Start() here
-		cc, err := scale.NewCruiseControlScaler(context.TODO(), cruiseControlURL)
+		cc, err := ccutil.NewCruiseControlScaler(context.TODO(), cruiseControlURL)
 		if err != nil {
 			return errors.WrapIfWithDetails(err, "failed to initialize Cruise Control Scaler",
 				"cruise control url", cruiseControlURL)
