@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package ccutil
+package cruisecontrol
 
 import (
 	"context"
@@ -30,10 +30,10 @@ func createMockCruiseControlHealer(_ context.Context, _ *v1beta1.KafkaCluster) (
 
 type mockCruiseControlHealer struct{}
 
-func (cc *mockCruiseControlHealer) EnableSelfHealing() error {
+func (cc *mockCruiseControlHealer) ResumeSelfHealing() error {
 	return nil
 }
 
-func (cc *mockCruiseControlHealer) DisableSelfHealing() error {
+func (cc *mockCruiseControlHealer) PauseSelfHealing() error {
 	return nil
 }

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package ccutil
+package cruisecontrol
 
 import (
 	"context"
@@ -74,7 +74,7 @@ func createNewCruiseControlHealer(ctx context.Context, instance *v1beta1.KafkaCl
 	}, nil
 }
 
-func (cc *cruiseControlHealer) DisableSelfHealing() error {
+func (cc *cruiseControlHealer) PauseSelfHealing() error {
 	req := api.AdminRequest{}
 
 	req.DisableSelfHealingFor = maps.Values(configToAnomalyMapper)
@@ -89,7 +89,7 @@ func (cc *cruiseControlHealer) DisableSelfHealing() error {
 
 	return nil
 }
-func (cc *cruiseControlHealer) EnableSelfHealing() error {
+func (cc *cruiseControlHealer) ResumeSelfHealing() error {
 	req := api.AdminRequest{}
 	req.EnableSelfHealingFor = []types.AnomalyType{}
 
