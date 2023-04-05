@@ -16,13 +16,16 @@ package scale
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math"
 	"strconv"
 	"strings"
+	"time"
 
 	"emperror.dev/errors"
 	"github.com/go-logr/logr"
+	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/banzaicloud/go-cruise-control/pkg/api"
 	"github.com/banzaicloud/go-cruise-control/pkg/client"
@@ -116,9 +119,19 @@ func (cc *cruiseControlScaler) Status(ctx context.Context) (CruiseControlStatus,
 		return CruiseControlStatus{}, err
 	}
 
+	result := resp.Result
+	// if the execution takes too much time, then cruise control converts the request into async
+	// and returns the taskID
+	if result == nil {
+		result, err = cc.waitForTaskCompletion(ctx, resp.TaskID)
+		if err != nil {
+			return CruiseControlStatus{}, err
+		}
+	}
+
 	goalsReady := true
-	if len(resp.Result.AnalyzerState.GoalReadiness) > 0 {
-		for _, goal := range resp.Result.AnalyzerState.GoalReadiness {
+	if len(result.AnalyzerState.GoalReadiness) > 0 {
+		for _, goal := range result.AnalyzerState.GoalReadiness {
 			if goal.Status != types.GoalReadinessStatusReady {
 				goalsReady = false
 				break
@@ -127,14 +140,59 @@ func (cc *cruiseControlScaler) Status(ctx context.Context) (CruiseControlStatus,
 	}
 
 	return CruiseControlStatus{
-		MonitorReady:       resp.Result.MonitorState.State == types.MonitorStateRunning,
-		ExecutorReady:      resp.Result.ExecutorState.State == types.ExecutorStateTypeNoTaskInProgress,
-		AnalyzerReady:      resp.Result.AnalyzerState.IsProposalReady && goalsReady,
-		ProposalReady:      resp.Result.AnalyzerState.IsProposalReady,
+		MonitorReady:       result.MonitorState.State == types.MonitorStateRunning,
+		ExecutorReady:      result.ExecutorState.State == types.ExecutorStateTypeNoTaskInProgress,
+		AnalyzerReady:      result.AnalyzerState.IsProposalReady && goalsReady,
+		ProposalReady:      result.AnalyzerState.IsProposalReady,
 		GoalsReady:         goalsReady,
-		MonitoredWindows:   resp.Result.MonitorState.NumMonitoredWindows,
-		MonitoringCoverage: resp.Result.MonitorState.MonitoringCoveragePercentage,
+		MonitoredWindows:   result.MonitorState.NumMonitoredWindows,
+		MonitoringCoverage: result.MonitorState.MonitoringCoveragePercentage,
 	}, nil
+}
+
+func (cc *cruiseControlScaler) waitForTaskCompletion(ctx context.Context, taskID string) (*types.StateResult, error) {
+	result := &types.StateResult{}
+
+	backoff := wait.Backoff{
+		Duration: time.Second,
+		Jitter:   0,
+		Factor:   2,
+		Steps:    5,
+	}
+
+	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
+		req := &api.UserTasksRequest{
+			UserTaskIDs:         []string{taskID},
+			FetchCompletedTasks: true,
+		}
+
+		resp, err := cc.client.UserTasks(ctx, req)
+		if err != nil {
+			return false, err
+		}
+
+		if len(resp.Result.UserTasks) != 1 {
+			return false, fmt.Errorf("could not get the Cruise Control state, expected the response for 1 task (%s), but got %d responses", taskID, len(resp.Result.UserTasks))
+		}
+
+		status := resp.Result.UserTasks[0].Status
+		if status == types.UserTaskStatusCompleted {
+			if err = json.Unmarshal([]byte(resp.Result.UserTasks[0].OriginalResponse), result); err != nil {
+				return false, err
+			}
+			return true, nil
+		} else if status == types.UserTaskStatusActive || status == types.UserTaskStatusInExecution {
+			return false, nil
+		}
+
+		return false, fmt.Errorf("could not get the Cruise Control state, the task finished with `%s` status", status)
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }
 
 // IsReady returns true if the Analyzer and Monitor components of Cruise Control are in ready state.
