@@ -526,11 +526,12 @@ func getScaleMock6() *mocks.MockCruiseControlScaler {
 		State:     v1beta1.CruiseControlTaskCompletedWithError,
 	})}
 	scaleMock.EXPECT().UserTasks(gomock.Any(), gomock.Any()).Return(userTaskResult, nil).AnyTimes()
-	scaleMock.EXPECT().Status(gomock.Any()).Return(scale.CruiseControlStatus{
-		ExecutorReady: true,
-		MonitorReady:  true,
-		AnalyzerReady: true,
-	}, nil).AnyTimes()
+	scaleMock.EXPECT().Status(gomock.Any()).Return(scale.StatusTaskResult{
+		Status: &scale.CruiseControlStatus{
+			ExecutorReady: true,
+			MonitorReady:  true,
+			AnalyzerReady: true,
+		}}, nil).AnyTimes()
 	scaleMock.EXPECT().RebalanceWithParams(gomock.Any(), gomock.All()).Return(scaleResultPointer(scale.Result{
 		TaskID:    "12346",
 		StartedAt: "Sat, 27 Aug 2022 12:22:21 GMT",
