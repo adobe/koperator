@@ -26,9 +26,10 @@ import (
 	"github.com/banzaicloud/go-cruise-control/pkg/api"
 	"github.com/banzaicloud/go-cruise-control/pkg/client"
 	"github.com/banzaicloud/go-cruise-control/pkg/types"
+	"github.com/go-logr/logr"
+
 	"github.com/banzaicloud/koperator/api/v1alpha1"
 	"github.com/banzaicloud/koperator/api/v1beta1"
-	"github.com/go-logr/logr"
 )
 
 const (
@@ -146,7 +147,6 @@ func (cc *cruiseControlScaler) Status(ctx context.Context) (StatusTaskResult, er
 
 // StatusTask returns a CruiseControlStatus describing the internal state of Cruise Control.
 func (cc *cruiseControlScaler) StatusTask(ctx context.Context, taskID string) (StatusTaskResult, error) {
-
 	req := &api.UserTasksRequest{
 		UserTaskIDs:         []string{taskID},
 		FetchCompletedTasks: true,
