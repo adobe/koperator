@@ -512,7 +512,13 @@ func (r *CruiseControlOperationReconciler) updateCurrentTasks(ctx context.Contex
 	return nil
 }
 
-func (r *CruiseControlOperationReconciler) getStatus(ctx context.Context, log logr.Logger, kafkaCluster *banzaiv1beta1.KafkaCluster, kafkaClusterRef client.ObjectKey, ccOperationListClusterWide banzaiv1alpha1.CruiseControlOperationList) (scale.CruiseControlStatus, error) {
+func (r *CruiseControlOperationReconciler) getStatus(
+	ctx context.Context,
+	log logr.Logger,
+	kafkaCluster *banzaiv1beta1.KafkaCluster,
+	kafkaClusterRef client.ObjectKey,
+	ccOperationListClusterWide banzaiv1alpha1.CruiseControlOperationList,
+) (scale.CruiseControlStatus, error) {
 	var statusOperation *banzaiv1alpha1.CruiseControlOperation
 	for i := range ccOperationListClusterWide.Items {
 		ccOperation := &ccOperationListClusterWide.Items[i]
