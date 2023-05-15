@@ -580,16 +580,17 @@ func getScaleMock7() *mocks.MockCruiseControlScaler {
 	scaleMock := mocks.NewMockCruiseControlScaler(mockCtrl)
 	scaleMock.EXPECT().IsUp(gomock.Any()).Return(true).AnyTimes()
 
+	startTime := metav1.Now().Format(time.RFC1123)
 	scaleMock.EXPECT().Status(gomock.Any()).Return(scale.StatusTaskResult{
 		TaskResult: &scale.Result{
 			TaskID:    "22222",
-			StartedAt: "Sat, 27 Aug 2022 12:22:21 GMT",
+			StartedAt: startTime,
 			State:     v1beta1.CruiseControlTaskActive,
 		}}, nil).AnyTimes()
 	scaleMock.EXPECT().StatusTask(gomock.Any(), "22222").Return(scale.StatusTaskResult{
 		TaskResult: &scale.Result{
 			TaskID:    "22222",
-			StartedAt: "Sat, 27 Aug 2022 12:22:21 GMT",
+			StartedAt: startTime,
 			State:     v1beta1.CruiseControlTaskCompleted,
 		},
 		Status: &scale.CruiseControlStatus{
