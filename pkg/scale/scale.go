@@ -107,7 +107,7 @@ type cruiseControlScaler struct {
 	client *client.Client
 }
 
-// Status returns a CruiseControlStatus describing the internal state of Cruise Control.
+// Status returns a StatusTaskResult describing the internal state of Cruise Control.
 func (cc *cruiseControlScaler) Status(ctx context.Context) (StatusTaskResult, error) {
 	req := api.StateRequestWithDefaults()
 	req.Verbose = true
@@ -116,10 +116,9 @@ func (cc *cruiseControlScaler) Status(ctx context.Context) (StatusTaskResult, er
 		return StatusTaskResult{}, err
 	}
 
-	result := resp.Result
-	// if the execution takes too much time, then cruise control converts the request into async
+	// if the execution takes too much time, then Cruise Control converts the request into async
 	// and returns the taskID
-	if result == nil {
+	if resp.Result == nil {
 		return StatusTaskResult{
 			TaskResult: &Result{
 				TaskID:             resp.TaskID,
@@ -131,7 +130,7 @@ func (cc *cruiseControlScaler) Status(ctx context.Context) (StatusTaskResult, er
 		}, nil
 	}
 
-	status := convert(result)
+	status := convert(resp.Result)
 
 	return StatusTaskResult{
 		TaskResult: &Result{
@@ -145,7 +144,7 @@ func (cc *cruiseControlScaler) Status(ctx context.Context) (StatusTaskResult, er
 	}, nil
 }
 
-// StatusTask returns a CruiseControlStatus describing the internal state of Cruise Control.
+// StatusTask returns the latest state of the Status Cruise Control task.
 func (cc *cruiseControlScaler) StatusTask(ctx context.Context, taskID string) (StatusTaskResult, error) {
 	req := &api.UserTasksRequest{
 		UserTaskIDs:         []string{taskID},
@@ -157,7 +156,7 @@ func (cc *cruiseControlScaler) StatusTask(ctx context.Context, taskID string) (S
 		return StatusTaskResult{}, err
 	}
 
-	//CC no longer has the info about the task
+	//CC no longer has the info about the task, mark it as completed with error
 	if len(resp.Result.UserTasks) == 0 {
 		return StatusTaskResult{
 			TaskResult: &Result{
