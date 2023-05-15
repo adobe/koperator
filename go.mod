@@ -136,6 +136,7 @@ require (
 )
 
 replace (
+	github.com/banzaicloud/go-cruise-control => github.com/adobe/go-cruise-control v0.6.0-adbe
 	github.com/banzaicloud/koperator/api => ./api
 	github.com/banzaicloud/koperator/properties => ./properties
 	github.com/gogo/protobuf => github.com/waynz0r/protobuf v1.3.3-0.20210811122234-64636cae0910
