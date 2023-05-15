@@ -43,12 +43,13 @@ import (
 )
 
 const (
-	defaultFailedTasksHistoryMaxLength = 50
-	ccOperationFinalizerGroup          = "finalizer.cruisecontroloperations.kafka.banzaicloud.io"
-	ccOperationForStopExecution        = "ccOperationStopExecution"
-	ccOperationFirstExecution          = "ccOperationFirstExecution"
-	ccOperationRetryExecution          = "ccOperationRetryExecution"
-	ccOperationInProgress              = "ccOperationInProgress"
+	defaultFailedTasksHistoryMaxLength             = 50
+	ccOperationFinalizerGroup                      = "finalizer.cruisecontroloperations.kafka.banzaicloud.io"
+	ccOperationForStopExecution                    = "ccOperationStopExecution"
+	ccOperationFirstExecution                      = "ccOperationFirstExecution"
+	ccOperationRetryExecution                      = "ccOperationRetryExecution"
+	ccOperationInProgress                          = "ccOperationInProgress"
+	defaultCruiseControlStatusOperationMaxDuration = time.Duration(5) * time.Minute
 )
 
 var (
@@ -522,12 +523,9 @@ func (r *CruiseControlOperationReconciler) getStatus(
 	var statusOperation *banzaiv1alpha1.CruiseControlOperation
 	for i := range ccOperationListClusterWide.Items {
 		ccOperation := &ccOperationListClusterWide.Items[i]
-		ref, err := kafkaClusterReference(ccOperation)
-		if err != nil {
-			// Note: not returning here to continue processing the operations,
-			// even if the user does not provide a KafkaClusterRef label on the CCOperation then the ref will be an empty object (not nil) and the filter will skip it.
-			log.Info(err.Error())
-		}
+		// ignoring the error here to continue processing the operations,
+		// even if the user does not provide a KafkaClusterRef label on the CCOperation then the ref will be an empty object (not nil) and the filter will skip it.
+		ref, _ := kafkaClusterReference(ccOperation)
 		if ref.Name == kafkaClusterRef.Name && ref.Namespace == kafkaClusterRef.Namespace && ccOperation.Status.CurrentTask != nil &&
 			ccOperation.Status.CurrentTask.Operation == banzaiv1alpha1.OperationStatus && ccOperation.IsCurrentTaskRunning() {
 			statusOperation = ccOperation
@@ -547,6 +545,11 @@ func (r *CruiseControlOperationReconciler) getStatus(
 		err = r.Status().Update(ctx, statusOperation)
 		if err != nil {
 			return scale.CruiseControlStatus{}, errors.WrapIfWithDetails(err, "could not update the state of Status CruiseControlOperation", "name", statusOperation.GetName(), "namespace", statusOperation.GetNamespace())
+		}
+
+		if statusOperation.CurrentTask().Finished != nil &&
+			statusOperation.CurrentTask().Finished.Time.Sub(statusOperation.CurrentTask().Started.Time) > defaultCruiseControlStatusOperationMaxDuration {
+			return scale.CruiseControlStatus{}, errors.New("the Cruise Control status operation took too long to finish")
 		}
 
 		if res.Status == nil {
