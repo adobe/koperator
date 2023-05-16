@@ -513,6 +513,14 @@ func (r *CruiseControlOperationReconciler) updateCurrentTasks(ctx context.Contex
 	return nil
 }
 
+// getStatus returns the internal state of Cruise Control.
+//
+// The logic is the following:
+//   - If the Cruise Control makes the Status request sync, then the result will be returned.
+//   - If the Cruise Control makes the Status request async, then a new Status CruiseControlOperation
+//     will be created and an error will be returned to indicate that Cruise Control is not ready yet.
+//   - If there is already a Status CruiseControlOperation in progress, then it will be updated and
+//     the result will be returned.
 func (r *CruiseControlOperationReconciler) getStatus(
 	ctx context.Context,
 	log logr.Logger,
