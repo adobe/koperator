@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strings"
 	"time"
 
 	"emperror.dev/errors"
@@ -34,6 +35,7 @@ import (
 
 	"github.com/banzaicloud/go-cruise-control/pkg/types"
 
+	apiutil "github.com/banzaicloud/koperator/api/util"
 	banzaiv1alpha1 "github.com/banzaicloud/koperator/api/v1alpha1"
 	banzaiv1beta1 "github.com/banzaicloud/koperator/api/v1beta1"
 	"github.com/banzaicloud/koperator/pkg/scale"
@@ -41,19 +43,21 @@ import (
 )
 
 const (
-	defaultFailedTasksHistoryMaxLength = 50
-	ccOperationFinalizerGroup          = "finalizer.cruisecontroloperations.kafka.banzaicloud.io"
-	ccOperationForStopExecution        = "ccOperationStopExecution"
-	ccOperationFirstExecution          = "ccOperationFirstExecution"
-	ccOperationRetryExecution          = "ccOperationRetryExecution"
-	ccOperationInProgress              = "ccOperationInProgress"
+	defaultFailedTasksHistoryMaxLength             = 50
+	ccOperationFinalizerGroup                      = "finalizer.cruisecontroloperations.kafka.banzaicloud.io"
+	ccOperationForStopExecution                    = "ccOperationStopExecution"
+	ccOperationFirstExecution                      = "ccOperationFirstExecution"
+	ccOperationRetryExecution                      = "ccOperationRetryExecution"
+	ccOperationInProgress                          = "ccOperationInProgress"
+	defaultCruiseControlStatusOperationMaxDuration = time.Duration(5) * time.Minute
 )
 
 var (
 	defaultRequeueIntervalInSeconds = 10
 	executionPriorityMap            = map[banzaiv1alpha1.CruiseControlTaskOperation]int{
-		banzaiv1alpha1.OperationAddBroker:    2,
-		banzaiv1alpha1.OperationRemoveBroker: 1,
+		banzaiv1alpha1.OperationAddBroker:    3,
+		banzaiv1alpha1.OperationRemoveBroker: 2,
+		banzaiv1alpha1.OperationRemoveDisks:  1,
 		banzaiv1alpha1.OperationRebalance:    0,
 	}
 	missingCCResErr = errors.New("missing Cruise Control user task result")
@@ -70,7 +74,7 @@ type CruiseControlOperationReconciler struct {
 
 // +kubebuilder:rbac:groups=kafka.banzaicloud.io,resources=cruisecontroloperations,verbs=get;list;watch;create;update;patch;delete;deletecollection
 // +kubebuilder:rbac:groups=kafka.banzaicloud.io,resources=cruisecontroloperations/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=kafka.banzaicloud.io,resources=cruisecontroloperations/finalizers,verbs=update
+// +kubebuilder:rbac:groups=kafka.banzaicloud.io,resources=cruisecontroloperations/finalizers,verbs=create;update;patch;delete
 
 //nolint:gocyclo
 func (r *CruiseControlOperationReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
@@ -94,6 +98,12 @@ func (r *CruiseControlOperationReconciler) Reconcile(ctx context.Context, reques
 	}
 
 	if currentCCOperation == nil {
+		return reconciled()
+	}
+
+	// Skip reconciliation for Cruise Control Status operation
+	if currentCCOperation.CurrentTaskOperation() == banzaiv1alpha1.OperationStatus {
+		log.V(1).Info("skipping reconciliation for Cruise Control Status operation")
 		return reconciled()
 	}
 
@@ -144,7 +154,7 @@ func (r *CruiseControlOperationReconciler) Reconcile(ctx context.Context, reques
 	}
 
 	// Checking Cruise Control health
-	status, err := r.scaler.Status(ctx)
+	status, err := r.getStatus(ctx, log, kafkaCluster, kafkaClusterRef, ccOperationListClusterWide)
 	if err != nil {
 		log.Error(err, "could not get Cruise Control status")
 		return requeueAfter(defaultRequeueIntervalInSeconds)
@@ -197,7 +207,11 @@ func (r *CruiseControlOperationReconciler) Reconcile(ctx context.Context, reques
 		return reconciled()
 	}
 
-	ccOperationExecution := selectOperationForExecution(ccOperationQueueMap)
+	ccOperationExecution, err := r.selectOperationForExecution(ccOperationQueueMap)
+	if err != nil {
+		log.Error(err, "requeue event as selecting operation for execution failed")
+		return requeueAfter(defaultRequeueIntervalInSeconds)
+	}
 	// There is nothing to be executed for now, requeue
 	if ccOperationExecution == nil {
 		return requeueAfter(defaultRequeueIntervalInSeconds)
@@ -265,8 +279,12 @@ func (r *CruiseControlOperationReconciler) executeOperation(ctx context.Context,
 		cruseControlTaskResult, err = r.scaler.RemoveBrokersWithParams(ctx, ccOperationExecution.CurrentTaskParameters())
 	case banzaiv1alpha1.OperationRebalance:
 		cruseControlTaskResult, err = r.scaler.RebalanceWithParams(ctx, ccOperationExecution.CurrentTaskParameters())
+	case banzaiv1alpha1.OperationRemoveDisks:
+		cruseControlTaskResult, err = r.scaler.RemoveDisksWithParams(ctx, ccOperationExecution.CurrentTaskParameters())
 	case banzaiv1alpha1.OperationStopExecution:
 		cruseControlTaskResult, err = r.scaler.StopExecution(ctx)
+	case banzaiv1alpha1.OperationStatus:
+		err = errors.NewWithDetails("Cruise Control operation not supported", "name", ccOperationExecution.GetName(), "namespace", ccOperationExecution.GetNamespace(), "operation", ccOperationExecution.CurrentTaskOperation(), "parameters", ccOperationExecution.CurrentTaskParameters())
 	default:
 		err = errors.NewWithDetails("Cruise Control operation not supported", "name", ccOperationExecution.GetName(), "namespace", ccOperationExecution.GetNamespace(), "operation", ccOperationExecution.CurrentTaskOperation(), "parameters", ccOperationExecution.CurrentTaskParameters())
 	}
@@ -300,29 +318,56 @@ func sortOperations(ccOperations []*banzaiv1alpha1.CruiseControlOperation) map[s
 	return ccOperationQueueMap
 }
 
-func selectOperationForExecution(ccOperationQueueMap map[string][]*banzaiv1alpha1.CruiseControlOperation) *banzaiv1alpha1.CruiseControlOperation {
-	// SELECTING OPERATION FOR EXECUTION
-	var ccOperationExecution *banzaiv1alpha1.CruiseControlOperation
+// selectOperationForExecution selects the next operation to be executed
+func (r *CruiseControlOperationReconciler) selectOperationForExecution(ccOperationQueueMap map[string][]*banzaiv1alpha1.CruiseControlOperation) (*banzaiv1alpha1.CruiseControlOperation, error) {
 	// First prio: execute the finalize task
-	switch {
-	case len(ccOperationQueueMap[ccOperationForStopExecution]) > 0:
-		ccOperationExecution = ccOperationQueueMap[ccOperationForStopExecution][0]
-		ccOperationExecution.CurrentTask().Operation = banzaiv1alpha1.OperationStopExecution
-	// Second prio: execute add_broker operation
-	case len(ccOperationQueueMap[ccOperationFirstExecution]) > 0 && ccOperationQueueMap[ccOperationFirstExecution][0].CurrentTaskOperation() == banzaiv1alpha1.OperationAddBroker:
-		ccOperationExecution = ccOperationQueueMap[ccOperationFirstExecution][0]
-	// Third prio: execute failed task
-	case len(ccOperationQueueMap[ccOperationRetryExecution]) > 0:
-		// When the default backoff duration elapsed we retry
-		if ccOperationQueueMap[ccOperationRetryExecution][0].IsReadyForRetryExecution() {
-			ccOperationExecution = ccOperationQueueMap[ccOperationRetryExecution][0]
-		}
-	// Forth prio: execute the first element in the FirstExecutionQueue which is ordered by operation type and k8s creation timestamp
-	case len(ccOperationQueueMap[ccOperationFirstExecution]) > 0:
-		ccOperationExecution = ccOperationQueueMap[ccOperationFirstExecution][0]
+	if op := getFirstOperation(ccOperationQueueMap, ccOperationForStopExecution); op != nil {
+		op.CurrentTask().Operation = banzaiv1alpha1.OperationStopExecution
+		return op, nil
 	}
 
-	return ccOperationExecution
+	// Second prio: execute add_broker operation
+	if op := getFirstOperation(ccOperationQueueMap, ccOperationFirstExecution); op != nil &&
+		op.CurrentTaskOperation() == banzaiv1alpha1.OperationAddBroker {
+		return op, nil
+	}
+
+	// Third prio: execute failed task
+	if op := getFirstOperation(ccOperationQueueMap, ccOperationRetryExecution); op != nil {
+		// If there is a failed remove_disks task and there is a rebalance_disks task in the queue, we execute the rebalance_disks task
+		// This could only happen if the user tried to delete a disk, and later rolled back the change
+		if op.CurrentTaskOperation() == banzaiv1alpha1.OperationRemoveDisks {
+			for _, opFirstExecution := range ccOperationQueueMap[ccOperationFirstExecution] {
+				if opFirstExecution.CurrentTaskOperation() == banzaiv1alpha1.OperationRebalance {
+					// Mark the remove disk operation as paused, so it is not retried
+					op.Labels[banzaiv1alpha1.PauseLabel] = True
+					err := r.Client.Update(context.TODO(), op)
+					if err != nil {
+						return nil, errors.WrapIfWithDetails(err, "failed to update Cruise Control operation", "name", op.Name, "namespace", op.Namespace)
+					}
+
+					// Execute the rebalance disks operation
+					return opFirstExecution, nil
+				}
+			}
+		}
+
+		// When the default backoff duration elapsed we retry
+		if op.IsReadyForRetryExecution() {
+			return op, nil
+		}
+	}
+
+	// Fourth prio: execute the first element in the FirstExecutionQueue which is ordered by operation type and k8s creation timestamp
+	return getFirstOperation(ccOperationQueueMap, ccOperationFirstExecution), nil
+}
+
+// getFirstOperation returns the first operation in the given queue
+func getFirstOperation(ccOperationQueueMap map[string][]*banzaiv1alpha1.CruiseControlOperation, key string) *banzaiv1alpha1.CruiseControlOperation {
+	if len(ccOperationQueueMap[key]) > 0 {
+		return ccOperationQueueMap[key][0]
+	}
+	return nil
 }
 
 // SetupCruiseControlWithManager registers cruise control controller to the manager
@@ -466,6 +511,121 @@ func (r *CruiseControlOperationReconciler) updateCurrentTasks(ctx context.Contex
 		}
 	}
 	return nil
+}
+
+// getStatus returns the internal state of Cruise Control.
+//
+// The logic is the following:
+//   - If the Cruise Control makes the Status request sync, then the result will be returned.
+//   - If the Cruise Control makes the Status request async, then a new Status CruiseControlOperation
+//     will be created and an error will be returned to indicate that Cruise Control is not ready yet.
+//   - If there is already a Status CruiseControlOperation in progress, then it will be updated and
+//     the result will be returned.
+func (r *CruiseControlOperationReconciler) getStatus(
+	ctx context.Context,
+	log logr.Logger,
+	kafkaCluster *banzaiv1beta1.KafkaCluster,
+	kafkaClusterRef client.ObjectKey,
+	ccOperationListClusterWide banzaiv1alpha1.CruiseControlOperationList,
+) (scale.CruiseControlStatus, error) {
+	var statusOperation *banzaiv1alpha1.CruiseControlOperation
+	for i := range ccOperationListClusterWide.Items {
+		ccOperation := &ccOperationListClusterWide.Items[i]
+		// ignoring the error here to continue processing the operations,
+		// even if the user does not provide a KafkaClusterRef label on the CCOperation then the ref will be an empty object (not nil) and the filter will skip it.
+		ref, _ := kafkaClusterReference(ccOperation)
+		if ref.Name == kafkaClusterRef.Name && ref.Namespace == kafkaClusterRef.Namespace && ccOperation.Status.CurrentTask != nil &&
+			ccOperation.Status.CurrentTask.Operation == banzaiv1alpha1.OperationStatus && ccOperation.IsCurrentTaskRunning() {
+			statusOperation = ccOperation
+			break
+		}
+	}
+
+	if statusOperation != nil {
+		res, err := r.scaler.StatusTask(ctx, statusOperation.CurrentTaskID())
+		if err != nil {
+			return scale.CruiseControlStatus{}, errors.WrapIfWithDetails(err, "could not get the latest state of Status CruiseControlOperation", "name", statusOperation.GetName(), "namespace", statusOperation.GetNamespace())
+		}
+		if err := updateResult(log, res.TaskResult, statusOperation, false); err != nil {
+			return scale.CruiseControlStatus{}, errors.WrapIfWithDetails(err, "could not update the state of Status CruiseControlOperation", "name", statusOperation.GetName(), "namespace", statusOperation.GetNamespace())
+		}
+
+		err = r.Status().Update(ctx, statusOperation)
+		if err != nil {
+			return scale.CruiseControlStatus{}, errors.WrapIfWithDetails(err, "could not update the state of Status CruiseControlOperation", "name", statusOperation.GetName(), "namespace", statusOperation.GetNamespace())
+		}
+
+		if statusOperation.CurrentTask().Finished != nil &&
+			statusOperation.CurrentTask().Finished.Time.Sub(statusOperation.CurrentTask().Started.Time) > defaultCruiseControlStatusOperationMaxDuration {
+			return scale.CruiseControlStatus{}, errors.New("the Cruise Control status operation took too long to finish")
+		}
+
+		if res.Status == nil {
+			return scale.CruiseControlStatus{}, errors.New("could not get Cruise Control status")
+		}
+
+		return *res.Status, nil
+	}
+
+	res, err := r.scaler.Status(ctx)
+	if err != nil {
+		return scale.CruiseControlStatus{}, errors.WrapIfWithDetails(err, "could not get Cruise Control status")
+	}
+
+	if res.Status == nil {
+		operationTTLSecondsAfterFinished := kafkaCluster.Spec.CruiseControlConfig.CruiseControlOperationSpec.GetTTLSecondsAfterFinished()
+		operation, err := r.createCCOperation(ctx, kafkaCluster, operationTTLSecondsAfterFinished, banzaiv1alpha1.OperationStatus)
+		if err != nil {
+			return scale.CruiseControlStatus{}, errors.WrapIfWithDetails(err, "could not create a new Status CruiseControlOperation")
+		}
+		if err = updateResult(log, res.TaskResult, operation, true); err != nil {
+			return scale.CruiseControlStatus{}, errors.WrapIfWithDetails(err, "could not update the state of Status CruiseControlOperation", "name", statusOperation.GetName(), "namespace", statusOperation.GetNamespace())
+		}
+		err = r.Status().Update(ctx, operation)
+		if err != nil {
+			return scale.CruiseControlStatus{}, errors.WrapIfWithDetails(err, "could not update the state of Status CruiseControlOperation", "name", statusOperation.GetName(), "namespace", statusOperation.GetNamespace())
+		}
+
+		return scale.CruiseControlStatus{}, errors.New("could not get Cruise Control status, the operation is still in progress")
+	}
+
+	return *res.Status, nil
+}
+
+func (r *CruiseControlOperationReconciler) createCCOperation(
+	ctx context.Context,
+	kafkaCluster *banzaiv1beta1.KafkaCluster,
+	ttlSecondsAfterFinished *int,
+	operationType banzaiv1alpha1.CruiseControlTaskOperation,
+) (*banzaiv1alpha1.CruiseControlOperation, error) {
+	operation := &banzaiv1alpha1.CruiseControlOperation{
+		ObjectMeta: v1.ObjectMeta{
+			GenerateName: fmt.Sprintf("%s-%s-", kafkaCluster.Name, strings.ReplaceAll(string(operationType), "_", "")),
+			Namespace:    kafkaCluster.Namespace,
+			Labels:       apiutil.LabelsForKafka(kafkaCluster.Name),
+		},
+	}
+
+	if ttlSecondsAfterFinished != nil {
+		operation.Spec.TTLSecondsAfterFinished = ttlSecondsAfterFinished
+	}
+
+	if err := controllerutil.SetControllerReference(kafkaCluster, operation, r.Scheme); err != nil {
+		return nil, err
+	}
+	if err := r.Client.Create(ctx, operation); err != nil {
+		return nil, err
+	}
+
+	operation.Status.CurrentTask = &banzaiv1alpha1.CruiseControlTask{
+		Operation: operationType,
+	}
+
+	if err := r.Status().Update(ctx, operation); err != nil {
+		return nil, err
+	}
+
+	return operation, nil
 }
 
 func isWaitingForFinalization(ccOperation *banzaiv1alpha1.CruiseControlOperation) bool {

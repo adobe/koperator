@@ -16,17 +16,17 @@ package scale
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math"
 	"strconv"
 	"strings"
 
 	"emperror.dev/errors"
-	"github.com/go-logr/logr"
-
 	"github.com/banzaicloud/go-cruise-control/pkg/api"
 	"github.com/banzaicloud/go-cruise-control/pkg/client"
 	"github.com/banzaicloud/go-cruise-control/pkg/types"
+	"github.com/go-logr/logr"
 
 	"github.com/banzaicloud/koperator/api/v1alpha1"
 	"github.com/banzaicloud/koperator/api/v1beta1"
@@ -35,11 +35,12 @@ import (
 const (
 	// Constants for the Cruise Control operations parameters
 	// Check for more details: https://github.com/linkedin/cruise-control/wiki/REST-APIs
-	paramBrokerID       = "brokerid"
-	paramExcludeDemoted = "exclude_recently_demoted_brokers"
-	paramExcludeRemoved = "exclude_recently_removed_brokers"
-	paramDestbrokerIDs  = "destination_broker_ids"
-	paramRebalanceDisk  = "rebalance_disk"
+	ParamBrokerID           = "brokerid"
+	ParamExcludeDemoted     = "exclude_recently_demoted_brokers"
+	ParamExcludeRemoved     = "exclude_recently_removed_brokers"
+	ParamDestbrokerIDs      = "destination_broker_ids"
+	ParamRebalanceDisk      = "rebalance_disk"
+	ParamBrokerIDAndLogDirs = "brokerid_and_logdirs"
 	// Cruise Control API returns NullPointerException when a broker storage capacity calculations are missing
 	// from the Cruise Control configurations
 	nullPointerExceptionErrString = "NullPointerException"
@@ -50,20 +51,23 @@ const (
 var (
 	newCruiseControlScaler   = createNewDefaultCruiseControlScaler
 	addBrokerSupportedParams = map[string]struct{}{
-		paramBrokerID:       {},
-		paramExcludeDemoted: {},
-		paramExcludeRemoved: {},
+		ParamBrokerID:       {},
+		ParamExcludeDemoted: {},
+		ParamExcludeRemoved: {},
 	}
 	removeBrokerSupportedParams = map[string]struct{}{
-		paramBrokerID:       {},
-		paramExcludeDemoted: {},
-		paramExcludeRemoved: {},
+		ParamBrokerID:       {},
+		ParamExcludeDemoted: {},
+		ParamExcludeRemoved: {},
 	}
 	rebalanceSupportedParams = map[string]struct{}{
-		paramDestbrokerIDs:  {},
-		paramRebalanceDisk:  {},
-		paramExcludeDemoted: {},
-		paramExcludeRemoved: {},
+		ParamDestbrokerIDs:  {},
+		ParamRebalanceDisk:  {},
+		ParamExcludeDemoted: {},
+		ParamExcludeRemoved: {},
+	}
+	removeDisksSupportedParams = map[string]struct{}{
+		ParamBrokerIDAndLogDirs: {},
 	}
 )
 
@@ -103,18 +107,102 @@ type cruiseControlScaler struct {
 	client *client.Client
 }
 
-// Status returns a CruiseControlStatus describing the internal state of Cruise Control.
-func (cc *cruiseControlScaler) Status(ctx context.Context) (CruiseControlStatus, error) {
+// Status returns a StatusTaskResult describing the internal state of Cruise Control.
+func (cc *cruiseControlScaler) Status(ctx context.Context) (StatusTaskResult, error) {
 	req := api.StateRequestWithDefaults()
 	req.Verbose = true
 	resp, err := cc.client.State(ctx, req)
 	if err != nil {
-		return CruiseControlStatus{}, err
+		return StatusTaskResult{}, err
 	}
 
+	// if the execution takes too much time, then Cruise Control converts the request into async
+	// and returns the taskID
+	if resp.Result == nil {
+		return StatusTaskResult{
+			TaskResult: &Result{
+				TaskID:             resp.TaskID,
+				StartedAt:          resp.Date,
+				ResponseStatusCode: resp.StatusCode,
+				RequestURL:         resp.RequestURL,
+				State:              v1beta1.CruiseControlTaskActive,
+			},
+		}, nil
+	}
+
+	status := convert(resp.Result)
+
+	return StatusTaskResult{
+		TaskResult: &Result{
+			TaskID:             resp.TaskID,
+			StartedAt:          resp.Date,
+			ResponseStatusCode: resp.StatusCode,
+			RequestURL:         resp.RequestURL,
+			State:              v1beta1.CruiseControlTaskActive,
+		},
+		Status: &status,
+	}, nil
+}
+
+// StatusTask returns the latest state of the Status Cruise Control task.
+func (cc *cruiseControlScaler) StatusTask(ctx context.Context, taskID string) (StatusTaskResult, error) {
+	req := &api.UserTasksRequest{
+		UserTaskIDs:         []string{taskID},
+		FetchCompletedTasks: true,
+	}
+
+	resp, err := cc.client.UserTasks(ctx, req)
+	if err != nil {
+		return StatusTaskResult{}, err
+	}
+
+	//CC no longer has the info about the task, mark it as completed with error
+	if len(resp.Result.UserTasks) == 0 {
+		return StatusTaskResult{
+			TaskResult: &Result{
+				TaskID: taskID,
+				State:  v1beta1.CruiseControlTaskCompletedWithError,
+			},
+		}, nil
+	}
+
+	if len(resp.Result.UserTasks) != 1 {
+		return StatusTaskResult{}, fmt.Errorf("could not get the Cruise Control state, expected the response for 1 task (%s), but got %d responses", taskID, len(resp.Result.UserTasks))
+	}
+
+	taskInfo := resp.Result.UserTasks[0]
+	status := taskInfo.Status
+	if status == types.UserTaskStatusCompleted {
+		result := &types.StateResult{}
+		if err = json.Unmarshal([]byte(taskInfo.OriginalResponse), result); err != nil {
+			return StatusTaskResult{}, err
+		}
+
+		status := convert(result)
+
+		return StatusTaskResult{
+			TaskResult: &Result{
+				TaskID:    taskInfo.UserTaskID,
+				StartedAt: taskInfo.StartMs.UTC().String(),
+				State:     v1beta1.CruiseControlUserTaskState(taskInfo.Status.String()),
+			},
+			Status: &status,
+		}, nil
+	}
+
+	return StatusTaskResult{
+		TaskResult: &Result{
+			TaskID:    taskInfo.UserTaskID,
+			StartedAt: taskInfo.StartMs.UTC().String(),
+			State:     v1beta1.CruiseControlUserTaskState(taskInfo.Status.String()),
+		},
+	}, nil
+}
+
+func convert(result *types.StateResult) CruiseControlStatus {
 	goalsReady := true
-	if len(resp.Result.AnalyzerState.GoalReadiness) > 0 {
-		for _, goal := range resp.Result.AnalyzerState.GoalReadiness {
+	if len(result.AnalyzerState.GoalReadiness) > 0 {
+		for _, goal := range result.AnalyzerState.GoalReadiness {
 			if goal.Status != types.GoalReadinessStatusReady {
 				goalsReady = false
 				break
@@ -122,32 +210,33 @@ func (cc *cruiseControlScaler) Status(ctx context.Context) (CruiseControlStatus,
 		}
 	}
 
-	return CruiseControlStatus{
-		MonitorReady:       resp.Result.MonitorState.State == types.MonitorStateRunning,
-		ExecutorReady:      resp.Result.ExecutorState.State == types.ExecutorStateTypeNoTaskInProgress,
-		AnalyzerReady:      resp.Result.AnalyzerState.IsProposalReady && goalsReady,
-		ProposalReady:      resp.Result.AnalyzerState.IsProposalReady,
+	status := CruiseControlStatus{
+		MonitorReady:       result.MonitorState.State == types.MonitorStateRunning,
+		ExecutorReady:      result.ExecutorState.State == types.ExecutorStateTypeNoTaskInProgress,
+		AnalyzerReady:      result.AnalyzerState.IsProposalReady && goalsReady,
+		ProposalReady:      result.AnalyzerState.IsProposalReady,
 		GoalsReady:         goalsReady,
-		MonitoredWindows:   resp.Result.MonitorState.NumMonitoredWindows,
-		MonitoringCoverage: resp.Result.MonitorState.MonitoringCoveragePercentage,
-	}, nil
+		MonitoredWindows:   result.MonitorState.NumMonitoredWindows,
+		MonitoringCoverage: result.MonitorState.MonitoringCoveragePercentage,
+	}
+	return status
 }
 
 // IsReady returns true if the Analyzer and Monitor components of Cruise Control are in ready state.
 func (cc *cruiseControlScaler) IsReady(ctx context.Context) bool {
 	status, err := cc.Status(ctx)
-	if err != nil {
+	if err != nil || status.Status == nil {
 		cc.log.Error(err, "could not get Cruise Control status")
 		return false
 	}
 	cc.log.Info("cruise control readiness",
-		"analyzer", status.AnalyzerReady,
-		"monitor", status.MonitorReady,
-		"executor", status.ExecutorReady,
-		"goals ready", status.GoalsReady,
-		"monitored windows", status.MonitoredWindows,
-		"monitoring coverage percentage", status.MonitoringCoverage)
-	return status.IsReady()
+		"analyzer", status.Status.AnalyzerReady,
+		"monitor", status.Status.MonitorReady,
+		"executor", status.Status.ExecutorReady,
+		"goals ready", status.Status.GoalsReady,
+		"monitored windows", status.Status.MonitoredWindows,
+		"monitoring coverage percentage", status.Status.MonitoringCoverage)
+	return status.Status.IsReady()
 }
 
 // IsUp returns true if Cruise Control is online.
@@ -205,19 +294,19 @@ func (cc *cruiseControlScaler) AddBrokersWithParams(ctx context.Context, params 
 	for param, pvalue := range params {
 		if _, ok := addBrokerSupportedParams[param]; ok {
 			switch param {
-			case paramBrokerID:
+			case ParamBrokerID:
 				ret, err := parseBrokerIDtoSlice(pvalue)
 				if err != nil {
 					return nil, err
 				}
 				addBrokerReq.BrokerIDs = ret
-			case paramExcludeDemoted:
+			case ParamExcludeDemoted:
 				ret, err := strconv.ParseBool(pvalue)
 				if err != nil {
 					return nil, err
 				}
 				addBrokerReq.ExcludeRecentlyDemotedBrokers = ret
-			case paramExcludeRemoved:
+			case ParamExcludeRemoved:
 				ret, err := strconv.ParseBool(pvalue)
 				if err != nil {
 					return nil, err
@@ -282,19 +371,19 @@ func (cc *cruiseControlScaler) RemoveBrokersWithParams(ctx context.Context, para
 	for param, pvalue := range params {
 		if _, ok := removeBrokerSupportedParams[param]; ok {
 			switch param {
-			case paramBrokerID:
+			case ParamBrokerID:
 				ret, err := parseBrokerIDtoSlice(pvalue)
 				if err != nil {
 					return nil, err
 				}
 				rmBrokerReq.BrokerIDs = ret
-			case paramExcludeDemoted:
+			case ParamExcludeDemoted:
 				ret, err := strconv.ParseBool(pvalue)
 				if err != nil {
 					return nil, err
 				}
 				rmBrokerReq.ExcludeRecentlyDemotedBrokers = ret
-			case paramExcludeRemoved:
+			case ParamExcludeRemoved:
 				ret, err := strconv.ParseBool(pvalue)
 				if err != nil {
 					return nil, err
@@ -464,25 +553,25 @@ func (cc *cruiseControlScaler) RebalanceWithParams(ctx context.Context, params m
 	for param, pvalue := range params {
 		if _, ok := rebalanceSupportedParams[param]; ok {
 			switch param {
-			case paramDestbrokerIDs:
+			case ParamDestbrokerIDs:
 				ret, err := parseBrokerIDtoSlice(pvalue)
 				if err != nil {
 					return nil, err
 				}
 				rebalanceReq.DestinationBrokerIDs = ret
-			case paramRebalanceDisk:
+			case ParamRebalanceDisk:
 				ret, err := strconv.ParseBool(pvalue)
 				if err != nil {
 					return nil, err
 				}
 				rebalanceReq.RebalanceDisk = ret
-			case paramExcludeDemoted:
+			case ParamExcludeDemoted:
 				ret, err := strconv.ParseBool(pvalue)
 				if err != nil {
 					return nil, err
 				}
 				rebalanceReq.ExcludeRecentlyDemotedBrokers = ret
-			case paramExcludeRemoved:
+			case ParamExcludeRemoved:
 				ret, err := strconv.ParseBool(pvalue)
 				if err != nil {
 					return nil, err
@@ -514,6 +603,81 @@ func (cc *cruiseControlScaler) RebalanceWithParams(ctx context.Context, params m
 		Result:             rebalanceResp.Result,
 		State:              v1beta1.CruiseControlTaskActive,
 	}, nil
+}
+
+func (cc *cruiseControlScaler) RemoveDisksWithParams(ctx context.Context, params map[string]string) (*Result, error) {
+	removeReq := &api.RemoveDisksRequest{}
+
+	for param, pvalue := range params {
+		if _, ok := removeDisksSupportedParams[param]; ok {
+			switch param {
+			case ParamBrokerIDAndLogDirs:
+				ret, err := parseBrokerIDsAndLogDirsToMap(pvalue)
+				if err != nil {
+					return nil, err
+				}
+				removeReq.BrokerIDAndLogDirs = ret
+			default:
+				return nil, fmt.Errorf("unsupported %s parameter: %s, supported parameters: %s", v1alpha1.OperationRemoveDisks, param, removeDisksSupportedParams)
+			}
+		}
+	}
+
+	if len(removeReq.BrokerIDAndLogDirs) == 0 {
+		return &Result{
+			State: v1beta1.CruiseControlTaskCompleted,
+		}, nil
+	}
+
+	removeResp, err := cc.client.RemoveDisks(ctx, removeReq)
+	if err != nil {
+		return &Result{
+			TaskID:             removeResp.TaskID,
+			StartedAt:          removeResp.Date,
+			ResponseStatusCode: removeResp.StatusCode,
+			RequestURL:         removeResp.RequestURL,
+			State:              v1beta1.CruiseControlTaskCompletedWithError,
+			Err:                err,
+		}, err
+	}
+
+	return &Result{
+		TaskID:             removeResp.TaskID,
+		StartedAt:          removeResp.Date,
+		ResponseStatusCode: removeResp.StatusCode,
+		RequestURL:         removeResp.RequestURL,
+		Result:             removeResp.Result,
+		State:              v1beta1.CruiseControlTaskActive,
+	}, nil
+}
+
+func parseBrokerIDsAndLogDirsToMap(brokerIDsAndLogDirs string) (map[int32][]string, error) {
+	// brokerIDsAndLogDirs format: brokerID1-logDir1,brokerID2-logDir2,brokerID1-logDir3
+	brokerIDLogDirMap := make(map[int32][]string)
+
+	if len(brokerIDsAndLogDirs) == 0 {
+		return brokerIDLogDirMap, nil
+	}
+
+	pairs := strings.Split(brokerIDsAndLogDirs, ",")
+	for _, pair := range pairs {
+		components := strings.SplitN(pair, "-", 2)
+		if len(components) != 2 {
+			return nil, errors.New("invalid format for brokerIDsAndLogDirs")
+		}
+
+		brokerID, err := strconv.ParseInt(components[0], 10, 32)
+		if err != nil {
+			return nil, errors.New("invalid broker ID")
+		}
+
+		logDir := components[1]
+
+		// Add logDir to the corresponding brokerID's list
+		brokerIDLogDirMap[int32(brokerID)] = append(brokerIDLogDirMap[int32(brokerID)], logDir)
+	}
+
+	return brokerIDLogDirMap, nil
 }
 
 func (cc *cruiseControlScaler) KafkaClusterLoad(ctx context.Context) (*api.KafkaClusterLoadResponse, error) {

@@ -79,6 +79,7 @@ type KafkaClusterReconciler struct {
 // +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=kafka.banzaicloud.io,resources=kafkaclusters,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=kafka.banzaicloud.io,resources=kafkaclusters/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=kafka.banzaicloud.io,resources=kafkaclusters/finalizers,verbs=create;update;patch;delete
 // +kubebuilder:rbac:groups=servicemesh.cisco.com,resources=istiomeshgateways,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=networking.istio.io,resources=*,verbs=*
 
@@ -150,6 +151,7 @@ func (r *KafkaClusterReconciler) Reconcile(ctx context.Context, request ctrl.Req
 					RequeueAfter: time.Duration(15) * time.Second,
 				}, nil
 			case errors.As(err, &errorfactory.CruiseControlTaskRunning{}):
+				log.Info("Cruise Control task running, requeuing", "error", err.Error())
 				return ctrl.Result{
 					RequeueAfter: time.Duration(20) * time.Second,
 				}, nil

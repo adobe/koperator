@@ -52,6 +52,21 @@ func (m *MockCruiseControlScaler) EXPECT() *MockCruiseControlScalerMockRecorder 
 	return m.recorder
 }
 
+// RemoveDisksWithParams mocks base method.
+func (m *MockCruiseControlScaler) RemoveDisksWithParams(ctx context.Context, params map[string]string) (*scale.Result, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RemoveDisksWithParams", ctx, params)
+	ret0, _ := ret[0].(*scale.Result)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RemoveDisksWithParams indicates an expected call of RemoveDisksWithParams.
+func (mr *MockCruiseControlScalerMockRecorder) RemoveDisksWithParams(ctx, params interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveDisksWithParams", reflect.TypeOf((*MockCruiseControlScaler)(nil).RemoveDisksWithParams), ctx, params)
+}
+
 // AddBrokers mocks base method.
 func (m *MockCruiseControlScaler) AddBrokers(ctx context.Context, brokerIDs ...string) (*scale.Result, error) {
 	m.ctrl.T.Helper()
@@ -281,10 +296,10 @@ func (mr *MockCruiseControlScalerMockRecorder) RemoveBrokersWithParams(ctx, para
 }
 
 // Status mocks base method.
-func (m *MockCruiseControlScaler) Status(ctx context.Context) (scale.CruiseControlStatus, error) {
+func (m *MockCruiseControlScaler) Status(ctx context.Context) (scale.StatusTaskResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Status", ctx)
-	ret0, _ := ret[0].(scale.CruiseControlStatus)
+	ret0, _ := ret[0].(scale.StatusTaskResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -293,6 +308,21 @@ func (m *MockCruiseControlScaler) Status(ctx context.Context) (scale.CruiseContr
 func (mr *MockCruiseControlScalerMockRecorder) Status(ctx interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Status", reflect.TypeOf((*MockCruiseControlScaler)(nil).Status), ctx)
+}
+
+// StatusTask mocks base method.
+func (m *MockCruiseControlScaler) StatusTask(ctx context.Context, taskID string) (scale.StatusTaskResult, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "StatusTask", ctx, taskID)
+	ret0, _ := ret[0].(scale.StatusTaskResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// StatusTask indicates an expected call of StatusTask.
+func (mr *MockCruiseControlScalerMockRecorder) StatusTask(ctx interface{}, taskID string) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StatusTask", reflect.TypeOf((*MockCruiseControlScaler)(nil).Status), ctx, taskID)
 }
 
 // StopExecution mocks base method.

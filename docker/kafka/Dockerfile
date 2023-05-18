@@ -28,6 +28,7 @@ FROM debian:bullseye-slim
 ARG scala_version=2.13
 ARG kafka_version=3.4.0
 
+
 RUN set -eux; \
 	apt-get update; \
 	apt-get install -y --no-install-recommends \

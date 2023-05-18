@@ -87,13 +87,18 @@ type KafkaClusterSpec struct {
 	IstioControlPlane *IstioControlPlaneReference `json:"istioControlPlane,omitempty"`
 	// If true OneBrokerPerNode ensures that each kafka broker will be placed on a different node unless a custom
 	// Affinity definition overrides this behavior
-	OneBrokerPerNode    bool                `json:"oneBrokerPerNode"`
-	PropagateLabels     bool                `json:"propagateLabels,omitempty"`
-	CruiseControlConfig CruiseControlConfig `json:"cruiseControlConfig"`
-	EnvoyConfig         EnvoyConfig         `json:"envoyConfig,omitempty"`
-	MonitoringConfig    MonitoringConfig    `json:"monitoringConfig,omitempty"`
-	AlertManagerConfig  *AlertManagerConfig `json:"alertManagerConfig,omitempty"`
-	IstioIngressConfig  IstioIngressConfig  `json:"istioIngressConfig,omitempty"`
+	OneBrokerPerNode bool `json:"oneBrokerPerNode"`
+	// RemoveUnusedIngressResources when true, the unnecessary resources from the previous ingress state will be removed.
+	// when false, they will be kept so the Kafka cluster remains available for those Kafka clients which are still using the previous ingress setting.
+	// +kubebuilder:default=false
+	// +optional
+	RemoveUnusedIngressResources bool                `json:"removeUnusedIngressResources,omitempty"`
+	PropagateLabels              bool                `json:"propagateLabels,omitempty"`
+	CruiseControlConfig          CruiseControlConfig `json:"cruiseControlConfig"`
+	EnvoyConfig                  EnvoyConfig         `json:"envoyConfig,omitempty"`
+	MonitoringConfig             MonitoringConfig    `json:"monitoringConfig,omitempty"`
+	AlertManagerConfig           *AlertManagerConfig `json:"alertManagerConfig,omitempty"`
+	IstioIngressConfig           IstioIngressConfig  `json:"istioIngressConfig,omitempty"`
 	// Envs defines environment variables for Kafka broker Pods.
 	// Adding the "+" prefix to the name prepends the value to that environment variable instead of overwriting it.
 	// Add the "+" suffix to append.
@@ -265,6 +270,7 @@ type CruiseControlConfig struct {
 	Log4jConfig                string                        `json:"log4jConfig,omitempty"`
 	Image                      string                        `json:"image,omitempty"`
 	TopicConfig                *TopicConfig                  `json:"topicConfig,omitempty"`
+	Affinity                   *corev1.Affinity              `json:"affinity,omitempty"`
 	//  Annotations to be applied to CruiseControl pod
 	// +optional
 	CruiseControlAnnotations map[string]string `json:"cruiseControlAnnotations,omitempty"`
@@ -361,6 +367,10 @@ type EnvoyConfig struct {
 	// EnableHealthCheckHttp10 is a toggle for adding HTTP1.0 support to Envoy health-check, default false
 	// +optional
 	EnableHealthCheckHttp10 bool `json:"enableHealthCheckHttp10,omitempty"`
+
+	// PodSecurityContext holds pod-level security attributes and common container
+	// settings for the Envoy pods.
+	PodSecurityContext *corev1.PodSecurityContext `json:"podSecurityContext,omitempty"`
 }
 
 // EnvoyCommandLineArgs defines envoy command line arguments
@@ -503,7 +513,7 @@ type SSLSecrets struct {
 	JKSPasswordName string                  `json:"jksPasswordName,omitempty"`
 	Create          bool                    `json:"create,omitempty"`
 	IssuerRef       *cmmeta.ObjectReference `json:"issuerRef,omitempty"`
-	// +kubebuilder:validation:Enum={"cert-manager"}
+	// +kubebuilder:validation:Enum={"cert-manager","k8s-csr"}
 	PKIBackend PKIBackend `json:"pkiBackend,omitempty"`
 }
 
@@ -867,6 +877,11 @@ func (cConfig *CruiseControlConfig) GetNodeSelector() map[string]string {
 	return cConfig.NodeSelector
 }
 
+// GetAffinity returns the Affinity config for cruise control
+func (cConfig *CruiseControlConfig) GetAffinity() *corev1.Affinity {
+	return cConfig.Affinity
+}
+
 // GetNodeSelector returns the node selector for envoy
 func (eConfig *EnvoyConfig) GetNodeSelector() map[string]string {
 	return eConfig.NodeSelector
@@ -880,6 +895,15 @@ func (eConfig *EnvoyConfig) GetAffinity() *corev1.Affinity {
 // GetTopologySpreadConstaints returns the Affinity config for envoy
 func (eConfig *EnvoyConfig) GetTopologySpreadConstaints() []corev1.TopologySpreadConstraint {
 	return eConfig.TopologySpreadConstraints
+}
+
+// GetPodSecurityContext returns the security context for the envoy deployment podspec.
+func (eConfig *EnvoyConfig) GetPodSecurityContext() *corev1.PodSecurityContext {
+	if eConfig == nil {
+		return nil
+	}
+
+	return eConfig.PodSecurityContext
 }
 
 // GetPriorityClassName returns the priority class name for envoy
