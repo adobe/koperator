@@ -119,5 +119,6 @@ COPY opt/kafka/config/log4j.properties ${KAFKA_HOME}/config/log4j.properties
 
 
 RUN chmod a+x ${KAFKA_HOME}/bin/*.sh
+RUN chmod g+rwX ${KAFKA_HOME} && mkdir -p ${KAFKA_HOME}/libs/extensions && chmod g+rwX ${KAFKA_HOME}/libs/extensions
 
 CMD ["kafka-server-start.sh"]
