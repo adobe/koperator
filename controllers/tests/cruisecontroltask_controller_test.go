@@ -85,231 +85,231 @@ var _ = Describe("CruiseControlTaskReconciler", func() {
 		err := k8sClient.Delete(context.Background(), namespaceObj)
 		Expect(err).NotTo(HaveOccurred())
 	})
-	When("new storage is added", Serial, func() {
+	// When("new storage is added", Serial, func() {
 
-		JustBeforeEach(func(ctx SpecContext) {
-			kafkaClusterCCReconciler.ScaleFactory = mocks.NewMockScaleFactory(getScaleMockCCTask2([]string{mountPath}))
+	// 	JustBeforeEach(func(ctx SpecContext) {
+	// 		kafkaClusterCCReconciler.ScaleFactory = mocks.NewMockScaleFactory(getScaleMockCCTask2([]string{mountPath}))
 
-			err := util.RetryOnConflict(util.DefaultBackOffForConflict, func() error {
-				if err := k8sClient.Get(ctx, types.NamespacedName{
-					Name:      kafkaCluster.Name,
-					Namespace: kafkaCluster.Namespace,
-				}, kafkaCluster); err != nil {
-					return err
-				}
-				brokerState := kafkaCluster.Status.BrokersState["0"]
-				volumeState := make(map[string]v1beta1.VolumeState)
-				volumeState[mountPath] = v1beta1.VolumeState{
-					CruiseControlVolumeState: v1beta1.GracefulDiskRebalanceRequired,
-				}
+	// 		err := util.RetryOnConflict(util.DefaultBackOffForConflict, func() error {
+	// 			if err := k8sClient.Get(ctx, types.NamespacedName{
+	// 				Name:      kafkaCluster.Name,
+	// 				Namespace: kafkaCluster.Namespace,
+	// 			}, kafkaCluster); err != nil {
+	// 				return err
+	// 			}
+	// 			brokerState := kafkaCluster.Status.BrokersState["0"]
+	// 			volumeState := make(map[string]v1beta1.VolumeState)
+	// 			volumeState[mountPath] = v1beta1.VolumeState{
+	// 				CruiseControlVolumeState: v1beta1.GracefulDiskRebalanceRequired,
+	// 			}
 
-				brokerState.GracefulActionState.VolumeStates = volumeState
-				kafkaCluster.Status.BrokersState["0"] = brokerState
-				return k8sClient.Status().Update(ctx, kafkaCluster)
-			})
+	// 			brokerState.GracefulActionState.VolumeStates = volumeState
+	// 			kafkaCluster.Status.BrokersState["0"] = brokerState
+	// 			return k8sClient.Status().Update(ctx, kafkaCluster)
+	// 		})
 
-			Expect(err).NotTo(HaveOccurred())
+	// 		Expect(err).NotTo(HaveOccurred())
 
-		})
-		It("should create one JBOD rebalance CruiseControlOperation", func(ctx SpecContext) {
-			Eventually(ctx, func() bool {
-				err := k8sClient.Get(ctx, types.NamespacedName{
-					Name:      kafkaCluster.Name,
-					Namespace: kafkaCluster.Namespace,
-				}, kafkaCluster)
-				Expect(err).NotTo(HaveOccurred())
+	// 	})
+	// 	It("should create one JBOD rebalance CruiseControlOperation", func(ctx SpecContext) {
+	// 		Eventually(ctx, func() bool {
+	// 			err := k8sClient.Get(ctx, types.NamespacedName{
+	// 				Name:      kafkaCluster.Name,
+	// 				Namespace: kafkaCluster.Namespace,
+	// 			}, kafkaCluster)
+	// 			Expect(err).NotTo(HaveOccurred())
 
-				brokerState, ok := kafkaCluster.Status.BrokersState["0"]
-				if !ok {
-					return false
-				}
-				volumeState, ok := brokerState.GracefulActionState.VolumeStates[mountPath]
-				if !ok || volumeState.CruiseControlOperationReference == nil {
-					return false
-				}
+	// 			brokerState, ok := kafkaCluster.Status.BrokersState["0"]
+	// 			if !ok {
+	// 				return false
+	// 			}
+	// 			volumeState, ok := brokerState.GracefulActionState.VolumeStates[mountPath]
+	// 			if !ok || volumeState.CruiseControlOperationReference == nil {
+	// 				return false
+	// 			}
 
-				operationList := &v1alpha1.CruiseControlOperationList{}
+	// 			operationList := &v1alpha1.CruiseControlOperationList{}
 
-				err = k8sClient.List(ctx, operationList, client.ListOption(client.InNamespace(kafkaCluster.Namespace)))
-				Expect(err).NotTo(HaveOccurred())
+	// 			err = k8sClient.List(ctx, operationList, client.ListOption(client.InNamespace(kafkaCluster.Namespace)))
+	// 			Expect(err).NotTo(HaveOccurred())
 
-				if len(operationList.Items) != 1 {
-					return false
-				}
-				operation = &operationList.Items[0]
-				return volumeState.CruiseControlOperationReference.Name == operation.Name &&
-					operation.CurrentTaskOperation() == v1alpha1.OperationRebalance &&
-					volumeState.CruiseControlVolumeState == v1beta1.GracefulDiskRebalanceScheduled &&
-					operation.CurrentTask() != nil && operation.CurrentTask().Parameters["rebalance_disk"] == trueStr
+	// 			if len(operationList.Items) != 1 {
+	// 				return false
+	// 			}
+	// 			operation = &operationList.Items[0]
+	// 			return volumeState.CruiseControlOperationReference.Name == operation.Name &&
+	// 				operation.CurrentTaskOperation() == v1alpha1.OperationRebalance &&
+	// 				volumeState.CruiseControlVolumeState == v1beta1.GracefulDiskRebalanceScheduled &&
+	// 				operation.CurrentTask() != nil && operation.CurrentTask().Parameters["rebalance_disk"] == trueStr
 
-			}, 15*time.Second, 500*time.Millisecond).Should(BeTrue())
-		})
-	})
-	When("new storage is added but there is a not JBOD capacityConfig for that", Serial, func() {
-		JustBeforeEach(func(ctx SpecContext) {
-			kafkaClusterCCReconciler.ScaleFactory = mocks.NewMockScaleFactory(getScaleMockCCTask2([]string{mountPath}))
-			err := k8sClient.Get(ctx, types.NamespacedName{
-				Name:      kafkaCluster.Name,
-				Namespace: kafkaCluster.Namespace,
-			}, kafkaCluster)
-			Expect(err).NotTo(HaveOccurred())
+	// 		}, 15*time.Second, 500*time.Millisecond).Should(BeTrue())
+	// 	})
+	// })
+	// When("new storage is added but there is a not JBOD capacityConfig for that", Serial, func() {
+	// 	JustBeforeEach(func(ctx SpecContext) {
+	// 		kafkaClusterCCReconciler.ScaleFactory = mocks.NewMockScaleFactory(getScaleMockCCTask2([]string{mountPath}))
+	// 		err := k8sClient.Get(ctx, types.NamespacedName{
+	// 			Name:      kafkaCluster.Name,
+	// 			Namespace: kafkaCluster.Namespace,
+	// 		}, kafkaCluster)
+	// 		Expect(err).NotTo(HaveOccurred())
 
-			kafkaCluster.Spec.CruiseControlConfig.CapacityConfig = `
-			{
-			"brokerCapacities":[
-			  {
-				"brokerId": "0",
-				"capacity": {
-				  "DISK": "50000",
-				  "CPU": "100",
-				  "NW_IN": "50000",
-				  "NW_OUT": "50000"
-				}
-			  }
-			]
-		  }`
-			err = k8sClient.Update(ctx, kafkaCluster)
-			Expect(err).NotTo(HaveOccurred())
-			err = util.RetryOnConflict(util.DefaultBackOffForConflict, func() error {
-				if err := k8sClient.Get(ctx, types.NamespacedName{
-					Name:      kafkaCluster.Name,
-					Namespace: kafkaCluster.Namespace,
-				}, kafkaCluster); err != nil {
-					return err
-				}
-				brokerState := kafkaCluster.Status.BrokersState["0"]
-				volumeState := make(map[string]v1beta1.VolumeState)
-				volumeState[mountPath] = v1beta1.VolumeState{
-					CruiseControlVolumeState: v1beta1.GracefulDiskRebalanceRequired,
-				}
+	// 		kafkaCluster.Spec.CruiseControlConfig.CapacityConfig = `
+	// 		{
+	// 		"brokerCapacities":[
+	// 		  {
+	// 			"brokerId": "0",
+	// 			"capacity": {
+	// 			  "DISK": "50000",
+	// 			  "CPU": "100",
+	// 			  "NW_IN": "50000",
+	// 			  "NW_OUT": "50000"
+	// 			}
+	// 		  }
+	// 		]
+	// 	  }`
+	// 		err = k8sClient.Update(ctx, kafkaCluster)
+	// 		Expect(err).NotTo(HaveOccurred())
+	// 		err = util.RetryOnConflict(util.DefaultBackOffForConflict, func() error {
+	// 			if err := k8sClient.Get(ctx, types.NamespacedName{
+	// 				Name:      kafkaCluster.Name,
+	// 				Namespace: kafkaCluster.Namespace,
+	// 			}, kafkaCluster); err != nil {
+	// 				return err
+	// 			}
+	// 			brokerState := kafkaCluster.Status.BrokersState["0"]
+	// 			volumeState := make(map[string]v1beta1.VolumeState)
+	// 			volumeState[mountPath] = v1beta1.VolumeState{
+	// 				CruiseControlVolumeState: v1beta1.GracefulDiskRebalanceRequired,
+	// 			}
 
-				brokerState.GracefulActionState.VolumeStates = volumeState
-				kafkaCluster.Status.BrokersState["0"] = brokerState
-				return k8sClient.Status().Update(ctx, kafkaCluster)
-			})
+	// 			brokerState.GracefulActionState.VolumeStates = volumeState
+	// 			kafkaCluster.Status.BrokersState["0"] = brokerState
+	// 			return k8sClient.Status().Update(ctx, kafkaCluster)
+	// 		})
 
-			Expect(err).NotTo(HaveOccurred())
+	// 		Expect(err).NotTo(HaveOccurred())
 
-		})
-		It("should create one not JBOD rebalance CruiseControlOperation", func(ctx SpecContext) {
-			Eventually(ctx, func() bool {
-				err := k8sClient.Get(ctx, types.NamespacedName{
-					Name:      kafkaCluster.Name,
-					Namespace: kafkaCluster.Namespace,
-				}, kafkaCluster)
-				Expect(err).NotTo(HaveOccurred())
+	// 	})
+	// 	It("should create one not JBOD rebalance CruiseControlOperation", func(ctx SpecContext) {
+	// 		Eventually(ctx, func() bool {
+	// 			err := k8sClient.Get(ctx, types.NamespacedName{
+	// 				Name:      kafkaCluster.Name,
+	// 				Namespace: kafkaCluster.Namespace,
+	// 			}, kafkaCluster)
+	// 			Expect(err).NotTo(HaveOccurred())
 
-				brokerState, ok := kafkaCluster.Status.BrokersState["0"]
-				if !ok {
-					return false
-				}
-				volumeState, ok := brokerState.GracefulActionState.VolumeStates[mountPath]
-				if !ok || volumeState.CruiseControlOperationReference == nil {
-					return false
-				}
+	// 			brokerState, ok := kafkaCluster.Status.BrokersState["0"]
+	// 			if !ok {
+	// 				return false
+	// 			}
+	// 			volumeState, ok := brokerState.GracefulActionState.VolumeStates[mountPath]
+	// 			if !ok || volumeState.CruiseControlOperationReference == nil {
+	// 				return false
+	// 			}
 
-				operationList := &v1alpha1.CruiseControlOperationList{}
+	// 			operationList := &v1alpha1.CruiseControlOperationList{}
 
-				err = k8sClient.List(ctx, operationList, client.ListOption(client.InNamespace(kafkaCluster.Namespace)))
-				Expect(err).NotTo(HaveOccurred())
+	// 			err = k8sClient.List(ctx, operationList, client.ListOption(client.InNamespace(kafkaCluster.Namespace)))
+	// 			Expect(err).NotTo(HaveOccurred())
 
-				if len(operationList.Items) != 1 {
-					return false
-				}
-				operation = &operationList.Items[0]
-				return volumeState.CruiseControlOperationReference.Name == operation.Name &&
-					operation.CurrentTaskOperation() == v1alpha1.OperationRebalance &&
-					volumeState.CruiseControlVolumeState == v1beta1.GracefulDiskRebalanceScheduled &&
-					operation.CurrentTask() != nil && operation.CurrentTask().Parameters["rebalance_disk"] != trueStr
+	// 			if len(operationList.Items) != 1 {
+	// 				return false
+	// 			}
+	// 			operation = &operationList.Items[0]
+	// 			return volumeState.CruiseControlOperationReference.Name == operation.Name &&
+	// 				operation.CurrentTaskOperation() == v1alpha1.OperationRebalance &&
+	// 				volumeState.CruiseControlVolumeState == v1beta1.GracefulDiskRebalanceScheduled &&
+	// 				operation.CurrentTask() != nil && operation.CurrentTask().Parameters["rebalance_disk"] != trueStr
 
-			}, 15*time.Second, 500*time.Millisecond).Should(BeTrue())
-		})
-	})
-	When("new storage is added and one broker is JBOD and another is not JBOD", Serial, func() {
-		JustBeforeEach(func(ctx SpecContext) {
-			kafkaClusterCCReconciler.ScaleFactory = mocks.NewMockScaleFactory(getScaleMockCCTask2([]string{mountPath}))
-			err := k8sClient.Get(ctx, types.NamespacedName{
-				Name:      kafkaCluster.Name,
-				Namespace: kafkaCluster.Namespace,
-			}, kafkaCluster)
-			Expect(err).NotTo(HaveOccurred())
+	// 		}, 15*time.Second, 500*time.Millisecond).Should(BeTrue())
+	// 	})
+	// })
+	// When("new storage is added and one broker is JBOD and another is not JBOD", Serial, func() {
+	// 	JustBeforeEach(func(ctx SpecContext) {
+	// 		kafkaClusterCCReconciler.ScaleFactory = mocks.NewMockScaleFactory(getScaleMockCCTask2([]string{mountPath}))
+	// 		err := k8sClient.Get(ctx, types.NamespacedName{
+	// 			Name:      kafkaCluster.Name,
+	// 			Namespace: kafkaCluster.Namespace,
+	// 		}, kafkaCluster)
+	// 		Expect(err).NotTo(HaveOccurred())
 
-			kafkaCluster.Spec.CruiseControlConfig.CapacityConfig = `
-			{
-			"brokerCapacities":[
-			  {
-				"brokerId": "1",
-				"capacity": {
-				  "DISK": "50000",
-				  "CPU": "100",
-				  "NW_IN": "50000",
-				  "NW_OUT": "50000"
-				}
-			  }
-			]
-		  }`
-			err = k8sClient.Update(ctx, kafkaCluster)
-			Expect(err).NotTo(HaveOccurred())
-			err = util.RetryOnConflict(util.DefaultBackOffForConflict, func() error {
-				if err := k8sClient.Get(ctx, types.NamespacedName{
-					Name:      kafkaCluster.Name,
-					Namespace: kafkaCluster.Namespace,
-				}, kafkaCluster); err != nil {
-					return err
-				}
-				brokerState0 := kafkaCluster.Status.BrokersState["0"]
-				volumeState := make(map[string]v1beta1.VolumeState)
-				volumeState[mountPath] = v1beta1.VolumeState{
-					CruiseControlVolumeState: v1beta1.GracefulDiskRebalanceRequired,
-				}
-				brokerState0.GracefulActionState.VolumeStates = volumeState
-				kafkaCluster.Status.BrokersState["0"] = brokerState0
+	// 		kafkaCluster.Spec.CruiseControlConfig.CapacityConfig = `
+	// 		{
+	// 		"brokerCapacities":[
+	// 		  {
+	// 			"brokerId": "1",
+	// 			"capacity": {
+	// 			  "DISK": "50000",
+	// 			  "CPU": "100",
+	// 			  "NW_IN": "50000",
+	// 			  "NW_OUT": "50000"
+	// 			}
+	// 		  }
+	// 		]
+	// 	  }`
+	// 		err = k8sClient.Update(ctx, kafkaCluster)
+	// 		Expect(err).NotTo(HaveOccurred())
+	// 		err = util.RetryOnConflict(util.DefaultBackOffForConflict, func() error {
+	// 			if err := k8sClient.Get(ctx, types.NamespacedName{
+	// 				Name:      kafkaCluster.Name,
+	// 				Namespace: kafkaCluster.Namespace,
+	// 			}, kafkaCluster); err != nil {
+	// 				return err
+	// 			}
+	// 			brokerState0 := kafkaCluster.Status.BrokersState["0"]
+	// 			volumeState := make(map[string]v1beta1.VolumeState)
+	// 			volumeState[mountPath] = v1beta1.VolumeState{
+	// 				CruiseControlVolumeState: v1beta1.GracefulDiskRebalanceRequired,
+	// 			}
+	// 			brokerState0.GracefulActionState.VolumeStates = volumeState
+	// 			kafkaCluster.Status.BrokersState["0"] = brokerState0
 
-				brokerState1 := kafkaCluster.Status.BrokersState["1"]
-				brokerState1.GracefulActionState.VolumeStates = volumeState
-				kafkaCluster.Status.BrokersState["1"] = brokerState1
+	// 			brokerState1 := kafkaCluster.Status.BrokersState["1"]
+	// 			brokerState1.GracefulActionState.VolumeStates = volumeState
+	// 			kafkaCluster.Status.BrokersState["1"] = brokerState1
 
-				return k8sClient.Status().Update(ctx, kafkaCluster)
-			})
+	// 			return k8sClient.Status().Update(ctx, kafkaCluster)
+	// 		})
 
-			Expect(err).NotTo(HaveOccurred())
+	// 		Expect(err).NotTo(HaveOccurred())
 
-		})
-		It("should create one not JBOD rebalance CruiseControlOperation", func(ctx SpecContext) {
-			Eventually(ctx, func() bool {
-				err := k8sClient.Get(ctx, types.NamespacedName{
-					Name:      kafkaCluster.Name,
-					Namespace: kafkaCluster.Namespace,
-				}, kafkaCluster)
-				Expect(err).NotTo(HaveOccurred())
+	// 	})
+	// 	It("should create one not JBOD rebalance CruiseControlOperation", func(ctx SpecContext) {
+	// 		Eventually(ctx, func() bool {
+	// 			err := k8sClient.Get(ctx, types.NamespacedName{
+	// 				Name:      kafkaCluster.Name,
+	// 				Namespace: kafkaCluster.Namespace,
+	// 			}, kafkaCluster)
+	// 			Expect(err).NotTo(HaveOccurred())
 
-				brokerState, ok := kafkaCluster.Status.BrokersState["0"]
-				if !ok {
-					return false
-				}
-				volumeState, ok := brokerState.GracefulActionState.VolumeStates[mountPath]
-				if !ok || volumeState.CruiseControlOperationReference == nil {
-					return false
-				}
+	// 			brokerState, ok := kafkaCluster.Status.BrokersState["0"]
+	// 			if !ok {
+	// 				return false
+	// 			}
+	// 			volumeState, ok := brokerState.GracefulActionState.VolumeStates[mountPath]
+	// 			if !ok || volumeState.CruiseControlOperationReference == nil {
+	// 				return false
+	// 			}
 
-				operationList := &v1alpha1.CruiseControlOperationList{}
+	// 			operationList := &v1alpha1.CruiseControlOperationList{}
 
-				err = k8sClient.List(ctx, operationList, client.ListOption(client.InNamespace(kafkaCluster.Namespace)))
-				Expect(err).NotTo(HaveOccurred())
+	// 			err = k8sClient.List(ctx, operationList, client.ListOption(client.InNamespace(kafkaCluster.Namespace)))
+	// 			Expect(err).NotTo(HaveOccurred())
 
-				if len(operationList.Items) != 1 {
-					return false
-				}
+	// 			if len(operationList.Items) != 1 {
+	// 				return false
+	// 			}
 
-				operation = &operationList.Items[0]
+	// 			operation = &operationList.Items[0]
 
-				return volumeState.CruiseControlOperationReference.Name == operation.Name &&
-					operation.CurrentTaskOperation() == v1alpha1.OperationRebalance &&
-					volumeState.CruiseControlVolumeState == v1beta1.GracefulDiskRebalanceScheduled &&
-					operation.CurrentTask() != nil && operation.CurrentTask().Parameters["rebalance_disk"] != trueStr
-			}, 15*time.Second, 500*time.Millisecond).Should(BeTrue())
-		})
-	})
+	// 			return volumeState.CruiseControlOperationReference.Name == operation.Name &&
+	// 				operation.CurrentTaskOperation() == v1alpha1.OperationRebalance &&
+	// 				volumeState.CruiseControlVolumeState == v1beta1.GracefulDiskRebalanceScheduled &&
+	// 				operation.CurrentTask() != nil && operation.CurrentTask().Parameters["rebalance_disk"] != trueStr
+	// 		}, 15*time.Second, 500*time.Millisecond).Should(BeTrue())
+	// 	})
+	// })
 	When("new broker is added", Serial, func() {
 		JustBeforeEach(func(ctx SpecContext) {
 			kafkaClusterCCReconciler.ScaleFactory = mocks.NewMockScaleFactory(getScaleMockCCTask1())

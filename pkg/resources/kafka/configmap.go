@@ -15,12 +15,18 @@
 package kafka
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strings"
 
 	"emperror.dev/errors"
 	"github.com/go-logr/logr"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	zookeeperutils "github.com/banzaicloud/koperator/pkg/util/zookeeper"
+
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 
@@ -30,45 +36,74 @@ import (
 	"github.com/banzaicloud/koperator/pkg/resources/templates"
 	"github.com/banzaicloud/koperator/pkg/util"
 	kafkautils "github.com/banzaicloud/koperator/pkg/util/kafka"
-	zookeeperutils "github.com/banzaicloud/koperator/pkg/util/zookeeper"
 	properties "github.com/banzaicloud/koperator/properties/pkg"
 )
 
-func (r *Reconciler) getConfigProperties(bConfig *v1beta1.BrokerConfig, id int32,
+func (r *Reconciler) getConfigProperties(bConfig *v1beta1.BrokerConfig, id int32, quorumVoters []string,
 	extListenerStatuses, intListenerStatuses, controllerIntListenerStatuses map[string]v1beta1.ListenerStatusList,
 	serverPasses map[string]string, clientPass string, superUsers []string, log logr.Logger) *properties.Properties {
 	config := properties.NewProperties()
 
-	// Add listener configuration
-	listenerConf := generateListenerSpecificConfig(&r.KafkaCluster.Spec.ListenersConfig, serverPasses, log)
-	config.Merge(listenerConf)
+	bootstrapServers, err := kafkautils.GetBootstrapServersService(r.KafkaCluster)
+	if err != nil {
+		log.Error(err, "getting Kafka bootstrap servers for Cruise Control failed")
+	}
 
-	// Add listener configuration
-	advertisedListenerConf := generateAdvertisedListenerConfig(id, r.KafkaCluster.Spec.ListenersConfig, extListenerStatuses, intListenerStatuses, controllerIntListenerStatuses)
-	if len(advertisedListenerConf) > 0 {
-		if err := config.Set(kafkautils.KafkaConfigAdvertisedListeners, advertisedListenerConf); err != nil {
-			log.Error(err, fmt.Sprintf("setting '%s' in broker configuration resulted an error", kafkautils.KafkaConfigAdvertisedListeners))
+	// Cruise Control metrics reporter configuration
+	configCCMetricsReporter(r.KafkaCluster, config, clientPass, bootstrapServers, log)
+
+	// Kafka Broker configurations
+	if r.KafkaCluster.Spec.KRaftMode {
+		configureBrokerKRaftMode(bConfig, id, r.KafkaCluster, config, quorumVoters, serverPasses, extListenerStatuses, intListenerStatuses, log)
+	} else {
+		configureBrokerZKMode(id, r.KafkaCluster, config, serverPasses, extListenerStatuses, intListenerStatuses, controllerIntListenerStatuses, log)
+	}
+
+	// This logic prevents the removal of the mountPath from the broker configmap
+	brokerConfigMapName := fmt.Sprintf(brokerConfigTemplate+"-%d", r.KafkaCluster.Name, id)
+	var brokerConfigMapOld v1.ConfigMap
+	err = r.Client.Get(context.Background(), client.ObjectKey{Name: brokerConfigMapName, Namespace: r.KafkaCluster.GetNamespace()}, &brokerConfigMapOld)
+	if err != nil && !apierrors.IsNotFound(err) {
+		log.Error(err, "getting broker configmap from the Kubernetes API server resulted an error")
+	}
+
+	mountPathsOld, err := getMountPathsFromBrokerConfigMap(&brokerConfigMapOld)
+	if err != nil {
+		log.Error(err, "could not get mountPaths from broker configmap", v1beta1.BrokerIdLabelKey, id)
+	}
+
+	mountPathsNew := generateStorageConfig(bConfig.StorageConfigs)
+	mountPathsMerged, isMountPathRemoved := mergeMountPaths(mountPathsOld, mountPathsNew)
+
+	if isMountPathRemoved {
+		log.Error(errors.New("removed storage is found in the KafkaCluster CR"),
+			"removing storage from broker is not supported", v1beta1.BrokerIdLabelKey, id, "mountPaths",
+			mountPathsOld, "mountPaths in kafkaCluster CR ", mountPathsNew)
+	}
+
+	if len(mountPathsMerged) != 0 {
+		if err := config.Set(kafkautils.KafkaConfigBrokerLogDirectory, strings.Join(mountPathsMerged, ",")); err != nil {
+			log.Error(err, fmt.Sprintf(kafkautils.BrokerConfigErrorMsgTemplate, kafkautils.KafkaConfigBrokerLogDirectory))
 		}
 	}
 
-	// Add control plane listener
-	cclConf := generateControlPlaneListener(r.KafkaCluster.Spec.ListenersConfig.InternalListeners)
-	if cclConf != "" {
-		if err := config.Set(kafkautils.KafkaConfigControlPlaneListener, cclConf); err != nil {
-			log.Error(err, fmt.Sprintf("setting '%s' parameter in broker configuration resulted an error", kafkautils.KafkaConfigControlPlaneListener))
+	// Add superuser configuration
+	su := strings.Join(generateSuperUsers(superUsers), ";")
+	if su != "" {
+		if err := config.Set(kafkautils.KafkaConfigSuperUsers, su); err != nil {
+			log.Error(err, fmt.Sprintf(kafkautils.BrokerConfigErrorMsgTemplate, kafkautils.KafkaConfigSuperUsers))
 		}
 	}
+	return config
+}
 
-	// Add Zookeeper configuration
-	if err := config.Set(kafkautils.KafkaConfigZooKeeperConnect, zookeeperutils.PrepareConnectionAddress(r.KafkaCluster.Spec.ZKAddresses, r.KafkaCluster.Spec.GetZkPath())); err != nil {
-		log.Error(err, fmt.Sprintf("setting '%s' parameter in broker configuration resulted an error", kafkautils.KafkaConfigZooKeeperConnect))
-	}
-
+func configCCMetricsReporter(kafkaCluster *v1beta1.KafkaCluster, config *properties.Properties, clientPass, bootstrapServers string, log logr.Logger) {
 	// Add Cruise Control Metrics Reporter SSL configuration
-	if util.IsSSLEnabledForInternalCommunication(r.KafkaCluster.Spec.ListenersConfig.InternalListeners) {
-		if !r.KafkaCluster.Spec.IsClientSSLSecretPresent() {
+	if util.IsSSLEnabledForInternalCommunication(kafkaCluster.Spec.ListenersConfig.InternalListeners) {
+		if !kafkaCluster.Spec.IsClientSSLSecretPresent() {
 			log.Error(errors.New("cruise control metrics reporter needs ssl but client certificate hasn't specified"), "")
 		}
+
 		keyStoreLoc := clientKeystorePath + "/" + v1alpha1.TLSJKSKeyStore
 		trustStoreLoc := clientKeystorePath + "/" + v1alpha1.TLSJKSTrustStore
 
@@ -88,26 +123,39 @@ func (r *Reconciler) getConfigProperties(bConfig *v1beta1.BrokerConfig, id int32
 	}
 
 	// Add Cruise Control Metrics Reporter configuration
-	if err := config.Set(kafkautils.CruiseControlConfigMetricsReporters, "com.linkedin.kafka.cruisecontrol.metricsreporter.CruiseControlMetricsReporter"); err != nil {
-		log.Error(err, fmt.Sprintf("setting '%s' in broker configuration resulted an error", kafkautils.CruiseControlConfigMetricsReporters))
-	}
-	bootstrapServers, err := kafkautils.GetBootstrapServersService(r.KafkaCluster)
-	if err != nil {
-		log.Error(err, "getting Kafka bootstrap servers for Cruise Control failed")
+	if err := config.Set(kafkautils.CruiseControlConfigMetricsReporters, kafkautils.CruiseControlConfigMetricsReportersVal); err != nil {
+		log.Error(err, fmt.Sprintf(kafkautils.BrokerConfigErrorMsgTemplate, kafkautils.CruiseControlConfigMetricsReporters))
 	}
 	if err := config.Set(kafkautils.CruiseControlConfigMetricsReportersBootstrapServers, bootstrapServers); err != nil {
-		log.Error(err, fmt.Sprintf("setting '%s' in broker configuration resulted an error", kafkautils.CruiseControlConfigMetricsReportersBootstrapServers))
+		log.Error(err, fmt.Sprintf(kafkautils.BrokerConfigErrorMsgTemplate, kafkautils.CruiseControlConfigMetricsReportersBootstrapServers))
 	}
 	if err := config.Set(kafkautils.CruiseControlConfigMetricsReporterK8sMode, true); err != nil {
-		log.Error(err, fmt.Sprintf("setting '%s' in broker configuration resulted an error", kafkautils.CruiseControlConfigMetricsReporterK8sMode))
+		log.Error(err, fmt.Sprintf(kafkautils.BrokerConfigErrorMsgTemplate, kafkautils.CruiseControlConfigMetricsReporterK8sMode))
+	}
+}
+
+func configureBrokerKRaftMode(bConfig *v1beta1.BrokerConfig, brokerID int32, kafkaCluster *v1beta1.KafkaCluster, config *properties.Properties,
+	quorumVoters []string, serverPasses map[string]string, extListenerStatuses, intListenerStatuses map[string]v1beta1.ListenerStatusList, log logr.Logger) {
+	if err := config.Set(kafkautils.KafkaConfigNodeID, brokerID); err != nil {
+		log.Error(err, fmt.Sprintf(kafkautils.BrokerConfigErrorMsgTemplate, kafkautils.KafkaConfigNodeID))
 	}
 
-	// Kafka Broker configuration
-	if err := config.Set(kafkautils.KafkaConfigBrokerId, id); err != nil {
-		log.Error(err, fmt.Sprintf("setting '%s' in broker configuration resulted an error", kafkautils.KafkaConfigBrokerId))
+	if err := config.Set(kafkautils.KafkaConfigProcessRoles, bConfig.Roles); err != nil {
+		log.Error(err, fmt.Sprintf(kafkautils.BrokerConfigErrorMsgTemplate, kafkautils.KafkaConfigProcessRoles))
 	}
 
-	// Storage configuration
+	if err := config.Set(kafkautils.KafkaConfigControllerQuorumVoters, quorumVoters); err != nil {
+		log.Error(err, fmt.Sprintf(kafkautils.BrokerConfigErrorMsgTemplate, kafkautils.KafkaConfigControllerQuorumVoters))
+	}
+
+	controllerListenerName := generateControlPlaneListener(kafkaCluster.Spec.ListenersConfig.InternalListeners)
+	if controllerListenerName != "" {
+		if err := config.Set(kafkautils.KafkaConfigControllerListenerName, controllerListenerName); err != nil {
+			log.Error(err, fmt.Sprintf(kafkautils.BrokerConfigErrorMsgTemplate, kafkautils.KafkaConfigControllerListenerName))
+		}
+	}
+
+	// Storage configuration!!!
 	storageConf := generateStorageConfig(bConfig.StorageConfigs)
 	if len(storageConf) > 0 {
 		if err := config.Set(kafkautils.KafkaConfigBrokerLogDirectory, storageConf); err != nil {
@@ -115,14 +163,77 @@ func (r *Reconciler) getConfigProperties(bConfig *v1beta1.BrokerConfig, id int32
 		}
 	}
 
-	// Add superuser configuration
-	su := strings.Join(generateSuperUsers(superUsers), ";")
-	if su != "" {
-		if err := config.Set(kafkautils.KafkaConfigSuperUsers, su); err != nil {
-			log.Error(err, fmt.Sprintf("setting '%s' in broker configuration resulted an error", kafkautils.KafkaConfigSuperUsers))
+	// Add listener configuration
+	listenerConf, listenerConfig := generateListenerSpecificConfig(&kafkaCluster.Spec.ListenersConfig, serverPasses, log)
+	config.Merge(listenerConf)
+
+	var advertisedListenerConf []string
+	// only expose "advertised.listeners" when the node serves as a regular broker or a combined node
+	if bConfig.IsBrokerNode() {
+		advertisedListenerConf = generateAdvertisedListenerConfig(brokerID, kafkaCluster.Spec.ListenersConfig,
+			extListenerStatuses, intListenerStatuses, nil)
+		if err := config.Set(kafkautils.KafkaConfigAdvertisedListeners, advertisedListenerConf); err != nil {
+			log.Error(err, fmt.Sprintf(kafkautils.BrokerConfigErrorMsgTemplate, kafkautils.KafkaConfigAdvertisedListeners))
 		}
 	}
-	return config
+
+	if bConfig.IsControllerOnlyNode() {
+		// "listeners" configuration can only contain controller configuration when the node is a controller-only node
+		for _, listener := range listenerConfig {
+			if listener[:len(controllerListenerName)] == strings.ToUpper(controllerListenerName) {
+				if err := config.Set(kafkautils.KafkaConfigListeners, listener); err != nil {
+					log.Error(err, fmt.Sprintf(kafkautils.BrokerConfigErrorMsgTemplate, kafkautils.KafkaConfigListeners))
+				}
+				break
+			}
+		}
+	} else if bConfig.IsBrokerOnlyNode() {
+		// "listeners" configuration cannot contain controller configuration when the node is a broker-only node
+		var nonControllerListener []string
+		for _, listener := range listenerConfig {
+			if listener[:len(controllerListenerName)] != strings.ToUpper(controllerListenerName) {
+				nonControllerListener = append(nonControllerListener, listener)
+			}
+		}
+		if err := config.Set(kafkautils.KafkaConfigListeners, nonControllerListener); err != nil {
+			log.Error(err, fmt.Sprintf(kafkautils.BrokerConfigErrorMsgTemplate, kafkautils.KafkaConfigListeners))
+		}
+	}
+}
+
+func configureBrokerZKMode(brokerID int32, kafkaCluster *v1beta1.KafkaCluster, config *properties.Properties,
+	serverPasses map[string]string, extListenerStatuses, intListenerStatuses,
+	controllerIntListenerStatuses map[string]v1beta1.ListenerStatusList, log logr.Logger) {
+	if err := config.Set(kafkautils.KafkaConfigBrokerID, brokerID); err != nil {
+		log.Error(err, fmt.Sprintf(kafkautils.BrokerConfigErrorMsgTemplate, kafkautils.KafkaConfigBrokerID))
+	}
+
+	// Add listener configuration
+	listenerConf, _ := generateListenerSpecificConfig(&kafkaCluster.Spec.ListenersConfig, serverPasses, log)
+	config.Merge(listenerConf)
+
+	// Add advertised listener configuration
+	advertisedListenerConf := generateAdvertisedListenerConfig(brokerID, kafkaCluster.Spec.ListenersConfig,
+		extListenerStatuses, intListenerStatuses, controllerIntListenerStatuses)
+	if len(advertisedListenerConf) > 0 {
+		if err := config.Set(kafkautils.KafkaConfigAdvertisedListeners, advertisedListenerConf); err != nil {
+			log.Error(err, fmt.Sprintf(kafkautils.BrokerConfigErrorMsgTemplate, kafkautils.KafkaConfigAdvertisedListeners))
+		}
+	}
+
+	// Add control plane listener
+	cclConf := generateControlPlaneListener(kafkaCluster.Spec.ListenersConfig.InternalListeners)
+	if cclConf != "" {
+		if err := config.Set(kafkautils.KafkaConfigControlPlaneListener, cclConf); err != nil {
+			log.Error(err, fmt.Sprintf(kafkautils.BrokerConfigErrorMsgTemplate, kafkautils.KafkaConfigControlPlaneListener))
+		}
+	}
+
+	// Add Zookeeper configuration
+	if err := config.Set(kafkautils.KafkaConfigZooKeeperConnect, zookeeperutils.PrepareConnectionAddress(
+		kafkaCluster.Spec.ZKAddresses, kafkaCluster.Spec.GetZkPath())); err != nil {
+		log.Error(err, fmt.Sprintf(kafkautils.BrokerConfigErrorMsgTemplate, kafkautils.KafkaConfigZooKeeperConnect))
+	}
 }
 
 // mergeMountPaths is merges the new mountPaths with the old.
@@ -158,19 +269,19 @@ func generateSuperUsers(users []string) (suStrings []string) {
 	return
 }
 
-func (r *Reconciler) configMap(id int32, brokerConfig *v1beta1.BrokerConfig, extListenerStatuses,
-	intListenerStatuses, controllerIntListenerStatuses map[string]v1beta1.ListenerStatusList,
+func (r *Reconciler) configMap(broker v1beta1.Broker, brokerConfig *v1beta1.BrokerConfig, quorumVoters []string,
+	extListenerStatuses, intListenerStatuses, controllerIntListenerStatuses map[string]v1beta1.ListenerStatusList,
 	serverPasses map[string]string, clientPass string, superUsers []string, log logr.Logger) *corev1.ConfigMap {
 	brokerConf := &corev1.ConfigMap{
 		ObjectMeta: templates.ObjectMeta(
-			fmt.Sprintf(brokerConfigTemplate+"-%d", r.KafkaCluster.Name, id), //nolint:goconst
+			fmt.Sprintf(brokerConfigTemplate+"-%d", r.KafkaCluster.Name, broker.Id),
 			apiutil.MergeLabels(
 				apiutil.LabelsForKafka(r.KafkaCluster.Name),
-				map[string]string{v1beta1.BrokerIdLabelKey: fmt.Sprintf("%d", id)},
+				map[string]string{v1beta1.BrokerIdLabelKey: fmt.Sprintf("%d", broker.Id)},
 			),
 			r.KafkaCluster,
 		),
-		Data: map[string]string{kafkautils.ConfigPropertyName: r.generateBrokerConfig(id, brokerConfig, extListenerStatuses,
+		Data: map[string]string{kafkautils.ConfigPropertyName: r.generateBrokerConfig(broker, brokerConfig, quorumVoters, extListenerStatuses,
 			intListenerStatuses, controllerIntListenerStatuses, serverPasses, clientPass, superUsers, log)},
 	}
 	if brokerConfig.Log4jConfig != "" {
@@ -244,32 +355,44 @@ func generateControlPlaneListener(iListeners []v1beta1.InternalListenerConfig) s
 	return controlPlaneListener
 }
 
-func generateListenerSpecificConfig(l *v1beta1.ListenersConfig, serverPasses map[string]string, log logr.Logger) *properties.Properties {
+func generateListenerSpecificConfig(l *v1beta1.ListenersConfig, serverPasses map[string]string, log logr.Logger) (*properties.Properties, []string) {
+	config := properties.NewProperties()
+
+	interBrokerListenerName, securityProtocolMapConfig, listenerConfig, internalListenerSSLConfig, externalListenerSSLConfig := getListenerSpecificConfig(l, serverPasses, log)
+
+	for k, v := range internalListenerSSLConfig {
+		if err := config.Set(k, v); err != nil {
+			log.Error(err, fmt.Sprintf("setting '%s' parameter in broker configuration resulted an error", k))
+		}
+	}
+
+	for k, v := range externalListenerSSLConfig {
+		if err := config.Set(k, v); err != nil {
+			log.Error(err, fmt.Sprintf("setting '%s' parameter in broker configuration resulted an error", k))
+		}
+	}
+
+	if err := config.Set(kafkautils.KafkaConfigListenerSecurityProtocolMap, securityProtocolMapConfig); err != nil {
+		log.Error(err, fmt.Sprintf("setting '%s' parameter in broker configuration resulted an error", kafkautils.KafkaConfigListenerSecurityProtocolMap))
+	}
+	if err := config.Set(kafkautils.KafkaConfigInterBrokerListenerName, interBrokerListenerName); err != nil {
+		log.Error(err, fmt.Sprintf("setting '%s' parameter in broker configuration resulted an error", kafkautils.KafkaConfigInterBrokerListenerName))
+	}
+	if err := config.Set(kafkautils.KafkaConfigListeners, listenerConfig); err != nil {
+		log.Error(err, fmt.Sprintf("setting '%s' parameter in broker configuration resulted an error", kafkautils.KafkaConfigListeners))
+	}
+
+	return config, listenerConfig
+}
+
+func getListenerSpecificConfig(l *v1beta1.ListenersConfig, serverPasses map[string]string, log logr.Logger) (string, []string, []string, map[string]string, map[string]string) {
 	var (
 		interBrokerListenerName   string
 		securityProtocolMapConfig []string
 		listenerConfig            []string
+		internalListenerSSLConfig map[string]string
+		externalListenerSSLConfig map[string]string
 	)
-
-	config := properties.NewProperties()
-
-	for _, eListener := range l.ExternalListeners {
-		if eListener.UsedForInnerBrokerCommunication {
-			if interBrokerListenerName == "" {
-				interBrokerListenerName = strings.ToUpper(eListener.Name)
-			} else {
-				log.Error(errors.New("inter broker listener name already set"), "config error")
-			}
-		}
-		upperedListenerType := eListener.Type.ToUpperString()
-		upperedListenerName := strings.ToUpper(eListener.Name)
-		securityProtocolMapConfig = append(securityProtocolMapConfig, fmt.Sprintf("%s:%s", upperedListenerName, upperedListenerType))
-		listenerConfig = append(listenerConfig, fmt.Sprintf("%s://:%d", upperedListenerName, eListener.ContainerPort))
-		// Add external listeners SSL configuration
-		if eListener.Type == v1beta1.SecurityProtocolSSL {
-			generateListenerSSLConfig(config, eListener.Name, eListener.SSLClientAuth, serverPasses[eListener.Name], log)
-		}
-	}
 
 	for _, iListener := range l.InternalListeners {
 		if iListener.UsedForInnerBrokerCommunication {
@@ -283,25 +406,28 @@ func generateListenerSpecificConfig(l *v1beta1.ListenersConfig, serverPasses map
 		upperedListenerName := strings.ToUpper(iListener.Name)
 		securityProtocolMapConfig = append(securityProtocolMapConfig, fmt.Sprintf("%s:%s", upperedListenerName, upperedListenerType))
 		listenerConfig = append(listenerConfig, fmt.Sprintf("%s://:%d", upperedListenerName, iListener.ContainerPort))
+
 		// Add internal listeners SSL configuration
 		if iListener.Type == v1beta1.SecurityProtocolSSL {
-			generateListenerSSLConfig(config, iListener.Name, iListener.SSLClientAuth, serverPasses[iListener.Name], log)
+			internalListenerSSLConfig = generateListenerSSLConfig(iListener.Name, iListener.SSLClientAuth, serverPasses[iListener.Name])
 		}
 	}
 
-	if err := config.Set(kafkautils.KafkaConfigListenerSecurityProtocolMap, securityProtocolMapConfig); err != nil {
-		log.Error(err, fmt.Sprintf("setting '%s' parameter in broker configuration resulted an error", kafkautils.KafkaConfigListenerSecurityProtocolMap))
+	for _, eListener := range l.ExternalListeners {
+		upperedListenerType := eListener.Type.ToUpperString()
+		upperedListenerName := strings.ToUpper(eListener.Name)
+		securityProtocolMapConfig = append(securityProtocolMapConfig, fmt.Sprintf("%s:%s", upperedListenerName, upperedListenerType))
+		listenerConfig = append(listenerConfig, fmt.Sprintf("%s://:%d", upperedListenerName, eListener.ContainerPort))
+		// Add external listeners SSL configuration
+		if eListener.Type == v1beta1.SecurityProtocolSSL {
+			externalListenerSSLConfig = generateListenerSSLConfig(eListener.Name, eListener.SSLClientAuth, serverPasses[eListener.Name])
+		}
 	}
-	if err := config.Set(kafkautils.KafkaConfigInterBrokerListenerName, interBrokerListenerName); err != nil {
-		log.Error(err, fmt.Sprintf("setting '%s' parameter in broker configuration resulted an error", kafkautils.KafkaConfigInterBrokerListenerName))
-	}
-	if err := config.Set(kafkautils.KafkaConfigListeners, listenerConfig); err != nil {
-		log.Error(err, fmt.Sprintf("setting '%s' parameter in broker configuration resulted an error", kafkautils.KafkaConfigListeners))
-	}
-	return config
+
+	return interBrokerListenerName, securityProtocolMapConfig, listenerConfig, internalListenerSSLConfig, externalListenerSSLConfig
 }
 
-func generateListenerSSLConfig(config *properties.Properties, name string, sslClientAuth v1beta1.SSLClientAuthentication, password string, log logr.Logger) {
+func generateListenerSSLConfig(name string, sslClientAuth v1beta1.SSLClientAuthentication, password string) map[string]string {
 	var listenerSSLConfig map[string]string
 	namedKeystorePath := fmt.Sprintf(listenerServerKeyStorePathTemplate, serverKeystorePath, name)
 	keyStoreType := "JKS"
@@ -325,11 +451,7 @@ func generateListenerSSLConfig(config *properties.Properties, name string, sslCl
 		listenerSSLConfig[fmt.Sprintf("%s.%s.%s", kafkautils.KafkaConfigListenerName, name, kafkautils.KafkaConfigSSLClientAuth)] = string(sslClientAuth)
 	}
 
-	for k, v := range listenerSSLConfig {
-		if err := config.Set(k, v); err != nil {
-			log.Error(err, fmt.Sprintf("setting '%s' parameter in broker configuration resulted an error", k))
-		}
-	}
+	return listenerSSLConfig
 }
 
 // mergeSuperUsersPropertyValue merges the target and source super.users property value, and returns it as string.
@@ -370,13 +492,14 @@ func mergeSuperUsersPropertyValue(source *properties.Properties, target *propert
 	return ""
 }
 
-func (r Reconciler) generateBrokerConfig(id int32, brokerConfig *v1beta1.BrokerConfig, extListenerStatuses,
-	intListenerStatuses, controllerIntListenerStatuses map[string]v1beta1.ListenerStatusList,
+func (r Reconciler) generateBrokerConfig(broker v1beta1.Broker, brokerConfig *v1beta1.BrokerConfig, quorumVoters []string,
+	extListenerStatuses, intListenerStatuses, controllerIntListenerStatuses map[string]v1beta1.ListenerStatusList,
 	serverPasses map[string]string, clientPass string, superUsers []string, log logr.Logger) string {
-	finalBrokerConfig := getBrokerReadOnlyConfig(id, r.KafkaCluster, log)
+	finalBrokerConfig := getBrokerReadOnlyConfig(broker, r.KafkaCluster, log)
 
 	// Get operator generated configuration
-	opGenConf := r.getConfigProperties(brokerConfig, id, extListenerStatuses, intListenerStatuses, controllerIntListenerStatuses, serverPasses, clientPass, superUsers, log)
+	opGenConf := r.getConfigProperties(brokerConfig, broker.Id, quorumVoters, extListenerStatuses, intListenerStatuses,
+		controllerIntListenerStatuses, serverPasses, clientPass, superUsers, log)
 
 	// Merge operator generated configuration to the final one
 	if opGenConf != nil {
@@ -396,7 +519,7 @@ func (r Reconciler) generateBrokerConfig(id int32, brokerConfig *v1beta1.BrokerC
 }
 
 // TODO move this into api in the future (adamantal)
-func getBrokerReadOnlyConfig(id int32, kafkaCluster *v1beta1.KafkaCluster, log logr.Logger) *properties.Properties {
+func getBrokerReadOnlyConfig(broker v1beta1.Broker, kafkaCluster *v1beta1.KafkaCluster, log logr.Logger) *properties.Properties {
 	// Parse cluster-wide readonly configuration
 	finalBrokerConfig, err := properties.NewFromString(kafkaCluster.Spec.ReadOnlyConfig)
 	if err != nil {
@@ -404,16 +527,9 @@ func getBrokerReadOnlyConfig(id int32, kafkaCluster *v1beta1.KafkaCluster, log l
 	}
 
 	// Parse readonly broker configuration
-	var parsedReadOnlyBrokerConfig *properties.Properties
-	// Find configuration for broker with id
-	for _, broker := range kafkaCluster.Spec.Brokers {
-		if broker.Id == id {
-			parsedReadOnlyBrokerConfig, err = properties.NewFromString(broker.ReadOnlyConfig)
-			if err != nil {
-				log.Error(err, fmt.Sprintf("failed to parse readonly broker configuration for broker with id: %d", id))
-			}
-			break
-		}
+	parsedReadOnlyBrokerConfig, err := properties.NewFromString(broker.ReadOnlyConfig)
+	if err != nil {
+		log.Error(err, fmt.Sprintf("failed to parse readonly broker configuration for broker with id: %d", broker.Id))
 	}
 
 	// Merge cluster-wide configuration into broker-level configuration

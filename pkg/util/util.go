@@ -48,6 +48,8 @@ import (
 	clientCtrl "sigs.k8s.io/controller-runtime/pkg/client"
 	k8s_zap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	apiutil "github.com/banzaicloud/koperator/api/util"
+
 	"github.com/banzaicloud/koperator/api/v1alpha1"
 	"github.com/banzaicloud/koperator/api/v1beta1"
 	"github.com/banzaicloud/koperator/pkg/errorfactory"
@@ -151,16 +153,6 @@ func ConvertPropertiesToMapStringPointer(pp *properties.Properties) map[string]*
 	return result
 }
 
-// StringSliceContains returns true if list contains s
-func StringSliceContains(list []string, s string) bool {
-	for _, v := range list {
-		if v == s {
-			return true
-		}
-	}
-	return false
-}
-
 // StringSliceRemove will remove s from list
 func StringSliceRemove(list []string, s string) []string {
 	for i, v := range list {
@@ -205,6 +197,35 @@ func GetBrokerIdsFromStatusAndSpec(brokerStatuses map[string]v1beta1.BrokerState
 	return brokerIDs
 }
 
+// GetBrokerFromKafkaClusterSpec gets the broker from the KafkaCluster CR based on given broker ID
+func GetBrokerFromKafkaClusterSpec(brokerId string, spec v1beta1.KafkaClusterSpec) *v1beta1.Broker {
+	for _, broker := range spec.Brokers {
+		if brokerId == strconv.Itoa(int(broker.Id)) {
+			return &broker
+		}
+	}
+	return nil
+}
+
+func FilterControllerOnlyNodes(brokerIDs []string, spec v1beta1.KafkaClusterSpec) ([]string, error) {
+	var filteredIDs []string
+	for _, brokerId := range brokerIDs {
+		broker := GetBrokerFromKafkaClusterSpec(brokerId, spec)
+		if broker != nil {
+			bConfig, err := broker.GetBrokerConfig(spec)
+			if err != nil {
+				return nil, err
+			}
+
+			if !bConfig.IsControllerOnlyNode() {
+				filteredIDs = append(filteredIDs, strconv.Itoa(int(broker.Id)))
+			}
+		}
+	}
+
+	return filteredIDs, nil
+}
+
 // IsIngressConfigInUse returns true if the provided ingressConfigName is bound to the given broker
 func IsIngressConfigInUse(iConfigName, defaultConfigName string, cluster *v1beta1.KafkaCluster, log logr.Logger) bool {
 	// Check if the global default is in use
@@ -219,12 +240,12 @@ func IsIngressConfigInUse(iConfigName, defaultConfigName string, cluster *v1beta
 			return false
 		}
 		if len(brokerConfig.BrokerIngressMapping) == 0 && iConfigName == defaultConfigName ||
-			StringSliceContains(brokerConfig.BrokerIngressMapping, iConfigName) {
+			apiutil.StringSliceContains(brokerConfig.BrokerIngressMapping, iConfigName) {
 			return true
 		}
 	}
 	for _, status := range cluster.Status.BrokersState {
-		if StringSliceContains(status.ExternalListenerConfigNames, iConfigName) {
+		if apiutil.StringSliceContains(status.ExternalListenerConfigNames, iConfigName) {
 			return true
 		}
 	}
@@ -245,12 +266,12 @@ func ShouldIncludeBroker(brokerConfig *v1beta1.BrokerConfig, status v1beta1.Kafk
 	defaultIngressConfigName, ingressConfigName string) bool {
 	if brokerConfig != nil {
 		if len(brokerConfig.BrokerIngressMapping) == 0 && (ingressConfigName == defaultIngressConfigName || defaultIngressConfigName == "") ||
-			StringSliceContains(brokerConfig.BrokerIngressMapping, ingressConfigName) {
+			apiutil.StringSliceContains(brokerConfig.BrokerIngressMapping, ingressConfigName) {
 			return true
 		}
 	}
 	if brokerState, ok := status.BrokersState[strconv.Itoa(brokerID)]; ok {
-		if StringSliceContains(brokerState.ExternalListenerConfigNames, ingressConfigName) {
+		if apiutil.StringSliceContains(brokerState.ExternalListenerConfigNames, ingressConfigName) {
 			return true
 		}
 	}

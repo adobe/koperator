@@ -334,11 +334,6 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 		runningBrokers[brokerID] = struct{}{}
 	}
 
-	controllerID, err := r.determineControllerId()
-	if err != nil {
-		log.Error(err, "could not find controller broker")
-	}
-
 	var pvcList corev1.PersistentVolumeClaimList
 	err = r.Client.List(ctx, &pvcList, client.ListOption(client.InNamespace(r.KafkaCluster.Namespace)), client.ListOption(matchingLabels))
 	if err != nil {
@@ -353,7 +348,47 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 		}
 	}
 
+	controllerID, err := r.determineControllerId()
+	if err != nil {
+		log.Error(err, "could not find controller broker")
+	}
+
+	var quorumVoters []string
+	if r.KafkaCluster.Spec.KRaftMode {
+		// all broker nodes under the same Kafka cluster must use the same cluster UUID
+		if r.KafkaCluster.Status.ClusterID == "" {
+			r.KafkaCluster.Status.ClusterID = generateRandomClusterID()
+			err = r.Client.Status().Update(ctx, r.KafkaCluster)
+			if apierrors.IsNotFound(err) {
+				err = r.Client.Update(ctx, r.KafkaCluster)
+			}
+			if err != nil {
+				return errors.NewWithDetails("could not update ClusterID status",
+					"component", componentName,
+					"clusterName", r.KafkaCluster.Name,
+					"clusterNamespace", r.KafkaCluster.Namespace)
+			}
+		}
+
+		quorumVoters, err = generateQuorumVoters(r.KafkaCluster, controllerIntListenerStatuses)
+		if err != nil {
+			return errors.WrapIfWithDetails(err,
+				"failed to generate quorum voters configuration",
+				"component", componentName,
+				"clusterName", r.KafkaCluster.GetName(),
+				"clusterNamespace", r.KafkaCluster.GetNamespace())
+		}
+
+		// In KRaft mode:
+		// 1. there is no way for admin client to know which node is the active controller, controllerID obtained above is just a broker ID of a random active broker (this is intentional by Kafka)
+		// 2. the follower controllers replicate the data that is written to the active controller and serves as hot standbys if the active controller fails.
+		//    Because the controllers now all track the latest state, controller fail-over will not require a lengthy reloading time to have all the state to transfer to the new controller
+		// Therefore, by setting the controllerID to be -1 to not take the controller identity into consideration when reordering the brokers
+		controllerID = -1
+	}
+
 	reorderedBrokers := reorderBrokers(runningBrokers, boundPersistentVolumeClaims, r.KafkaCluster.Spec.Brokers, r.KafkaCluster.Status.BrokersState, controllerID, log)
+
 	allBrokerDynamicConfigSucceeded := true
 	for _, broker := range reorderedBrokers {
 		brokerConfig, err := broker.GetBrokerConfig(r.KafkaCluster.Spec)
@@ -363,14 +398,14 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 
 		var configMap *corev1.ConfigMap
 		if r.KafkaCluster.Spec.RackAwareness == nil {
-			configMap = r.configMap(broker.Id, brokerConfig, extListenerStatuses, intListenerStatuses, controllerIntListenerStatuses, serverPasses, clientPass, superUsers, log)
+			configMap = r.configMap(broker, brokerConfig, quorumVoters, extListenerStatuses, intListenerStatuses, controllerIntListenerStatuses, serverPasses, clientPass, superUsers, log)
 			err := k8sutil.Reconcile(log, r.Client, configMap, r.KafkaCluster)
 			if err != nil {
 				return errors.WrapIfWithDetails(err, "failed to reconcile resource", "resource", configMap.GetObjectKind().GroupVersionKind())
 			}
 		} else if brokerState, ok := r.KafkaCluster.Status.BrokersState[strconv.Itoa(int(broker.Id))]; ok {
 			if brokerState.RackAwarenessState != "" {
-				configMap = r.configMap(broker.Id, brokerConfig, extListenerStatuses, intListenerStatuses, controllerIntListenerStatuses, serverPasses, clientPass, superUsers, log)
+				configMap = r.configMap(broker, brokerConfig, quorumVoters, extListenerStatuses, intListenerStatuses, controllerIntListenerStatuses, serverPasses, clientPass, superUsers, log)
 				err := k8sutil.Reconcile(log, r.Client, configMap, r.KafkaCluster)
 				if err != nil {
 					return errors.WrapIfWithDetails(err, "failed to reconcile resource", "resource", configMap.GetObjectKind().GroupVersionKind())
@@ -492,6 +527,9 @@ func (r *Reconciler) reconcileKafkaPodDelete(ctx context.Context, log logr.Logge
 				scale.KafkaBrokerDemoted,
 				scale.KafkaBrokerBadDisks,
 			}
+
+			// Note: CC will not be able to query the controller-only nodes in KRaft mode
+			// therefore, there will be no GracefulDownscale for deleting a controller-only node in the Kafka cluster
 			availableBrokers, err := cc.BrokersWithState(ctx, brokerStates...)
 			if err != nil {
 				log.Error(err, "failed to get the list of available brokers from Cruise Control")
@@ -540,13 +578,18 @@ func (r *Reconciler) reconcileKafkaPodDelete(ctx context.Context, log logr.Logge
 				continue
 			}
 
-			if brokerState, ok := r.KafkaCluster.Status.BrokersState[broker.Labels[v1beta1.BrokerIdLabelKey]]; ok &&
-				brokerState.GracefulActionState.CruiseControlState != v1beta1.GracefulDownscaleSucceeded &&
-				brokerState.GracefulActionState.CruiseControlState != v1beta1.GracefulUpscaleRequired {
-				if brokerState.GracefulActionState.CruiseControlState == v1beta1.GracefulDownscaleRunning {
-					log.Info("cc task is still running for broker", v1beta1.BrokerIdLabelKey, broker.Labels[v1beta1.BrokerIdLabelKey], "CruiseControlOperationReference", brokerState.GracefulActionState.CruiseControlOperationReference)
+			processRoles, found := broker.GetLabels()[v1beta1.ProcessRolesKey]
+			// only applicable in KRaft: if this Kafka pod is not a controller-only node, there is no corresponding CC
+			// therefore we can just skip the broker state check and delete the pod safely
+			if !(found && processRoles == v1beta1.ControllerNodeProcessRole) {
+				if brokerState, ok := r.KafkaCluster.Status.BrokersState[broker.Labels[v1beta1.BrokerIdLabelKey]]; ok &&
+					brokerState.GracefulActionState.CruiseControlState != v1beta1.GracefulDownscaleSucceeded &&
+					brokerState.GracefulActionState.CruiseControlState != v1beta1.GracefulUpscaleRequired {
+					if brokerState.GracefulActionState.CruiseControlState == v1beta1.GracefulDownscaleRunning {
+						log.Info("cc task is still running for broker", v1beta1.BrokerIdLabelKey, broker.Labels[v1beta1.BrokerIdLabelKey], "CruiseControlOperationReference", brokerState.GracefulActionState.CruiseControlOperationReference)
+					}
+					continue
 				}
-				continue
 			}
 
 			err = r.Client.Delete(context.TODO(), &broker)
@@ -612,6 +655,7 @@ func arePodsAlreadyDeleted(pods []corev1.Pod, log logr.Logger) bool {
 	}
 	return true
 }
+
 func (r *Reconciler) getClientPasswordKeyAndUser() (string, string, error) {
 	var clientPass, CN string
 	if r.KafkaCluster.Spec.IsClientSSLSecretPresent() {
@@ -807,7 +851,14 @@ func (r *Reconciler) reconcileKafkaPod(log logr.Logger, desiredPod *corev1.Pod, 
 			if ccState != v1beta1.GracefulUpscaleSucceeded && !ccState.IsDownscale() {
 				gracefulActionState := v1beta1.GracefulActionState{CruiseControlState: v1beta1.GracefulUpscaleSucceeded}
 
-				if r.KafkaCluster.Status.CruiseControlTopicStatus == v1beta1.CruiseControlTopicReady {
+				// TODO: remove this part when we have a better state management strategy for all the controller-only nodes
+				controllerOnlyNode := false
+				if r.KafkaCluster.Spec.KRaftMode {
+					if processRoles, found := desiredPod.Labels[v1beta1.ProcessRolesKey]; found && processRoles == v1beta1.ControllerNodeProcessRole {
+						controllerOnlyNode = true
+					}
+				}
+				if !controllerOnlyNode && r.KafkaCluster.Status.CruiseControlTopicStatus == v1beta1.CruiseControlTopicReady {
 					gracefulActionState = v1beta1.GracefulActionState{CruiseControlState: v1beta1.GracefulUpscaleRequired}
 				}
 				statusErr = k8sutil.UpdateBrokerStatus(r.Client, []string{desiredPod.Labels[v1beta1.BrokerIdLabelKey]}, r.KafkaCluster, gracefulActionState, log)
@@ -816,6 +867,7 @@ func (r *Reconciler) reconcileKafkaPod(log logr.Logger, desiredPod *corev1.Pod, 
 				}
 			}
 		}
+
 		log.Info("resource created")
 		return nil
 	case len(podList.Items) == 1:
@@ -1455,6 +1507,8 @@ func (r *Reconciler) getK8sNodeIP(nodeName string, nodeAddressType string) (stri
 }
 
 // determineControllerId returns the ID of the controller broker of the current cluster
+// In KRaft mode, controller accesses are isolated from admin client (see KIP-590 for mode details),
+// therefore, the KRaft metadata caches intentionally choose a random broker node to report as the controller
 func (r *Reconciler) determineControllerId() (int32, error) {
 	kClient, close, err := r.kafkaClientProvider.NewFromCluster(r.Client, r.KafkaCluster)
 	if err != nil {
