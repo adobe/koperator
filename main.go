@@ -123,9 +123,13 @@ func main() {
 	watchedNamespaces := make(map[string]cache.Config)
 	if namespaces != "" {
 		namespaceList = strings.Split(namespaces, ",")
-		for i := range namespaceList {
-			watchedNamespaces[strings.TrimSpace(namespaceList[i])] = cache.Config{}
+	} else {
+		if namespaces, ok := os.LookupEnv("WATCH_NAMESPACE"); ok {
+			namespaceList = strings.Split(namespaces, ",")
 		}
+	}
+	for i := range namespaceList {
+		watchedNamespaces[strings.TrimSpace(namespaceList[i])] = cache.Config{}
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
