@@ -135,12 +135,13 @@ func main() {
 	// same watched namespaces will return the same hash so only one operator will be active
 	h := md5.New()
 	io.WriteString(h, namespaces)
-	leaderElectionHash := fmt.Sprintf("%x", h.Sum(nil))
+	leaderElectionID := fmt.Sprintf("%s-%x", "controller-leader-election-helper", h.Sum(nil))
+	setupLog.Info("Using leader electrion id", "LeaderElectionID", leaderElectionID, "watched namespaces", namespaceList)
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:           scheme,
 		LeaderElection:   enableLeaderElection,
-		LeaderElectionID: fmt.Sprintf("%s-%s", "controller-leader-election-helper", leaderElectionHash),
+		LeaderElectionID: leaderElectionID,
 		WebhookServer: webhook.NewServer(webhook.Options{
 			Port:    webhookServerPort,
 			CertDir: webhookCertDir,
