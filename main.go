@@ -31,10 +31,8 @@ package main
 
 import (
 	"context"
-	"crypto/md5"
 	"flag"
 	"fmt"
-	"io"
 	"os"
 	"strings"
 
@@ -133,9 +131,7 @@ func main() {
 
 	// hash the watched namespaces to allow for more than one operator deployment per namespace
 	// same watched namespaces will return the same hash so only one operator will be active
-	h := md5.New()
-	io.WriteString(h, namespaces)
-	leaderElectionID := fmt.Sprintf("%s-%x", "controller-leader-election-helper", h.Sum(nil))
+	leaderElectionID := fmt.Sprintf("%s-%x", "controller-leader-election-helper", util.GetMD5Hash(namespaces))
 	setupLog.Info("Using leader electrion id", "LeaderElectionID", leaderElectionID, "watched namespaces", namespaceList)
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
