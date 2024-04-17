@@ -690,3 +690,29 @@ cruise.control.metrics.reporter.kubernetes.mode=true`,
 		}
 	}
 }
+
+func TestGetMD5Hash(t *testing.T) {
+	testCases := []struct {
+		testName string
+		input    string
+		expected string
+	}{
+		{
+			testName: "empty string",
+			input:    "",
+			expected: "d41d8cd98f00b204e9800998ecf8427e",
+		},
+		{
+			testName: "non-empty string",
+			input:    "test",
+			expected: "098f6bcd4621d373cade4e832627b4f6",
+		},
+	}
+
+	for _, test := range testCases {
+		hash := GetMD5Hash(test.input)
+		if hash != test.expected {
+			t.Errorf("Expected: %s  Got: %s", test.expected, hash)
+		}
+	}
+}

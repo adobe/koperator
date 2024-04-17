@@ -32,6 +32,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"os"
 	"strings"
 
@@ -131,10 +132,15 @@ func main() {
 		watchedNamespaces[strings.TrimSpace(namespaceList[i])] = cache.Config{}
 	}
 
+	// hash the watched namespaces to allow for more than one operator deployment per namespace
+	// same watched namespaces will return the same hash so only one operator will be active
+	leaderElectionID := fmt.Sprintf("%s-%x", "controller-leader-election-helper", util.GetMD5Hash(namespaces))
+	setupLog.Info("Using leader electrion id", "LeaderElectionID", leaderElectionID, "watched namespaces", namespaceList)
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:           scheme,
 		LeaderElection:   enableLeaderElection,
-		LeaderElectionID: "controller-leader-election-helper",
+		LeaderElectionID: leaderElectionID,
 		WebhookServer: webhook.NewServer(webhook.Options{
 			Port:    webhookServerPort,
 			CertDir: webhookCertDir,

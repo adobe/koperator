@@ -18,9 +18,11 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/md5"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -550,4 +552,10 @@ func RetryOnConflict(backoff wait.Backoff, fn func() error) error {
 
 func GetExternalPortForBroker(externalStartingPort, brokerId int32) int32 {
 	return externalStartingPort + brokerId
+}
+
+// Generage MD5 hash for a given string
+func GetMD5Hash(text string) string {
+	hash := md5.Sum([]byte(text))
+	return hex.EncodeToString(hash[:])
 }
