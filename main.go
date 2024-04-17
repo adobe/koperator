@@ -128,6 +128,7 @@ func main() {
 		namespaces = os.Getenv("WATCH_NAMESPACE")
 		namespaceList = strings.Split(namespaces, ",")
 	}
+	fmt.Println("-------------------------namespaces", namespaces)
 	for i := range namespaceList {
 		watchedNamespaces[strings.TrimSpace(namespaceList[i])] = cache.Config{}
 	}
