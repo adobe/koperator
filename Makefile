@@ -17,7 +17,7 @@ RELEASE_MSG ?= "koperator release"
 
 REL_TAG = $(shell ./scripts/increment_version.sh -${RELEASE_TYPE} ${TAG})
 
-GOLANGCI_VERSION = 1.55.2
+GOLANGCI_VERSION = 1.57.2
 LICENSEI_VERSION = 0.9.0
 GOPROXY=https://proxy.golang.org
 
@@ -184,7 +184,7 @@ release: check-release ## Tag and push a release.
 	git push origin ${REL_TAG}
 
 update-go-deps: ## Update Go modules dependencies.
-	for dir in api properties . test/e2e; do \
+	for dir in api properties . tests/e2e; do \
 		( \
 		echo "Updating $$dir deps"; \
 		cd $$dir; \
@@ -243,7 +243,7 @@ gen-license-header: bin/gotemplate ## Generate license header used in source cod
 		--source="$(BOILERPLATE_DIR)"
 
 
-MOCKGEN_VERSION := 0.2.0
+MOCKGEN_VERSION := 0.4.0
 
 bin/mockgen: $(BIN_DIR)/mockgen-$(MOCKGEN_VERSION) ## Symlink mockgen-<version> into versionless mockgen.
 	@ln -sf mockgen-$(MOCKGEN_VERSION) $(BIN_DIR)/mockgen

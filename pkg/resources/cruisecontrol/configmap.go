@@ -17,6 +17,7 @@ package cruisecontrol
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/banzaicloud/koperator/api/v1alpha1"
 	"sort"
 	"strconv"
 
@@ -29,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	apiutil "github.com/banzaicloud/koperator/api/util"
-	"github.com/banzaicloud/koperator/api/v1alpha1"
 	"github.com/banzaicloud/koperator/api/v1beta1"
 	"github.com/banzaicloud/koperator/pkg/resources/templates"
 	"github.com/banzaicloud/koperator/pkg/util"
@@ -100,15 +100,12 @@ func (r *Reconciler) configMap(clientPass string, capacityConfig string, log log
 func generateSSLConfig(kafkaCluster v1beta1.KafkaClusterSpec, clientPass string, log logr.Logger) *properties.Properties {
 	config := properties.NewProperties()
 	if kafkaCluster.IsClientSSLSecretPresent() && util.IsSSLEnabledForInternalCommunication(kafkaCluster.ListenersConfig.InternalListeners) {
-		keyStoreLoc := keystoreVolumePath + "/" + v1alpha1.TLSJKSKeyStore
-		trustStoreLoc := keystoreVolumePath + "/" + v1alpha1.TLSJKSTrustStore
-
 		sslConfig := map[string]string{
 			kafkautils.KafkaConfigSecurityProtocol:      "SSL",
 			kafkautils.KafkaConfigSSLTrustStoreType:     "JKS",
 			kafkautils.KafkaConfigSSLKeystoreType:       "JKS",
-			kafkautils.KafkaConfigSSLTrustStoreLocation: trustStoreLoc,
-			kafkautils.KafkaConfigSSLKeyStoreLocation:   keyStoreLoc,
+			kafkautils.KafkaConfigSSLTrustStoreLocation: keystoreVolumePath + "/" + v1alpha1.TLSJKSKeyStore,
+			kafkautils.KafkaConfigSSLKeyStoreLocation:   keystoreVolumePath + "/" + v1alpha1.TLSJKSTrustStore,
 			kafkautils.KafkaConfigSSLKeyStorePassword:   clientPass,
 			kafkautils.KafkaConfigSSLTrustStorePassword: clientPass,
 		}

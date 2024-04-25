@@ -255,12 +255,11 @@ func generateUserSecret(key []byte, secretName, namespace string) *corev1.Secret
 
 func generateCSRResource(csr []byte, name, namespace, signerName string,
 	expirationSeconds int32, annotation map[string]string) *certsigningreqv1.CertificateSigningRequest {
-	owner := types.NamespacedName{Namespace: namespace, Name: name}
 	return &certsigningreqv1.CertificateSigningRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: name + "-",
 			Annotations: util.MergeAnnotations(annotation,
-				map[string]string{pkicommon.KafkaUserAnnotationName: owner.String(), IncludeFullChainAnnotation: "true"}),
+				map[string]string{pkicommon.KafkaUserAnnotationName: types.NamespacedName{Namespace: namespace, Name: name}.String(), IncludeFullChainAnnotation: "true"}),
 		},
 		Spec: certsigningreqv1.CertificateSigningRequestSpec{
 			Request:           csr,

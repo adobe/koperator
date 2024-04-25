@@ -222,7 +222,7 @@ func addPvc(log logr.Logger, alertLabels model.LabelSet, alertAnnotations model.
 				corev1.ReadWriteOnce,
 			},
 			StorageClassName: storageClassName,
-			Resources: corev1.ResourceRequirements{
+			Resources: corev1.VolumeResourceRequirements{
 				Requests: corev1.ResourceList{
 					"storage": resource.MustParse(string(alertAnnotations["diskSize"])),
 				},
@@ -399,7 +399,7 @@ func upScale(log logr.Logger, labels model.LabelSet, annotations model.LabelSet,
 								corev1.ReadWriteOnce,
 							},
 							StorageClassName: storageClassName,
-							Resources: corev1.ResourceRequirements{
+							Resources: corev1.VolumeResourceRequirements{
 								Requests: corev1.ResourceList{
 									"storage": resource.MustParse(string(annotations["diskSize"])),
 								},

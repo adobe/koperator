@@ -148,7 +148,7 @@ func TestGenerateCapacityConfig_JBOD(t *testing.T) {
 								{
 									MountPath: "/path-from-default",
 									PvcSpec: &v1.PersistentVolumeClaimSpec{
-										Resources: v1.ResourceRequirements{
+										Resources: v1.VolumeResourceRequirements{
 											Requests: v1.ResourceList{
 												v1.ResourceStorage: quantity,
 											},
@@ -185,7 +185,7 @@ func TestGenerateCapacityConfig_JBOD(t *testing.T) {
 									{
 										MountPath: "/path1",
 										PvcSpec: &v1.PersistentVolumeClaimSpec{
-											Resources: v1.ResourceRequirements{
+											Resources: v1.VolumeResourceRequirements{
 												Requests: v1.ResourceList{
 													v1.ResourceStorage: quantity,
 												},
@@ -271,7 +271,7 @@ func TestGenerateCapacityConfig_JBOD(t *testing.T) {
 								{
 									MountPath: "/path-from-default",
 									PvcSpec: &v1.PersistentVolumeClaimSpec{
-										Resources: v1.ResourceRequirements{
+										Resources: v1.VolumeResourceRequirements{
 											Requests: v1.ResourceList{
 												v1.ResourceStorage: quantity,
 											},
@@ -392,7 +392,7 @@ func TestGenerateCapacityConfig_JBOD(t *testing.T) {
 								{
 									MountPath: "/path-from-default",
 									PvcSpec: &v1.PersistentVolumeClaimSpec{
-										Resources: v1.ResourceRequirements{
+										Resources: v1.VolumeResourceRequirements{
 											Requests: v1.ResourceList{
 												v1.ResourceStorage: oneMiQuantity,
 											},
@@ -443,7 +443,7 @@ func TestGenerateCapacityConfig_JBOD(t *testing.T) {
 								{
 									MountPath: "/path-from-default",
 									PvcSpec: &v1.PersistentVolumeClaimSpec{
-										Resources: v1.ResourceRequirements{
+										Resources: v1.VolumeResourceRequirements{
 											Requests: v1.ResourceList{
 												v1.ResourceStorage: quantity,
 											},
@@ -477,7 +477,7 @@ func TestGenerateCapacityConfig_JBOD(t *testing.T) {
 									{
 										MountPath: "/path1",
 										PvcSpec: &v1.PersistentVolumeClaimSpec{
-											Resources: v1.ResourceRequirements{
+											Resources: v1.VolumeResourceRequirements{
 												Requests: v1.ResourceList{
 													v1.ResourceStorage: quantity,
 												},
@@ -592,7 +592,7 @@ func TestReturnErrorStorageConfigLessThan1MB(t *testing.T) {
 						{
 							MountPath: "/path-from-default",
 							PvcSpec: &v1.PersistentVolumeClaimSpec{
-								Resources: v1.ResourceRequirements{
+								Resources: v1.VolumeResourceRequirements{
 									Requests: v1.ResourceList{
 										v1.ResourceStorage: fiveHundredKiQuantity,
 									},
@@ -974,7 +974,7 @@ func TestGenerateCapacityConfigWithUserProvidedInput(t *testing.T) {
 									{
 										MountPath: "/path1",
 										PvcSpec: &v1.PersistentVolumeClaimSpec{
-											Resources: v1.ResourceRequirements{
+											Resources: v1.VolumeResourceRequirements{
 												Requests: v1.ResourceList{
 													v1.ResourceStorage: resource.MustParse("100M"),
 												},

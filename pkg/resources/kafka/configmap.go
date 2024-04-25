@@ -69,13 +69,10 @@ func (r *Reconciler) getConfigProperties(bConfig *v1beta1.BrokerConfig, id int32
 		if !r.KafkaCluster.Spec.IsClientSSLSecretPresent() {
 			log.Error(errors.New("cruise control metrics reporter needs ssl but client certificate hasn't specified"), "")
 		}
-		keyStoreLoc := clientKeystorePath + "/" + v1alpha1.TLSJKSKeyStore
-		trustStoreLoc := clientKeystorePath + "/" + v1alpha1.TLSJKSTrustStore
-
 		sslConfig := map[string]string{
 			kafkautils.KafkaConfigSecurityProtocol:      "SSL",
-			kafkautils.KafkaConfigSSLTrustStoreLocation: trustStoreLoc,
-			kafkautils.KafkaConfigSSLKeyStoreLocation:   keyStoreLoc,
+			kafkautils.KafkaConfigSSLTrustStoreLocation: clientKeystorePath + "/" + v1alpha1.TLSJKSTrustStore,
+			kafkautils.KafkaConfigSSLKeyStoreLocation:   clientKeystorePath + "/" + v1alpha1.TLSJKSKeyStore,
 			kafkautils.KafkaConfigSSLKeyStorePassword:   clientPass,
 			kafkautils.KafkaConfigSSLTrustStorePassword: clientPass,
 		}
