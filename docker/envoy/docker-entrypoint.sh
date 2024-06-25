@@ -1,7 +1,6 @@
 #!/usr/bin/env sh
 set -e
 
-
 loglevel="${loglevel:-}"
 USERID=$(id -u)
 
@@ -18,20 +17,16 @@ if [ "$1" = 'envoy' ]; then
     fi
 fi
 
-# This `docker-entrypoint.sh` disables the su-exec as envoy and only runs envoy as root user.
-# From the envoy git repo:
-# if [ "$ENVOY_UID" != "0" ] && [ "$USERID" = 0 ]; then
-#     if [ -n "$ENVOY_UID" ]; then
-#         usermod -u "$ENVOY_UID" envoy
-#     fi
-#     if [ -n "$ENVOY_GID" ]; then
-#         groupmod -g "$ENVOY_GID" envoy
-#     fi
-#     # Ensure the envoy user is able to write to container logs
-#     chown envoy:envoy /dev/stdout /dev/stderr
-#     exec su-exec envoy "${@}"
-# else
-#     exec "${@}"
-# fi
-
-exec "${@}"
+if [ "$ENVOY_UID" != "0" ] && [ "$USERID" = 0 ]; then
+    if [ -n "$ENVOY_UID" ]; then
+        usermod -u "$ENVOY_UID" envoy
+    fi
+    if [ -n "$ENVOY_GID" ]; then
+        groupmod -g "$ENVOY_GID" envoy
+    fi
+    # Ensure the envoy user is able to write to container logs
+    usermod -a -G tty envoy
+    exec su-exec envoy "${@}"
+else
+    exec "${@}"
+fi
