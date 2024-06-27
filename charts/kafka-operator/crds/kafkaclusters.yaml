@@ -21677,6 +21677,8 @@ spec:
                           description: At least one of the listeners should have this
                             flag enabled
                           type: boolean
+                        usedForKafkaAdminCommunication:
+                          type: boolean
                       required:
                       - containerPort
                       - externalStartingPort
@@ -21752,6 +21754,8 @@ spec:
                         usedForInnerBrokerCommunication:
                           description: At least one of the listeners should have this
                             flag enabled
+                          type: boolean
+                        usedForKafkaAdminCommunication:
                           type: boolean
                       required:
                       - containerPort

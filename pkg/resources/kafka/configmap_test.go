@@ -605,6 +605,27 @@ metric.reporters=com.linkedin.kafka.cruisecontrol.metricsreporter.CruiseControlM
 super.users=User:CN=kafka-headless.kafka.svc.cluster.local
 zookeeper.connect=example.zk:2181/`,
 		},
+		{
+			testName:                  "security_inter_broker_protocol_Set",
+			readOnlyConfig:            `security.inter.broker.protocol=SASL_SSL`,
+			zkAddresses:               []string{"example.zk:2181"},
+			zkPath:                    ``,
+			kubernetesClusterDomain:   ``,
+			clusterWideConfig:         ``,
+			perBrokerConfig:           ``,
+			perBrokerReadOnlyConfig:   ``,
+			advertisedListenerAddress: `kafka-0.kafka.svc.cluster.local:9092`,
+			listenerType:              "plaintext",
+			expectedConfig: `advertised.listeners=INTERNAL://kafka-0.kafka.svc.cluster.local:9092
+broker.id=0
+cruise.control.metrics.reporter.bootstrap.servers=kafka-all-broker.kafka.svc.cluster.local:9092
+cruise.control.metrics.reporter.kubernetes.mode=true
+listener.security.protocol.map=INTERNAL:PLAINTEXT
+listeners=INTERNAL://:9092
+metric.reporters=com.linkedin.kafka.cruisecontrol.metricsreporter.CruiseControlMetricsReporter
+zookeeper.connect=example.zk:2181/
+security.inter.broker.protocol=SASL_SSL`,
+		},
 	}
 
 	t.Parallel()

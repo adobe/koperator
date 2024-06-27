@@ -691,6 +691,89 @@ cruise.control.metrics.reporter.kubernetes.mode=true`,
 	}
 }
 
+func TestConstructEListenerLabelName(t *testing.T) {
+	tests := []struct {
+		ingressConfigName string
+		eListenerName     string
+		expected          string
+	}{
+		{"globalConfig", "example_listener_name", "example-listener-name"},
+		{"globalConfig", "no_underscores", "no-underscores"},
+		{"globalConfig", "multiple___underscores", "multiple---underscores"},
+		{"globalConfig", "noUnderscoresHere", "noUnderscoresHere"},
+		{"nonGlobalConfig", "example_listener_name", "example-listener-name-nonGlobalConfig"},
+	}
+
+	for _, test := range tests {
+		result := ConstructEListenerLabelName(test.ingressConfigName, test.eListenerName)
+		if result != test.expected {
+			t.Errorf("ConstructEListenerLabelName(%q, %q) = %q; want %q", test.ingressConfigName, test.eListenerName, result, test.expected)
+		}
+	}
+}
+
+func TestGenerateEnvoyResourceName(t *testing.T) {
+	testCases := []struct {
+		resourceNameFormat                       string
+		resourceNameWithScopeFormat              string
+		extListener                              v1beta1.ExternalListenerConfig
+		ingressConfig                            v1beta1.IngressConfig
+		ingressConfigName, clusterName, expected string
+	}{
+		{
+			resourceNameFormat:          "%s-%s",
+			resourceNameWithScopeFormat: "%s-%s-%s",
+			extListener: v1beta1.ExternalListenerConfig{
+				CommonListenerSpec: v1beta1.CommonListenerSpec{Name: "noUnderscores"},
+			},
+			ingressConfig:     v1beta1.IngressConfig{},
+			ingressConfigName: "globalConfig",
+			clusterName:       "clusterName",
+			expected:          "noUnderscores-clusterName",
+		},
+		{
+			resourceNameFormat:          "%s-%s",
+			resourceNameWithScopeFormat: "%s-%s-%s",
+			extListener: v1beta1.ExternalListenerConfig{
+				CommonListenerSpec: v1beta1.CommonListenerSpec{Name: "under_scores"},
+			},
+			ingressConfig:     v1beta1.IngressConfig{},
+			ingressConfigName: "globalConfig",
+			clusterName:       "clusterName",
+			expected:          "under-scores-clusterName",
+		},
+		{
+			resourceNameFormat:          "%s-%s",
+			resourceNameWithScopeFormat: "%s-%s-%s",
+			extListener: v1beta1.ExternalListenerConfig{
+				CommonListenerSpec: v1beta1.CommonListenerSpec{Name: "noUnderscores"},
+			},
+			ingressConfig:     v1beta1.IngressConfig{},
+			ingressConfigName: "nonGlobalConfig",
+			clusterName:       "clusterName",
+			expected:          "noUnderscores-nonGlobalConfig-clusterName",
+		},
+		{
+			resourceNameFormat:          "%s-%s",
+			resourceNameWithScopeFormat: "%s-%s-%s",
+			extListener: v1beta1.ExternalListenerConfig{
+				CommonListenerSpec: v1beta1.CommonListenerSpec{Name: "under_scores"},
+			},
+			ingressConfig:     v1beta1.IngressConfig{},
+			ingressConfigName: "nonGlobalConfig",
+			clusterName:       "clusterName",
+			expected:          "under-scores-nonGlobalConfig-clusterName",
+		},
+	}
+	for _, test := range testCases {
+		hash := GenerateEnvoyResourceName(test.resourceNameFormat, test.resourceNameWithScopeFormat, test.extListener, test.ingressConfig,
+			test.ingressConfigName, test.clusterName)
+		if hash != test.expected {
+			t.Errorf("Expected: %s  Got: %s", test.expected, hash)
+		}
+	}
+}
+
 func TestGetMD5Hash(t *testing.T) {
 	testCases := []struct {
 		testName string

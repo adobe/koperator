@@ -748,6 +748,7 @@ type CommonListenerSpec struct {
 	// At least one of the listeners should have this flag enabled
 	// +optional
 	UsedForInnerBrokerCommunication bool `json:"usedForInnerBrokerCommunication"`
+	UsedForKafkaAdminCommunication  bool `json:"usedForKafkaAdminCommunication,omitempty"`
 }
 
 func (c *CommonListenerSpec) GetServerSSLCertSecretName() string {

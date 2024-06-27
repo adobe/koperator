@@ -37,11 +37,18 @@ func UseSSL(cluster *v1beta1.KafkaCluster) bool {
 
 func getContainerPortForInnerCom(internalListeners []v1beta1.InternalListenerConfig, extListeners []v1beta1.ExternalListenerConfig) int32 {
 	for _, val := range internalListeners {
+		if val.UsedForKafkaAdminCommunication { // Cannot Currently update the CRD as I do not have permissions
+			return val.ContainerPort
+		}
 		if val.UsedForInnerBrokerCommunication {
 			return val.ContainerPort
 		}
 	}
+
 	for _, val := range extListeners {
+		if val.UsedForKafkaAdminCommunication {
+			return val.ContainerPort
+		}
 		if val.UsedForInnerBrokerCommunication {
 			return val.ContainerPort
 		}
