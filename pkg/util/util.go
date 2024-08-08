@@ -236,11 +236,12 @@ func IsIngressConfigInUse(iConfigName, defaultConfigName string, cluster *v1beta
 
 // ConstructEListenerLabelName construct an eListener label name based on ingress config name and listener name
 func ConstructEListenerLabelName(ingressConfigName, eListenerName string) string {
+	externalListenerName := strings.ReplaceAll(eListenerName, "_", "-")
 	if ingressConfigName == IngressConfigGlobalName {
-		return eListenerName
+		return externalListenerName
 	}
 
-	return fmt.Sprintf(ExternalListenerLabelNameTemplate, eListenerName, ingressConfigName)
+	return fmt.Sprintf(ExternalListenerLabelNameTemplate, externalListenerName, ingressConfigName)
 }
 
 // ShouldIncludeBroker returns true if the broker should be included as a resource on external listener resources
@@ -437,10 +438,11 @@ func ConvertConfigEntryListToProperties(config []sarama.ConfigEntry) (*propertie
 func GenerateEnvoyResourceName(resourceNameFormat string, resourceNameWithScopeFormat string, extListener v1beta1.ExternalListenerConfig, ingressConfig v1beta1.IngressConfig,
 	ingressConfigName, clusterName string) string {
 	var resourceName string
+	externalListenerName := strings.ReplaceAll(extListener.Name, "_", "-")
 	if ingressConfigName == IngressConfigGlobalName {
-		resourceName = fmt.Sprintf(resourceNameFormat, extListener.Name, clusterName)
+		resourceName = fmt.Sprintf(resourceNameFormat, externalListenerName, clusterName)
 	} else {
-		resourceName = fmt.Sprintf(resourceNameWithScopeFormat, extListener.Name, ingressConfigName, clusterName)
+		resourceName = fmt.Sprintf(resourceNameWithScopeFormat, externalListenerName, ingressConfigName, clusterName)
 	}
 
 	return resourceName

@@ -30,6 +30,7 @@ const (
 	KafkaConfigListenerName                = "listener.name"
 	KafkaConfigListenerSecurityProtocolMap = "listener.security.protocol.map"
 	KafkaConfigInterBrokerListenerName     = "inter.broker.listener.name"
+	KafkaConfigSecurityInterBrokerProtocol = "security.inter.broker.protocol"
 	KafkaConfigAdvertisedListeners         = "advertised.listeners"
 	KafkaConfigControlPlaneListener        = "control.plane.listener.name"
 

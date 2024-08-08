@@ -748,6 +748,9 @@ type CommonListenerSpec struct {
 	// At least one of the listeners should have this flag enabled
 	// +optional
 	UsedForInnerBrokerCommunication bool `json:"usedForInnerBrokerCommunication"`
+	// UsedForKafkaAdminCommunication allows for a different port to be returned when the koperator is checking for the port to use to check if kafka is operating.
+	// +optional
+	UsedForKafkaAdminCommunication bool `json:"usedForKafkaAdminCommunication,omitempty"`
 }
 
 func (c *CommonListenerSpec) GetServerSSLCertSecretName() string {
