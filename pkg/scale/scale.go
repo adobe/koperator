@@ -141,6 +141,7 @@ func (cc *cruiseControlScaler) Status(ctx context.Context) (StatusTaskResult, er
 			State:              v1beta1.CruiseControlTaskActive,
 		},
 		Status: &status,
+		State:  resp.Result,
 	}, nil
 }
 

@@ -43,6 +43,7 @@ import (
 	"github.com/banzaicloud/koperator/pkg/kafkaclient"
 	"github.com/banzaicloud/koperator/pkg/pki"
 	"github.com/banzaicloud/koperator/pkg/resources"
+	"github.com/banzaicloud/koperator/pkg/resources/contouringress"
 	"github.com/banzaicloud/koperator/pkg/resources/cruisecontrol"
 	"github.com/banzaicloud/koperator/pkg/resources/cruisecontrolmonitoring"
 	"github.com/banzaicloud/koperator/pkg/resources/envoy"
@@ -51,6 +52,8 @@ import (
 	"github.com/banzaicloud/koperator/pkg/resources/kafkamonitoring"
 	"github.com/banzaicloud/koperator/pkg/resources/nodeportexternalaccess"
 	"github.com/banzaicloud/koperator/pkg/util"
+
+	contour "github.com/projectcontour/contour/apis/projectcontour/v1"
 )
 
 var clusterFinalizer = "finalizer.kafkaclusters.kafka.banzaicloud.io"
@@ -118,6 +121,7 @@ func (r *KafkaClusterReconciler) Reconcile(ctx context.Context, request ctrl.Req
 		envoy.New(r.Client, instance),
 		istioingress.New(r.Client, instance),
 		nodeportexternalaccess.New(r.Client, instance),
+		contouringress.New(r.Client, instance),
 		kafkamonitoring.New(r.Client, instance),
 		cruisecontrolmonitoring.New(r.Client, instance),
 		kafka.New(r.Client, r.DirectClient, instance, r.KafkaClientProvider),
@@ -365,6 +369,7 @@ func SetupKafkaClusterWithManager(mgr ctrl.Manager) *ctrl.Builder {
 
 	kafkaWatches(builder)
 	envoyWatches(builder)
+	contourWatches(builder)
 	cruiseControlWatches(builder)
 
 	builder.WithEventFilter(
@@ -415,6 +420,12 @@ func envoyWatches(builder *ctrl.Builder) *ctrl.Builder {
 		Owns(&corev1.Service{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.ConfigMap{})
+}
+
+func contourWatches(builder *ctrl.Builder) *ctrl.Builder {
+	return builder.
+		Owns(&corev1.Service{}).
+		Owns(&contour.HTTPProxy{})
 }
 
 func cruiseControlWatches(builder *ctrl.Builder) *ctrl.Builder {

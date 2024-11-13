@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"emperror.dev/errors"
+	ccTypes "github.com/banzaicloud/go-cruise-control/pkg/types"
 	"github.com/go-logr/logr"
 	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
@@ -36,8 +37,11 @@ import (
 
 	"github.com/banzaicloud/koperator/api/v1alpha1"
 	"github.com/banzaicloud/koperator/api/v1beta1"
+	controllerMocks "github.com/banzaicloud/koperator/controllers/tests/mocks"
+	"github.com/banzaicloud/koperator/pkg/kafkaclient"
 	"github.com/banzaicloud/koperator/pkg/resources"
 	"github.com/banzaicloud/koperator/pkg/resources/kafka/mocks"
+	"github.com/banzaicloud/koperator/pkg/scale"
 )
 
 func TestGetBrokersWithPendingOrRunningCCTask(t *testing.T) {
@@ -1272,6 +1276,9 @@ func TestReconcileConcurrentBrokerRestartsAllowed(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "kafka-101", Labels: map[string]string{"brokerId": "101"}, DeletionTimestamp: &metav1.Time{Time: time.Now()}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "kafka-201", Labels: map[string]string{"brokerId": "201"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "kafka-301", Labels: map[string]string{"brokerId": "301"}}},
+				// {ObjectMeta: metav1.ObjectMeta{Name: "kafka-101", DeletionTimestamp: &metav1.Time{Time: time.Now()}}},
+				// {ObjectMeta: metav1.ObjectMeta{Name: "kafka-201"}},
+				// {ObjectMeta: metav1.ObjectMeta{Name: "kafka-301"}},
 			},
 			errorExpected: true,
 		},
@@ -1285,7 +1292,7 @@ func TestReconcileConcurrentBrokerRestartsAllowed(t *testing.T) {
 				Spec: v1beta1.KafkaClusterSpec{
 					Brokers: []v1beta1.Broker{{Id: 101}, {Id: 201}, {Id: 301}},
 					RollingUpgradeConfig: v1beta1.RollingUpgradeConfig{
-						ConcurrentBrokerRestartsAllowed: 2,
+						ConcurrentBrokerRestartCountPerRack: 2,
 					},
 				},
 				Status: v1beta1.KafkaClusterStatus{State: v1beta1.KafkaClusterRollingUpgrading},
@@ -1296,6 +1303,9 @@ func TestReconcileConcurrentBrokerRestartsAllowed(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "kafka-101", Labels: map[string]string{"brokerId": "101"}, DeletionTimestamp: &metav1.Time{Time: time.Now()}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "kafka-201", Labels: map[string]string{"brokerId": "201"}, DeletionTimestamp: &metav1.Time{Time: time.Now()}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "kafka-301", Labels: map[string]string{"brokerId": "301"}}},
+				// {ObjectMeta: metav1.ObjectMeta{Name: "kafka-101", DeletionTimestamp: &metav1.Time{Time: time.Now()}}},
+				// {ObjectMeta: metav1.ObjectMeta{Name: "kafka-201", DeletionTimestamp: &metav1.Time{Time: time.Now()}}},
+				// {ObjectMeta: metav1.ObjectMeta{Name: "kafka-301"}},
 			},
 			errorExpected: true,
 		},
@@ -1309,7 +1319,7 @@ func TestReconcileConcurrentBrokerRestartsAllowed(t *testing.T) {
 				Spec: v1beta1.KafkaClusterSpec{
 					Brokers: []v1beta1.Broker{{Id: 101}, {Id: 102}, {Id: 201}, {Id: 102}, {Id: 301}, {Id: 302}},
 					RollingUpgradeConfig: v1beta1.RollingUpgradeConfig{
-						ConcurrentBrokerRestartsAllowed: 2,
+						ConcurrentBrokerRestartCountPerRack: 2,
 					},
 				},
 				Status: v1beta1.KafkaClusterStatus{State: v1beta1.KafkaClusterRollingUpgrading},
@@ -1323,6 +1333,14 @@ func TestReconcileConcurrentBrokerRestartsAllowed(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "kafka-202", Labels: map[string]string{"brokerId": "202"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "kafka-301", Labels: map[string]string{"brokerId": "301"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "kafka-302", Labels: map[string]string{"brokerId": "302"}}},
+			},
+			ccStatus: &scale.StatusTaskResult{
+				State: &ccTypes.StateResult{
+					AnalyzerState: ccTypes.AnalyzerState{ReadyGoals: []ccTypes.Goal{ccTypes.RackAwareDistributionGoal}},
+					AnomalyDetectorState: ccTypes.AnomalyDetectorState{
+						RecentGoalViolations: []ccTypes.AnomalyDetails{{UnfixableViolatedGoals: []ccTypes.Goal{}, FixableViolatedGoals: []ccTypes.Goal{}}},
+					},
+				},
 			},
 			errorExpected: true,
 		},
@@ -1342,7 +1360,7 @@ func TestReconcileConcurrentBrokerRestartsAllowed(t *testing.T) {
 						{Id: 301, ReadOnlyConfig: "broker.rack=az3"},
 						{Id: 302, ReadOnlyConfig: ""}},
 					RollingUpgradeConfig: v1beta1.RollingUpgradeConfig{
-						ConcurrentBrokerRestartsAllowed: 2,
+						ConcurrentBrokerRestartCountPerRack: 2,
 					},
 				},
 				Status: v1beta1.KafkaClusterStatus{State: v1beta1.KafkaClusterRollingUpgrading},
@@ -1356,6 +1374,14 @@ func TestReconcileConcurrentBrokerRestartsAllowed(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "kafka-202", Labels: map[string]string{"brokerId": "202"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "kafka-301", Labels: map[string]string{"brokerId": "301"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "kafka-302", Labels: map[string]string{"brokerId": "302"}}},
+			},
+			ccStatus: &scale.StatusTaskResult{
+				State: &ccTypes.StateResult{
+					AnalyzerState: ccTypes.AnalyzerState{ReadyGoals: []ccTypes.Goal{ccTypes.RackAwareDistributionGoal}},
+					AnomalyDetectorState: ccTypes.AnomalyDetectorState{
+						RecentGoalViolations: []ccTypes.AnomalyDetails{{UnfixableViolatedGoals: []ccTypes.Goal{}, FixableViolatedGoals: []ccTypes.Goal{}}},
+					},
+				},
 			},
 			errorExpected: true,
 		},
@@ -1430,6 +1456,42 @@ func TestReconcileConcurrentBrokerRestartsAllowed(t *testing.T) {
 			outOfSyncReplicas:  []int32{},
 		},
 		{
+			testName: "Pod is deleted if allowed concurrent restarts is default and failure threshold is not reached",
+			kafkaCluster: v1beta1.KafkaCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "kafka",
+					Namespace: "kafka",
+				},
+				Spec: v1beta1.KafkaClusterSpec{
+					Brokers: []v1beta1.Broker{
+						{Id: 101, ReadOnlyConfig: "broker.rack=az1"},
+						{Id: 102, ReadOnlyConfig: "broker.rack=az1"},
+						{Id: 201, ReadOnlyConfig: "broker.rack=az2"},
+						{Id: 202, ReadOnlyConfig: "broker.rack=az2"},
+						{Id: 301, ReadOnlyConfig: "broker.rack=az3"},
+						{Id: 302, ReadOnlyConfig: "broker.rack=az3"}},
+					RollingUpgradeConfig: v1beta1.RollingUpgradeConfig{
+						FailureThreshold:                    1,
+						ConcurrentBrokerRestartCountPerRack: 1,
+					},
+				},
+				Status: v1beta1.KafkaClusterStatus{State: v1beta1.KafkaClusterRollingUpgrading},
+			},
+			desiredPod: &corev1.Pod{},
+			currentPod: &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "kafka-102", Labels: map[string]string{"brokerId": "102"}}},
+			pods: []corev1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Name: "kafka-101", Labels: map[string]string{"brokerId": "101"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "kafka-102", Labels: map[string]string{"brokerId": "102"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "kafka-201", Labels: map[string]string{"brokerId": "201"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "kafka-202", Labels: map[string]string{"brokerId": "202"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "kafka-301", Labels: map[string]string{"brokerId": "301"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "kafka-302", Labels: map[string]string{"brokerId": "302"}}},
+			},
+			allOfflineReplicas: []int32{},
+			outOfSyncReplicas:  []int32{},
+			errorExpected:      false,
+		},
+		{
 			testName: "Pod is not deleted if pod is restarting in another AZ, even if allowed concurrent restarts is not reached",
 			kafkaCluster: v1beta1.KafkaCluster{
 				ObjectMeta: metav1.ObjectMeta{
@@ -1445,8 +1507,8 @@ func TestReconcileConcurrentBrokerRestartsAllowed(t *testing.T) {
 						{Id: 301, ReadOnlyConfig: "broker.rack=az3"},
 						{Id: 302, ReadOnlyConfig: "broker.rack=az3"}},
 					RollingUpgradeConfig: v1beta1.RollingUpgradeConfig{
-						FailureThreshold:                2,
-						ConcurrentBrokerRestartsAllowed: 2,
+						FailureThreshold:                    2,
+						ConcurrentBrokerRestartCountPerRack: 2,
 					},
 				},
 				Status: v1beta1.KafkaClusterStatus{State: v1beta1.KafkaClusterRollingUpgrading},
@@ -1460,6 +1522,14 @@ func TestReconcileConcurrentBrokerRestartsAllowed(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "kafka-202", Labels: map[string]string{"brokerId": "202"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "kafka-301", Labels: map[string]string{"brokerId": "301"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "kafka-302", Labels: map[string]string{"brokerId": "302"}}},
+			},
+			ccStatus: &scale.StatusTaskResult{
+				State: &ccTypes.StateResult{
+					AnalyzerState: ccTypes.AnalyzerState{ReadyGoals: []ccTypes.Goal{ccTypes.RackAwareDistributionGoal}},
+					AnomalyDetectorState: ccTypes.AnomalyDetectorState{
+						RecentGoalViolations: []ccTypes.AnomalyDetails{{UnfixableViolatedGoals: []ccTypes.Goal{}, FixableViolatedGoals: []ccTypes.Goal{}}},
+					},
+				},
 			},
 			errorExpected: true,
 		},
@@ -1479,8 +1549,8 @@ func TestReconcileConcurrentBrokerRestartsAllowed(t *testing.T) {
 						{Id: 301, ReadOnlyConfig: "broker.rack=az3"},
 						{Id: 302, ReadOnlyConfig: "broker.rack=az3"}},
 					RollingUpgradeConfig: v1beta1.RollingUpgradeConfig{
-						FailureThreshold:                2,
-						ConcurrentBrokerRestartsAllowed: 2,
+						FailureThreshold:                    2,
+						ConcurrentBrokerRestartCountPerRack: 2,
 					},
 				},
 				Status: v1beta1.KafkaClusterStatus{State: v1beta1.KafkaClusterRollingUpgrading},
@@ -1495,9 +1565,45 @@ func TestReconcileConcurrentBrokerRestartsAllowed(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "kafka-301", Labels: map[string]string{"brokerId": "301"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "kafka-302", Labels: map[string]string{"brokerId": "302"}}},
 			},
-			outOfSyncReplicas:  []int32{201},
 			allOfflineReplicas: []int32{},
+			outOfSyncReplicas:  []int32{201},
 			errorExpected:      true,
+		},
+		{
+			testName: "Pod is deleted if all pods are running and CC RackAwareDistributionGoal is not ready and allowed concurrent restarts is not reached",
+			kafkaCluster: v1beta1.KafkaCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "kafka",
+					Namespace: "kafka",
+				},
+				Spec: v1beta1.KafkaClusterSpec{
+					Brokers: []v1beta1.Broker{
+						{Id: 101, ReadOnlyConfig: "broker.rack=az1"},
+						{Id: 102, ReadOnlyConfig: "broker.rack=az1"},
+						{Id: 201, ReadOnlyConfig: "broker.rack=az2"},
+						{Id: 202, ReadOnlyConfig: "broker.rack=az2"},
+						{Id: 301, ReadOnlyConfig: "broker.rack=az3"},
+						{Id: 302, ReadOnlyConfig: "broker.rack=az3"}},
+					RollingUpgradeConfig: v1beta1.RollingUpgradeConfig{
+						FailureThreshold:                    2,
+						ConcurrentBrokerRestartCountPerRack: 2,
+					},
+				},
+				Status: v1beta1.KafkaClusterStatus{State: v1beta1.KafkaClusterRollingUpgrading},
+			},
+			desiredPod: &corev1.Pod{},
+			currentPod: &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "kafka-102", Labels: map[string]string{"brokerId": "102"}}},
+			pods: []corev1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Name: "kafka-101", Labels: map[string]string{"brokerId": "101"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "kafka-102", Labels: map[string]string{"brokerId": "102"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "kafka-201", Labels: map[string]string{"brokerId": "201"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "kafka-202", Labels: map[string]string{"brokerId": "202"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "kafka-301", Labels: map[string]string{"brokerId": "301"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "kafka-302", Labels: map[string]string{"brokerId": "302"}}},
+			},
+			allOfflineReplicas: []int32{},
+			outOfSyncReplicas:  []int32{101},
+			errorExpected:      false,
 		},
 		{
 			testName: "Pod is deleted if failure is in same AZ and allowed concurrent restarts is not reached",
@@ -1515,8 +1621,8 @@ func TestReconcileConcurrentBrokerRestartsAllowed(t *testing.T) {
 						{Id: 301, ReadOnlyConfig: "broker.rack=az3"},
 						{Id: 302, ReadOnlyConfig: "broker.rack=az3"}},
 					RollingUpgradeConfig: v1beta1.RollingUpgradeConfig{
-						FailureThreshold:                2,
-						ConcurrentBrokerRestartsAllowed: 2,
+						FailureThreshold:                    2,
+						ConcurrentBrokerRestartCountPerRack: 2,
 					},
 				},
 				Status: v1beta1.KafkaClusterStatus{State: v1beta1.KafkaClusterRollingUpgrading},
@@ -1531,9 +1637,17 @@ func TestReconcileConcurrentBrokerRestartsAllowed(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "kafka-301", Labels: map[string]string{"brokerId": "301"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "kafka-302", Labels: map[string]string{"brokerId": "302"}}},
 			},
-			outOfSyncReplicas:  []int32{101},
 			allOfflineReplicas: []int32{},
-			errorExpected:      false,
+			outOfSyncReplicas:  []int32{101},
+			ccStatus: &scale.StatusTaskResult{
+				State: &ccTypes.StateResult{
+					AnalyzerState: ccTypes.AnalyzerState{ReadyGoals: []ccTypes.Goal{ccTypes.RackAwareDistributionGoal}},
+					AnomalyDetectorState: ccTypes.AnomalyDetectorState{
+						RecentGoalViolations: []ccTypes.AnomalyDetails{{UnfixableViolatedGoals: []ccTypes.Goal{}, FixableViolatedGoals: []ccTypes.Goal{}}},
+					},
+				},
+			},
+			errorExpected: false,
 		},
 		{
 			testName: "Pod is not deleted if pod is restarting in another AZ, if brokers per AZ < tolerated failures",
@@ -1549,8 +1663,8 @@ func TestReconcileConcurrentBrokerRestartsAllowed(t *testing.T) {
 						{Id: 301, ReadOnlyConfig: "broker.rack=az3"},
 					},
 					RollingUpgradeConfig: v1beta1.RollingUpgradeConfig{
-						FailureThreshold:                2,
-						ConcurrentBrokerRestartsAllowed: 2,
+						FailureThreshold:                    2,
+						ConcurrentBrokerRestartCountPerRack: 2,
 					},
 				},
 				Status: v1beta1.KafkaClusterStatus{State: v1beta1.KafkaClusterRollingUpgrading},
@@ -1561,6 +1675,14 @@ func TestReconcileConcurrentBrokerRestartsAllowed(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "kafka-101", Labels: map[string]string{"brokerId": "101"}, DeletionTimestamp: &metav1.Time{Time: time.Now()}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "kafka-201", Labels: map[string]string{"brokerId": "201"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "kafka-301", Labels: map[string]string{"brokerId": "301"}}},
+			},
+			ccStatus: &scale.StatusTaskResult{
+				State: &ccTypes.StateResult{
+					AnalyzerState: ccTypes.AnalyzerState{ReadyGoals: []ccTypes.Goal{ccTypes.RackAwareDistributionGoal}},
+					AnomalyDetectorState: ccTypes.AnomalyDetectorState{
+						RecentGoalViolations: []ccTypes.AnomalyDetails{{UnfixableViolatedGoals: []ccTypes.Goal{}, FixableViolatedGoals: []ccTypes.Goal{}}},
+					},
+				},
 			},
 			errorExpected: true,
 		},
@@ -1578,8 +1700,8 @@ func TestReconcileConcurrentBrokerRestartsAllowed(t *testing.T) {
 						{Id: 301, ReadOnlyConfig: "broker.rack=az3"},
 					},
 					RollingUpgradeConfig: v1beta1.RollingUpgradeConfig{
-						FailureThreshold:                2,
-						ConcurrentBrokerRestartsAllowed: 2,
+						FailureThreshold:                    2,
+						ConcurrentBrokerRestartCountPerRack: 2,
 					},
 				},
 				Status: v1beta1.KafkaClusterStatus{State: v1beta1.KafkaClusterRollingUpgrading},
@@ -1591,8 +1713,8 @@ func TestReconcileConcurrentBrokerRestartsAllowed(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "kafka-201", Labels: map[string]string{"brokerId": "201"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "kafka-301", Labels: map[string]string{"brokerId": "301"}}},
 			},
-			outOfSyncReplicas:  []int32{101},
 			allOfflineReplicas: []int32{},
+			outOfSyncReplicas:  []int32{101},
 			errorExpected:      true,
 		},
 		{
@@ -1609,8 +1731,8 @@ func TestReconcileConcurrentBrokerRestartsAllowed(t *testing.T) {
 						{Id: 301, ReadOnlyConfig: "broker.rack=az3"},
 					},
 					RollingUpgradeConfig: v1beta1.RollingUpgradeConfig{
-						FailureThreshold:                2,
-						ConcurrentBrokerRestartsAllowed: 2,
+						FailureThreshold:                    2,
+						ConcurrentBrokerRestartCountPerRack: 2,
 					},
 				},
 				Status: v1beta1.KafkaClusterStatus{State: v1beta1.KafkaClusterRollingUpgrading},
@@ -1640,8 +1762,8 @@ func TestReconcileConcurrentBrokerRestartsAllowed(t *testing.T) {
 						{Id: 301, ReadOnlyConfig: "broker.rack=az-3"},
 					},
 					RollingUpgradeConfig: v1beta1.RollingUpgradeConfig{
-						FailureThreshold:                2,
-						ConcurrentBrokerRestartsAllowed: 2,
+						FailureThreshold:                    2,
+						ConcurrentBrokerRestartCountPerRack: 2,
 					},
 				},
 				Status: v1beta1.KafkaClusterStatus{State: v1beta1.KafkaClusterRollingUpgrading},
@@ -1652,6 +1774,14 @@ func TestReconcileConcurrentBrokerRestartsAllowed(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "kafka-101", Labels: map[string]string{"brokerId": "101"}, DeletionTimestamp: &metav1.Time{Time: time.Now()}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "kafka-201", Labels: map[string]string{"brokerId": "201"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "kafka-301", Labels: map[string]string{"brokerId": "301"}}},
+			},
+			ccStatus: &scale.StatusTaskResult{
+				State: &ccTypes.StateResult{
+					AnalyzerState: ccTypes.AnalyzerState{ReadyGoals: []ccTypes.Goal{ccTypes.RackAwareDistributionGoal}},
+					AnomalyDetectorState: ccTypes.AnomalyDetectorState{
+						RecentGoalViolations: []ccTypes.AnomalyDetails{{UnfixableViolatedGoals: []ccTypes.Goal{}, FixableViolatedGoals: []ccTypes.Goal{}}},
+					},
+				},
 			},
 			errorExpected: true,
 		},
@@ -1689,6 +1819,13 @@ func TestReconcileConcurrentBrokerRestartsAllowed(t *testing.T) {
 			}
 			mockKafkaClientProvider.On("NewFromCluster", mockClient, &test.kafkaCluster).Return(mockedKafkaClient, func() {}, nil)
 
+			// Mock Cruise Control client
+			mockCruiseControl := controllerMocks.NewMockCruiseControlScaler(mockCtrl)
+			if test.ccStatus != nil {
+				mockCruiseControl.EXPECT().Status(context.Background()).Return(*test.ccStatus, nil)
+			}
+			r.CruiseControlScalerFactory = controllerMocks.NewMockScaleFactory(mockCruiseControl)
+
 			// Call the handleRollingUpgrade function with the provided test.desiredPod and test.currentPod
 			err := r.handleRollingUpgrade(logf.Log, test.desiredPod, test.currentPod, reflect.TypeOf(test.desiredPod))
 
@@ -1698,6 +1835,88 @@ func TestReconcileConcurrentBrokerRestartsAllowed(t *testing.T) {
 			} else {
 				assert.Nil(t, err, "Expected no error but got one")
 			}
+		})
+	}
+}
+
+func TestGetBrokerAzMap(t *testing.T) {
+	t.Parallel()
+	testCases := []struct {
+		testName      string
+		kafkaCluster  v1beta1.KafkaCluster
+		expectedAzMap map[int32]string
+	}{
+		{
+			testName: "Brokers have different AZs if no broker rack value is set",
+			kafkaCluster: v1beta1.KafkaCluster{
+				Spec: v1beta1.KafkaClusterSpec{
+					Brokers: []v1beta1.Broker{
+						{Id: 101, ReadOnlyConfig: ""},
+						{Id: 201, ReadOnlyConfig: ""},
+						{Id: 301, ReadOnlyConfig: ""},
+					},
+				},
+			},
+			expectedAzMap: map[int32]string{101: "101", 201: "201", 301: "301"},
+		},
+		{
+			testName: "Brokers have different AZs if one broker has no broker rack value set",
+			kafkaCluster: v1beta1.KafkaCluster{
+				Spec: v1beta1.KafkaClusterSpec{
+					Brokers: []v1beta1.Broker{
+						{Id: 101, ReadOnlyConfig: "broker.rack=az1"},
+						{Id: 102, ReadOnlyConfig: ""},
+						{Id: 201, ReadOnlyConfig: "broker.rack=az2"},
+						{Id: 202, ReadOnlyConfig: "broker.rack=az2"},
+						{Id: 301, ReadOnlyConfig: "broker.rack=az3"},
+						{Id: 302, ReadOnlyConfig: "broker.rack=az3"},
+					},
+				},
+			},
+			expectedAzMap: map[int32]string{101: "101", 102: "102", 201: "201", 202: "202", 301: "301", 302: "302"},
+		},
+		{
+			testName: "Brokers have different AZs if read only configs is a corrupted string for one broker",
+			kafkaCluster: v1beta1.KafkaCluster{
+				Spec: v1beta1.KafkaClusterSpec{
+					Brokers: []v1beta1.Broker{
+						{Id: 101, ReadOnlyConfig: "broker.rack;az1"},
+						{Id: 201, ReadOnlyConfig: "broker.rack=az2"},
+						{Id: 301, ReadOnlyConfig: "broker.rack=az3"},
+					},
+				},
+			},
+			expectedAzMap: map[int32]string{101: "101", 201: "201", 301: "301"},
+		},
+		{
+			testName: "Brokers have correct AZs if read only configs is valid for all brokers",
+			kafkaCluster: v1beta1.KafkaCluster{
+				Spec: v1beta1.KafkaClusterSpec{
+					Brokers: []v1beta1.Broker{
+						{Id: 101, ReadOnlyConfig: "broker.rack=az-1"},
+						{Id: 102, ReadOnlyConfig: "broker.rack=az-1"},
+						{Id: 201, ReadOnlyConfig: "broker.rack=az-2"},
+						{Id: 202, ReadOnlyConfig: "broker.rack=az-2"},
+						{Id: 301, ReadOnlyConfig: "broker.rack=az-3"},
+						{Id: 302, ReadOnlyConfig: "broker.rack=az-3"},
+					},
+				},
+			},
+			expectedAzMap: map[int32]string{
+				101: "az-1",
+				102: "az-1",
+				201: "az-2",
+				202: "az-2",
+				301: "az-3",
+				302: "az-3",
+			},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.testName, func(t *testing.T) {
+			azMap := getBrokerAzMap(&test.kafkaCluster)
+			assert.Equal(t, test.expectedAzMap, azMap)
 		})
 	}
 }

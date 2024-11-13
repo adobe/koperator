@@ -372,7 +372,6 @@ func TestCreateCCOperation(t *testing.T) {
 	}
 
 	mockCtrl := gomock.NewController(t)
-
 	for _, testCase := range testCases {
 		mockClient := mocks.NewMockClient(mockCtrl)
 		mockSubResourceClient := mocks.NewMockSubResourceClient(mockCtrl)

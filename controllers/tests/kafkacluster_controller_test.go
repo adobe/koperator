@@ -436,6 +436,7 @@ var _ = Describe("KafkaCluster with two config external listener", func() {
 		kafkaClusterKRaft.Spec.Brokers = createMinimalKRaftBrokers()
 		kafkaClusterKRaft.Name = fmt.Sprintf("kafkacluster-kraft-%d", count)
 	})
+
 	JustBeforeEach(func(ctx SpecContext) {
 		By("creating namespace " + namespace)
 		err := k8sClient.Create(ctx, namespaceObj)
@@ -515,6 +516,15 @@ var _ = Describe("KafkaCluster with two config external listener", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		waitForClusterRunningState(ctx, kafkaClusterKRaft, namespace)
+	})
+	JustAfterEach(func(ctx SpecContext) {
+		// in the tests the CC topic might not get deleted
+
+		By("deleting Kafka cluster object " + kafkaCluster.Name + " in namespace " + namespace)
+		err := k8sClient.Delete(ctx, kafkaCluster)
+		Expect(err).NotTo(HaveOccurred())
+
+		kafkaCluster = nil
 	})
 
 	When("configuring two ingress envoy controller config inside the external listener using both as bindings", func() {
@@ -599,7 +609,15 @@ var _ = Describe("KafkaCluster with two config external listener and tls", func(
 
 		waitForClusterRunningState(ctx, kafkaCluster, namespace)
 	})
+	JustAfterEach(func(ctx SpecContext) {
+		// in the tests the CC topic might not get deleted
 
+		By("deleting Kafka cluster object " + kafkaCluster.Name + " in namespace " + namespace)
+		err := k8sClient.Delete(ctx, kafkaCluster)
+		Expect(err).NotTo(HaveOccurred())
+
+		kafkaCluster = nil
+	})
 	When("configuring two ingress envoy controller config inside the external listener using both as bindings", func() {
 		BeforeEach(func() {
 			kafkaCluster.Spec.Brokers[0].BrokerConfig = &v1beta1.BrokerConfig{BrokerIngressMapping: []string{"az1"}}

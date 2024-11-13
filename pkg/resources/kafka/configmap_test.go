@@ -604,6 +604,26 @@ metric.reporters=com.linkedin.kafka.cruisecontrol.metricsreporter.CruiseControlM
 super.users=User:CN=kafka-headless.kafka.svc.cluster.local
 zookeeper.connect=example.zk:2181/`,
 		},
+		{
+			testName:                  "security_inter_broker_protocol_Set",
+			readOnlyConfig:            `security.inter.broker.protocol=SASL_SSL`,
+			zkAddresses:               []string{"example.zk:2181"},
+			zkPath:                    ``,
+			kubernetesClusterDomain:   ``,
+			clusterWideConfig:         ``,
+			perBrokerConfig:           ``,
+			perBrokerReadOnlyConfig:   ``,
+			advertisedListenerAddress: `kafka-0.kafka.svc.cluster.local:9092`,
+			listenerType:              "plaintext",
+			expectedConfig: `advertised.listeners=INTERNAL://kafka-0.kafka.svc.cluster.local:9092
+broker.id=0
+cruise.control.metrics.reporter.bootstrap.servers=kafka-all-broker.kafka.svc.cluster.local:9092
+cruise.control.metrics.reporter.kubernetes.mode=true
+listener.security.protocol.map=INTERNAL:PLAINTEXT
+listeners=INTERNAL://:9092
+zookeeper.connect=example.zk:2181/
+security.inter.broker.protocol=SASL_SSL`,
+		},
 	}
 
 	t.Parallel()
@@ -614,7 +634,7 @@ zookeeper.connect=example.zk:2181/`,
 
 		t.Run(test.testName, func(t *testing.T) {
 			mockClient := mocks.NewMockClient(mockCtrl)
-			mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+			// mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 			r := Reconciler{
 				Reconciler: resources.Reconciler{
 					Client: mockClient,

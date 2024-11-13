@@ -12919,6 +12919,19 @@ spec:
                 type: string
               clusterWideConfig:
                 type: string
+              contourIngressConfig:
+                properties:
+                  brokerFQDNTemplate:
+                    description: Broker hostname template for Contour IngressRoute
+                      resource to generate broker hostnames.
+                    type: string
+                  tlsSecretName:
+                    description: TLS secret used for Contour IngressRoute resource
+                    type: string
+                required:
+                - brokerFQDNTemplate
+                - tlsSecretName
+                type: object
               cruiseControlConfig:
                 description: CruiseControlConfig defines the config for Cruise Control
                 properties:
@@ -18837,6 +18850,7 @@ spec:
                   as well.
                 enum:
                 - envoy
+                - contour
                 - istioingress
                 type: string
               istioControlPlane:
@@ -19197,6 +19211,7 @@ spec:
                           enum:
                           - LoadBalancer
                           - NodePort
+                          - ClusterIP
                           type: string
                         anyCastPort:
                           description: configuring AnyCastPort allows kafka cluster
@@ -19216,6 +19231,21 @@ spec:
                             ingressConfig:
                               additionalProperties:
                                 properties:
+                                  contourIngressConfig:
+                                    properties:
+                                      brokerFQDNTemplate:
+                                        description: Broker hostname template for
+                                          Contour IngressRoute resource to generate
+                                          broker hostnames.
+                                        type: string
+                                      tlsSecretName:
+                                        description: TLS secret used for Contour IngressRoute
+                                          resource
+                                        type: string
+                                    required:
+                                    - brokerFQDNTemplate
+                                    - tlsSecretName
+                                    type: object
                                   envoyConfig:
                                     description: EnvoyConfig defines the config for
                                       Envoy
@@ -21673,6 +21703,11 @@ spec:
                           description: At least one of the listeners should have this
                             flag enabled
                           type: boolean
+                        usedForKafkaAdminCommunication:
+                          description: UsedForKafkaAdminCommunication allows for a
+                            different port to be returned when the koperator is checking
+                            for the port to use to check if kafka is operating.
+                          type: boolean
                       required:
                       - containerPort
                       - externalStartingPort
@@ -21748,6 +21783,11 @@ spec:
                         usedForInnerBrokerCommunication:
                           description: At least one of the listeners should have this
                             flag enabled
+                          type: boolean
+                        usedForKafkaAdminCommunication:
+                          description: UsedForKafkaAdminCommunication allows for a
+                            different port to be returned when the koperator is checking
+                            for the port to use to check if kafka is operating.
                           type: boolean
                       required:
                       - containerPort

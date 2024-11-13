@@ -32,6 +32,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"os"
 	"strings"
 
@@ -49,6 +50,8 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
+
+	contour "github.com/projectcontour/contour/apis/projectcontour/v1"
 
 	banzaicloudv1alpha1 "github.com/banzaicloud/koperator/api/v1alpha1"
 	banzaicloudv1beta1 "github.com/banzaicloud/koperator/api/v1beta1"
@@ -76,6 +79,8 @@ func init() {
 	_ = banzaiistiov1alpha1.AddToScheme(scheme)
 
 	_ = istioclientv1beta1.AddToScheme(scheme)
+
+	_ = contour.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -123,15 +128,23 @@ func main() {
 	watchedNamespaces := make(map[string]cache.Config)
 	if namespaces != "" {
 		namespaceList = strings.Split(namespaces, ",")
-		for i := range namespaceList {
-			watchedNamespaces[strings.TrimSpace(namespaceList[i])] = cache.Config{}
-		}
+	} else {
+		namespaces = os.Getenv("WATCH_NAMESPACE")
+		namespaceList = strings.Split(namespaces, ",")
 	}
+	for i := range namespaceList {
+		watchedNamespaces[strings.TrimSpace(namespaceList[i])] = cache.Config{}
+	}
+
+	// hash the watched namespaces to allow for more than one operator deployment per namespace
+	// same watched namespaces will return the same hash so only one operator will be active
+	leaderElectionID := fmt.Sprintf("%s-%x", "controller-leader-election-helper", util.GetMD5Hash(namespaces))
+	setupLog.Info("Using leader electrion id", "LeaderElectionID", leaderElectionID, "watched namespaces", namespaceList)
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:           scheme,
 		LeaderElection:   enableLeaderElection,
-		LeaderElectionID: "controller-leader-election-helper",
+		LeaderElectionID: leaderElectionID,
 		WebhookServer: webhook.NewServer(webhook.Options{
 			Port:    webhookServerPort,
 			CertDir: webhookCertDir,

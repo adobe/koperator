@@ -178,7 +178,7 @@ type KafkaClusterSpec struct {
 	RollingUpgradeConfig        RollingUpgradeConfig    `json:"rollingUpgradeConfig"`
 	// Selector for broker pods that need to be recycled/reconciled
 	TaintedBrokersSelector *metav1.LabelSelector `json:"taintedBrokersSelector,omitempty"`
-	// +kubebuilder:validation:Enum=envoy;istioingress
+	// +kubebuilder:validation:Enum=envoy;contour;istioingress
 	// IngressController specifies the type of the ingress controller to be used for external listeners. The `istioingress` ingress controller type requires the `spec.istioControlPlane` field to be populated as well.
 	IngressController string `json:"ingressController,omitempty"`
 	// IstioControlPlane is a reference to the IstioControlPlane resource for envoy configuration. It must be specified if istio ingress is used.
@@ -190,13 +190,14 @@ type KafkaClusterSpec struct {
 	// when false, they will be kept so the Kafka cluster remains available for those Kafka clients which are still using the previous ingress setting.
 	// +kubebuilder:default=false
 	// +optional
-	RemoveUnusedIngressResources bool                `json:"removeUnusedIngressResources,omitempty"`
-	PropagateLabels              bool                `json:"propagateLabels,omitempty"`
-	CruiseControlConfig          CruiseControlConfig `json:"cruiseControlConfig"`
-	EnvoyConfig                  EnvoyConfig         `json:"envoyConfig,omitempty"`
-	MonitoringConfig             MonitoringConfig    `json:"monitoringConfig,omitempty"`
-	AlertManagerConfig           *AlertManagerConfig `json:"alertManagerConfig,omitempty"`
-	IstioIngressConfig           IstioIngressConfig  `json:"istioIngressConfig,omitempty"`
+	RemoveUnusedIngressResources bool                 `json:"removeUnusedIngressResources,omitempty"`
+	PropagateLabels              bool                 `json:"propagateLabels,omitempty"`
+	CruiseControlConfig          CruiseControlConfig  `json:"cruiseControlConfig"`
+	EnvoyConfig                  EnvoyConfig          `json:"envoyConfig,omitempty"`
+	ContourIngressConfig         ContourIngressConfig `json:"contourIngressConfig,omitempty"`
+	MonitoringConfig             MonitoringConfig     `json:"monitoringConfig,omitempty"`
+	AlertManagerConfig           *AlertManagerConfig  `json:"alertManagerConfig,omitempty"`
+	IstioIngressConfig           IstioIngressConfig   `json:"istioIngressConfig,omitempty"`
 	// Envs defines environment variables for Kafka broker Pods.
 	// Adding the "+" prefix to the name prepends the value to that environment variable instead of overwriting it.
 	// Add the "+" suffix to append.
@@ -622,6 +623,10 @@ func (c IngressServiceSettings) GetServiceType() corev1.ServiceType {
 	return c.ServiceType
 }
 
+func (c ContourIngressConfig) GetBrokerFqdn(brokerId int32) string {
+	return strings.Replace(c.BrokerFQDNTemplate, "%id", strconv.Itoa(int(brokerId)), 1)
+}
+
 // Replace %id in brokerHostnameTemplate with actual broker id
 func (c EnvoyConfig) GetBrokerHostname(brokerId int32) string {
 	return strings.Replace(c.BrokerHostnameTemplate, "%id", strconv.Itoa(int(brokerId)), 1)
@@ -702,7 +707,7 @@ type ExternalListenerConfig struct {
 	// IngressControllerTargetPort defines the container port that the ingress controller uses for handling external traffic.
 	// If not defined, 29092 will be used as the default IngressControllerTargetPort value.
 	IngressControllerTargetPort *int32 `json:"ingressControllerTargetPort,omitempty"`
-	// +kubebuilder:validation:Enum=LoadBalancer;NodePort
+	// +kubebuilder:validation:Enum=LoadBalancer;NodePort;ClusterIP
 	// accessMethod defines the method which the external listener is exposed through.
 	// Two types are supported LoadBalancer and NodePort.
 	// The recommended and default is the LoadBalancer.
@@ -725,8 +730,16 @@ type Config struct {
 
 type IngressConfig struct {
 	IngressServiceSettings `json:",inline"`
-	IstioIngressConfig     *IstioIngressConfig `json:"istioIngressConfig,omitempty"`
-	EnvoyConfig            *EnvoyConfig        `json:"envoyConfig,omitempty"`
+	IstioIngressConfig     *IstioIngressConfig   `json:"istioIngressConfig,omitempty"`
+	EnvoyConfig            *EnvoyConfig          `json:"envoyConfig,omitempty"`
+	ContourIngressConfig   *ContourIngressConfig `json:"contourIngressConfig,omitempty"`
+}
+
+type ContourIngressConfig struct {
+	// TLS secret used for Contour IngressRoute resource
+	TLSSecretName string `json:"tlsSecretName"`
+	// Broker hostname template for Contour IngressRoute resource to generate broker hostnames.
+	BrokerFQDNTemplate string `json:"brokerFQDNTemplate"`
 }
 
 // InternalListenerConfig defines the internal listener config for Kafka
@@ -764,6 +777,9 @@ type CommonListenerSpec struct {
 	// At least one of the listeners should have this flag enabled
 	// +optional
 	UsedForInnerBrokerCommunication bool `json:"usedForInnerBrokerCommunication"`
+	// UsedForKafkaAdminCommunication allows for a different port to be returned when the koperator is checking for the port to use to check if kafka is operating.
+	// +optional
+	UsedForKafkaAdminCommunication bool `json:"usedForKafkaAdminCommunication,omitempty"`
 }
 
 func (c *CommonListenerSpec) GetServerSSLCertSecretName() string {

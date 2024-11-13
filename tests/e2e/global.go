@@ -34,6 +34,17 @@ var (
 		},
 		RemoteCRDPathVersionTemplate: "https://github.com/jetstack/cert-manager/releases/download/v%s/cert-manager.crds.yaml",
 	}
+	// contour ingress controller
+	contourIngressControllerHelmDescriptor = helmDescriptor{
+		Repository:   "https://charts.bitnami.com/bitnami",
+		ChartName:    "contour",
+		ChartVersion: "15.4.0",
+		ReleaseName:  "contour",
+		Namespace:    "projectcontour",
+		SetValues: map[string]string{
+			"installCRDs": "true",
+		},
+	}
 
 	// koperatorLocalHelmDescriptor describes the Koperator Helm component with
 	// a local chart and version.

@@ -18,9 +18,11 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/md5"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -54,6 +56,7 @@ import (
 	"github.com/banzaicloud/koperator/api/v1beta1"
 	"github.com/banzaicloud/koperator/pkg/errorfactory"
 	"github.com/banzaicloud/koperator/pkg/util/cert"
+	"github.com/banzaicloud/koperator/pkg/util/contour"
 	envoyutils "github.com/banzaicloud/koperator/pkg/util/envoy"
 	"github.com/banzaicloud/koperator/pkg/util/istioingress"
 	properties "github.com/banzaicloud/koperator/properties/pkg"
@@ -254,11 +257,12 @@ func IsIngressConfigInUse(iConfigName, defaultConfigName string, cluster *v1beta
 
 // ConstructEListenerLabelName construct an eListener label name based on ingress config name and listener name
 func ConstructEListenerLabelName(ingressConfigName, eListenerName string) string {
+	externalListenerName := strings.ReplaceAll(eListenerName, "_", "-")
 	if ingressConfigName == IngressConfigGlobalName {
-		return eListenerName
+		return externalListenerName
 	}
 
-	return fmt.Sprintf(ExternalListenerLabelNameTemplate, eListenerName, ingressConfigName)
+	return fmt.Sprintf(ExternalListenerLabelNameTemplate, externalListenerName, ingressConfigName)
 }
 
 // ShouldIncludeBroker returns true if the broker should be included as a resource on external listener resources
@@ -338,6 +342,34 @@ func GetIngressConfigs(kafkaClusterSpec v1beta1.KafkaClusterSpec,
 				IngressConfigGlobalName: {
 					IngressServiceSettings: eListenerConfig.IngressServiceSettings,
 					IstioIngressConfig:     &kafkaClusterSpec.IstioIngressConfig,
+				},
+			}
+		}
+	case contour.IngressControllerName:
+		if eListenerConfig.Config != nil {
+			defaultIngressConfigName = eListenerConfig.Config.DefaultIngressConfig
+			ingressConfigs = make(map[string]v1beta1.IngressConfig, len(eListenerConfig.Config.IngressConfig))
+			for k, iConf := range eListenerConfig.Config.IngressConfig {
+				if iConf.ContourIngressConfig != nil {
+					err := mergo.Merge(iConf.ContourIngressConfig, kafkaClusterSpec.ContourIngressConfig)
+					if err != nil {
+						return nil, "", errors.WrapWithDetails(err,
+							"could not merge global envoy config with local one", "envoyConfig", k)
+					}
+					err = mergo.Merge(&iConf.IngressServiceSettings, eListenerConfig.IngressServiceSettings)
+					if err != nil {
+						return nil, "", errors.WrapWithDetails(err,
+							"could not merge global loadbalancer config with local one",
+							"externalListenerName", eListenerConfig.Name)
+					}
+					ingressConfigs[k] = iConf
+				}
+			}
+		} else {
+			ingressConfigs = map[string]v1beta1.IngressConfig{
+				IngressConfigGlobalName: {
+					IngressServiceSettings: eListenerConfig.IngressServiceSettings,
+					ContourIngressConfig:   &kafkaClusterSpec.ContourIngressConfig,
 				},
 			}
 		}
@@ -427,10 +459,11 @@ func ConvertConfigEntryListToProperties(config []sarama.ConfigEntry) (*propertie
 func GenerateEnvoyResourceName(resourceNameFormat string, resourceNameWithScopeFormat string, extListener v1beta1.ExternalListenerConfig, ingressConfig v1beta1.IngressConfig,
 	ingressConfigName, clusterName string) string {
 	var resourceName string
+	externalListenerName := strings.ReplaceAll(extListener.Name, "_", "-")
 	if ingressConfigName == IngressConfigGlobalName {
-		resourceName = fmt.Sprintf(resourceNameFormat, extListener.Name, clusterName)
+		resourceName = fmt.Sprintf(resourceNameFormat, externalListenerName, clusterName)
 	} else {
-		resourceName = fmt.Sprintf(resourceNameWithScopeFormat, extListener.Name, ingressConfigName, clusterName)
+		resourceName = fmt.Sprintf(resourceNameWithScopeFormat, externalListenerName, ingressConfigName, clusterName)
 	}
 
 	return resourceName
@@ -571,4 +604,10 @@ func RetryOnConflict(backoff wait.Backoff, fn func() error) error {
 
 func GetExternalPortForBroker(externalStartingPort, brokerId int32) int32 {
 	return externalStartingPort + brokerId
+}
+
+// Generage MD5 hash for a given string
+func GetMD5Hash(text string) string {
+	hash := md5.Sum([]byte(text))
+	return hex.EncodeToString(hash[:])
 }

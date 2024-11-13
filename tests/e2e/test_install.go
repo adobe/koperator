@@ -37,6 +37,13 @@ func testInstall() bool {
 			})
 		})
 
+		When("Installing contour ingress controller", func() {
+			It("Installing contour Helm chart", func() {
+				err = contourIngressControllerHelmDescriptor.installHelmChart(kubectlOptions)
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+
 		When("Installing zookeeper-operator", func() {
 			It("Installing zookeeper-operator Helm chart", func() {
 				err = zookeeperOperatorHelmDescriptor.installHelmChart(kubectlOptions)
