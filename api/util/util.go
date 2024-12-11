@@ -40,6 +40,14 @@ func LabelsForKafka(name string) map[string]string {
 	return map[string]string{"app": "kafka", "kafka_cr": name}
 }
 
+func LabelsForBroker(name string) map[string]string {
+	return map[string]string{"isBrokerNode": "true", "app": "kafka", "kafka_cr": name}
+}
+
+func LabelsForController(name string) map[string]string {
+	return map[string]string{"isControllerNode": "true", "app": "kafka", "kafka_cr": name}
+}
+
 // StringSliceContains returns true if list contains s
 func StringSliceContains(list []string, s string) bool {
 	for _, v := range list {

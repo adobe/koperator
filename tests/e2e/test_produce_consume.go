@@ -20,7 +20,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func testProduceConsumeInternal() bool {
+func testProduceConsumeInternal() bool { //nolint:unparam // Note: respecting Ginkgo testing interface by returning bool.
 	return When("Internally produce and consume message to/from Kafka cluster", func() {
 		var kubectlOptions k8s.KubectlOptions
 		var err error

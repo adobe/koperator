@@ -33,6 +33,7 @@ import (
 	banzaicloudv1beta1 "github.com/banzaicloud/koperator/api/v1beta1"
 	"github.com/banzaicloud/koperator/pkg/util"
 	clientutil "github.com/banzaicloud/koperator/pkg/util/client"
+	"github.com/banzaicloud/koperator/pkg/util/kafka"
 )
 
 // IsAlreadyOwnedError checks if a controller already own the instance
@@ -404,7 +405,7 @@ func UpdateListenerStatuses(ctx context.Context, c client.Client, cluster *banza
 	return nil
 }
 
-func CreateInternalListenerStatuses(kafkaCluster *banzaicloudv1beta1.KafkaCluster, externalListenerStatus map[string]banzaicloudv1beta1.ListenerStatusList) (map[string]banzaicloudv1beta1.ListenerStatusList, map[string]banzaicloudv1beta1.ListenerStatusList) {
+func CreateInternalListenerStatuses(kafkaCluster *banzaicloudv1beta1.KafkaCluster, externalListenerStatus map[string]banzaicloudv1beta1.ListenerStatusList) (map[string]banzaicloudv1beta1.ListenerStatusList, map[string]banzaicloudv1beta1.ListenerStatusList, error) {
 	intListenerStatuses := make(map[string]banzaicloudv1beta1.ListenerStatusList, len(kafkaCluster.Spec.ListenersConfig.InternalListeners))
 	controllerIntListenerStatuses := make(map[string]banzaicloudv1beta1.ListenerStatusList)
 
@@ -417,13 +418,45 @@ func CreateInternalListenerStatuses(kafkaCluster *banzaicloudv1beta1.KafkaCluste
 		if kafkaCluster.Spec.HeadlessServiceEnabled {
 			name = "headless"
 		}
+
+		address := fmt.Sprintf("%s:%d", internalAddress, iListener.ContainerPort)
+
+		// used the controller headless address when KRaft is enabled and this listener is for controllers
+		if iListener.UsedForControllerCommunication {
+			address = fmt.Sprintf("%s:%d", clientutil.GenerateKafkaControllerAddressWithoutPort(kafkaCluster), iListener.ContainerPort)
+		}
+
 		listenerStatusList = append(listenerStatusList, banzaicloudv1beta1.ListenerStatus{
 			Name:    name,
-			Address: fmt.Sprintf("%s:%d", internalAddress, iListener.ContainerPort),
+			Address: address,
 		})
 
 		// add addresses per broker
 		for _, broker := range kafkaCluster.Spec.Brokers {
+			if kafkaCluster.Spec.KRaftMode {
+				// for KRaft mode, skip when listener is used for interbroker communication and is not a broker role
+				if iListener.UsedForInnerBrokerCommunication {
+					brokerConfig, err := broker.GetBrokerConfig(kafkaCluster.Spec)
+					if err != nil {
+						return nil, nil, err
+					}
+					if !brokerConfig.IsBrokerNode() {
+						continue
+					}
+				}
+
+				// for KRaft mode, skip when listener is used for controller communication and is not a controller role
+				if iListener.UsedForControllerCommunication {
+					brokerConfig, err := broker.GetBrokerConfig(kafkaCluster.Spec)
+					if err != nil {
+						return nil, nil, err
+					}
+					if !brokerConfig.IsControllerNode() {
+						continue
+					}
+				}
+			}
+
 			var address = ""
 			if iListener.ExternalListenerForHostname != "" && iListener.InternalStartingPort > 0 {
 				if eListenerStatus, ok := externalListenerStatus[iListener.ExternalListenerForHostname]; ok {
@@ -434,13 +467,18 @@ func CreateInternalListenerStatuses(kafkaCluster *banzaicloudv1beta1.KafkaCluste
 
 			if address == "" {
 				if kafkaCluster.Spec.HeadlessServiceEnabled {
-					address = fmt.Sprintf("%s-%d.%s-headless.%s.svc.%s:%d", kafkaCluster.Name, broker.Id, kafkaCluster.Name,
+					headlessSvcNameFormat := "%s-%d." + kafka.HeadlessServiceTemplate + ".%s.svc.%s:%d"
+					if kafkaCluster.Spec.KRaftMode && iListener.UsedForControllerCommunication {
+						headlessSvcNameFormat = "%s-%d." + kafka.HeadlessControllerServiceTemplate + ".%s.svc.%s:%d"
+					}
+					address = fmt.Sprintf(headlessSvcNameFormat, kafkaCluster.Name, broker.Id, kafkaCluster.Name,
 						kafkaCluster.Namespace, kafkaCluster.Spec.GetKubernetesClusterDomain(), iListener.ContainerPort)
 				} else {
 					address = fmt.Sprintf("%s-%d.%s.svc.%s:%d", kafkaCluster.Name, broker.Id, kafkaCluster.Namespace,
 						kafkaCluster.Spec.GetKubernetesClusterDomain(), iListener.ContainerPort)
 				}
 			}
+
 			listenerStatusList = append(listenerStatusList, banzaicloudv1beta1.ListenerStatus{
 				Name:    fmt.Sprintf("broker-%d", broker.Id),
 				Address: address,
@@ -454,7 +492,7 @@ func CreateInternalListenerStatuses(kafkaCluster *banzaicloudv1beta1.KafkaCluste
 		}
 	}
 
-	return intListenerStatuses, controllerIntListenerStatuses
+	return intListenerStatuses, controllerIntListenerStatuses, nil
 }
 
 func getHostnameForBrokerId(eListenerStatusList v1beta1.ListenerStatusList, brokerId int32) string {

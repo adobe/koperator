@@ -19,6 +19,8 @@ const (
 	AllBrokerServiceTemplate = "%s-all-broker"
 	// HeadlessServiceTemplate template for Kafka headless service
 	HeadlessServiceTemplate = "%s-headless"
+	// HeadlessControllerServiceTemplate template for Kafka headless service
+	HeadlessControllerServiceTemplate = "%s-controller-headless"
 	// NodePortServiceTemplate template for Kafka nodeport service
 	NodePortServiceTemplate = "%s-%d-%s"
 

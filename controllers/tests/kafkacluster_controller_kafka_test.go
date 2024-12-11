@@ -525,48 +525,90 @@ func expectKafkaCRStatus(ctx context.Context, kafkaCluster *v1beta1.KafkaCluster
 	Expect(kafkaCluster.Status.State).To(Equal(v1beta1.KafkaClusterRunning))
 	Expect(kafkaCluster.Status.AlertCount).To(Equal(0))
 
-	Expect(kafkaCluster.Status.ListenerStatuses).To(Equal(v1beta1.ListenerStatuses{
-		InternalListeners: map[string]v1beta1.ListenerStatusList{
-			"internal": {
-				{
-					Name:    "any-broker",
-					Address: fmt.Sprintf("%s-all-broker.%s.svc.cluster.local:29092", kafkaCluster.Name, kafkaCluster.Namespace),
-				},
-				{
-					Name:    "broker-0",
-					Address: fmt.Sprintf("%s-0.%s.svc.cluster.local:29092", kafkaCluster.Name, kafkaCluster.Namespace),
-				},
-				{
-					Name:    "broker-1",
-					Address: fmt.Sprintf("%s-1.%s.svc.cluster.local:29092", kafkaCluster.Name, kafkaCluster.Namespace),
-				},
-				{
-					Name:    "broker-2",
-					Address: fmt.Sprintf("%s-2.%s.svc.cluster.local:29092", kafkaCluster.Name, kafkaCluster.Namespace),
-				},
-			},
-		},
-		ExternalListeners: map[string]v1beta1.ListenerStatusList{
-			"test": {
-				{
-					Name:    "any-broker",
-					Address: "test.host.com:29092",
-				},
-				{
-					Name:    "broker-0",
-					Address: "test.host.com:19090",
-				},
-				{
-					Name:    "broker-1",
-					Address: "test.host.com:19091",
-				},
-				{
-					Name:    "broker-2",
-					Address: "test.host.com:19092",
+	if kafkaCluster.Spec.KRaftMode == false {
+		Expect(kafkaCluster.Status.ListenerStatuses).To(Equal(v1beta1.ListenerStatuses{
+			InternalListeners: map[string]v1beta1.ListenerStatusList{
+				"internal": {
+					{
+						Name:    "any-broker",
+						Address: fmt.Sprintf("%s-all-broker.%s.svc.cluster.local:29092", kafkaCluster.Name, kafkaCluster.Namespace),
+					},
+					{
+						Name:    "broker-0",
+						Address: fmt.Sprintf("%s-0.%s.svc.cluster.local:29092", kafkaCluster.Name, kafkaCluster.Namespace),
+					},
+					{
+						Name:    "broker-1",
+						Address: fmt.Sprintf("%s-1.%s.svc.cluster.local:29092", kafkaCluster.Name, kafkaCluster.Namespace),
+					},
+					{
+						Name:    "broker-2",
+						Address: fmt.Sprintf("%s-2.%s.svc.cluster.local:29092", kafkaCluster.Name, kafkaCluster.Namespace),
+					},
 				},
 			},
-		},
-	}))
+			ExternalListeners: map[string]v1beta1.ListenerStatusList{
+				"test": {
+					{
+						Name:    "any-broker",
+						Address: "test.host.com:29092",
+					},
+					{
+						Name:    "broker-0",
+						Address: "test.host.com:19090",
+					},
+					{
+						Name:    "broker-1",
+						Address: "test.host.com:19091",
+					},
+					{
+						Name:    "broker-2",
+						Address: "test.host.com:19092",
+					},
+				},
+			},
+		}))
+	}
+	if kafkaCluster.Spec.KRaftMode == true {
+		Expect(kafkaCluster.Status.ListenerStatuses).To(Equal(v1beta1.ListenerStatuses{
+			InternalListeners: map[string]v1beta1.ListenerStatusList{
+				"internal": {
+					{
+						Name:    "any-broker",
+						Address: fmt.Sprintf("%s-all-broker.%s.svc.cluster.local:29092", kafkaCluster.Name, kafkaCluster.Namespace),
+					},
+					{
+						Name:    "broker-0",
+						Address: fmt.Sprintf("%s-0.%s.svc.cluster.local:29092", kafkaCluster.Name, kafkaCluster.Namespace),
+					},
+					{
+						Name:    "broker-2",
+						Address: fmt.Sprintf("%s-2.%s.svc.cluster.local:29092", kafkaCluster.Name, kafkaCluster.Namespace),
+					},
+				},
+			},
+			ExternalListeners: map[string]v1beta1.ListenerStatusList{
+				"test": {
+					{
+						Name:    "any-broker",
+						Address: "test.host.com:29092",
+					},
+					{
+						Name:    "broker-0",
+						Address: "test.host.com:19090",
+					},
+					{
+						Name:    "broker-1",
+						Address: "test.host.com:19091",
+					},
+					{
+						Name:    "broker-2",
+						Address: "test.host.com:19092",
+					},
+				},
+			},
+		}))
+	}
 	for _, brokerState := range kafkaCluster.Status.BrokersState {
 		Expect(brokerState.Version).To(Equal("3.4.1"))
 		Expect(brokerState.Image).To(Equal(kafkaCluster.Spec.GetClusterImage()))

@@ -53,7 +53,7 @@ spec:
       brokerConfig:
         processRoles:
           - controller
-          - broker
+          # - broker
     - id: 4
       brokerConfigGroup: "default"
       brokerConfig:

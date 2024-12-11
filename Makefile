@@ -102,7 +102,7 @@ test: generate fmt vet bin/setup-envtest
 test-e2e:
 	 IMG_E2E=${IMG_E2E} go test github.com/banzaicloud/koperator/tests/e2e \
 		-v \
-		-timeout 20m \
+		-timeout 45m \
 		-tags e2e \
 		--ginkgo.show-node-events \
 		--ginkgo.trace \

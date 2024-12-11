@@ -35,6 +35,18 @@ import (
 )
 
 func (r *Reconciler) headlessService() runtime.Object {
+	if r.KafkaCluster.Spec.KRaftMode {
+		return r.headlessServiceTemplate(kafkautils.HeadlessServiceTemplate, apiutil.LabelsForBroker(r.KafkaCluster.GetName()))
+	}
+
+	return r.headlessServiceTemplate(kafkautils.HeadlessServiceTemplate, apiutil.LabelsForKafka(r.KafkaCluster.GetName()))
+}
+
+func (r *Reconciler) headlessControllerService() runtime.Object {
+	return r.headlessServiceTemplate(kafkautils.HeadlessControllerServiceTemplate, apiutil.LabelsForController(r.KafkaCluster.GetName()))
+}
+
+func (r *Reconciler) headlessServiceTemplate(addressTemplate string, selectorLabels map[string]string) runtime.Object {
 	var usedPorts []corev1.ServicePort
 	// Append internal listener ports
 	usedPorts = append(usedPorts,
@@ -58,15 +70,15 @@ func (r *Reconciler) headlessService() runtime.Object {
 
 	return &corev1.Service{
 		ObjectMeta: templates.ObjectMetaWithAnnotations(
-			fmt.Sprintf(kafkautils.HeadlessServiceTemplate, r.KafkaCluster.GetName()),
-			apiutil.MergeLabels(apiutil.LabelsForKafka(r.KafkaCluster.GetName()), r.KafkaCluster.GetLabels()),
+			fmt.Sprintf(addressTemplate, r.KafkaCluster.GetName()),
+			apiutil.MergeLabels(selectorLabels, r.KafkaCluster.GetLabels()),
 			r.KafkaCluster.Spec.ListenersConfig.GetServiceAnnotations(),
 			r.KafkaCluster,
 		),
 		Spec: corev1.ServiceSpec{
 			Type:                     corev1.ServiceTypeClusterIP,
 			SessionAffinity:          corev1.ServiceAffinityNone,
-			Selector:                 apiutil.LabelsForKafka(r.KafkaCluster.Name),
+			Selector:                 selectorLabels,
 			Ports:                    usedPorts,
 			ClusterIP:                corev1.ClusterIPNone,
 			PublishNotReadyAddresses: true,

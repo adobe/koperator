@@ -45,6 +45,12 @@ const (
 	// ProcessRolesKey is used to identify which process roles the Kafka pod has
 	ProcessRolesKey = "processRoles"
 
+	// IsBrokerNodeKey is used to identify if the kafka pod is either a broker or a broker_controller
+	IsBrokerNodeKey = "isBrokerNode"
+
+	// IsControllerNodeKey is used to identify if the kafka pod is a controller or broker_controller
+	IsControllerNodeKey = "isControllerNode"
+
 	// DefaultCruiseControlImage is the default CC image used when users don't specify it in CruiseControlConfig.Image
 	DefaultCruiseControlImage = "ghcr.io/banzaicloud/cruise-control:2.5.123"
 
@@ -1095,14 +1101,19 @@ func (bConfig *BrokerConfig) GetBrokerAnnotations() map[string]string {
 }
 
 // GetBrokerLabels returns the labels that are applied to broker pods
-func (bConfig *BrokerConfig) GetBrokerLabels(kafkaClusterName string, brokerId int32) map[string]string {
+func (bConfig *BrokerConfig) GetBrokerLabels(kafkaClusterName string, brokerId int32, kRaftMode bool) map[string]string {
+	kraftLabels := make(map[string]string, 0)
+	if kRaftMode {
+		kraftLabels = map[string]string{
+			ProcessRolesKey:     strings.Join(bConfig.Roles, "_"),
+			IsControllerNodeKey: fmt.Sprintf("%t", bConfig.IsControllerNode()),
+			IsBrokerNodeKey:     fmt.Sprintf("%t", bConfig.IsBrokerNode()),
+		}
+	}
 	return util.MergeLabels(
 		bConfig.BrokerLabels,
 		util.LabelsForKafka(kafkaClusterName),
-		map[string]string{
-			BrokerIdLabelKey: fmt.Sprintf("%d", brokerId),
-			ProcessRolesKey:  strings.Join(bConfig.Roles, "_"),
-		},
+		kraftLabels, map[string]string{BrokerIdLabelKey: fmt.Sprintf("%d", brokerId)},
 	)
 }
 

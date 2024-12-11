@@ -436,13 +436,125 @@ func TestGetBrokerLabels(t *testing.T) {
 
 		expectedBrokerId = 0
 	)
+	testCases := []struct {
+		testName       string
+		brokerConfig   *BrokerConfig
+		expectedLabels map[string]string
+		kRaftMode      bool
+	}{
+		{
+			testName: "Labels in zookeeper mode",
+			expectedLabels: map[string]string{
+				AppLabelKey:      expectedDefaultLabelApp,
+				BrokerIdLabelKey: strconv.Itoa(expectedBrokerId),
+				KafkaCRLabelKey:  expectedKafkaCRName,
+				"test_label_key": "test_label_value",
+			},
+			brokerConfig: &BrokerConfig{
+				Roles: nil,
+				BrokerLabels: map[string]string{
+					AppLabelKey:      "test_app",
+					BrokerIdLabelKey: "test_id",
+					KafkaCRLabelKey:  "test_cr_name",
+					"test_label_key": "test_label_value",
+				},
+			},
+			kRaftMode: false,
+		},
+		{
+			testName: "Labels for broker in kraft mode",
+			expectedLabels: map[string]string{
+				AppLabelKey:         expectedDefaultLabelApp,
+				BrokerIdLabelKey:    strconv.Itoa(expectedBrokerId),
+				KafkaCRLabelKey:     expectedKafkaCRName,
+				"test_label_key":    "test_label_value",
+				ProcessRolesKey:     "broker",
+				IsBrokerNodeKey:     "true",
+				IsControllerNodeKey: "false",
+			},
+			brokerConfig: &BrokerConfig{
+				Roles: []string{"broker"},
+				BrokerLabels: map[string]string{
+					AppLabelKey:      "test_app",
+					BrokerIdLabelKey: "test_id",
+					KafkaCRLabelKey:  "test_cr_name",
+					"test_label_key": "test_label_value",
+				},
+			},
+			kRaftMode: true,
+		},
+		{
+			testName: "Labels for controller in kraft mode",
+			expectedLabels: map[string]string{
+				AppLabelKey:         expectedDefaultLabelApp,
+				BrokerIdLabelKey:    strconv.Itoa(expectedBrokerId),
+				KafkaCRLabelKey:     expectedKafkaCRName,
+				"test_label_key":    "test_label_value",
+				ProcessRolesKey:     "controller",
+				IsBrokerNodeKey:     "false",
+				IsControllerNodeKey: "true",
+			},
+			brokerConfig: &BrokerConfig{
+				Roles: []string{"controller"},
+				BrokerLabels: map[string]string{
+					AppLabelKey:      "test_app",
+					BrokerIdLabelKey: "test_id",
+					KafkaCRLabelKey:  "test_cr_name",
+					"test_label_key": "test_label_value",
+				},
+			},
+			kRaftMode: true,
+		},
+		{
+			testName: "Labels for controller/broker in kraft mode",
+			expectedLabels: map[string]string{
+				AppLabelKey:         expectedDefaultLabelApp,
+				BrokerIdLabelKey:    strconv.Itoa(expectedBrokerId),
+				KafkaCRLabelKey:     expectedKafkaCRName,
+				"test_label_key":    "test_label_value",
+				ProcessRolesKey:     "controller_broker",
+				IsBrokerNodeKey:     "true",
+				IsControllerNodeKey: "true",
+			},
+			brokerConfig: &BrokerConfig{
+				Roles: []string{"controller", "broker"},
+				BrokerLabels: map[string]string{
+					AppLabelKey:      "test_app",
+					BrokerIdLabelKey: "test_id",
+					KafkaCRLabelKey:  "test_cr_name",
+					"test_label_key": "test_label_value",
+				},
+			},
+			kRaftMode: true,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.testName, func(t *testing.T) {
+			result := test.brokerConfig.GetBrokerLabels(expectedKafkaCRName, expectedBrokerId, test.kRaftMode)
+			if !reflect.DeepEqual(result, test.expectedLabels) {
+				t.Error("Expected:", test.expectedLabels, "Got:", result)
+			}
+		})
+	}
+}
+
+func TestGetBrokerLabelKraft(t *testing.T) {
+	const (
+		expectedDefaultLabelApp = "kafka"
+		expectedKafkaCRName     = "kafka"
+
+		expectedBrokerId = 0
+	)
 
 	expected := map[string]string{
-		AppLabelKey:      expectedDefaultLabelApp,
-		BrokerIdLabelKey: strconv.Itoa(expectedBrokerId),
-		KafkaCRLabelKey:  expectedKafkaCRName,
-		"test_label_key": "test_label_value",
-		ProcessRolesKey:  "broker",
+		AppLabelKey:         expectedDefaultLabelApp,
+		BrokerIdLabelKey:    strconv.Itoa(expectedBrokerId),
+		KafkaCRLabelKey:     expectedKafkaCRName,
+		"test_label_key":    "test_label_value",
+		ProcessRolesKey:     "broker",
+		IsBrokerNodeKey:     "true",
+		IsControllerNodeKey: "false",
 	}
 
 	brokerConfig := &BrokerConfig{
@@ -455,7 +567,7 @@ func TestGetBrokerLabels(t *testing.T) {
 		},
 	}
 
-	result := brokerConfig.GetBrokerLabels(expectedKafkaCRName, expectedBrokerId)
+	result := brokerConfig.GetBrokerLabels(expectedKafkaCRName, expectedBrokerId, true)
 
 	if !reflect.DeepEqual(result, expected) {
 		t.Error("Expected:", expected, "Got:", result)

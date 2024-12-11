@@ -52,7 +52,7 @@ func (r *Reconciler) pod(id int32, brokerConfig *v1beta1.BrokerConfig, pvcs []co
 	pod := &corev1.Pod{
 		ObjectMeta: templates.ObjectMetaWithGeneratedNameAndAnnotations(
 			fmt.Sprintf("%s-%d-", r.KafkaCluster.Name, id),
-			brokerConfig.GetBrokerLabels(r.KafkaCluster.Name, id),
+			brokerConfig.GetBrokerLabels(r.KafkaCluster.Name, id, r.KafkaCluster.Spec.KRaftMode),
 			brokerConfig.GetBrokerAnnotations(),
 			r.KafkaCluster,
 		),
@@ -120,7 +120,12 @@ fi`},
 	}
 	if r.KafkaCluster.Spec.HeadlessServiceEnabled {
 		pod.Spec.Hostname = fmt.Sprintf("%s-%d", r.KafkaCluster.Name, id)
-		pod.Spec.Subdomain = fmt.Sprintf(kafkautils.HeadlessServiceTemplate, r.KafkaCluster.Name)
+
+		if brokerConfig.IsControllerNode() {
+			pod.Spec.Subdomain = fmt.Sprintf(kafkautils.HeadlessControllerServiceTemplate, r.KafkaCluster.Name)
+		} else {
+			pod.Spec.Subdomain = fmt.Sprintf(kafkautils.HeadlessServiceTemplate, r.KafkaCluster.Name)
+		}
 	}
 
 	if r.KafkaCluster.Spec.KRaftMode {

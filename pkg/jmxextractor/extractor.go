@@ -29,9 +29,10 @@ import (
 )
 
 const (
-	headlessServiceJMXTemplate = "http://%s-%d." + kafka.HeadlessServiceTemplate + ".%s.svc.%s:%d"
-	serviceJMXTemplate         = "http://%s-%d.%s.svc.%s:%d"
-	versionRegexGroup          = "version"
+	headlessServiceJMXTemplate           = "http://%s-%d." + kafka.HeadlessServiceTemplate + ".%s.svc.%s:%d"
+	headlessControllerServiceJMXTemplate = "http://%s-%d." + kafka.HeadlessControllerServiceTemplate + ".%s.svc.%s:%d"
+	serviceJMXTemplate                   = "http://%s-%d.%s.svc.%s:%d"
+	versionRegexGroup                    = "version"
 )
 
 var newJMXExtractor = createNewJMXExtractor
@@ -74,9 +75,14 @@ func NewMockJMXExtractor() {
 func (exp *jmxExtractor) ExtractDockerImageAndVersion(brokerId int32, brokerConfig *v1beta1.BrokerConfig,
 	clusterImage string, headlessServiceEnabled bool) (*v1beta1.KafkaVersion, error) {
 	var requestURL string
+
 	if headlessServiceEnabled {
+		var jmxTemplate = headlessServiceJMXTemplate
+		if brokerConfig.IsControllerNode() {
+			jmxTemplate = headlessControllerServiceJMXTemplate
+		}
 		requestURL =
-			fmt.Sprintf(headlessServiceJMXTemplate,
+			fmt.Sprintf(jmxTemplate,
 				exp.clusterName, brokerId, exp.clusterName, exp.clusterNamespace,
 				exp.kubernetesClusterDomain, 9020)
 	} else {
