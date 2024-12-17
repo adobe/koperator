@@ -27,6 +27,7 @@ import (
 	"github.com/banzaicloud/koperator/pkg/resources"
 	mocks "github.com/banzaicloud/koperator/pkg/resources/kafka/mocks"
 	"github.com/banzaicloud/koperator/pkg/util"
+
 	"go.uber.org/mock/gomock"
 )
 
