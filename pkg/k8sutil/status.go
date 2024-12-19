@@ -433,10 +433,10 @@ func CreateInternalListenerStatuses(kafkaCluster *banzaicloudv1beta1.KafkaCluste
 
 		// add addresses per broker
 		for _, broker := range kafkaCluster.Spec.Brokers {
+			brokerConfig, err := broker.GetBrokerConfig(kafkaCluster.Spec)
 			if kafkaCluster.Spec.KRaftMode {
 				// for KRaft mode, skip when listener is used for interbroker communication and is not a broker role
 				if iListener.UsedForInnerBrokerCommunication {
-					brokerConfig, err := broker.GetBrokerConfig(kafkaCluster.Spec)
 					if err != nil {
 						return nil, nil, err
 					}
@@ -447,7 +447,6 @@ func CreateInternalListenerStatuses(kafkaCluster *banzaicloudv1beta1.KafkaCluste
 
 				// for KRaft mode, skip when listener is used for controller communication and is not a controller role
 				if iListener.UsedForControllerCommunication {
-					brokerConfig, err := broker.GetBrokerConfig(kafkaCluster.Spec)
 					if err != nil {
 						return nil, nil, err
 					}
@@ -467,10 +466,8 @@ func CreateInternalListenerStatuses(kafkaCluster *banzaicloudv1beta1.KafkaCluste
 
 			if address == "" {
 				if kafkaCluster.Spec.HeadlessServiceEnabled {
-					headlessSvcNameFormat := "%s-%d." + kafka.HeadlessServiceTemplate + ".%s.svc.%s:%d"
-					if kafkaCluster.Spec.KRaftMode && iListener.UsedForControllerCommunication {
-						headlessSvcNameFormat = "%s-%d." + kafka.HeadlessControllerServiceTemplate + ".%s.svc.%s:%d"
-					}
+					headlessSvcNameFormat := "%s-%d." + brokerConfig.GetHeadlessServiceTemplate() + ".%s.svc.%s:%d"
+
 					address = fmt.Sprintf(headlessSvcNameFormat, kafkaCluster.Name, broker.Id, kafkaCluster.Name,
 						kafkaCluster.Namespace, kafkaCluster.Spec.GetKubernetesClusterDomain(), iListener.ContainerPort)
 				} else {

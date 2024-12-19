@@ -120,12 +120,7 @@ fi`},
 	}
 	if r.KafkaCluster.Spec.HeadlessServiceEnabled {
 		pod.Spec.Hostname = fmt.Sprintf("%s-%d", r.KafkaCluster.Name, id)
-
-		if brokerConfig.IsControllerNode() {
-			pod.Spec.Subdomain = fmt.Sprintf(kafkautils.HeadlessControllerServiceTemplate, r.KafkaCluster.Name)
-		} else {
-			pod.Spec.Subdomain = fmt.Sprintf(kafkautils.HeadlessServiceTemplate, r.KafkaCluster.Name)
-		}
+		pod.Spec.Subdomain = fmt.Sprintf(brokerConfig.GetHeadlessServiceTemplate(), r.KafkaCluster.Name)
 	}
 
 	if r.KafkaCluster.Spec.KRaftMode {

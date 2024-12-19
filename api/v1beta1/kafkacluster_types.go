@@ -32,6 +32,7 @@ import (
 
 	"github.com/banzaicloud/koperator/api/assets"
 	"github.com/banzaicloud/koperator/api/util"
+	// kafkautils "github.com/banzaicloud/koperator/pkg/util/kafka"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -987,6 +988,13 @@ func (bConfig *BrokerConfig) GetServiceAccount() string {
 		return bConfig.ServiceAccountName
 	}
 	return defaultServiceAccountName
+}
+
+func (bConfig *BrokerConfig) GetHeadlessServiceTemplate() string {
+	if bConfig.IsControllerNode() {
+		return kafkautils.HeadlessControllerServiceTemplate
+	}
+	return kafkautils.HeadlessServiceTemplate
 }
 
 // GetServiceAccount returns the Kubernetes Service Account to use for EnvoyConfig
