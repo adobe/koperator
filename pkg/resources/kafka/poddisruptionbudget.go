@@ -70,7 +70,6 @@ func (r *Reconciler) podDisruptionBudgetControllers(log logr.Logger) (runtime.Ob
 }
 
 func (r *Reconciler) podDisruptionBudget(name string, podSelectorLabels map[string]string, minAvailable intstr.IntOrString) (runtime.Object, error) {
-
 	return &policyv1.PodDisruptionBudget{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "PodDisruptionBudget",
