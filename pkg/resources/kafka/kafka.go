@@ -238,11 +238,23 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 		}
 	}
 
-	// Handle PDB
+	// Handle PDB for brokers
 	if r.KafkaCluster.Spec.DisruptionBudget.Create {
-		o, err := r.podDisruptionBudget(log)
+		o, err := r.podDisruptionBudgetBrokers(log)
 		if err != nil {
-			return errors.WrapIfWithDetails(err, "failed to compute podDisruptionBudget")
+			return errors.WrapIfWithDetails(err, "failed to compute podDisruptionBudget for brokersr.KafkaCluster.Spec.KRaftMode ")
+		}
+		err = k8sutil.Reconcile(log, r.Client, o, r.KafkaCluster)
+		if err != nil {
+			return errors.WrapIfWithDetails(err, "failed to reconcile resource", "resource", o.GetObjectKind().GroupVersionKind())
+		}
+	}
+
+	// Handle PDB for controllers (KRaft only)
+	if r.KafkaCluster.Spec.KRaftMode && r.KafkaCluster.Spec.DisruptionBudget.Create {
+		o, err := r.podDisruptionBudgetControllers(log)
+		if err != nil {
+			return errors.WrapIfWithDetails(err, "failed to compute podDisruptionBudget for controllers")
 		}
 		err = k8sutil.Reconcile(log, r.Client, o, r.KafkaCluster)
 		if err != nil {
