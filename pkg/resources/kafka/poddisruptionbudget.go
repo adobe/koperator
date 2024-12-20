@@ -60,6 +60,7 @@ func (r *Reconciler) podDisruptionBudgetControllers(log logr.Logger) (runtime.Ob
 	minAvailable, err := r.computeControllerMinAvailable()
 
 	if err != nil {
+		log.Error(err, "error occurred during computing minAvailable for controllers PDB")
 		return nil, err
 	}
 
@@ -132,7 +133,7 @@ func (r *Reconciler) computeMinAvailable(log logr.Logger) (intstr.IntOrString, e
 
 	controllerCount, err := r.getControllerCount()
 	if err != nil {
-		log.Error(err, "error occurred during parsing the disruption budget")
+		log.Error(err, "error occurred during get controller count")
 		return intstr.FromInt(-1), err
 	}
 
