@@ -90,14 +90,18 @@ func (r *Reconciler) podDisruptionBudget(name string, podSelectorLabels map[stri
 	}, nil
 }
 
-func (r *Reconciler) getControllerCount() (int, error) {
+func (r *Reconciler) getControllerCount(controllerRoleOnly bool) (int, error) {
 	controllerCount := 0
 	for _, broker := range r.KafkaCluster.Spec.Brokers {
 		brokerConfig, err := broker.GetBrokerConfig(r.KafkaCluster.Spec)
 		if err != nil {
 			return -1, err
 		}
-		if brokerConfig.IsControllerNode() {
+		if controllerRoleOnly {
+			if brokerConfig.IsControllerOnlyNode() {
+				controllerCount++
+			}
+		} else if brokerConfig.IsControllerNode() {
 			controllerCount++
 		}
 	}
@@ -107,7 +111,7 @@ func (r *Reconciler) getControllerCount() (int, error) {
 // Calculate minAvailable as max between brokerCount - 1 (so we only allow 1 controller to be disrupted)
 // and 1 (case when there is only 1 controller)
 func (r *Reconciler) computeControllerMinAvailable() (intstr.IntOrString, error) {
-	controllerCount, err := r.getControllerCount()
+	controllerCount, err := r.getControllerCount(false)
 	if err != nil {
 		return intstr.FromInt(-1), err
 	}
@@ -130,7 +134,7 @@ func (r *Reconciler) computeMinAvailable(log logr.Logger) (intstr.IntOrString, e
 
 	*/
 
-	controllerCount, err := r.getControllerCount()
+	controllerCount, err := r.getControllerCount(true)
 	if err != nil {
 		log.Error(err, "error occurred during get controller count")
 		return intstr.FromInt(-1), err

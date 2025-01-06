@@ -242,7 +242,7 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 	if r.KafkaCluster.Spec.DisruptionBudget.Create {
 		o, err := r.podDisruptionBudgetBrokers(log)
 		if err != nil {
-			return errors.WrapIfWithDetails(err, "failed to compute podDisruptionBudget for brokersr.KafkaCluster.Spec.KRaftMode ")
+			return errors.WrapIfWithDetails(err, "failed to compute podDisruptionBudget for brokers")
 		}
 		err = k8sutil.Reconcile(log, r.Client, o, r.KafkaCluster)
 		if err != nil {
