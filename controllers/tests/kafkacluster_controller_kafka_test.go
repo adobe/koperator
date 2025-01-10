@@ -88,6 +88,14 @@ func expectKafkaAllBrokerService(ctx context.Context, kafkaCluster *v1beta1.Kafk
 }
 
 func expectKafkaPDB(ctx context.Context, kafkaCluster *v1beta1.KafkaCluster) {
+	if kafkaCluster.Spec.KRaftMode {
+		expectKafkaPDBKraft(ctx, kafkaCluster)
+	} else {
+		expectKafkaPDBZK(ctx, kafkaCluster)
+	}
+}
+
+func expectKafkaPDBZK(ctx context.Context, kafkaCluster *v1beta1.KafkaCluster) {
 	// get current CR
 	err := k8sClient.Get(ctx, types.NamespacedName{Name: kafkaCluster.Name, Namespace: kafkaCluster.Namespace}, kafkaCluster)
 	Expect(err).NotTo(HaveOccurred())
@@ -106,7 +114,7 @@ func expectKafkaPDB(ctx context.Context, kafkaCluster *v1beta1.KafkaCluster) {
 	// wait until reconcile finishes
 	waitForClusterRunningState(ctx, kafkaCluster, kafkaCluster.Namespace)
 
-	// get created PDB
+	// get created broker PDB
 	pdb := policyv1.PodDisruptionBudget{}
 	Eventually(ctx, func() error {
 		return k8sClient.Get(ctx, types.NamespacedName{
@@ -115,13 +123,78 @@ func expectKafkaPDB(ctx context.Context, kafkaCluster *v1beta1.KafkaCluster) {
 		}, &pdb)
 	}).Should(Succeed())
 
-	// make assertions
+	// make assertions for broker pdb
 	Expect(pdb.Labels).To(HaveKeyWithValue(v1beta1.AppLabelKey, "kafka"))
 	Expect(pdb.Labels).To(HaveKeyWithValue(v1beta1.KafkaCRLabelKey, kafkaCluster.Name))
+	Expect(pdb.Labels).To(Not(HaveKey(v1beta1.IsBrokerNodeKey)))
 	Expect(pdb.Spec.MinAvailable).To(Equal(util.IntstrPointer(3)))
 	Expect(pdb.Spec.Selector).NotTo(BeNil())
 	Expect(pdb.Spec.Selector.MatchLabels).To(HaveKeyWithValue(v1beta1.AppLabelKey, "kafka"))
 	Expect(pdb.Spec.Selector.MatchLabels).To(HaveKeyWithValue(v1beta1.KafkaCRLabelKey, kafkaCluster.Name))
+	Expect(pdb.Spec.Selector.MatchLabels).To(Not(HaveKey(v1beta1.IsBrokerNodeKey)))
+
+	Eventually(ctx, func() error {
+		return k8sClient.Get(ctx, types.NamespacedName{
+			Namespace: kafkaCluster.Namespace,
+			Name:      fmt.Sprintf("%s-controller-pdb", kafkaCluster.Name),
+		}, &pdb)
+	}).WithTimeout(1000).Should(MatchError(fmt.Sprintf("poddisruptionbudgets.policy \"%s-controller-pdb\" not found", kafkaCluster.Name)))
+}
+
+func expectKafkaPDBKraft(ctx context.Context, kafkaCluster *v1beta1.KafkaCluster) {
+	// get current CR
+	err := k8sClient.Get(ctx, types.NamespacedName{Name: kafkaCluster.Name, Namespace: kafkaCluster.Namespace}, kafkaCluster)
+	Expect(err).NotTo(HaveOccurred())
+
+	// set PDB and reset status
+	kafkaCluster.Spec.DisruptionBudget = v1beta1.DisruptionBudget{
+		Create: true,
+		Budget: "20%",
+	}
+	kafkaCluster.Status = v1beta1.KafkaClusterStatus{}
+
+	// update CR
+	err = k8sClient.Update(ctx, kafkaCluster)
+	Expect(err).NotTo(HaveOccurred())
+
+	// wait until reconcile finishes
+	waitForClusterRunningState(ctx, kafkaCluster, kafkaCluster.Namespace)
+
+	// get created broker PDB
+	pdb := policyv1.PodDisruptionBudget{}
+	Eventually(ctx, func() error {
+		return k8sClient.Get(ctx, types.NamespacedName{
+			Namespace: kafkaCluster.Namespace,
+			Name:      fmt.Sprintf("%s-pdb", kafkaCluster.Name),
+		}, &pdb)
+	}).Should(Succeed())
+
+	// make assertions for broker pdb
+	Expect(pdb.Labels).To(HaveKeyWithValue(v1beta1.AppLabelKey, "kafka"))
+	Expect(pdb.Labels).To(HaveKeyWithValue(v1beta1.KafkaCRLabelKey, kafkaCluster.Name))
+	Expect(pdb.Labels).To(HaveKeyWithValue(v1beta1.IsBrokerNodeKey, "true"))
+	Expect(pdb.Spec.MinAvailable).To(Equal(util.IntstrPointer(2)))
+	Expect(pdb.Spec.Selector).NotTo(BeNil())
+	Expect(pdb.Spec.Selector.MatchLabels).To(HaveKeyWithValue(v1beta1.AppLabelKey, "kafka"))
+	Expect(pdb.Spec.Selector.MatchLabels).To(HaveKeyWithValue(v1beta1.KafkaCRLabelKey, kafkaCluster.Name))
+	Expect(pdb.Spec.Selector.MatchLabels).To(HaveKeyWithValue(v1beta1.IsBrokerNodeKey, "true"))
+
+	Eventually(ctx, func() error {
+		return k8sClient.Get(ctx, types.NamespacedName{
+			Namespace: kafkaCluster.Namespace,
+			Name:      fmt.Sprintf("%s-controller-pdb", kafkaCluster.Name),
+		}, &pdb)
+	}).Should(Succeed())
+
+	// make assertions for controller pdb
+	Expect(pdb.Labels).To(HaveKeyWithValue(v1beta1.AppLabelKey, "kafka"))
+	Expect(pdb.Labels).To(HaveKeyWithValue(v1beta1.KafkaCRLabelKey, kafkaCluster.Name))
+	Expect(pdb.Labels).To(HaveKeyWithValue(v1beta1.IsControllerNodeKey, "true"))
+	Expect(pdb.Spec.MinAvailable).To(Equal(util.IntstrPointer(1)))
+	Expect(pdb.Spec.Selector).NotTo(BeNil())
+	Expect(pdb.Spec.Selector.MatchLabels).To(HaveKeyWithValue(v1beta1.AppLabelKey, "kafka"))
+	Expect(pdb.Spec.Selector.MatchLabels).To(HaveKeyWithValue(v1beta1.KafkaCRLabelKey, kafkaCluster.Name))
+	Expect(pdb.Spec.Selector.MatchLabels).To(HaveKeyWithValue(v1beta1.IsControllerNodeKey, "true"))
 }
 
 func expectKafkaPVC(ctx context.Context, kafkaCluster *v1beta1.KafkaCluster) {
