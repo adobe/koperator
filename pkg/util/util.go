@@ -268,7 +268,7 @@ func ConstructEListenerLabelName(ingressConfigName, eListenerName string) string
 // ShouldIncludeBroker returns true if the broker should be included as a resource on external listener resources
 func ShouldIncludeBroker(brokerConfig *v1beta1.BrokerConfig, status v1beta1.KafkaClusterStatus, brokerID int,
 	defaultIngressConfigName, ingressConfigName string) bool {
-	// in KRaft mode, contoller only are excluded
+	// in KRaft mode, controller only are excluded
 	if brokerConfig != nil && (len(brokerConfig.Roles) == 0 || brokerConfig.IsBrokerNode()) {
 		if len(brokerConfig.BrokerIngressMapping) == 0 && (ingressConfigName == defaultIngressConfigName || defaultIngressConfigName == "") ||
 			apiutil.StringSliceContains(brokerConfig.BrokerIngressMapping, ingressConfigName) {
