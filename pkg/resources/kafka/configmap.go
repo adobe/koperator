@@ -417,6 +417,17 @@ func getListenerSpecificConfig(l *v1beta1.ListenersConfig, serverPasses map[stri
 	internalListenerSSLConfig = make(map[string]string)
 	externalListenerSSLConfig = make(map[string]string)
 
+	for _, eListener := range l.ExternalListeners {
+		upperedListenerType := eListener.Type.ToUpperString()
+		upperedListenerName := strings.ToUpper(eListener.Name)
+		securityProtocolMapConfig = append(securityProtocolMapConfig, fmt.Sprintf("%s:%s", upperedListenerName, upperedListenerType))
+		listenerConfig = append(listenerConfig, fmt.Sprintf("%s://:%d", upperedListenerName, eListener.ContainerPort))
+		// Add external listeners SSL configuration
+		if eListener.Type == v1beta1.SecurityProtocolSSL {
+			maps.Copy(externalListenerSSLConfig, generateListenerSSLConfig(eListener.Name, eListener.SSLClientAuth, serverPasses[eListener.Name]))
+		}
+	}
+
 	for _, iListener := range l.InternalListeners {
 		if iListener.UsedForInnerBrokerCommunication {
 			if interBrokerListenerName == "" {
@@ -433,17 +444,6 @@ func getListenerSpecificConfig(l *v1beta1.ListenersConfig, serverPasses map[stri
 		// Add internal listeners SSL configuration
 		if iListener.Type == v1beta1.SecurityProtocolSSL {
 			maps.Copy(internalListenerSSLConfig, generateListenerSSLConfig(iListener.Name, iListener.SSLClientAuth, serverPasses[iListener.Name]))
-		}
-	}
-
-	for _, eListener := range l.ExternalListeners {
-		upperedListenerType := eListener.Type.ToUpperString()
-		upperedListenerName := strings.ToUpper(eListener.Name)
-		securityProtocolMapConfig = append(securityProtocolMapConfig, fmt.Sprintf("%s:%s", upperedListenerName, upperedListenerType))
-		listenerConfig = append(listenerConfig, fmt.Sprintf("%s://:%d", upperedListenerName, eListener.ContainerPort))
-		// Add external listeners SSL configuration
-		if eListener.Type == v1beta1.SecurityProtocolSSL {
-			maps.Copy(externalListenerSSLConfig, generateListenerSSLConfig(eListener.Name, eListener.SSLClientAuth, serverPasses[eListener.Name]))
 		}
 	}
 
