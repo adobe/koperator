@@ -20,10 +20,10 @@ jobs:
           go-version: 1.21
           
       # Enable Tmate Session if you'd like to Debut the E2E Kind Cluster
-      # - name: Setup tmate session
-      #   uses: mxschmitt/action-tmate@v3
-      #   with:
-      #     detached: true
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+        with:
+          detached: true
 
       - name: Checkout code
         uses: actions/checkout@v4
