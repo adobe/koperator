@@ -81,20 +81,20 @@ func expectDefaultBrokerSettingsForExternalListenerBinding(ctx context.Context, 
 		if kafkaCluster.Spec.KRaftMode {
 			switch broker.Id {
 			case 0:
-				expectedListeners = "INTERNAL://:29092,TEST://:9094"
+				expectedListeners = "TEST://:9094,INTERNAL://:29092"
 			case 1:
 				expectedListeners = "CONTROLLER://:29093"
 			case 2:
-				expectedListeners = "INTERNAL://:29092,CONTROLLER://:29093,TEST://:9094"
+				expectedListeners = "TEST://:9094,INTERNAL://:29092,CONTROLLER://:29093"
 			}
 		} else {
-			expectedListeners = "INTERNAL://:29092,CONTROLLER://:29093,TEST://:9094"
+			expectedListeners = "TEST://:9094,INTERNAL://:29092,CONTROLLER://:29093"
 		}
 		Expect(listeners.Value()).To(Equal(expectedListeners))
 
 		listenerSecMap, found := brokerConfig.Get(kafkautils.KafkaConfigListenerSecurityProtocolMap)
 		Expect(found).To(BeTrue())
-		Expect(listenerSecMap.Value()).To(Equal("INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT,TEST:PLAINTEXT"))
+		Expect(listenerSecMap.Value()).To(Equal("TEST:PLAINTEXT,INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT"))
 		// check service
 		service := corev1.Service{}
 		Eventually(ctx, func() error {
