@@ -543,7 +543,7 @@ var _ = Describe("KafkaCluster with two config external listener", func() {
 			expectBrokerConfigmapForAz2ExternalListener(ctx, kafkaCluster, count)
 
 			expectEnvoyWithConfigAz1(ctx, kafkaClusterKRaft)
-			expectEnvoyWithConfigAz2(ctx, kafkaClusterKRaft)
+			expectEnvoyWithConfigAz2KRaft(ctx, kafkaClusterKRaft)
 			expectBrokerConfigmapForAz1ExternalListener(ctx, kafkaClusterKRaft, count)
 			expectBrokerConfigmapForAz2ExternalListener(ctx, kafkaClusterKRaft, count)
 		})

@@ -671,10 +671,6 @@ func expectKafkaCRStatus(ctx context.Context, kafkaCluster *v1beta1.KafkaCluster
 						Address: "test.host.com:19090",
 					},
 					{
-						Name:    "broker-1",
-						Address: "test.host.com:19091",
-					},
-					{
 						Name:    "broker-2",
 						Address: "test.host.com:19092",
 					},
