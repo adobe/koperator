@@ -42,7 +42,7 @@ ENV PATH $JAVA_HOME/bin:$PATH
 
 # Default to UTF-8 file.encoding
 ENV LANG C.UTF-8
-ENV JAVA_VERSION 21
+ENV JAVA_VERSION 17
 
 RUN set -eux; \
 	\
