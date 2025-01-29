@@ -1,8 +1,9 @@
 FROM alpine:latest AS kafka_dist
 
 ARG scala_version=2.13
-ARG kafka_version=3.7.0
-ARG kafka_distro_base_url=https://downloads.apache.org/kafka
+ARG kafka_version=3.6.2
+# ARG kafka_distro_base_url=https://downloads.apache.org/kafka
+ARG kafka_distro_base_url=https://archive.apache.org/dist/kafka
 
 ENV kafka_distro=kafka_$scala_version-$kafka_version.tgz
 ENV kafka_distro_asc=$kafka_distro.asc
@@ -26,7 +27,7 @@ RUN rm -r kafka_$scala_version-$kafka_version/bin/windows
 FROM debian:bullseye-slim
 
 ARG scala_version=2.13
-ARG kafka_version=3.7.0
+ARG kafka_version=3.6.2
 
 
 RUN set -eux; \
@@ -36,7 +37,7 @@ RUN set -eux; \
 	; \
 	rm -rf /var/lib/apt/lists/*
 
-ENV JAVA_HOME /usr/local/openjdk-21
+ENV JAVA_HOME /usr/local/openjdk-17
 ENV PATH $JAVA_HOME/bin:$PATH
 
 # Default to UTF-8 file.encoding
@@ -48,12 +49,12 @@ RUN set -eux; \
 	arch="$(dpkg --print-architecture)"; \
 	case "$arch" in \
 		'amd64') \
-			downloadUrl='https://download.oracle.com/java/21/latest/jdk-21_linux-x64_bin.tar.gz'; \
-			downloadSha256='https://download.oracle.com/java/21/latest/jdk-21_linux-x64_bin.tar.gz.sha256'; \
+			downloadUrl='https://download.oracle.com/java/21/latest/jdk-17_linux-x64_bin.tar.gz'; \
+			downloadSha256='https://download.oracle.com/java/21/latest/jdk-17_linux-x64_bin.tar.gz.sha256'; \
 			;; \
 		'arm64') \
-			downloadUrl='https://download.oracle.com/java/21/latest/jdk-21_linux-aarch64_bin.tar.gz'; \
-			downloadSha256='https://download.oracle.com/java/21/latest/jdk-21_linux-aarch64_bin.tar.gz.sha256'; \
+			downloadUrl='https://download.oracle.com/java/21/latest/jdk-17_linux-aarch64_bin.tar.gz'; \
+			downloadSha256='https://download.oracle.com/java/21/latest/jdk-17_linux-aarch64_bin.tar.gz.sha256'; \
 			;; \
 		*) echo >&2 "error: unsupported architecture: '$arch'"; exit 1 ;; \
 	esac; \
