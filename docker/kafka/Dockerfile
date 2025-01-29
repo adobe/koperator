@@ -49,12 +49,12 @@ RUN set -eux; \
 	arch="$(dpkg --print-architecture)"; \
 	case "$arch" in \
 		'amd64') \
-			downloadUrl='https://download.oracle.com/java/21/latest/jdk-17_linux-x64_bin.tar.gz'; \
-			downloadSha256='https://download.oracle.com/java/21/latest/jdk-17_linux-x64_bin.tar.gz.sha256'; \
+			downloadUrl='https://download.oracle.com/java/17/latest/jdk-17_linux-x64_bin.tar.gz'; \
+			downloadSha256='https://download.oracle.com/java/17/latest/jdk-17_linux-x64_bin.tar.gz.sha256'; \
 			;; \
 		'arm64') \
-			downloadUrl='https://download.oracle.com/java/21/latest/jdk-17_linux-aarch64_bin.tar.gz'; \
-			downloadSha256='https://download.oracle.com/java/21/latest/jdk-17_linux-aarch64_bin.tar.gz.sha256'; \
+			downloadUrl='https://download.oracle.com/java/17/latest/jdk-17_linux-aarch64_bin.tar.gz'; \
+			downloadSha256='https://download.oracle.com/java/17/latest/jdk-17_linux-aarch64_bin.tar.gz.sha256'; \
 			;; \
 		*) echo >&2 "error: unsupported architecture: '$arch'"; exit 1 ;; \
 	esac; \
