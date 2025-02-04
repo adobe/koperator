@@ -256,6 +256,23 @@ var _ = Describe("KafkaCluster", func() {
 			expectCruiseControl(ctx, kafkaClusterKRaft)
 		})
 	})
+	When("configuring Kafka cluster in KRaft mode with CLUSTER_ID env var", func() {
+		BeforeEach(func() {
+			loadBalancerServiceName = fmt.Sprintf("envoy-loadbalancer-test-%s", kafkaCluster.Name)
+			externalListenerHostName = "test.host.com"
+
+			loadBalancerServiceNameKRaft = fmt.Sprintf("envoy-loadbalancer-test-%s", kafkaClusterKRaft.Name)
+			externalListenerHostNameKRaft = "test.host.com"
+			kafkaClusterKRaft.Spec.Envs = append(kafkaClusterKRaft.Spec.Envs, corev1.EnvVar{
+				Name:  "CLUSTER_ID",
+				Value: "test-cluster-id",
+			})
+		})
+
+		It("should reconciles objects properly", func(ctx SpecContext) {
+			expectKafka(ctx, kafkaClusterKRaft, count)
+		})
+	})
 	When("configuring one ingress envoy controller config inside the external listener without bindings", func() {
 		BeforeEach(func() {
 			testExternalListener := kafkaCluster.Spec.ListenersConfig.ExternalListeners[0]

@@ -131,13 +131,10 @@ fi`},
 	if r.KafkaCluster.Spec.KRaftMode {
 		for i, container := range pod.Spec.Containers {
 			if container.Name == kafkaContainerName {
+
 				// in KRaft mode, all broker nodes within the same Kafka cluster need to use the same cluster ID to format the storage
-				pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env,
-					corev1.EnvVar{
-						Name:  "CLUSTER_ID",
-						Value: r.KafkaCluster.Status.ClusterID,
-					},
-				)
+				addClusterIdEnv(r, pod, i)
+
 				// see how this env var is used in wait-for-envoy-sidecars.sh
 				storageMountPaths := brokerConfig.GetStorageMountPaths()
 				if storageMountPaths != "" {
@@ -154,6 +151,22 @@ fi`},
 	}
 
 	return pod
+}
+
+func addClusterIdEnv(r *Reconciler, pod *corev1.Pod, i int) {
+	// when cluster id env var already present from KafkaCluster, do not add it again
+	for _, envVar := range r.KafkaCluster.Spec.Envs {
+		if envVar.Name == "CLUSTER_ID" {
+			return
+		}
+	}
+
+	pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env,
+		corev1.EnvVar{
+			Name:  "CLUSTER_ID",
+			Value: r.KafkaCluster.Status.ClusterID,
+		},
+	)
 }
 
 func (r *Reconciler) generateKafkaContainerPorts(log logr.Logger) []corev1.ContainerPort {
