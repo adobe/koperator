@@ -1056,12 +1056,6 @@ process.roles=broker,controller
 							{
 								MountPath: "/test-kafka-logs",
 							},
-							{
-								MountPath: "/test-kafka-logs-50",
-							},
-							{
-								MountPath: "/test-kafka-logs-100",
-							},
 						},
 					},
 					ReadOnlyConfig: "migration.broker.controllerQuorumConfigEnabled=true\nmigration.broker.kRaftMode=false",
@@ -1073,12 +1067,6 @@ process.roles=broker,controller
 						StorageConfigs: []v1beta1.StorageConfig{
 							{
 								MountPath: "/test-kafka-logs",
-							},
-							{
-								MountPath: "/test-kafka-logs-50",
-							},
-							{
-								MountPath: "/test-kafka-logs-100",
 							},
 						},
 					},
@@ -1121,11 +1109,11 @@ process.roles=broker,controller
 					},
 					{
 						Name:    "broker-200",
-						Address: "kafka-100.kafka.svc.cluster.local:9092",
+						Address: "kafka-200.kafka.svc.cluster.local:9092",
 					},
 					{
 						Name:    "broker-300",
-						Address: "kafka-100.kafka.svc.cluster.local:9092",
+						Address: "kafka-300.kafka.svc.cluster.local:9092",
 					},
 				},
 			},
@@ -1144,12 +1132,12 @@ process.roles=broker,controller
 						Address: "kafka-100.kafka.svc.cluster.local:9093",
 					},
 					{
-						Name:    "broker-100",
-						Address: "kafka-100.kafka.svc.cluster.local:9093",
+						Name:    "broker-200",
+						Address: "kafka-200.kafka.svc.cluster.local:9093",
 					},
 					{
-						Name:    "broker-100",
-						Address: "kafka-100.kafka.svc.cluster.local:9093",
+						Name:    "broker-300",
+						Address: "kafka-300.kafka.svc.cluster.local:9093",
 					},
 				},
 			},
@@ -1192,6 +1180,9 @@ metric.reporters=com.linkedin.kafka.cruisecontrol.metricsreporter.CruiseControlM
 `,
 				`advertised.listeners=INTERNAL://kafka-200.kafka.svc.cluster.local:9092
 broker.id=200
+control.plane.listener.name=CONTROLLER
+controller.listener.names=CONTROLLER
+controller.quorum.voters=50@kafka-50.kafka.svc.cluster.local:9093,100@kafka-100.kafka.svc.cluster.local:9093
 cruise.control.metrics.reporter.bootstrap.servers=kafka-all-broker.kafka.svc.cluster.local:9092
 cruise.control.metrics.reporter.kubernetes.mode=true
 inter.broker.listener.name=INTERNAL
@@ -1201,8 +1192,6 @@ log.dirs=/test-kafka-logs/kafka
 metric.reporters=com.linkedin.kafka.cruisecontrol.metricsreporter.CruiseControlMetricsReporter
 `,
 				`advertised.listeners=INTERNAL://kafka-300.kafka.svc.cluster.local:9092
-controller.listener.names=CONTROLLER
-controller.quorum.voters=50@kafka-50.kafka.svc.cluster.local:9093,100@kafka-100.kafka.svc.cluster.local:9093
 cruise.control.metrics.reporter.bootstrap.servers=kafka-all-broker.kafka.svc.cluster.local:9092
 cruise.control.metrics.reporter.kubernetes.mode=true
 inter.broker.listener.name=INTERNAL
