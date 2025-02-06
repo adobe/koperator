@@ -153,9 +153,11 @@ func configureBrokerKRaftMode(bConfig *v1beta1.BrokerConfig, brokerID int32, kaf
 	quorumVoters []string, serverPasses map[string]string, extListenerStatuses, intListenerStatuses map[string]v1beta1.ListenerStatusList, log logr.Logger,
 	brokerReadOnlyConfig *properties.Properties) {
 
-	// configure "node.id" and "process.roles" by default OR when MigrationBrokerKRaftMode is set and 'true'.
-	// this is to support the zk to kRaft migration
-	if migrationBrokerKRaftMode, found := brokerReadOnlyConfig.Get(kafkautils.MigrationBrokerKRaftMode); !found || migrationBrokerKRaftMode.Value() == "true" {
+	controllerListenerName := generateControlPlaneListener(kafkaCluster.Spec.ListenersConfig.InternalListeners)
+
+	// when kRaft is enabled for the cluster, brokers can still be configured to use zookeeper for metadata.
+	// this is to support the zk to kRaft migration where both zookeeper and kRaft controllers are running in parallel.
+	if shouldUseKRaftModeForBroker(brokerReadOnlyConfig) {
 		if err := config.Set(kafkautils.KafkaConfigNodeID, brokerID); err != nil {
 			log.Error(err, fmt.Sprintf(kafkautils.BrokerConfigErrorMsgTemplate, kafkautils.KafkaConfigNodeID))
 		}
@@ -163,25 +165,20 @@ func configureBrokerKRaftMode(bConfig *v1beta1.BrokerConfig, brokerID int32, kaf
 		if err := config.Set(kafkautils.KafkaConfigProcessRoles, bConfig.Roles); err != nil {
 			log.Error(err, fmt.Sprintf(kafkautils.BrokerConfigErrorMsgTemplate, kafkautils.KafkaConfigProcessRoles))
 		}
-	} else { // migrationBrokerKRaftMode.Value() == "false"  -> use zk mode for broker
-		// when in zk mode, "broker.id" and "control.plane.listener.name" are set so it can communicate with zookeeper
+	} else { // use zk mode for broker.
+		// when in zk mode, "broker.id" and "control.plane.listener.name" are configured so it will communicate with zookeeper
 		if err := config.Set(kafkautils.KafkaConfigBrokerID, brokerID); err != nil {
 			log.Error(err, fmt.Sprintf(kafkautils.BrokerConfigErrorMsgTemplate, kafkautils.KafkaConfigBrokerID))
 		}
 
-		cclConf := generateControlPlaneListener(kafkaCluster.Spec.ListenersConfig.InternalListeners)
-		if cclConf != "" {
-			if err := config.Set(kafkautils.KafkaConfigControlPlaneListener, cclConf); err != nil {
+		if controllerListenerName != "" {
+			if err := config.Set(kafkautils.KafkaConfigControlPlaneListener, controllerListenerName); err != nil {
 				log.Error(err, fmt.Sprintf(kafkautils.BrokerConfigErrorMsgTemplate, kafkautils.KafkaConfigControlPlaneListener))
 			}
 		}
 	}
 
-	controllerListenerName := generateControlPlaneListener(kafkaCluster.Spec.ListenersConfig.InternalListeners)
-
-	// configure "controller.quorum.voters" and "controller.listener.names" by default OR when MigrationBrokerControllerQuorumConfigEnabled is set and 'true'.
-	// this is to support the zk to kRaft migration
-	if migrationBrokerControllerQuorumConfigEnabled, found := brokerReadOnlyConfig.Get(kafkautils.MigrationBrokerControllerQuorumConfigEnabled); !found || migrationBrokerControllerQuorumConfigEnabled.Value() == "true" {
+	if shouldConfigureControllerQuorumForBroker(brokerReadOnlyConfig) {
 		if err := config.Set(kafkautils.KafkaConfigControllerQuorumVoters, quorumVoters); err != nil {
 			log.Error(err, fmt.Sprintf(kafkautils.BrokerConfigErrorMsgTemplate, kafkautils.KafkaConfigControllerQuorumVoters))
 		}
@@ -237,6 +234,20 @@ func configureBrokerKRaftMode(bConfig *v1beta1.BrokerConfig, brokerID int32, kaf
 			log.Error(err, fmt.Sprintf(kafkautils.BrokerConfigErrorMsgTemplate, kafkautils.KafkaConfigListeners))
 		}
 	}
+}
+
+// Returns true by default (not in migration configured) OR when MigrationBrokerKRaftMode is set and 'true'.
+// this is to support the zk to kRaft migration
+func shouldUseKRaftModeForBroker(brokerReadOnlyConfig *properties.Properties) bool {
+	migrationBrokerKRaftMode, found := brokerReadOnlyConfig.Get(kafkautils.MigrationBrokerKRaftMode)
+	return !found || migrationBrokerKRaftMode.Value() == "true"
+}
+
+// Returns true by default (not in migration) OR when MigrationBrokerControllerQuorumConfigEnabled is set and 'true'.
+// this is to support the zk to kRaft migration
+func shouldConfigureControllerQuorumForBroker(brokerReadOnlyConfig *properties.Properties) bool {
+	migrationBrokerControllerQuorumConfigEnabled, found := brokerReadOnlyConfig.Get(kafkautils.MigrationBrokerControllerQuorumConfigEnabled)
+	return !found || migrationBrokerControllerQuorumConfigEnabled.Value() == "true"
 }
 
 func configureBrokerZKMode(brokerID int32, kafkaCluster *v1beta1.KafkaCluster, config *properties.Properties,

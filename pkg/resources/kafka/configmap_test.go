@@ -1048,6 +1048,42 @@ process.roles=broker,controller
 					},
 					ReadOnlyConfig: "migration.broker.controllerQuorumConfigEnabled=false\nmigration.broker.kRaftMode=false",
 				},
+				{
+					Id: 200,
+					BrokerConfig: &v1beta1.BrokerConfig{
+						Roles: []string{"broker"},
+						StorageConfigs: []v1beta1.StorageConfig{
+							{
+								MountPath: "/test-kafka-logs",
+							},
+							{
+								MountPath: "/test-kafka-logs-50",
+							},
+							{
+								MountPath: "/test-kafka-logs-100",
+							},
+						},
+					},
+					ReadOnlyConfig: "migration.broker.controllerQuorumConfigEnabled=true\nmigration.broker.kRaftMode=false",
+				},
+				{
+					Id: 300,
+					BrokerConfig: &v1beta1.BrokerConfig{
+						Roles: []string{"broker"},
+						StorageConfigs: []v1beta1.StorageConfig{
+							{
+								MountPath: "/test-kafka-logs",
+							},
+							{
+								MountPath: "/test-kafka-logs-50",
+							},
+							{
+								MountPath: "/test-kafka-logs-100",
+							},
+						},
+					},
+					ReadOnlyConfig: "migration.broker.controllerQuorumConfigEnabled=false\nmigration.broker.kRaftMode=true",
+				},
 			},
 			listenersConfig: v1beta1.ListenersConfig{
 				InternalListeners: []v1beta1.InternalListenerConfig{
@@ -1083,6 +1119,14 @@ process.roles=broker,controller
 						Name:    "broker-100",
 						Address: "kafka-100.kafka.svc.cluster.local:9092",
 					},
+					{
+						Name:    "broker-200",
+						Address: "kafka-100.kafka.svc.cluster.local:9092",
+					},
+					{
+						Name:    "broker-300",
+						Address: "kafka-100.kafka.svc.cluster.local:9092",
+					},
 				},
 			},
 			controllerListenerStatus: map[string]v1beta1.ListenerStatusList{
@@ -1094,6 +1138,14 @@ process.roles=broker,controller
 					{
 						Name:    "broker-50",
 						Address: "kafka-50.kafka.svc.cluster.local:9093",
+					},
+					{
+						Name:    "broker-100",
+						Address: "kafka-100.kafka.svc.cluster.local:9093",
+					},
+					{
+						Name:    "broker-100",
+						Address: "kafka-100.kafka.svc.cluster.local:9093",
 					},
 					{
 						Name:    "broker-100",
@@ -1137,6 +1189,29 @@ listener.security.protocol.map=INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
 listeners=INTERNAL://:9092,CONTROLLER://:9093
 log.dirs=/test-kafka-logs/kafka,/test-kafka-logs-50/kafka,/test-kafka-logs-100/kafka
 metric.reporters=com.linkedin.kafka.cruisecontrol.metricsreporter.CruiseControlMetricsReporter
+`,
+				`advertised.listeners=INTERNAL://kafka-200.kafka.svc.cluster.local:9092
+broker.id=200
+cruise.control.metrics.reporter.bootstrap.servers=kafka-all-broker.kafka.svc.cluster.local:9092
+cruise.control.metrics.reporter.kubernetes.mode=true
+inter.broker.listener.name=INTERNAL
+listener.security.protocol.map=INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+listeners=INTERNAL://:9092
+log.dirs=/test-kafka-logs/kafka
+metric.reporters=com.linkedin.kafka.cruisecontrol.metricsreporter.CruiseControlMetricsReporter
+`,
+				`advertised.listeners=INTERNAL://kafka-300.kafka.svc.cluster.local:9092
+controller.listener.names=CONTROLLER
+controller.quorum.voters=50@kafka-50.kafka.svc.cluster.local:9093,100@kafka-100.kafka.svc.cluster.local:9093
+cruise.control.metrics.reporter.bootstrap.servers=kafka-all-broker.kafka.svc.cluster.local:9092
+cruise.control.metrics.reporter.kubernetes.mode=true
+inter.broker.listener.name=INTERNAL
+listener.security.protocol.map=INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+listeners=INTERNAL://:9092
+log.dirs=/test-kafka-logs/kafka
+metric.reporters=com.linkedin.kafka.cruisecontrol.metricsreporter.CruiseControlMetricsReporter
+node.id=300
+process.roles=broker
 `},
 		},
 	}
