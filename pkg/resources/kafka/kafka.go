@@ -366,7 +366,6 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 	if r.KafkaCluster.Spec.KRaftMode {
 		// all broker nodes under the same Kafka cluster must use the same cluster UUID
 		if r.KafkaCluster.Status.ClusterID == "" {
-
 			// CLUSTER_ID can be overridden with ENV (e.g for migration from ZK to KRaft so it matches the value for ZK cluster)
 			for _, env := range r.KafkaCluster.Spec.Envs {
 				if env.Name == "CLUSTER_ID" {

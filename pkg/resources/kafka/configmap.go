@@ -152,7 +152,6 @@ func (r *Reconciler) configCCMetricsReporter(broker v1beta1.Broker, config *prop
 func configureBrokerKRaftMode(bConfig *v1beta1.BrokerConfig, brokerID int32, kafkaCluster *v1beta1.KafkaCluster, config *properties.Properties,
 	quorumVoters []string, serverPasses map[string]string, extListenerStatuses, intListenerStatuses map[string]v1beta1.ListenerStatusList, log logr.Logger,
 	brokerReadOnlyConfig *properties.Properties) {
-
 	controllerListenerName := generateControlPlaneListener(kafkaCluster.Spec.ListenersConfig.InternalListeners)
 
 	// when kRaft is enabled for the cluster, brokers can still be configured to use zookeeper for metadata.

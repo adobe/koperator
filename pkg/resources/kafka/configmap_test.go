@@ -722,7 +722,7 @@ zookeeper.connect=example.zk:2181/`,
 
 // TestGenerateBrokerConfigKRaftMode serves as an aggregated test on top of TestGenerateBrokerConfig to verify basic broker configurations under KRaft mode
 // Note: most of the test cases under TestGenerateBrokerConfig are not replicated here since running KRaft mode doesn't affect things like SSL and storage configurations
-func TestGenerateBrokerConfigKRaftMode(t *testing.T) {
+func TestGenerateBrokerConfigKRaftMode(t *testing.T) { //nolint funlen
 	testCases := []struct {
 		testName                 string
 		brokers                  []v1beta1.Broker

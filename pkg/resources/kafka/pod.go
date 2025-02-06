@@ -131,7 +131,6 @@ fi`},
 	if r.KafkaCluster.Spec.KRaftMode {
 		for i, container := range pod.Spec.Containers {
 			if container.Name == kafkaContainerName {
-
 				// in KRaft mode, all broker nodes within the same Kafka cluster need to use the same cluster ID to format the storage
 				addClusterIdEnv(r, pod, i)
 
