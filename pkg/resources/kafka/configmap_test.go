@@ -729,6 +729,8 @@ func TestGenerateBrokerConfigKRaftMode(t *testing.T) { //nolint funlen
 		listenersConfig          v1beta1.ListenersConfig
 		internalListenerStatuses map[string]v1beta1.ListenerStatusList
 		controllerListenerStatus map[string]v1beta1.ListenerStatusList
+		zkAddresses              []string
+		zkPath                   string
 		expectedBrokerConfigs    []string
 	}{
 		{
@@ -1141,6 +1143,8 @@ process.roles=broker,controller
 					},
 				},
 			},
+			zkAddresses: []string{"example.zk:2181"},
+			zkPath:      "/kafka",
 			expectedBrokerConfigs: []string{
 				`advertised.listeners=INTERNAL://kafka-0.kafka.svc.cluster.local:9092
 controller.listener.names=CONTROLLER
@@ -1177,6 +1181,7 @@ listener.security.protocol.map=INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
 listeners=INTERNAL://:9092,CONTROLLER://:9093
 log.dirs=/test-kafka-logs/kafka,/test-kafka-logs-50/kafka,/test-kafka-logs-100/kafka
 metric.reporters=com.linkedin.kafka.cruisecontrol.metricsreporter.CruiseControlMetricsReporter
+zookeeper.connect=example.zk:2181/kafka
 `,
 				`advertised.listeners=INTERNAL://kafka-200.kafka.svc.cluster.local:9092
 broker.id=200
@@ -1190,6 +1195,7 @@ listener.security.protocol.map=INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
 listeners=INTERNAL://:9092
 log.dirs=/test-kafka-logs/kafka
 metric.reporters=com.linkedin.kafka.cruisecontrol.metricsreporter.CruiseControlMetricsReporter
+zookeeper.connect=example.zk:2181/kafka
 `,
 				`advertised.listeners=INTERNAL://kafka-300.kafka.svc.cluster.local:9092
 cruise.control.metrics.reporter.bootstrap.servers=kafka-all-broker.kafka.svc.cluster.local:9092
@@ -1225,6 +1231,8 @@ process.roles=broker
 							KRaftMode:       true,
 							ListenersConfig: test.listenersConfig,
 							Brokers:         test.brokers,
+							ZKAddresses:     test.zkAddresses,
+							ZKPath:          test.zkPath,
 						},
 					},
 				},
