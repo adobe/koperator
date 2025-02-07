@@ -165,15 +165,10 @@ func configureBrokerKRaftMode(bConfig *v1beta1.BrokerConfig, brokerID int32, kaf
 			log.Error(err, fmt.Sprintf(kafkautils.BrokerConfigErrorMsgTemplate, kafkautils.KafkaConfigProcessRoles))
 		}
 	} else { // use zk mode for broker.
-		// when in zk mode, "broker.id" and "control.plane.listener.name" are configured so it will communicate with zookeeper
+		// when in zk mode, "broker.id" and "zookeeper.connect" are configured so it will communicate with zookeeper
+		// control.plane.listener.name will not be set in zk mode.  There for it will default to the interbroker listener.
 		if err := config.Set(kafkautils.KafkaConfigBrokerID, brokerID); err != nil {
 			log.Error(err, fmt.Sprintf(kafkautils.BrokerConfigErrorMsgTemplate, kafkautils.KafkaConfigBrokerID))
-		}
-
-		if controllerListenerName != "" {
-			if err := config.Set(kafkautils.KafkaConfigControlPlaneListener, controllerListenerName); err != nil {
-				log.Error(err, fmt.Sprintf(kafkautils.BrokerConfigErrorMsgTemplate, kafkautils.KafkaConfigControlPlaneListener))
-			}
 		}
 
 		if err := config.Set(kafkautils.KafkaConfigZooKeeperConnect, zookeeperutils.PrepareConnectionAddress(
