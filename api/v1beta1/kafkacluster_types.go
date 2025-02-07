@@ -1102,12 +1102,17 @@ func (bConfig *BrokerConfig) GetBrokerAnnotations() map[string]string {
 
 // GetBrokerLabels returns the labels that are applied to broker pods
 func (bConfig *BrokerConfig) GetBrokerLabels(kafkaClusterName string, brokerId int32, kRaftMode bool) map[string]string {
-	kraftLabels := make(map[string]string, 0)
+	var kraftLabels map[string]string
 	if kRaftMode {
 		kraftLabels = map[string]string{
 			ProcessRolesKey:     strings.Join(bConfig.Roles, "_"),
 			IsControllerNodeKey: fmt.Sprintf("%t", bConfig.IsControllerNode()),
 			IsBrokerNodeKey:     fmt.Sprintf("%t", bConfig.IsBrokerNode()),
+		}
+	} else { // in ZK mode -> new labels for backward compatibility for the headless service when going from ZK to KRaft
+		kraftLabels = map[string]string{
+			IsControllerNodeKey: fmt.Sprintf("%t", false),
+			IsBrokerNodeKey:     fmt.Sprintf("%t", true),
 		}
 	}
 	return util.MergeLabels(

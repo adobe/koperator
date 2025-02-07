@@ -1004,7 +1004,7 @@ process.roles=broker,controller
 `},
 		},
 		{
-			testName: "a Kafka cluster with a mix of broker-only, controller-only, and combined roles; controller nodes with multiple mount paths, and various migration configs set on each brokers",
+			testName: "a Kafka cluster with a mix of broker-only, controller-only, and combined roles; and various migration configs set on each brokers",
 			brokers: []v1beta1.Broker{
 				{
 					Id: 0,
@@ -1173,7 +1173,6 @@ process.roles=controller
 `,
 				`advertised.listeners=INTERNAL://kafka-100.kafka.svc.cluster.local:9092
 broker.id=100
-control.plane.listener.name=CONTROLLER
 cruise.control.metrics.reporter.bootstrap.servers=kafka-all-broker.kafka.svc.cluster.local:9092
 cruise.control.metrics.reporter.kubernetes.mode=true
 inter.broker.listener.name=INTERNAL
@@ -1185,7 +1184,6 @@ zookeeper.connect=example.zk:2181/kafka
 `,
 				`advertised.listeners=INTERNAL://kafka-200.kafka.svc.cluster.local:9092
 broker.id=200
-control.plane.listener.name=CONTROLLER
 controller.listener.names=CONTROLLER
 controller.quorum.voters=50@kafka-50.kafka.svc.cluster.local:9093,100@kafka-100.kafka.svc.cluster.local:9093
 cruise.control.metrics.reporter.bootstrap.servers=kafka-all-broker.kafka.svc.cluster.local:9092
