@@ -445,10 +445,12 @@ func TestGetBrokerLabels(t *testing.T) {
 		{
 			testName: "Labels in zookeeper mode",
 			expectedLabels: map[string]string{
-				AppLabelKey:      expectedDefaultLabelApp,
-				BrokerIdLabelKey: strconv.Itoa(expectedBrokerId),
-				KafkaCRLabelKey:  expectedKafkaCRName,
-				"test_label_key": "test_label_value",
+				AppLabelKey:         expectedDefaultLabelApp,
+				BrokerIdLabelKey:    strconv.Itoa(expectedBrokerId),
+				KafkaCRLabelKey:     expectedKafkaCRName,
+				IsBrokerNodeKey:     "true",
+				IsControllerNodeKey: "false",
+				"test_label_key":    "test_label_value",
 			},
 			brokerConfig: &BrokerConfig{
 				Roles: nil,

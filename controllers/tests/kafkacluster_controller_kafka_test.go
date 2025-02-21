@@ -432,6 +432,14 @@ func expectKafkaBrokerPod(ctx context.Context, kafkaCluster *v1beta1.KafkaCluste
 				Value: "/kafka-logs,/ephemeral-dir1",
 			},
 		))
+
+		// when CLUSTER_ID is set as an ENV, verify the status is not randomly generated
+		for _, env := range kafkaCluster.Spec.Envs {
+			if env.Name == "CLUSTER_ID" {
+				Expect(kafkaCluster.Status.ClusterID).To(Equal("test-cluster-id"))
+				break
+			}
+		}
 	} else {
 		Expect(container.Env).To(ConsistOf(
 			// the exact value is not interesting

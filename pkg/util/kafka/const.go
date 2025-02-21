@@ -51,6 +51,12 @@ const (
 	KafkaConfigSSLKeyStorePassword   = "ssl.keystore.password"
 )
 
+// used for zk to kraft migration
+const (
+	MigrationBrokerControllerQuorumConfigEnabled = "migration.broker.controllerQuorumConfigEnabled"
+	MigrationBrokerKRaftMode                     = "migration.broker.kRaftMode"
+)
+
 // used for Cruise Control configurations
 const (
 	CruiseControlConfigMetricsReporters                  = "metric.reporters"
