@@ -407,16 +407,7 @@ func generateListenerSpecificConfig(kcs *v1beta1.KafkaClusterSpec, serverPasses 
 	config := properties.NewProperties()
 
 	l := kcs.ListenersConfig
-	r := kcs.ReadOnlyConfig
-
-	securityProtocolSet := false
-	for _, broker := range kcs.Brokers {
-		b := broker.ReadOnlyConfig
-		if strings.Contains(b, kafkautils.KafkaConfigSecurityInterBrokerProtocol+"=") {
-			securityProtocolSet = true
-			break
-		}
-	}
+	//r := kcs.ReadOnlyConfig
 
 	interBrokerListenerName, securityProtocolMapConfig, listenerConfig, internalListenerSSLConfig, externalListenerSSLConfig := getListenerSpecificConfig(&l, serverPasses, log)
 
@@ -436,10 +427,11 @@ func generateListenerSpecificConfig(kcs *v1beta1.KafkaClusterSpec, serverPasses 
 		log.Error(err, fmt.Sprintf("setting '%s' parameter in broker configuration resulted an error", kafkautils.KafkaConfigListenerSecurityProtocolMap))
 	}
 
-	if !securityProtocolSet {
-		if !strings.Contains(r, kafkautils.KafkaConfigSecurityInterBrokerProtocol+"=") {
+	for _, broker := range kcs.Brokers {
+		b := broker.ReadOnlyConfig
+		if !strings.Contains(b, kafkautils.KafkaConfigSecurityInterBrokerProtocol+"=") {
 			if err := config.Set(kafkautils.KafkaConfigInterBrokerListenerName, interBrokerListenerName); err != nil {
-				log.Error(err, fmt.Sprintf("setting '%s' parameter in broker configuration resulted an error", kafkautils.KafkaConfigInterBrokerListenerName))
+				log.Error(err, fmt.Sprintf("setting '%s' parameter in broker configuration resulted in an error", kafkautils.KafkaConfigInterBrokerListenerName))
 			}
 		}
 	}
