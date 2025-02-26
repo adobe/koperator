@@ -622,6 +622,7 @@ cruise.control.metrics.reporter.kubernetes.mode=true
 listener.security.protocol.map=INTERNAL:PLAINTEXT
 listeners=INTERNAL://:9092
 security.inter.broker.protocol=SASL_SSL
+inter.broker.listener.name=INTERNAL
 zookeeper.connect=example.zk:2181/`,
 		},
 	}
