@@ -51,8 +51,16 @@ func (r *Reconciler) getConfigProperties(bConfig *v1beta1.BrokerConfig, broker v
 	// }
 
 	// Add listener configuration
-	listenerConf, _ := generateListenerSpecificConfig(&r.KafkaCluster.Spec, serverPasses, log)
-	config.Merge(listenerConf)
+	generalConfig, brokerConfigs, _ := generateListenerSpecificConfig(&r.KafkaCluster.Spec, serverPasses, log)
+
+	brokerConfig, exists := brokerConfigs[broker.Id]
+	if !exists {
+		log.Error(nil, fmt.Sprintf("No specific listener config found for broker %d, using default config", broker.Id))
+		brokerConfig = properties.NewProperties()
+	}
+
+	config.Merge(brokerConfig)
+	config.Merge(generalConfig)
 
 	// Cruise Control metrics reporter configuration
 	r.configCCMetricsReporter(broker, config, clientPass, log)
@@ -198,9 +206,19 @@ func configureBrokerKRaftMode(bConfig *v1beta1.BrokerConfig, brokerID int32, kaf
 	}
 
 	// Add listener configuration
-	listenerConf, listenerConfig := generateListenerSpecificConfig(&kafkaCluster.Spec, serverPasses, log)
-	config.Merge(listenerConf)
+	generalConfig, brokerConfigs, listenerConfig := generateListenerSpecificConfig(&kafkaCluster.Spec, serverPasses, log)
 
+	brokerConfig, exists := brokerConfigs[brokerID]
+	if !exists {
+		log.Error(nil, fmt.Sprintf("No specific listener config found for broker %d, using default config", brokerID))
+		brokerConfig = properties.NewProperties()
+	} else {
+		log.Info("Applying listener-specific config for broker",
+			"brokerID", brokerID, "config", brokerConfig.String())
+	}
+
+	config.Merge(brokerConfig)
+	config.Merge(generalConfig)
 	var advertisedListenerConf []string
 	// only expose "advertised.listeners" when the node serves as a regular broker or a combined node
 	if bConfig.IsBrokerNode() {
@@ -257,9 +275,16 @@ func configureBrokerZKMode(brokerID int32, kafkaCluster *v1beta1.KafkaCluster, c
 	}
 
 	// Add listener configuration
-	listenerConf, _ := generateListenerSpecificConfig(&kafkaCluster.Spec, serverPasses, log)
-	config.Merge(listenerConf)
+	generalConfig, brokerConfigs, _ := generateListenerSpecificConfig(&kafkaCluster.Spec, serverPasses, log)
 
+	brokerConfig, exists := brokerConfigs[brokerID]
+	if !exists {
+		log.Error(nil, fmt.Sprintf("No specific listener config found for broker %d, using default config", brokerID))
+		brokerConfig = properties.NewProperties()
+	}
+
+	config.Merge(brokerConfig)
+	config.Merge(generalConfig)
 	// Add advertised listener configuration
 	advertisedListenerConf := generateAdvertisedListenerConfig(brokerID, kafkaCluster.Spec.ListenersConfig,
 		extListenerStatuses, intListenerStatuses, controllerIntListenerStatuses)
@@ -403,8 +428,9 @@ func generateControlPlaneListener(iListeners []v1beta1.InternalListenerConfig) s
 	return controlPlaneListener
 }
 
-func generateListenerSpecificConfig(kcs *v1beta1.KafkaClusterSpec, serverPasses map[string]string, log logr.Logger) (*properties.Properties, []string) {
+func generateListenerSpecificConfig(kcs *v1beta1.KafkaClusterSpec, serverPasses map[string]string, log logr.Logger) (*properties.Properties, map[int32]*properties.Properties, []string) {
 	config := properties.NewProperties()
+	brokerConfigs := make(map[int32]*properties.Properties)
 
 	l := kcs.ListenersConfig
 	//r := kcs.ReadOnlyConfig
@@ -428,19 +454,32 @@ func generateListenerSpecificConfig(kcs *v1beta1.KafkaClusterSpec, serverPasses 
 	}
 
 	for _, broker := range kcs.Brokers {
+		brokerConfig := properties.NewProperties()
+		brokerID := broker.Id
+
 		b := broker.ReadOnlyConfig
-		if !strings.Contains(b, kafkautils.KafkaConfigSecurityInterBrokerProtocol+"=") {
-			if err := config.Set(kafkautils.KafkaConfigInterBrokerListenerName, interBrokerListenerName); err != nil {
-				log.Error(err, fmt.Sprintf("setting '%s' parameter in broker configuration resulted in an error", kafkautils.KafkaConfigInterBrokerListenerName))
+		trimmedConfig := strings.TrimSpace(b)
+
+		if strings.Contains(trimmedConfig, kafkautils.KafkaConfigSecurityInterBrokerProtocol+"=") {
+			log.Info("Security InterBrokerProtocol is set for this broker, skipping config update", "broker", broker)
+		} else {
+			log.Info("Security InterBrokerProtocol NOT found for broker, setting inter.broker.listener.name",
+				"interBrokerListenerName", interBrokerListenerName, "broker", broker)
+
+			if err := brokerConfig.Set(kafkautils.KafkaConfigInterBrokerListenerName, interBrokerListenerName); err != nil {
+				log.Error(err, fmt.Sprintf("setting '%s' parameter in broker configuration resulted in an error",
+					kafkautils.KafkaConfigInterBrokerListenerName))
 			}
 		}
+
+		brokerConfigs[brokerID] = brokerConfig
 	}
 
 	if err := config.Set(kafkautils.KafkaConfigListeners, listenerConfig); err != nil {
 		log.Error(err, fmt.Sprintf("setting '%s' parameter in broker configuration resulted an error", kafkautils.KafkaConfigListeners))
 	}
 
-	return config, listenerConfig
+	return config, brokerConfigs, listenerConfig
 }
 
 func getListenerSpecificConfig(l *v1beta1.ListenersConfig, serverPasses map[string]string, log logr.Logger) (string, []string, []string, map[string]string, map[string]string) {
