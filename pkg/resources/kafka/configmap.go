@@ -71,7 +71,7 @@ func (r *Reconciler) getConfigProperties(bConfig *v1beta1.BrokerConfig, broker v
 	if r.KafkaCluster.Spec.KRaftMode {
 		configureBrokerKRaftMode(bConfig, broker.Id, r.KafkaCluster, config, quorumVoters, serverPasses, extListenerStatuses, intListenerStatuses, log, brokerReadOnlyConfig)
 	} else {
-		configureBrokerZKMode(broker.Id, r.KafkaCluster, config, serverPasses, extListenerStatuses, intListenerStatuses, controllerIntListenerStatuses, log)
+		configureBrokerZKMode(broker.Id, r.KafkaCluster, config, extListenerStatuses, intListenerStatuses, controllerIntListenerStatuses, log)
 	}
 
 	// This logic prevents the removal of the mountPath from the broker configmap
@@ -268,8 +268,7 @@ func shouldConfigureControllerQuorumForBroker(brokerReadOnlyConfig *properties.P
 	return !found || migrationBrokerControllerQuorumConfigEnabled.Value() == "true"
 }
 
-func configureBrokerZKMode(brokerID int32, kafkaCluster *v1beta1.KafkaCluster, config *properties.Properties,
-	serverPasses map[string]string, extListenerStatuses, intListenerStatuses,
+func configureBrokerZKMode(brokerID int32, kafkaCluster *v1beta1.KafkaCluster, config *properties.Properties, extListenerStatuses, intListenerStatuses,
 	controllerIntListenerStatuses map[string]v1beta1.ListenerStatusList, log logr.Logger) {
 	if err := config.Set(kafkautils.KafkaConfigBrokerID, brokerID); err != nil {
 		log.Error(err, fmt.Sprintf(kafkautils.BrokerConfigErrorMsgTemplate, kafkautils.KafkaConfigBrokerID))
