@@ -208,18 +208,6 @@ func configureBrokerKRaftMode(bConfig *v1beta1.BrokerConfig, brokerID int32, kaf
 	// // Add listener configuration
 	_, _, listenerConfig := generateListenerSpecificConfig(&kafkaCluster.Spec, serverPasses, log)
 
-	// brokerConfig, exists := brokerConfigs[brokerID]
-	// if !exists {
-	// 	log.Error(nil, fmt.Sprintf("No specific listener config found for broker %d, using default config", brokerID))
-	// 	brokerConfig = properties.NewProperties()
-	// } else {
-	// 	log.Info("Applying listener-specific config for broker",
-	// 		"brokerID", brokerID, "config", brokerConfig.String())
-	// }
-
-	// config.Merge(brokerConfig)
-	// config.Merge(generalConfig)
-
 	var advertisedListenerConf []string
 	// only expose "advertised.listeners" when the node serves as a regular broker or a combined node
 	if bConfig.IsBrokerNode() {
@@ -273,18 +261,6 @@ func configureBrokerZKMode(brokerID int32, kafkaCluster *v1beta1.KafkaCluster, c
 	if err := config.Set(kafkautils.KafkaConfigBrokerID, brokerID); err != nil {
 		log.Error(err, fmt.Sprintf(kafkautils.BrokerConfigErrorMsgTemplate, kafkautils.KafkaConfigBrokerID))
 	}
-
-	// Add listener configuration
-	// generalConfig, brokerConfigs, _ := generateListenerSpecificConfig(&kafkaCluster.Spec, serverPasses, log)
-
-	// brokerConfig, exists := brokerConfigs[brokerID]
-	// if !exists {
-	// 	log.Error(nil, fmt.Sprintf("No specific listener config found for broker %d, using default config", brokerID))
-	// 	brokerConfig = properties.NewProperties()
-	// }
-
-	// config.Merge(brokerConfig)
-	// config.Merge(generalConfig)
 
 	// Add advertised listener configuration
 	advertisedListenerConf := generateAdvertisedListenerConfig(brokerID, kafkaCluster.Spec.ListenersConfig,
