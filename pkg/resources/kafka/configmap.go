@@ -71,7 +71,7 @@ func (r *Reconciler) getConfigProperties(bConfig *v1beta1.BrokerConfig, broker v
 	if r.KafkaCluster.Spec.KRaftMode {
 		configureBrokerKRaftMode(bConfig, broker.Id, r.KafkaCluster, config, quorumVoters, serverPasses, extListenerStatuses, intListenerStatuses, log, brokerReadOnlyConfig)
 	} else {
-		configureBrokerZKMode(broker.Id, r.KafkaCluster, config, serverPasses, extListenerStatuses, intListenerStatuses, controllerIntListenerStatuses, log)
+		configureBrokerZKMode(broker.Id, r.KafkaCluster, config, extListenerStatuses, intListenerStatuses, controllerIntListenerStatuses, log)
 	}
 
 	// This logic prevents the removal of the mountPath from the broker configmap
@@ -205,20 +205,20 @@ func configureBrokerKRaftMode(bConfig *v1beta1.BrokerConfig, brokerID int32, kaf
 		}
 	}
 
-	// Add listener configuration
-	generalConfig, brokerConfigs, listenerConfig := generateListenerSpecificConfig(&kafkaCluster.Spec, serverPasses, log)
+	// // Add listener configuration
+	_, _, listenerConfig := generateListenerSpecificConfig(&kafkaCluster.Spec, serverPasses, log)
 
-	brokerConfig, exists := brokerConfigs[brokerID]
-	if !exists {
-		log.Error(nil, fmt.Sprintf("No specific listener config found for broker %d, using default config", brokerID))
-		brokerConfig = properties.NewProperties()
-	} else {
-		log.Info("Applying listener-specific config for broker",
-			"brokerID", brokerID, "config", brokerConfig.String())
-	}
+	// brokerConfig, exists := brokerConfigs[brokerID]
+	// if !exists {
+	// 	log.Error(nil, fmt.Sprintf("No specific listener config found for broker %d, using default config", brokerID))
+	// 	brokerConfig = properties.NewProperties()
+	// } else {
+	// 	log.Info("Applying listener-specific config for broker",
+	// 		"brokerID", brokerID, "config", brokerConfig.String())
+	// }
 
-	config.Merge(brokerConfig)
-	config.Merge(generalConfig)
+	// config.Merge(brokerConfig)
+	// config.Merge(generalConfig)
 
 	var advertisedListenerConf []string
 	// only expose "advertised.listeners" when the node serves as a regular broker or a combined node
@@ -268,23 +268,23 @@ func shouldConfigureControllerQuorumForBroker(brokerReadOnlyConfig *properties.P
 	return !found || migrationBrokerControllerQuorumConfigEnabled.Value() == "true"
 }
 
-func configureBrokerZKMode(brokerID int32, kafkaCluster *v1beta1.KafkaCluster, config *properties.Properties, serverPasses map[string]string, extListenerStatuses, intListenerStatuses,
+func configureBrokerZKMode(brokerID int32, kafkaCluster *v1beta1.KafkaCluster, config *properties.Properties, extListenerStatuses, intListenerStatuses,
 	controllerIntListenerStatuses map[string]v1beta1.ListenerStatusList, log logr.Logger) {
 	if err := config.Set(kafkautils.KafkaConfigBrokerID, brokerID); err != nil {
 		log.Error(err, fmt.Sprintf(kafkautils.BrokerConfigErrorMsgTemplate, kafkautils.KafkaConfigBrokerID))
 	}
 
 	// Add listener configuration
-	generalConfig, brokerConfigs, _ := generateListenerSpecificConfig(&kafkaCluster.Spec, serverPasses, log)
+	// generalConfig, brokerConfigs, _ := generateListenerSpecificConfig(&kafkaCluster.Spec, serverPasses, log)
 
-	brokerConfig, exists := brokerConfigs[brokerID]
-	if !exists {
-		log.Error(nil, fmt.Sprintf("No specific listener config found for broker %d, using default config", brokerID))
-		brokerConfig = properties.NewProperties()
-	}
+	// brokerConfig, exists := brokerConfigs[brokerID]
+	// if !exists {
+	// 	log.Error(nil, fmt.Sprintf("No specific listener config found for broker %d, using default config", brokerID))
+	// 	brokerConfig = properties.NewProperties()
+	// }
 
-	config.Merge(brokerConfig)
-	config.Merge(generalConfig)
+	// config.Merge(brokerConfig)
+	// config.Merge(generalConfig)
 
 	// Add advertised listener configuration
 	advertisedListenerConf := generateAdvertisedListenerConfig(brokerID, kafkaCluster.Spec.ListenersConfig,
