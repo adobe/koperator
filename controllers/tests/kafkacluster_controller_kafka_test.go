@@ -366,8 +366,11 @@ func expectKafkaBrokerPod(ctx context.Context, kafkaCluster *v1beta1.KafkaCluste
 	}).Should(HaveLen(1))
 
 	pod := podList.Items[0]
-
-	Expect(pod.GenerateName).To(Equal(fmt.Sprintf("%s-%d-", kafkaCluster.Name, broker.Id)))
+	if kafkaCluster.Spec.KRaftMode && broker.BrokerConfig.IsControllerNode() {
+		Expect(pod.GenerateName).To(Equal(fmt.Sprintf("%s-controller-%d-", kafkaCluster.Name, broker.Id)))
+	} else {
+		Expect(pod.GenerateName).To(Equal(fmt.Sprintf("%s-%d-", kafkaCluster.Name, broker.Id)))
+	}
 	Expect(pod.Labels).To(HaveKeyWithValue(v1beta1.BrokerIdLabelKey, strconv.Itoa(int(broker.Id))))
 	getContainerName := func(c corev1.Container) string { return c.Name }
 	// test exact order, because if the slice reorders, it triggers another reconcile cycle

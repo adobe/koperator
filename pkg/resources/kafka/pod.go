@@ -49,9 +49,15 @@ func (r *Reconciler) pod(id int32, brokerConfig *v1beta1.BrokerConfig, pvcs []co
 	// TODO remove this bash envoy sidecar checker script once sidecar precedence becomes available to Kubernetes(baluchicken)
 	command := []string{"bash", "-c", envoySidecarScript}
 
+	// Updating Controller pod names to say "controller"
+	podname := fmt.Sprintf("%s-%d-", r.KafkaCluster.Name, id)
+	if r.KafkaCluster.Spec.KRaftMode && brokerConfig.IsControllerNode() {
+		podname = fmt.Sprintf("%s-controller-%d-", r.KafkaCluster.Name, id)
+	}
+
 	pod := &corev1.Pod{
 		ObjectMeta: templates.ObjectMetaWithGeneratedNameAndAnnotations(
-			fmt.Sprintf("%s-%d-", r.KafkaCluster.Name, id),
+			podname,
 			brokerConfig.GetBrokerLabels(r.KafkaCluster.Name, id, r.KafkaCluster.Spec.KRaftMode),
 			brokerConfig.GetBrokerAnnotations(),
 			r.KafkaCluster,
