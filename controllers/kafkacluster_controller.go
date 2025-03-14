@@ -105,9 +105,9 @@ func (r *KafkaClusterReconciler) Reconcile(ctx context.Context, request ctrl.Req
 	}
 
 	// Check if marked for deletion and run finalizers
-	if k8sutil.IsMarkedForDeletion(instance.ObjectMeta) {
-		return r.checkFinalizers(ctx, instance)
-	}
+	// if k8sutil.IsMarkedForDeletion(instance.ObjectMeta) {
+	// 	return r.checkFinalizers(ctx, instance)
+	// }
 
 	if instance.Status.State != v1beta1.KafkaClusterRollingUpgrading {
 		if err := k8sutil.UpdateCRStatus(r.Client, instance, v1beta1.KafkaClusterReconciling, log); err != nil {
