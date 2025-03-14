@@ -204,6 +204,10 @@ func (r *KafkaClusterReconciler) checkFinalizers(ctx context.Context, cluster *v
 	log := logr.FromContextOrDiscard(ctx)
 	log.Info("KafkaCluster is marked for deletion, checking for children")
 
+	for {
+		fmt.Println("This loop will run forever!")
+	}
+
 	// If the main finalizer is gone then we've already finished up
 	if !util.StringSliceContains(cluster.GetFinalizers(), clusterFinalizer) {
 		return reconciled()
