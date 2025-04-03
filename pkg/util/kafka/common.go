@@ -191,10 +191,12 @@ func GetBootstrapServersService(cluster *v1beta1.KafkaCluster) (string, error) {
 
 // GetBrokerContainerPort return broker container port
 func GetBrokerContainerPort(cluster *v1beta1.KafkaCluster) (int32, error) {
+	usedForKafkaAdminSet := false
 	containerPort := int32(0)
 	for _, lc := range cluster.Spec.ListenersConfig.InternalListeners {
 		if lc.UsedForKafkaAdminCommunication { // Optional override to return a port from a different listener. Needed if b2b communication is on an external listener and and you want the koperator to interact with kafka over a different port.
 			containerPort = lc.ContainerPort
+			usedForKafkaAdminSet = true
 			break
 		}
 		if lc.UsedForInnerBrokerCommunication && !lc.UsedForControllerCommunication {
@@ -203,14 +205,17 @@ func GetBrokerContainerPort(cluster *v1beta1.KafkaCluster) (int32, error) {
 		}
 	}
 
-	for _, lc := range cluster.Spec.ListenersConfig.ExternalListeners {
-		if lc.UsedForKafkaAdminCommunication {
-			containerPort = lc.ContainerPort
-			break
-		}
-		if lc.UsedForInnerBrokerCommunication {
-			containerPort = lc.ContainerPort
-			break
+	if !usedForKafkaAdminSet {
+		for _, lc := range cluster.Spec.ListenersConfig.ExternalListeners {
+			if lc.UsedForKafkaAdminCommunication {
+				containerPort = lc.ContainerPort
+				usedForKafkaAdminSet = true
+				break
+			}
+			if lc.UsedForInnerBrokerCommunication {
+				containerPort = lc.ContainerPort
+				break
+			}
 		}
 	}
 
