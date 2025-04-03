@@ -209,7 +209,6 @@ func GetBrokerContainerPort(cluster *v1beta1.KafkaCluster) (int32, error) {
 		for _, lc := range cluster.Spec.ListenersConfig.ExternalListeners {
 			if lc.UsedForKafkaAdminCommunication {
 				containerPort = lc.ContainerPort
-				usedForKafkaAdminSet = true
 				break
 			}
 			if lc.UsedForInnerBrokerCommunication {
