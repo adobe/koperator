@@ -23,7 +23,7 @@ operator:
   # When this field is not empty and Cert-manager is used,
   # the Cert-manager's Custom Resource Namespace must be included in the comma separated list.
   # When it is empty, all namespaces will be watched.
-  namespaces: "kafka, cert-manager"
+  namespaces: ""
   verboseLogging: false
   developmentLogging: false
   resources:
