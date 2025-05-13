@@ -277,10 +277,13 @@ func (r *CruiseControlTaskReconciler) Reconcile(ctx context.Context, request ctr
 				return requeueWithError(log, fmt.Sprintf("failed to filter out controller-only nodes from the Kafka cluster, "+
 					"clusterName: %s, clusterNamespace: %s", instance.GetName(), instance.GetNamespace()), err)
 			}
-		}
 
-		if len(filteredBrokerIDs) == 0 {
-			return reconciled()
+			if len(filteredBrokerIDs) > 0 {
+				return reconciled()
+			}
+
+		} else {
+			filteredBrokerIDs = brokerIDs
 		}
 
 		var cruiseControlOpRef corev1.LocalObjectReference
