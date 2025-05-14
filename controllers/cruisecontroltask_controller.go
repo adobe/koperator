@@ -281,7 +281,6 @@ func (r *CruiseControlTaskReconciler) Reconcile(ctx context.Context, request ctr
 			if len(filteredBrokerIDs) > 0 {
 				return reconciled()
 			}
-
 		} else {
 			filteredBrokerIDs = brokerIDs
 		}
