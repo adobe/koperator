@@ -278,7 +278,7 @@ func (r *CruiseControlTaskReconciler) Reconcile(ctx context.Context, request ctr
 					"clusterName: %s, clusterNamespace: %s", instance.GetName(), instance.GetNamespace()), err)
 			}
 
-			if len(filteredBrokerIDs) > 0 {
+			if len(filteredBrokerIDs) == 0 {
 				return reconciled()
 			}
 		} else {
