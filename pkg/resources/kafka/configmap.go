@@ -467,8 +467,6 @@ func getListenerSpecificConfig(l *v1beta1.ListenersConfig, serverPasses map[stri
 		internalListenerSSLConfig map[string]string
 		externalListenerSSLConfig map[string]string
 	)
-	l := kcs.ListenersConfig
-	r := kcs.ReadOnlyConfig
 
 	internalListenerSSLConfig = make(map[string]string)
 	externalListenerSSLConfig = make(map[string]string)
