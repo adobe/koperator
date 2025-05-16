@@ -543,6 +543,15 @@ var _ = Describe("KafkaCluster with two config external listener", func() {
 
 		kafkaCluster = nil
 	})
+	JustAfterEach(func(ctx SpecContext) {
+		// in the tests the CC topic might not get deleted
+
+		By("deleting Kafka cluster object " + kafkaCluster.Name + " in namespace " + namespace)
+		err := k8sClient.Delete(ctx, kafkaCluster)
+		Expect(err).NotTo(HaveOccurred())
+
+		kafkaCluster = nil
+	})
 
 	When("configuring two ingress envoy controller config inside the external listener using both as bindings", func() {
 		BeforeEach(func() {
