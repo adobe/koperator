@@ -226,49 +226,18 @@ var _ = Describe("KafkaCluster", func() {
 
 		defer func() {
 			if r := recover(); r != nil {
-				fmt.Printf("Recovered from panic in JustAfterEach: %v\n", r)
+				fmt.Printf("Recovered from panic in global AfterEach: %v\n", r)
 				debug.PrintStack()
 			}
 		}()
 
-		if kafkaCluster != nil {
-			clusterName := kafkaCluster.Name
-			clusterNamespace := kafkaCluster.Namespace
+		testDesc := CurrentSpecReport()
+		fmt.Printf("Running global cleanup for test: %s\n", testDesc.LeafNodeText)
 
-			By(fmt.Sprintf("deleting Kafka cluster object %s in namespace %s", clusterName, clusterNamespace))
+		SafeKafkaCleanup(ctx, k8sClient, kafkaCluster, kafkaClusterKRaft, namespace)
 
-			err := k8sClient.DeleteAllOf(ctx, &v1beta1.KafkaCluster{},
-				client.InNamespace(clusterNamespace),
-				client.MatchingLabels{v1beta1.KafkaCRLabelKey: clusterName})
-
-			if err != nil {
-				fmt.Printf("Warning: Error deleting KafkaCluster %s/%s: %v\n",
-					clusterNamespace, clusterName, err)
-			}
-
-			kafkaCluster = nil
-		} else {
-			fmt.Println("kafkaCluster already nil in JustAfterEach")
-		}
-
-		if kafkaClusterKRaft != nil {
-			clusterName := kafkaClusterKRaft.Name
-			clusterNamespace := kafkaClusterKRaft.Namespace
-
-			By(fmt.Sprintf("deleting Kafka cluster object under KRaft mode %s in namespace %s",
-				clusterName, clusterNamespace))
-
-			err := k8sClient.DeleteAllOf(ctx, &v1beta1.KafkaCluster{},
-				client.InNamespace(clusterNamespace),
-				client.MatchingLabels{v1beta1.KafkaCRLabelKey: clusterName})
-
-			if err != nil {
-				fmt.Printf("Warning: Error deleting KRaft KafkaCluster %s/%s: %v\n",
-					clusterNamespace, clusterName, err)
-			}
-
-			kafkaClusterKRaft = nil
-		}
+		kafkaCluster = nil
+		kafkaClusterKRaft = nil
 
 	})
 	When("using default configuration", func() {
@@ -577,30 +546,18 @@ var _ = Describe("KafkaCluster with two config external listener", func() {
 		// in the tests the CC topic might not get deleted
 		defer func() {
 			if r := recover(); r != nil {
-				fmt.Printf("Recovered from panic in JustAfterEach: %v\n", r)
+				fmt.Printf("Recovered from panic in global AfterEach: %v\n", r)
 				debug.PrintStack()
 			}
 		}()
 
-		if kafkaCluster != nil {
-			clusterName := kafkaCluster.Name
-			clusterNamespace := kafkaCluster.Namespace
+		testDesc := CurrentSpecReport()
+		fmt.Printf("Running global cleanup for test: %s\n", testDesc.LeafNodeText)
 
-			By(fmt.Sprintf("deleting Kafka cluster object %s in namespace %s", clusterName, clusterNamespace))
+		SafeKafkaCleanup(ctx, k8sClient, kafkaCluster, kafkaClusterKRaft, namespace)
 
-			err := k8sClient.DeleteAllOf(ctx, &v1beta1.KafkaCluster{},
-				client.InNamespace(clusterNamespace),
-				client.MatchingLabels{v1beta1.KafkaCRLabelKey: clusterName})
-
-			if err != nil {
-				fmt.Printf("Warning: Error deleting KafkaCluster %s/%s: %v\n",
-					clusterNamespace, clusterName, err)
-			}
-
-			kafkaCluster = nil
-		} else {
-			fmt.Println("kafkaCluster already nil in JustAfterEach")
-		}
+		kafkaCluster = nil
+		kafkaClusterKRaft = nil
 	})
 
 	When("configuring two ingress envoy controller config inside the external listener using both as bindings", func() {
@@ -690,30 +647,17 @@ var _ = Describe("KafkaCluster with two config external listener and tls", func(
 
 		defer func() {
 			if r := recover(); r != nil {
-				fmt.Printf("Recovered from panic in JustAfterEach: %v\n", r)
+				fmt.Printf("Recovered from panic in global AfterEach: %v\n", r)
 				debug.PrintStack()
 			}
 		}()
 
-		if kafkaCluster != nil {
-			clusterName := kafkaCluster.Name
-			clusterNamespace := kafkaCluster.Namespace
+		testDesc := CurrentSpecReport()
+		fmt.Printf("Running global cleanup for test: %s\n", testDesc.LeafNodeText)
 
-			By(fmt.Sprintf("deleting Kafka cluster object %s in namespace %s", clusterName, clusterNamespace))
+		SafeKafkaCleanup(ctx, k8sClient, kafkaCluster, nil, namespace)
 
-			err := k8sClient.DeleteAllOf(ctx, &v1beta1.KafkaCluster{},
-				client.InNamespace(clusterNamespace),
-				client.MatchingLabels{v1beta1.KafkaCRLabelKey: clusterName})
-
-			if err != nil {
-				fmt.Printf("Warning: Error deleting KafkaCluster %s/%s: %v\n",
-					clusterNamespace, clusterName, err)
-			}
-
-			kafkaCluster = nil
-		} else {
-			fmt.Println("kafkaCluster already nil in JustAfterEach")
-		}
+		kafkaCluster = nil
 	})
 	When("configuring two ingress envoy controller config inside the external listener using both as bindings", func() {
 		BeforeEach(func() {
@@ -776,4 +720,61 @@ func createMinimalKRaftBrokers() []v1beta1.Broker {
 			},
 			BrokerConfigGroup: defaultBrokerConfigGroup},
 	}
+}
+
+func SafeKafkaCleanup(ctx context.Context, kClient client.Client, cluster *v1beta1.KafkaCluster, kraftCluster *v1beta1.KafkaCluster, ns string) {
+	fmt.Println("Starting safe Kafka cleanup")
+
+	if cluster != nil {
+		clusterName := cluster.Name
+		clusterNamespace := cluster.Namespace
+
+		fmt.Printf("Safely deleting Kafka cluster %s/%s\n", clusterNamespace, clusterName)
+
+		err := kClient.DeleteAllOf(ctx, &v1beta1.KafkaCluster{},
+			client.InNamespace(clusterNamespace),
+			client.MatchingLabels{v1beta1.KafkaCRLabelKey: clusterName})
+
+		if err != nil {
+			fmt.Printf("Warning: Error deleting KafkaCluster %s/%s: %v\n",
+				clusterNamespace, clusterName, err)
+		}
+	} else {
+		fmt.Println("Standard Kafka cluster already nil")
+	}
+
+	if kraftCluster != nil {
+		clusterName := kraftCluster.Name
+		clusterNamespace := kraftCluster.Namespace
+
+		fmt.Printf("Safely deleting KRaft cluster %s/%s\n", clusterNamespace, clusterName)
+
+		err := kClient.DeleteAllOf(ctx, &v1beta1.KafkaCluster{},
+			client.InNamespace(clusterNamespace),
+			client.MatchingLabels{v1beta1.KafkaCRLabelKey: clusterName})
+
+		if err != nil {
+			fmt.Printf("Warning: Error deleting KRaft KafkaCluster %s/%s: %v\n",
+				clusterNamespace, clusterName, err)
+		}
+	} else {
+		fmt.Println("KRaft cluster already nil")
+	}
+
+	if ns != "" {
+		fmt.Printf("Cleaning up services in namespace %s\n", ns)
+
+		svcList := &corev1.ServiceList{}
+		if err := kClient.List(ctx, svcList, client.InNamespace(ns)); err == nil {
+			for i := range svcList.Items {
+				svc := &svcList.Items[i]
+				fmt.Printf("Deleting service %s/%s\n", ns, svc.Name)
+				_ = kClient.Delete(ctx, svc)
+			}
+		} else {
+			fmt.Printf("Warning: Error listing services in namespace %s: %v\n", ns, err)
+		}
+	}
+
+	fmt.Println("Finished safe Kafka cleanup")
 }
