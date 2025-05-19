@@ -221,16 +221,22 @@ var _ = Describe("KafkaCluster", func() {
 
 	JustAfterEach(func(ctx SpecContext) {
 		// in the tests the CC topic might not get deleted
-
-		By("deleting Kafka cluster object " + kafkaCluster.Name + " in namespace " + namespace)
-		err := k8sClient.Delete(ctx, kafkaCluster)
-		Expect(err).NotTo(HaveOccurred())
-
-		By("deleting Kafka cluster object under KRaft mode " + kafkaClusterKRaft.Name + " in namespace " + kafkaClusterKRaft.Namespace)
-		err = k8sClient.Delete(ctx, kafkaClusterKRaft)
-		Expect(err).NotTo(HaveOccurred())
-
-		kafkaCluster = nil
+		if kafkaCluster != nil {
+			By("deleting Kafka cluster object " + kafkaCluster.Name + " in namespace " + namespace)
+			err := k8sClient.Delete(ctx, kafkaCluster)
+			Expect(err).NotTo(HaveOccurred())
+			kafkaCluster = nil
+		} else {
+			fmt.Println("kafkaCluster already nil in JustAfterEach 1")
+		}
+		if kafkaClusterKRaft != nil {
+			By("deleting Kafka cluster object under KRaft mode " + kafkaClusterKRaft.Name + " in namespace " + kafkaClusterKRaft.Namespace)
+			err := k8sClient.Delete(ctx, kafkaClusterKRaft)
+			Expect(err).NotTo(HaveOccurred())
+			kafkaClusterKRaft = nil
+		} else {
+			fmt.Println("kafkaClusterKraft already nil in JustAfterEach 1")
+		}
 	})
 	When("using default configuration", func() {
 		BeforeEach(func() {
@@ -536,12 +542,15 @@ var _ = Describe("KafkaCluster with two config external listener", func() {
 	})
 	JustAfterEach(func(ctx SpecContext) {
 		// in the tests the CC topic might not get deleted
+		if kafkaCluster != nil {
+			By("deleting Kafka cluster object " + kafkaCluster.Name + " in namespace " + namespace)
+			err := k8sClient.Delete(ctx, kafkaCluster)
+			Expect(err).NotTo(HaveOccurred())
 
-		By("deleting Kafka cluster object " + kafkaCluster.Name + " in namespace " + namespace)
-		err := k8sClient.Delete(ctx, kafkaCluster)
-		Expect(err).NotTo(HaveOccurred())
-
-		kafkaCluster = nil
+			kafkaCluster = nil
+		} else {
+			fmt.Println("kafkaCluster already nil in JustAfterEach")
+		}
 	})
 
 	When("configuring two ingress envoy controller config inside the external listener using both as bindings", func() {
@@ -629,11 +638,16 @@ var _ = Describe("KafkaCluster with two config external listener and tls", func(
 	JustAfterEach(func(ctx SpecContext) {
 		// in the tests the CC topic might not get deleted
 
-		By("deleting Kafka cluster object " + kafkaCluster.Name + " in namespace " + namespace)
-		err := k8sClient.Delete(ctx, kafkaCluster)
-		Expect(err).NotTo(HaveOccurred())
+		if kafkaCluster != nil {
+			By("deleting Kafka cluster object " + kafkaCluster.Name + " in namespace " + namespace)
+			err := k8sClient.Delete(ctx, kafkaCluster)
+			Expect(err).NotTo(HaveOccurred())
 
-		kafkaCluster = nil
+			kafkaCluster = nil
+		} else {
+			fmt.Println("kafkaCluster already nil in JustAfterEach")
+		}
+		//cleanupNamespaceResources(k8sClient, namespace, 60*time.Second)
 	})
 	When("configuring two ingress envoy controller config inside the external listener using both as bindings", func() {
 		BeforeEach(func() {
