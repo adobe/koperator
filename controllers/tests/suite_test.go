@@ -32,13 +32,16 @@ package tests
 import (
 	"context"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	corev1 "k8s.io/api/core/v1"
 	apiv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -193,7 +196,7 @@ var _ = BeforeSuite(func(ctx SpecContext) {
 		DirectClient: mgr.GetAPIReader(),
 		Scheme:       mgr.GetScheme(),
 		ScaleFactory: func(ctx context.Context, kafkaCluster *v1beta1.KafkaCluster) (scale.CruiseControlScaler, error) {
-			return nil, errors.New("there is no scale mock")
+			return nil, errors.New("there is no scale mock KafkaCluster Reconciler")
 		},
 	}
 
@@ -205,7 +208,7 @@ var _ = BeforeSuite(func(ctx SpecContext) {
 		DirectClient: mgr.GetAPIReader(),
 		Scheme:       mgr.GetScheme(),
 		ScaleFactory: func(ctx context.Context, kafkaCluster *v1beta1.KafkaCluster) (scale.CruiseControlScaler, error) {
-			return nil, errors.New("there is no scale mock")
+			return nil, errors.New("there is no scale mock CCOperation Reconciler")
 		},
 	}
 
@@ -250,34 +253,34 @@ var _ = BeforeSuite(func(ctx SpecContext) {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(crd.Spec.Names.Kind).To(Equal("KafkaUser"))
 
-	// svcList := &corev1.ServiceList{}
-	// err = k8sClient.List(context.Background(), svcList)
-	// if err == nil {
-	// 	beforeCount := len(svcList.Items)
-	// 	fmt.Printf("[DIAG] Before test: Found %d services cluster-wide\n", beforeCount)
-	// }
+	svcList := &corev1.ServiceList{}
+	err = k8sClient.List(context.Background(), svcList)
+	if err == nil {
+		beforeCount := len(svcList.Items)
+		fmt.Printf("[DIAG] Before test: Found %d services cluster-wide\n", beforeCount)
+	}
 
 })
 
-// var _ = ginkgo.AfterEach(func() {
-// 	svcList := &corev1.ServiceList{}
-// 	err := k8sClient.List(context.Background(), svcList)
-// 	if err == nil {
-// 		afterCount := len(svcList.Items)
-// 		fmt.Printf("[DIAG] After test: Found %d services cluster-wide\n", afterCount)
+var _ = ginkgo.AfterEach(func() {
+	svcList := &corev1.ServiceList{}
+	err := k8sClient.List(context.Background(), svcList)
+	if err == nil {
+		afterCount := len(svcList.Items)
+		fmt.Printf("[DIAG] After test: Found %d services cluster-wide\n", afterCount)
 
-// 		for _, svc := range svcList.Items {
-// 			if svc.Spec.Type == corev1.ServiceTypeClusterIP && svc.Spec.ClusterIP != "" && svc.Spec.ClusterIP != "None" {
-// 				fmt.Printf("[DIAG] Service %s/%s is using ClusterIP: %s\n",
-// 					svc.Namespace, svc.Name, svc.Spec.ClusterIP)
+		for _, svc := range svcList.Items {
+			if svc.Spec.Type == corev1.ServiceTypeClusterIP && svc.Spec.ClusterIP != "" && svc.Spec.ClusterIP != "None" {
+				fmt.Printf("[DIAG] Service %s/%s is using ClusterIP: %s\n",
+					svc.Namespace, svc.Name, svc.Spec.ClusterIP)
 
-// 				if len(svc.Finalizers) > 0 {
-// 					fmt.Printf("[DIAG]   Has finalizers: %v\n", svc.Finalizers)
-// 				}
-// 			}
-// 		}
-// 	}
-// })
+				if len(svc.Finalizers) > 0 {
+					fmt.Printf("[DIAG]   Has finalizers: %v\n", svc.Finalizers)
+				}
+			}
+		}
+	}
+})
 
 var _ = AfterSuite(func() {
 	By("tearing down the test environment")
