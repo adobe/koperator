@@ -250,34 +250,7 @@ var _ = BeforeSuite(func(ctx SpecContext) {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(crd.Spec.Names.Kind).To(Equal("KafkaUser"))
 
-	// svcList := &corev1.ServiceList{}
-	// err = k8sClient.List(context.Background(), svcList)
-	// if err == nil {
-	// 	beforeCount := len(svcList.Items)
-	// 	fmt.Printf("[DIAG] Before test: Found %d services cluster-wide\n", beforeCount)
-	// }
-
 })
-
-// var _ = ginkgo.AfterEach(func() {
-// 	svcList := &corev1.ServiceList{}
-// 	err := k8sClient.List(context.Background(), svcList)
-// 	if err == nil {
-// 		afterCount := len(svcList.Items)
-// 		fmt.Printf("[DIAG] After test: Found %d services cluster-wide\n", afterCount)
-
-// 		for _, svc := range svcList.Items {
-// 			if svc.Spec.Type == corev1.ServiceTypeClusterIP && svc.Spec.ClusterIP != "" && svc.Spec.ClusterIP != "None" {
-// 				fmt.Printf("[DIAG] Service %s/%s is using ClusterIP: %s\n",
-// 					svc.Namespace, svc.Name, svc.Spec.ClusterIP)
-
-// 				if len(svc.Finalizers) > 0 {
-// 					fmt.Printf("[DIAG]   Has finalizers: %v\n", svc.Finalizers)
-// 				}
-// 			}
-// 		}
-// 	}
-// })
 
 var _ = AfterSuite(func() {
 	By("tearing down the test environment")
