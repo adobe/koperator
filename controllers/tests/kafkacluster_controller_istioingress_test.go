@@ -481,6 +481,8 @@ var _ = Describe("KafkaClusterIstioIngressControllerWithBrokerIdBindings", func(
 		err := k8sClient.Delete(ctx, kafkaCluster)
 		Expect(err).NotTo(HaveOccurred())
 		kafkaCluster = nil
+		//cleanupNamespaceResources(k8sClient, namespace, 60*time.Second)
+		//cleanupNamespaceResources(k8sClient, namespace, 60*time.Second)
 	})
 
 	When("Istio ingress controller is configured", func() {

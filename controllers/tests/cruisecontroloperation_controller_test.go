@@ -74,8 +74,6 @@ var _ = Describe("CruiseControlTaskReconciler", func() {
 		cruiseControlOperationReconciler.ScaleFactory = func(ctx context.Context, kafkaCluster *v1beta1.KafkaCluster) (scale.CruiseControlScaler, error) {
 			return nil, errors.New("there is no scale mock CC test")
 		}
-
-		//cleanupNamespaceResources(k8sClient, namespace, 60*time.Second)
 	})
 	When("there is an add_broker operation for execution", Serial, func() {
 		JustBeforeEach(func(ctx SpecContext) {

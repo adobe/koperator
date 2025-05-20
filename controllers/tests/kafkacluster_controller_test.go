@@ -17,13 +17,11 @@ package tests
 import (
 	"context"
 	"fmt"
-	"runtime/debug"
 	"sync/atomic"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -223,17 +221,6 @@ var _ = Describe("KafkaCluster", func() {
 
 	JustAfterEach(func(ctx SpecContext) {
 		// in the tests the CC topic might not get deleted
-
-		defer func() {
-			if r := recover(); r != nil {
-				fmt.Printf("Recovered from panic in global AfterEach: %v\n", r)
-				debug.PrintStack()
-			}
-		}()
-
-		testDesc := CurrentSpecReport()
-		fmt.Printf("Running global cleanup for test: %s\n", testDesc.LeafNodeText)
-
 		SafeKafkaCleanup(ctx, k8sClient, kafkaCluster, kafkaClusterKRaft, namespace)
 
 		kafkaCluster = nil
@@ -543,16 +530,6 @@ var _ = Describe("KafkaCluster with two config external listener", func() {
 		waitForClusterRunningState(ctx, kafkaClusterKRaft, namespace)
 	})
 	JustAfterEach(func(ctx SpecContext) {
-		// in the tests the CC topic might not get deleted
-		defer func() {
-			if r := recover(); r != nil {
-				fmt.Printf("Recovered from panic in global AfterEach: %v\n", r)
-				debug.PrintStack()
-			}
-		}()
-
-		testDesc := CurrentSpecReport()
-		fmt.Printf("Running global cleanup for test: %s\n", testDesc.LeafNodeText)
 
 		SafeKafkaCleanup(ctx, k8sClient, kafkaCluster, kafkaClusterKRaft, namespace)
 
@@ -643,17 +620,6 @@ var _ = Describe("KafkaCluster with two config external listener and tls", func(
 		waitForClusterRunningState(ctx, kafkaCluster, namespace)
 	})
 	JustAfterEach(func(ctx SpecContext) {
-		// in the tests the CC topic might not get deleted
-
-		defer func() {
-			if r := recover(); r != nil {
-				fmt.Printf("Recovered from panic in global AfterEach: %v\n", r)
-				debug.PrintStack()
-			}
-		}()
-
-		testDesc := CurrentSpecReport()
-		fmt.Printf("Running global cleanup for test: %s\n", testDesc.LeafNodeText)
 
 		SafeKafkaCleanup(ctx, k8sClient, kafkaCluster, nil, namespace)
 
@@ -720,61 +686,4 @@ func createMinimalKRaftBrokers() []v1beta1.Broker {
 			},
 			BrokerConfigGroup: defaultBrokerConfigGroup},
 	}
-}
-
-func SafeKafkaCleanup(ctx context.Context, kClient client.Client, cluster *v1beta1.KafkaCluster, kraftCluster *v1beta1.KafkaCluster, ns string) {
-	fmt.Println("Starting safe Kafka cleanup")
-
-	if cluster != nil {
-		clusterName := cluster.Name
-		clusterNamespace := cluster.Namespace
-
-		fmt.Printf("Safely deleting Kafka cluster %s/%s\n", clusterNamespace, clusterName)
-
-		err := kClient.DeleteAllOf(ctx, &v1beta1.KafkaCluster{},
-			client.InNamespace(clusterNamespace),
-			client.MatchingLabels{v1beta1.KafkaCRLabelKey: clusterName})
-
-		if err != nil {
-			fmt.Printf("Warning: Error deleting KafkaCluster %s/%s: %v\n",
-				clusterNamespace, clusterName, err)
-		}
-	} else {
-		fmt.Println("Standard Kafka cluster already nil")
-	}
-
-	if kraftCluster != nil {
-		clusterName := kraftCluster.Name
-		clusterNamespace := kraftCluster.Namespace
-
-		fmt.Printf("Safely deleting KRaft cluster %s/%s\n", clusterNamespace, clusterName)
-
-		err := kClient.DeleteAllOf(ctx, &v1beta1.KafkaCluster{},
-			client.InNamespace(clusterNamespace),
-			client.MatchingLabels{v1beta1.KafkaCRLabelKey: clusterName})
-
-		if err != nil {
-			fmt.Printf("Warning: Error deleting KRaft KafkaCluster %s/%s: %v\n",
-				clusterNamespace, clusterName, err)
-		}
-	} else {
-		fmt.Println("KRaft cluster already nil")
-	}
-
-	if ns != "" {
-		fmt.Printf("Cleaning up services in namespace %s\n", ns)
-
-		svcList := &corev1.ServiceList{}
-		if err := kClient.List(ctx, svcList, client.InNamespace(ns)); err == nil {
-			for i := range svcList.Items {
-				svc := &svcList.Items[i]
-				fmt.Printf("Deleting service %s/%s\n", ns, svc.Name)
-				_ = kClient.Delete(ctx, svc)
-			}
-		} else {
-			fmt.Printf("Warning: Error listing services in namespace %s: %v\n", ns, err)
-		}
-	}
-
-	fmt.Println("Finished safe Kafka cleanup")
 }
