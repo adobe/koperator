@@ -93,9 +93,9 @@ func SafeKafkaCleanup(ctx context.Context, kClient client.Client, cluster *v1bet
 				if len(svc.Finalizers) > 0 {
 					patchedSvc := svc.DeepCopy()
 					patchedSvc.Finalizers = nil
-					kClient.Patch(ctx, patchedSvc, client.MergeFrom(svc))
+					err = kClient.Patch(ctx, patchedSvc, client.MergeFrom(svc)) //TODO Handle Error
 				}
-				kClient.Delete(ctx, svc, &client.DeleteOptions{
+				err = kClient.Delete(ctx, svc, &client.DeleteOptions{ //TODO Handle error
 					GracePeriodSeconds: ptr.To[int64](0),
 				})
 			}
