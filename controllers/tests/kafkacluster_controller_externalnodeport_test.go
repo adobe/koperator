@@ -86,6 +86,7 @@ var _ = Describe("KafkaClusterNodeportExternalAccess", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		waitForClusterRunningState(ctx, kafkaCluster, namespace)
+
 	})
 
 	JustAfterEach(func(ctx SpecContext) {
@@ -98,7 +99,12 @@ var _ = Describe("KafkaClusterNodeportExternalAccess", func() {
 	})
 
 	When("NodePortExternalIP is configured", func() {
+		var allocatedNodePorts []int32
+		var safePort int32
 		BeforeEach(func() {
+			allocatedNodePorts = nil
+			safePort = GetNodePort()
+			allocatedNodePorts = append(allocatedNodePorts, safePort)
 			// update the external listener config with a nodeport listener
 			kafkaCluster.Spec.ListenersConfig.ExternalListeners = []v1beta1.ExternalListenerConfig{
 				{
@@ -107,7 +113,7 @@ var _ = Describe("KafkaClusterNodeportExternalAccess", func() {
 						ContainerPort: 9733,
 						Type:          "plaintext",
 					},
-					ExternalStartingPort: 31123,
+					ExternalStartingPort: safePort,
 					AccessMethod:         corev1.ServiceTypeNodePort,
 				},
 			}
@@ -147,6 +153,14 @@ var _ = Describe("KafkaClusterNodeportExternalAccess", func() {
 			}
 		})
 
+		AfterEach(func() {
+			// Release the port
+			for _, port := range allocatedNodePorts {
+				ReleaseNodePort(port)
+			}
+			allocatedNodePorts = nil
+		})
+
 		It("reconciles the service successfully", func(ctx SpecContext) {
 			var svc corev1.Service
 			svcName := fmt.Sprintf("%s-0-test", kafkaClusterCRName)
@@ -179,7 +193,7 @@ var _ = Describe("KafkaClusterNodeportExternalAccess", func() {
 				Protocol:   corev1.ProtocolTCP,
 				Port:       9733,
 				TargetPort: intstr.FromInt(9733),
-				NodePort:   31123,
+				NodePort:   safePort,
 			}))
 
 			// check status
