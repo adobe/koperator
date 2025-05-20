@@ -548,30 +548,30 @@ var _ = Describe("KafkaCluster with two config external listener", func() {
 
 		// SafeKafkaCleanup(ctx, k8sClient, kafkaCluster, kafkaClusterKRaft, namespace)
 
-		By("deleting Kafka cluster object " + kafkaCluster.Name + " in namespace " + namespace)
+		// By("deleting Kafka cluster object " + kafkaCluster.Name + " in namespace " + namespace)
 
-		if kafkaCluster != nil {
-			By("deleting Kafka cluster object " + kafkaCluster.Name + " in namespace " + namespace)
-			fmt.Printf("Context before delete: %v\n", ctx)
-			fmt.Printf("kafkacluster: %v\n", kafkaCluster)
+		// if kafkaCluster != nil {
+		// 	By("deleting Kafka cluster object " + kafkaCluster.Name + " in namespace " + namespace)
+		// 	fmt.Printf("Context before delete: %v\n", ctx)
+		// 	fmt.Printf("kafkacluster: %v\n", kafkaCluster)
 
-			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						fmt.Printf("Recovered from panic during kafkaCluster deletion: %v\n", r)
-					}
-				}()
+		// 	func() {
+		// 		defer func() {
+		// 			if r := recover(); r != nil {
+		// 				fmt.Printf("Recovered from panic during kafkaCluster deletion: %v\n", r)
+		// 			}
+		// 		}()
 
-				err := k8sClient.Delete(ctx, kafkaCluster)
-				if err != nil {
-					fmt.Printf("Error deleting kafkaCluster: %v\n", err)
-				}
-			}()
-		} else {
-			fmt.Printf("kafkacluster Already Nil!\n")
-		}
+		// 		err := k8sClient.Delete(ctx, kafkaCluster)
+		// 		if err != nil {
+		// 			fmt.Printf("Error deleting kafkaCluster: %v\n", err)
+		// 		}
+		// 	}()
+		// } else {
+		// 	fmt.Printf("kafkacluster Already Nil!\n")
+		// }
 
-		kafkaCluster = nil
+		// kafkaCluster = nil
 	})
 
 	When("configuring two ingress envoy controller config inside the external listener using both as bindings", func() {
@@ -598,6 +598,8 @@ var _ = Describe("KafkaCluster with two config external listener", func() {
 
 			expectEnvoyWithConfigAz1(ctx, kafkaClusterKRaft)
 			expectEnvoyWithConfigAz2KRaft(ctx, kafkaClusterKRaft)
+			fmt.Printf("kafkaclusterKRaft before brokerConfigmap check: %v\n", kafkaClusterKRaft)
+			fmt.Printf("count before brokerConfigmap check: %v\n", count)
 			expectBrokerConfigmapForAz1ExternalListener(ctx, kafkaClusterKRaft, count)
 			expectBrokerConfigmapForAz2ExternalListener(ctx, kafkaClusterKRaft, count)
 		})
