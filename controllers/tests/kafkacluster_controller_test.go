@@ -551,8 +551,8 @@ var _ = Describe("KafkaCluster with two config external listener", func() {
 		By("deleting Kafka cluster object " + kafkaCluster.Name + " in namespace " + namespace)
 
 		if kafkaCluster != nil {
-			fmt.Printf(" Context before delete: ", ctx)
-			fmt.Printf(" kafkacluster: ", kafkaCluster)
+			fmt.Printf("Context before delete: %v\n", ctx)
+			fmt.Printf("kafkacluster: %v\n", kafkaCluster)
 			err := k8sClient.Delete(ctx, kafkaCluster)
 			Expect(err).NotTo(HaveOccurred())
 		} else {
