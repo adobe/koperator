@@ -222,7 +222,15 @@ var _ = Describe("KafkaCluster", func() {
 
 	JustAfterEach(func(ctx SpecContext) {
 		// in the tests the CC topic might not get deleted
-		SafeKafkaCleanup(ctx, k8sClient, kafkaCluster, kafkaClusterKRaft, namespace)
+		// SafeKafkaCleanup(ctx, k8sClient, kafkaCluster, kafkaClusterKRaft, namespace)
+
+		By("deleting Kafka cluster object " + kafkaCluster.Name + " in namespace " + namespace)
+		err := k8sClient.Delete(ctx, kafkaCluster)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("deleting Kafka cluster object under KRaft mode " + kafkaClusterKRaft.Name + " in namespace " + kafkaClusterKRaft.Namespace)
+		err = k8sClient.Delete(ctx, kafkaClusterKRaft)
+		Expect(err).NotTo(HaveOccurred())
 
 		kafkaCluster = nil
 		kafkaClusterKRaft = nil
@@ -538,7 +546,11 @@ var _ = Describe("KafkaCluster with two config external listener", func() {
 			}
 		}()
 
-		SafeKafkaCleanup(ctx, k8sClient, kafkaCluster, kafkaClusterKRaft, namespace)
+		// SafeKafkaCleanup(ctx, k8sClient, kafkaCluster, kafkaClusterKRaft, namespace)
+
+		By("deleting Kafka cluster object " + kafkaCluster.Name + " in namespace " + namespace)
+		err := k8sClient.Delete(ctx, kafkaCluster)
+		Expect(err).NotTo(HaveOccurred())
 
 		kafkaCluster = nil
 		kafkaClusterKRaft = nil
@@ -634,7 +646,10 @@ var _ = Describe("KafkaCluster with two config external listener and tls", func(
 	})
 	JustAfterEach(func(ctx SpecContext) {
 
-		SafeKafkaCleanup(ctx, k8sClient, kafkaCluster, nil, namespace)
+		// SafeKafkaCleanup(ctx, k8sClient, kafkaCluster, nil, namespace)
+		By("deleting Kafka cluster object " + kafkaCluster.Name + " in namespace " + namespace)
+		err := k8sClient.Delete(ctx, kafkaCluster)
+		Expect(err).NotTo(HaveOccurred())
 
 		kafkaCluster = nil
 	})
