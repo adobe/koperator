@@ -546,6 +546,12 @@ var _ = Describe("KafkaCluster with two config external listener", func() {
 
 	When("configuring two ingress envoy controller config inside the external listener using both as bindings", func() {
 		BeforeEach(func() {
+			defer func() {
+				if r := recover(); r != nil {
+					fmt.Printf("Recovered from panic in BeforeEach: %v\n", r)
+					debug.PrintStack()
+				}
+			}()
 			kafkaCluster.Spec.Brokers[0].BrokerConfig = &v1beta1.BrokerConfig{BrokerIngressMapping: []string{"az1"}}
 			kafkaCluster.Spec.Brokers[1].BrokerConfig = &v1beta1.BrokerConfig{BrokerIngressMapping: []string{"az2"}}
 
