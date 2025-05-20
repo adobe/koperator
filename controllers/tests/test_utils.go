@@ -1,3 +1,31 @@
+// Copyright © 2020 Cisco Systems, Inc. and/or its affiliates
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+/*
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+	http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package tests
 
 import (
@@ -83,9 +111,7 @@ func GetNodePort() int32 {
 	nodePortMutex.Lock()
 	defer nodePortMutex.Unlock()
 
-	startPort := int32(30000 + (len(nodePorts)*17)%2000)
-
-	for port := startPort; port < 32767; port++ {
+	for port := int32(30000); port < 32767; port++ {
 		if !nodePorts[port] {
 			nodePorts[port] = true
 			fmt.Printf("Allocated NodePort %d\n", port)
@@ -102,6 +128,7 @@ func ReleaseNodePort(port int32) {
 	defer nodePortMutex.Unlock()
 
 	delete(nodePorts, port)
+	fmt.Printf("Released NodePort %d\n", port)
 }
 
 var _ = ginkgo.AfterEach(func() {
