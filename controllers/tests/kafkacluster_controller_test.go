@@ -555,12 +555,21 @@ var _ = Describe("KafkaCluster with two config external listener", func() {
 			fmt.Printf("kafkacluster: %v\n", kafkaCluster)
 			err := k8sClient.Delete(ctx, kafkaCluster)
 			Expect(err).NotTo(HaveOccurred())
+			kafkaCluster = nil
 		} else {
 			fmt.Printf(" kafkacluster Already Nil!")
 		}
 
-		kafkaCluster = nil
-		kafkaClusterKRaft = nil
+		if kafkaClusterKRaft != nil {
+			By("deleting Kafka cluster object under KRaft mode " + kafkaClusterKRaft.Name + " in namespace " + kafkaClusterKRaft.Namespace)
+			fmt.Printf("kafkaclusterKRaft: %v\n", kafkaClusterKRaft)
+			err := k8sClient.Delete(ctx, kafkaClusterKRaft)
+			Expect(err).NotTo(HaveOccurred())
+
+			kafkaClusterKRaft = nil
+		} else {
+			fmt.Printf("kafkaclusterKRaft Already Nil!\n")
+		}
 	})
 
 	When("configuring two ingress envoy controller config inside the external listener using both as bindings", func() {
@@ -574,6 +583,7 @@ var _ = Describe("KafkaCluster with two config external listener", func() {
 			kafkaCluster.Spec.Brokers[0].BrokerConfig = &v1beta1.BrokerConfig{BrokerIngressMapping: []string{"az1"}}
 			kafkaCluster.Spec.Brokers[1].BrokerConfig = &v1beta1.BrokerConfig{BrokerIngressMapping: []string{"az2"}}
 
+			fmt.Printf("kafkaclusterKRaft before accessing brokers: %v\n", kafkaClusterKRaft)
 			/* same tests for KafkaCluster in KRaft mode */
 			kafkaClusterKRaft.Spec.Brokers[0].BrokerConfig.BrokerIngressMapping = []string{"az1"}
 			kafkaClusterKRaft.Spec.Brokers[1].BrokerConfig.BrokerIngressMapping = []string{"az2"}
