@@ -571,28 +571,7 @@ var _ = Describe("KafkaCluster with two config external listener", func() {
 			fmt.Printf("kafkacluster Already Nil!\n")
 		}
 
-		if kafkaClusterKRaft != nil {
-			By("deleting Kafka cluster object under KRaft mode " + kafkaClusterKRaft.Name + " in namespace " + kafkaClusterKRaft.Namespace)
-			fmt.Printf("kafkaclusterKRaft: %v\n", kafkaClusterKRaft)
-
-			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						fmt.Printf("Recovered from panic during kafkaClusterKRaft deletion: %v\n", r)
-					}
-				}()
-
-				err := k8sClient.Delete(ctx, kafkaClusterKRaft)
-				if err != nil {
-					fmt.Printf("Error deleting kafkaClusterKRaft: %v\n", err)
-				}
-			}()
-		} else {
-			fmt.Printf("kafkaclusterKRaft Already Nil!\n")
-		}
-
 		kafkaCluster = nil
-		kafkaClusterKRaft = nil
 	})
 
 	When("configuring two ingress envoy controller config inside the external listener using both as bindings", func() {
