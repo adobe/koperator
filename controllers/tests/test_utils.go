@@ -50,6 +50,13 @@ var (
 func SafeKafkaCleanup(ctx context.Context, kClient client.Client, cluster *v1beta1.KafkaCluster, kraftCluster *v1beta1.KafkaCluster, ns string) {
 	fmt.Println("Starting safe Kafka cleanup")
 
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Printf("Recovered from panic in SafeKafkaCleanup: %v\n", r)
+			debug.PrintStack()
+		}
+	}()
+
 	if cluster != nil {
 		clusterName := cluster.Name
 		clusterNamespace := cluster.Namespace

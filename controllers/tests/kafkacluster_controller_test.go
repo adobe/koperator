@@ -17,6 +17,7 @@ package tests
 import (
 	"context"
 	"fmt"
+	"runtime/debug"
 	"sync/atomic"
 	"time"
 
@@ -530,6 +531,12 @@ var _ = Describe("KafkaCluster with two config external listener", func() {
 		waitForClusterRunningState(ctx, kafkaClusterKRaft, namespace)
 	})
 	JustAfterEach(func(ctx SpecContext) {
+		defer func() {
+			if r := recover(); r != nil {
+				fmt.Printf("Recovered from panic in JustAfterEach: %v\n", r)
+				debug.PrintStack()
+			}
+		}()
 
 		SafeKafkaCleanup(ctx, k8sClient, kafkaCluster, kafkaClusterKRaft, namespace)
 
