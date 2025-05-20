@@ -74,7 +74,6 @@ var _ = Describe("KafkaTopic", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		kafkaCluster = nil
-		//cleanupNamespaceResources(k8sClient, namespace, 60*time.Second)
 	})
 
 	When("the topic does not exist", func() {

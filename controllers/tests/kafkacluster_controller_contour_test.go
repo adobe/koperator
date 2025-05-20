@@ -97,7 +97,6 @@ var _ = Describe("KafkaClusterWithContourIngressController", Label("contour"), f
 		By("deleting Kafka cluster object " + kafkaCluster.Name + " in namespace " + namespace)
 		err := k8sClient.Delete(ctx, kafkaCluster)
 		Expect(err).NotTo(HaveOccurred())
-		//cleanupNamespaceResources(k8sClient, namespace, 60*time.Second)
 
 		kafkaCluster = nil
 	})
