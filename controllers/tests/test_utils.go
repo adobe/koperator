@@ -34,7 +34,6 @@ import (
 	"runtime/debug"
 	"sync"
 
-	"github.com/onsi/ginkgo/v2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -144,31 +143,31 @@ func ReleaseNodePort(port int32) {
 	fmt.Printf("Released NodePort %d\n", port)
 }
 
-var _ = ginkgo.AfterEach(func() {
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Printf("Recovered from panic in global AfterEach: %v\n", r)
-			debug.PrintStack()
-		}
-	}()
+// var _ = ginkgo.AfterEach(func() {
+// 	defer func() {
+// 		if r := recover(); r != nil {
+// 			fmt.Printf("Recovered from panic in global AfterEach: %v\n", r)
+// 			debug.PrintStack()
+// 		}
+// 	}()
 
-	fmt.Printf("Running global cleanup for test\n")
+// 	fmt.Printf("Running global cleanup for test\n")
 
-})
+// })
 
-func SafeJustAfterEach(cleanupFunc func(context.Context)) func() {
-	return func() {
-		// Create a background context
-		ctx := context.Background()
+// func SafeJustAfterEach(cleanupFunc func(context.Context)) func() {
+// 	return func() {
+// 		// Create a background context
+// 		ctx := context.Background()
 
-		// Recover from panics
-		defer func() {
-			if r := recover(); r != nil {
-				fmt.Printf("Recovered from panic in JustAfterEach: %v\n", r)
-				debug.PrintStack()
-			}
-		}()
+// 		// Recover from panics
+// 		defer func() {
+// 			if r := recover(); r != nil {
+// 				fmt.Printf("Recovered from panic in JustAfterEach: %v\n", r)
+// 				debug.PrintStack()
+// 			}
+// 		}()
 
-		cleanupFunc(ctx)
-	}
-}
+// 		cleanupFunc(ctx)
+// 	}
+// }
