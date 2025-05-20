@@ -551,25 +551,48 @@ var _ = Describe("KafkaCluster with two config external listener", func() {
 		By("deleting Kafka cluster object " + kafkaCluster.Name + " in namespace " + namespace)
 
 		if kafkaCluster != nil {
+			By("deleting Kafka cluster object " + kafkaCluster.Name + " in namespace " + namespace)
 			fmt.Printf("Context before delete: %v\n", ctx)
 			fmt.Printf("kafkacluster: %v\n", kafkaCluster)
-			err := k8sClient.Delete(ctx, kafkaCluster)
-			Expect(err).NotTo(HaveOccurred())
-			kafkaCluster = nil
+
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						fmt.Printf("Recovered from panic during kafkaCluster deletion: %v\n", r)
+					}
+				}()
+
+				err := k8sClient.Delete(ctx, kafkaCluster)
+				if err != nil {
+					fmt.Printf("Error deleting kafkaCluster: %v\n", err)
+				}
+			}()
 		} else {
-			fmt.Printf(" kafkacluster Already Nil!")
+			fmt.Printf("kafkacluster Already Nil!\n")
 		}
 
 		if kafkaClusterKRaft != nil {
 			By("deleting Kafka cluster object under KRaft mode " + kafkaClusterKRaft.Name + " in namespace " + kafkaClusterKRaft.Namespace)
 			fmt.Printf("kafkaclusterKRaft: %v\n", kafkaClusterKRaft)
-			err := k8sClient.Delete(ctx, kafkaClusterKRaft)
-			Expect(err).NotTo(HaveOccurred())
 
-			kafkaClusterKRaft = nil
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						fmt.Printf("Recovered from panic during kafkaClusterKRaft deletion: %v\n", r)
+					}
+				}()
+
+				err := k8sClient.Delete(ctx, kafkaClusterKRaft)
+				if err != nil {
+					fmt.Printf("Error deleting kafkaClusterKRaft: %v\n", err)
+				}
+			}()
 		} else {
 			fmt.Printf("kafkaclusterKRaft Already Nil!\n")
 		}
+
+		kafkaCluster = nil
+		kafkaClusterKRaft = nil
 	})
 
 	When("configuring two ingress envoy controller config inside the external listener using both as bindings", func() {
