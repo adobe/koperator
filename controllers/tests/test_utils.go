@@ -93,11 +93,17 @@ func SafeKafkaCleanup(ctx context.Context, kClient client.Client, cluster *v1bet
 				if len(svc.Finalizers) > 0 {
 					patchedSvc := svc.DeepCopy()
 					patchedSvc.Finalizers = nil
-					err = kClient.Patch(ctx, patchedSvc, client.MergeFrom(svc)) //TODO Handle Error
+					if err := kClient.Patch(ctx, patchedSvc, client.MergeFrom(svc)); err != nil {
+						fmt.Printf("Warning: Error removing finalizers from service %s/%s: %v\n",
+							ns, svc.Name, err)
+					}
 				}
-				err = kClient.Delete(ctx, svc, &client.DeleteOptions{ //TODO Handle error
+				if err := kClient.Delete(ctx, svc, &client.DeleteOptions{
 					GracePeriodSeconds: ptr.To[int64](0),
-				})
+				}); err != nil {
+					fmt.Printf("Warning: Error deleting service %s/%s: %v\n",
+						ns, svc.Name, err)
+				}
 			}
 		} else {
 			fmt.Printf("Warning: Error listing services in namespace %s: %v\n", ns, err)
