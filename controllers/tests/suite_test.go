@@ -277,7 +277,7 @@ func GetNodePort() int32 {
 	fmt.Println("GetNodePort: Looking for an available nodeport")
 
 	if k8sClient == nil {
-		fmt.Println("WARNING: k8sClient not initialized, skipping Kubernetes service check")
+		fmt.Println("WARNING: k8sClient not initialized yet skipping Kubernetes service check")
 	} else {
 		k8sUsedPorts := make(map[int32]bool)
 
