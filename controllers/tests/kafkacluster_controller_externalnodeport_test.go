@@ -182,7 +182,6 @@ var _ = Describe("KafkaClusterNodeportExternalAccess", func() {
 			}))
 		})
 		AfterEach(func() {
-			// Release the ports
 			for _, port := range allocatedNodePorts {
 				ReleaseNodePort(port)
 			}
@@ -244,7 +243,6 @@ var _ = Describe("KafkaClusterNodeportExternalAccess", func() {
 		})
 
 		AfterEach(func() {
-			// Release the port
 			for _, port := range allocatedNodePorts {
 				ReleaseNodePort(port)
 			}
@@ -404,7 +402,6 @@ var _ = Describe("KafkaClusterNodeportExternalAccess", func() {
 			}))
 		})
 		AfterEach(func() {
-			// Release the port
 			for _, port := range allocatedNodePorts {
 				ReleaseNodePort(port)
 			}

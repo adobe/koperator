@@ -222,7 +222,6 @@ var _ = Describe("KafkaCluster", func() {
 
 	JustAfterEach(func(ctx SpecContext) {
 		// in the tests the CC topic might not get deleted
-		// SafeKafkaCleanup(ctx, k8sClient, kafkaCluster, kafkaClusterKRaft, namespace)
 
 		By("deleting Kafka cluster object " + kafkaCluster.Name + " in namespace " + namespace)
 		err := k8sClient.Delete(ctx, kafkaCluster)
@@ -545,33 +544,6 @@ var _ = Describe("KafkaCluster with two config external listener", func() {
 				debug.PrintStack()
 			}
 		}()
-
-		// SafeKafkaCleanup(ctx, k8sClient, kafkaCluster, kafkaClusterKRaft, namespace)
-
-		// By("deleting Kafka cluster object " + kafkaCluster.Name + " in namespace " + namespace)
-
-		// if kafkaCluster != nil {
-		// 	By("deleting Kafka cluster object " + kafkaCluster.Name + " in namespace " + namespace)
-		// 	fmt.Printf("Context before delete: %v\n", ctx)
-		// 	fmt.Printf("kafkacluster: %v\n", kafkaCluster)
-
-		// 	func() {
-		// 		defer func() {
-		// 			if r := recover(); r != nil {
-		// 				fmt.Printf("Recovered from panic during kafkaCluster deletion: %v\n", r)
-		// 			}
-		// 		}()
-
-		// 		err := k8sClient.Delete(ctx, kafkaCluster)
-		// 		if err != nil {
-		// 			fmt.Printf("Error deleting kafkaCluster: %v\n", err)
-		// 		}
-		// 	}()
-		// } else {
-		// 	fmt.Printf("kafkacluster Already Nil!\n")
-		// }
-
-		// kafkaCluster = nil
 	})
 
 	When("configuring two ingress envoy controller config inside the external listener using both as bindings", func() {
@@ -663,8 +635,6 @@ var _ = Describe("KafkaCluster with two config external listener and tls", func(
 		waitForClusterRunningState(ctx, kafkaCluster, namespace)
 	})
 	JustAfterEach(func(ctx SpecContext) {
-
-		// SafeKafkaCleanup(ctx, k8sClient, kafkaCluster, nil, namespace)
 		By("deleting Kafka cluster object " + kafkaCluster.Name + " in namespace " + namespace)
 		err := k8sClient.Delete(ctx, kafkaCluster)
 		Expect(err).NotTo(HaveOccurred())
