@@ -585,7 +585,6 @@ var _ = Describe("KafkaCluster with two config external listener", func() {
 			kafkaCluster.Spec.Brokers[0].BrokerConfig = &v1beta1.BrokerConfig{BrokerIngressMapping: []string{"az1"}}
 			kafkaCluster.Spec.Brokers[1].BrokerConfig = &v1beta1.BrokerConfig{BrokerIngressMapping: []string{"az2"}}
 
-			fmt.Printf("kafkaclusterKRaft before accessing brokers: %v\n", kafkaClusterKRaft)
 			/* same tests for KafkaCluster in KRaft mode */
 			kafkaClusterKRaft.Spec.Brokers[0].BrokerConfig.BrokerIngressMapping = []string{"az1"}
 			kafkaClusterKRaft.Spec.Brokers[1].BrokerConfig.BrokerIngressMapping = []string{"az2"}
@@ -598,8 +597,6 @@ var _ = Describe("KafkaCluster with two config external listener", func() {
 
 			expectEnvoyWithConfigAz1(ctx, kafkaClusterKRaft)
 			expectEnvoyWithConfigAz2KRaft(ctx, kafkaClusterKRaft)
-			fmt.Printf("kafkaclusterKRaft before brokerConfigmap check: %v\n", kafkaClusterKRaft)
-			fmt.Printf("count before brokerConfigmap check: %v\n", count)
 			expectBrokerConfigmapForAz1ExternalListener(ctx, kafkaClusterKRaft, count)
 			expectBrokerConfigmapForAz2ExternalListener(ctx, kafkaClusterKRaft, count)
 		})
