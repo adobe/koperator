@@ -33,7 +33,6 @@ jobs:
 
       - name: Add Helm repositories
         run: |
-          # helm repo add banzaicloud-stable "https://kubernetes-charts.banzaicloud.com"
           helm repo add incubator "https://charts.helm.sh/incubator"
           helm repo add stable "https://charts.helm.sh/stable"
 
