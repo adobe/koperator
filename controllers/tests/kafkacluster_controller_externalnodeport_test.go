@@ -53,7 +53,7 @@ var (
 var allocatedNodePorts []int32
 var safePort int32
 
-var _ = Describe("KafkaClusterNodeportExternalAccess", func() {
+var _ = Describe("KafkaClusterNodeportExternalAccess", Ordered, func() {
 	var (
 		count              uint64 = 0
 		namespace          string
