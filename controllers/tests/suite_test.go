@@ -280,7 +280,6 @@ func GetNodePort(portAmount int32) int32 {
 	if k8sClient == nil {
 		fmt.Println("WARNING: k8sClient not initialized yet skipping Kubernetes service check")
 	} else {
-
 		var serviceList corev1.ServiceList
 		if err := k8sClient.List(context.Background(), &serviceList); err == nil {
 			fmt.Printf("GetNodePort: Found %d services to check for nodeports\n", len(serviceList.Items))
