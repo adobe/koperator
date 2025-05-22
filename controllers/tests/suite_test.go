@@ -303,22 +303,22 @@ func GetNodePort(portAmount int32) int32 {
 	for attempts = 0; attempts < 100; attempts++ {
 		port := minPort + rand.Int31n(int32(portRange))
 
-    allAvailable := true
-    for i := int32(0); i <= portAmount; i++ {
-      if nodePorts[port+i] {
-        allAvailable = false
-        break
-      }
-    }
+		allAvailable := true
+		for i := int32(0); i <= portAmount; i++ {
+			if nodePorts[port+i] {
+				allAvailable = false
+				break
+			}
+		}
 
-    if allAvailable {
-      for i := int32(0); i <= portAmount; i++ {
-        nodePorts[port+i] = true
-      }
-      fmt.Printf("GetNodePort: Successfully allocated NodePort range %d-%d after %d attempts\n",
-        port, port+portAmount, attempts+1)
-      return port
-    }
+		if allAvailable {
+			for i := int32(0); i <= portAmount; i++ {
+				nodePorts[port+i] = true
+			}
+			fmt.Printf("GetNodePort: Successfully allocated NodePort range %d-%d after %d attempts\n",
+				port, port+portAmount, attempts+1)
+			return port
+		}
 	}
 
 	fmt.Printf("WARNING: No free NodePorts found after %d attempts, returning 0 for auto-assignment\n", attempts)
