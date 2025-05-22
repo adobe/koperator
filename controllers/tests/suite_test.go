@@ -268,7 +268,7 @@ var (
 )
 
 func GetNodePort(portAmount int32) int32 {
-	portAmount = portAmount - 1
+	portAmount--
 	nodePortMutex.Lock()
 	defer nodePortMutex.Unlock()
 
@@ -320,12 +320,10 @@ func GetNodePort(portAmount int32) int32 {
 					port, port+portAmount, attempts+1)
 				return port
 			}
-		} else {
-			if !nodePorts[port] {
-				nodePorts[port] = true
-				fmt.Printf("GetNodePort: Successfully allocated NodePort %d after %d attempts\n", port, attempts+1)
-				return port
-			}
+		} else if !nodePorts[port] {
+			nodePorts[port] = true
+			fmt.Printf("GetNodePort: Successfully allocated NodePort %d after %d attempts\n", port, attempts+1)
+			return port
 		}
 	}
 
