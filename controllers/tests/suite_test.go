@@ -267,7 +267,8 @@ var (
 	nodePorts     = make(map[int32]bool)
 )
 
-func GetNodePort() int32 {
+func GetNodePort(portAmount int32) int32 {
+	portAmount = portAmount - 1
 	nodePortMutex.Lock()
 	defer nodePortMutex.Unlock()
 
@@ -279,7 +280,6 @@ func GetNodePort() int32 {
 	if k8sClient == nil {
 		fmt.Println("WARNING: k8sClient not initialized yet skipping Kubernetes service check")
 	} else {
-		k8sUsedPorts := make(map[int32]bool)
 
 		var serviceList corev1.ServiceList
 		if err := k8sClient.List(context.Background(), &serviceList); err == nil {
@@ -288,20 +288,15 @@ func GetNodePort() int32 {
 				if service.Spec.Type == corev1.ServiceTypeNodePort {
 					for _, port := range service.Spec.Ports {
 						if port.NodePort > 0 {
-							k8sUsedPorts[port.NodePort] = true
+							nodePorts[port.NodePort] = true
 							fmt.Printf("GetNodePort: Found existing nodeport %d in service %s/%s\n",
 								port.NodePort, service.Namespace, service.Name)
 						}
 					}
 				}
 			}
-			fmt.Printf("GetNodePort: Found %d nodeports already in use by Kubernetes\n", len(k8sUsedPorts))
 		} else {
 			fmt.Printf("ERROR: Failed to list services: %v\n", err)
-		}
-
-		for port := range k8sUsedPorts {
-			nodePorts[port] = true
 		}
 	}
 
@@ -309,10 +304,29 @@ func GetNodePort() int32 {
 	for attempts = 0; attempts < 100; attempts++ {
 		port := minPort + rand.Int31n(int32(portRange))
 
-		if !nodePorts[port] {
-			nodePorts[port] = true
-			fmt.Printf("GetNodePort: Successfully allocated NodePort %d after %d attempts\n", port, attempts+1)
-			return port
+		if portAmount > 0 {
+			allAvailable := true
+			for i := int32(0); i <= portAmount; i++ {
+				if nodePorts[port+i] {
+					allAvailable = false
+					break
+				}
+			}
+
+			if allAvailable {
+				for i := int32(0); i <= portAmount; i++ {
+					nodePorts[port+i] = true
+				}
+				fmt.Printf("GetNodePort: Successfully allocated NodePort range %d-%d after %d attempts\n",
+					port, port+portAmount, attempts+1)
+				return port
+			}
+		} else {
+			if !nodePorts[port] {
+				nodePorts[port] = true
+				fmt.Printf("GetNodePort: Successfully allocated NodePort %d after %d attempts\n", port, attempts+1)
+				return port
+			}
 		}
 	}
 

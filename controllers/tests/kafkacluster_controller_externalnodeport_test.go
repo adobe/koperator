@@ -192,7 +192,7 @@ var _ = Describe("KafkaClusterNodeportExternalAccess", func() {
 	When("NodePortExternalIP is configured", func() {
 		BeforeEach(func() {
 			allocatedNodePorts = nil
-			safePort = GetNodePort()
+			safePort = GetNodePort(1)
 			allocatedNodePorts = append(allocatedNodePorts, safePort)
 			// update the external listener config with a nodeport listener
 			kafkaCluster.Spec.ListenersConfig.ExternalListeners = []v1beta1.ExternalListenerConfig{
@@ -335,7 +335,7 @@ var _ = Describe("KafkaClusterNodeportExternalAccess", func() {
 	When("hostnameOverride is configured", func() {
 		BeforeEach(func() {
 			allocatedNodePorts = nil
-			safePort = GetNodePort()
+			safePort = GetNodePort(3)
 			allocatedNodePorts = append(allocatedNodePorts, safePort)
 			kafkaCluster.Spec.ListenersConfig.ExternalListeners = []v1beta1.ExternalListenerConfig{
 				{
