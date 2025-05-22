@@ -160,7 +160,6 @@ func waitForClusterRunningState(ctx context.Context, kafkaCluster *v1beta1.Kafka
 			}
 		}
 	}()
-
 	Eventually(ch, 240*time.Second, 50*time.Millisecond).Should(Receive())
 }
 

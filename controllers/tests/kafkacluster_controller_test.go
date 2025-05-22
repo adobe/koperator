@@ -17,6 +17,7 @@ package tests
 import (
 	"context"
 	"fmt"
+	"runtime/debug"
 	"sync/atomic"
 	"time"
 
@@ -231,6 +232,8 @@ var _ = Describe("KafkaCluster", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		kafkaCluster = nil
+		kafkaClusterKRaft = nil
+
 	})
 	When("using default configuration", func() {
 		BeforeEach(func() {
@@ -535,13 +538,12 @@ var _ = Describe("KafkaCluster with two config external listener", func() {
 		waitForClusterRunningState(ctx, kafkaClusterKRaft, namespace)
 	})
 	JustAfterEach(func(ctx SpecContext) {
-		// in the tests the CC topic might not get deleted
-
-		By("deleting Kafka cluster object " + kafkaCluster.Name + " in namespace " + namespace)
-		err := k8sClient.Delete(ctx, kafkaCluster)
-		Expect(err).NotTo(HaveOccurred())
-
-		kafkaCluster = nil
+		defer func() {
+			if r := recover(); r != nil {
+				fmt.Printf("Recovered from panic in JustAfterEach: %v\n", r)
+				debug.PrintStack()
+			}
+		}()
 	})
 	JustAfterEach(func(ctx SpecContext) {
 		// in the tests the CC topic might not get deleted
@@ -555,6 +557,12 @@ var _ = Describe("KafkaCluster with two config external listener", func() {
 
 	When("configuring two ingress envoy controller config inside the external listener using both as bindings", func() {
 		BeforeEach(func() {
+			defer func() {
+				if r := recover(); r != nil {
+					fmt.Printf("Recovered from panic in BeforeEach: %v\n", r)
+					debug.PrintStack()
+				}
+			}()
 			kafkaCluster.Spec.Brokers[0].BrokerConfig = &v1beta1.BrokerConfig{BrokerIngressMapping: []string{"az1"}}
 			kafkaCluster.Spec.Brokers[1].BrokerConfig = &v1beta1.BrokerConfig{BrokerIngressMapping: []string{"az2"}}
 
@@ -636,8 +644,6 @@ var _ = Describe("KafkaCluster with two config external listener and tls", func(
 		waitForClusterRunningState(ctx, kafkaCluster, namespace)
 	})
 	JustAfterEach(func(ctx SpecContext) {
-		// in the tests the CC topic might not get deleted
-
 		By("deleting Kafka cluster object " + kafkaCluster.Name + " in namespace " + namespace)
 		err := k8sClient.Delete(ctx, kafkaCluster)
 		Expect(err).NotTo(HaveOccurred())

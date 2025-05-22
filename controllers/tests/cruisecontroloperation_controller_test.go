@@ -72,7 +72,7 @@ var _ = Describe("CruiseControlTaskReconciler", func() {
 	})
 	JustAfterEach(func() {
 		cruiseControlOperationReconciler.ScaleFactory = func(ctx context.Context, kafkaCluster *v1beta1.KafkaCluster) (scale.CruiseControlScaler, error) {
-			return nil, errors.New("there is no scale mock")
+			return nil, errors.New("there is no scale mock CC test")
 		}
 	})
 	When("there is an add_broker operation for execution", Serial, func() {

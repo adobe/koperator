@@ -103,6 +103,8 @@ var _ = BeforeSuite(func() {
 		ControlPlaneStopTimeout:  stopTimeout,
 		AttachControlPlaneOutput: false,
 	}
+	apiServer := testEnv.ControlPlane.GetAPIServer()
+	apiServer.Configure().Set("service-cluster-ip-range", "10.0.0.0/16")
 
 	var cfg *rest.Config
 	var err error
