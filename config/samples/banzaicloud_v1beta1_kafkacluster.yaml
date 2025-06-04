@@ -5,7 +5,7 @@ metadata:
     controller-tools.k8s.io: "1.0"
   name: kafka
 spec:
-  # specify if the cluster is in KRaft mode or not, default is true
+  # specify if the cluster is in KRaft mode or not, default is false
   kRaft: false
   # Specify if the cluster should use headlessService for Kafka or individual services
   # using service/broker may come in handy in case of service mesh
