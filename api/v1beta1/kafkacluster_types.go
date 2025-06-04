@@ -295,6 +295,8 @@ type BrokerConfig struct {
 	// processRoles defines the role(s) for this particular Kafka node: "broker", "controller", or both.
 	// This must be set in KRaft mode. If set in ZooKeeper mode, Koperator ignores this configuration.
 	// +kubebuilder:validation:MaxItems=2
+	// +kubebuilder:validation:Items:Type=string
+	// +kubebuilder:validation:Items:Enum=controller;broker
 	// +optional
 	Roles                []string                      `json:"processRoles,omitempty"`
 	Image                string                        `json:"image,omitempty"`
