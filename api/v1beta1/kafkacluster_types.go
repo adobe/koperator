@@ -155,7 +155,7 @@ const (
 type KafkaClusterSpec struct {
 	// kRaft is used to decide where the Kafka cluster is under KRaft mode or ZooKeeper mode.
 	// This is default to be true; if set to false, the Kafka cluster is in ZooKeeper mode.
-	// +kubebuilder:default=true
+	// +kubebuilder:default=false
 	// +optional
 	KRaftMode              bool            `json:"kRaft"`
 	HeadlessServiceEnabled bool            `json:"headlessServiceEnabled"`
