@@ -225,8 +225,6 @@ func expectBrokerConfigmapForAz2ExternalListener(ctx context.Context, kafkaClust
 			19092, randomGenTestNumber, 2, randomGenTestNumber, randomGenTestNumber, 2, randomGenTestNumber)
 	}
 	Expect(advertisedListener.Value()).To(Equal(expectedAdvertisedListener))
-	// Expect(advertisedListener.Value()).To(Equal(fmt.Sprintf("TEST://external.az2.host.com:%d,CONTROLLER://kafkacluster-%d-%d.kafkaconfigtest-%d.svc.cluster.local:29093,INTERNAL://kafkacluster-%d-%d.kafkaconfigtest-%d.svc.cluster.local:29092",
-	// 19092, randomGenTestNumber, 2, randomGenTestNumber, randomGenTestNumber, 2, randomGenTestNumber)))
 }
 
 func expectBrokerConfigmapForAz2ExternalListenerTls(kafkaCluster *v1beta1.KafkaCluster, randomGenTestNumber uint64) {

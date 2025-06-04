@@ -3,7 +3,7 @@
 # RUN KOPERATOR LOCALLY ON KIND
 ### Create kind cluster
 kind delete clusters e2e-kind
-kind create cluster --config=/Users/dvaseeka/Documents/adobe/kRaft-migration/pipeline-kraft-migration/koperators/koperator/tests/e2e/platforms/kind/kind_config.yaml --name=e2e-kind
+kind create cluster --config=tests/e2e/platforms/kind/kind_config.yaml --name=e2e-kind
 
 ### Build/Load images
 kind load docker-image docker-pipeline-upstream-mirror.dr-uw2.adobeitc.com/adobe/cruise-control:2.5.133-adbe-20240313 --name e2e-kind
