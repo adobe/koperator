@@ -240,3 +240,5 @@ rules:
   # Export all other java.{lang,nio}* beans using default format
   - pattern: java.lang.+
   - pattern: java.nio.+
+  - pattern: 'aiven.kafka.server.tieredstorage<(.*)>'
+    cache: true
