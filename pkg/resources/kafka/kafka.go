@@ -297,6 +297,9 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 
 	brokersVolumes := make(map[string][]*corev1.PersistentVolumeClaim, len(r.KafkaCluster.Spec.Brokers))
 	for _, broker := range r.KafkaCluster.Spec.Brokers {
+		if broker.BrokerConfigGroup == "controllerGroup" {
+			continue
+		}
 		brokerConfig, err := broker.GetBrokerConfig(r.KafkaCluster.Spec)
 		if err != nil {
 			return errors.WrapIf(err, "failed to reconcile resource")
