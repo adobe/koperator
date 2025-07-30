@@ -13,7 +13,9 @@ WORKDIR /var/tmp
 
 RUN wget -q $kafka_distro_base_url/$kafka_version/$kafka_distro
 RUN wget -q $kafka_distro_base_url/$kafka_version/$kafka_distro_asc
+RUN wget -q $kafka_distro_base_url/KEYS
 
+RUN gpg --import KEYS
 RUN gpg --keyserver pgpkeys.mit.edu --recv-key DE885DD3
 RUN gpg --verify $kafka_distro_asc $kafka_distro
 
