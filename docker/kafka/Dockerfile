@@ -16,7 +16,7 @@ RUN wget -q $kafka_distro_base_url/$kafka_version/$kafka_distro_asc
 RUN wget -q $kafka_distro_base_url/KEYS
 
 RUN gpg --import KEYS
-# RUN gpg --verify $kafka_distro_asc $kafka_distro
+RUN gpg --verify $kafka_distro_asc $kafka_distro
 
 RUN tar -xzf $kafka_distro
 RUN rm -r kafka_$scala_version-$kafka_version/bin/windows
