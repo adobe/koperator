@@ -241,9 +241,8 @@ rules:
   - pattern: java.lang.+
   - pattern: java.nio.+
   # Export kraft metrics
-  - pattern: kafka.raft<type=(.+), name=(.+)><>Value
-    name: kafka_raft_$1_$2
+  - pattern: kafka.raft<type=raft-metrics, name=(.+)><>Value
+    name: kafka_raft_metrics_$1
     cache: true
-    labels:
-      type: $1
-      name: $2
+    labels: {}
+    type: GAUGE
