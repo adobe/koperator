@@ -243,6 +243,3 @@ rules:
   # Export kraft metrics
   - pattern: "kafka.server<type=raft-metrics, name=current-state>"
     name: "kafka_server_raft_metrics_current_state"
-    labels:
-      status: "$1"
-    value: 1
