@@ -240,3 +240,10 @@ rules:
   # Export all other java.{lang,nio}* beans using default format
   - pattern: java.lang.+
   - pattern: java.nio.+
+  # Export kraft metrics
+  - pattern: kafka.raft<type=(.+), name=(.+)><>Value
+    name: kafka_raft_$1_$2
+    cache: true
+    labels:
+      type: $1
+      name: $2
