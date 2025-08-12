@@ -20,10 +20,10 @@ if [ -n "$MATCHING_METRIC" ]; then
         exit 0
     else
         # Any other state (e.g., 'candidate', 'unattached', 'observer') is not considered healthy
-        echo "Warning: The controller is not in a healthy state for this check."
+        echo "Failure: The controller is in an unexpected state: $STATE. Expecting 'leader' or 'follower'."
         exit 1
     fi
 else
-    echo "Failure: No active Kraft controller state found with a value of 1.0."
+    echo "Failure: No active kafka_server_raft_metrics_current_state_ metric found with a value of 1.0."
     exit 1
 fi
