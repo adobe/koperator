@@ -109,18 +109,6 @@ fi`},
 		if err != nil {
 			log.Error(err, "failed to find controller listener port")
 		} else {
-			kafkaContainer.LivenessProbe = &corev1.Probe{
-				ProbeHandler: corev1.ProbeHandler{
-					Exec: &corev1.ExecAction{
-						Command: []string{"/bin/bash", "-c", assets.KraftControllerHealthcheckSh},
-					},
-				},
-				InitialDelaySeconds: 30,
-				PeriodSeconds:       10,
-				TimeoutSeconds:      5,
-				FailureThreshold:    6,
-			}
-
 			kafkaContainer.ReadinessProbe = &corev1.Probe{
 				ProbeHandler: corev1.ProbeHandler{
 					TCPSocket: &corev1.TCPSocketAction{
@@ -130,11 +118,22 @@ fi`},
 						},
 					},
 				},
-				InitialDelaySeconds: 15,
-				PeriodSeconds:       10,
+				InitialDelaySeconds: 0,
+				PeriodSeconds:       5,
 				TimeoutSeconds:      5,
 				FailureThreshold:    20,
 			}
+		}
+		kafkaContainer.LivenessProbe = &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				Exec: &corev1.ExecAction{
+					Command: []string{"/bin/bash", "-c", assets.KraftControllerHealthcheckSh},
+				},
+			},
+			InitialDelaySeconds: 30,
+			PeriodSeconds:       10,
+			TimeoutSeconds:      5,
+			FailureThreshold:    6,
 		}
 	}
 
