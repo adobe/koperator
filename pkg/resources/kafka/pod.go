@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	apiutil "github.com/banzaicloud/koperator/api/util"
+  "github.com/banzaicloud/koperator/api/assets"
 	"github.com/banzaicloud/koperator/api/v1beta1"
 	"github.com/banzaicloud/koperator/pkg/k8sutil"
 	"github.com/banzaicloud/koperator/pkg/resources/kafkamonitoring"
@@ -110,14 +111,11 @@ fi`},
 		} else {
 			kafkaContainer.LivenessProbe = &corev1.Probe{
 				ProbeHandler: corev1.ProbeHandler{
-					TCPSocket: &corev1.TCPSocketAction{
-						Port: intstr.IntOrString{
-							Type:   intstr.Int,
-							IntVal: controllerlistenerPort,
-						},
+					Exec: &corev1.ExecAction{
+						Command: []string{"/bin/bash", "-c", assets.KraftControllerHealthcheckSh},
 					},
 				},
-				InitialDelaySeconds: 15,
+				InitialDelaySeconds: 30,
 				PeriodSeconds:       10,
 				TimeoutSeconds:      5,
 				FailureThreshold:    6,

@@ -240,6 +240,8 @@ rules:
   # Export all other java.{lang,nio}* beans using default format
   - pattern: java.lang.+
   - pattern: java.nio.+
-  # Export kraft metrics
-  - pattern: "kafka.server<type=raft-metrics, name=current-state>"
-    name: "kafka_server_raft_metrics_current_state"
+  # Export kraft current state metrics
+  - pattern: 'kafka.server<type=raft-metrics><>current-state: (.+)'
+    name: "kafka_server_raft_metrics_current_state_$1"
+    type: GAUGE
+    value: 1

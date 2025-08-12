@@ -25,4 +25,7 @@ var (
 
 	//go:embed kafka/jmx-exporter.yml
 	KafkaJmxExporterYaml string
+
+	//go:embed kafka/kraft-controller-healthcheck.sh
+	KraftControllerHealthcheckSh string
 )
