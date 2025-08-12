@@ -27,8 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
+	"github.com/banzaicloud/koperator/api/assets"
 	apiutil "github.com/banzaicloud/koperator/api/util"
-  "github.com/banzaicloud/koperator/api/assets"
 	"github.com/banzaicloud/koperator/api/v1beta1"
 	"github.com/banzaicloud/koperator/pkg/k8sutil"
 	"github.com/banzaicloud/koperator/pkg/resources/kafkamonitoring"
