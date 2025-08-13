@@ -437,12 +437,7 @@ func generateListenerSpecificConfig(kcs *v1beta1.KafkaClusterSpec, serverPasses 
 		b := broker.ReadOnlyConfig
 		trimmedConfig := strings.TrimSpace(b)
 
-		if strings.Contains(trimmedConfig, kafkautils.KafkaConfigSecurityInterBrokerProtocol+"=") {
-			log.Info("Security InterBrokerProtocol is set for this broker, skipping config update", "broker", broker)
-		} else {
-			log.Info("Security InterBrokerProtocol NOT found for broker, setting inter.broker.listener.name",
-				"interBrokerListenerName", interBrokerListenerName, "broker", broker)
-
+		if !strings.Contains(trimmedConfig, kafkautils.KafkaConfigSecurityInterBrokerProtocol+"=") {
 			if err := brokerConfig.Set(kafkautils.KafkaConfigInterBrokerListenerName, interBrokerListenerName); err != nil {
 				log.Error(err, fmt.Sprintf("setting '%s' parameter in broker configuration resulted in an error",
 					kafkautils.KafkaConfigInterBrokerListenerName))
