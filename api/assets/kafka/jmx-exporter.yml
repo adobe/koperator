@@ -1,6 +1,11 @@
 lowercaseOutputName: true
 rules:
   # Special cases and very specific rules
+    # Export kraft current state metrics
+  - pattern: 'kafka.server<type=raft-metrics><>current-state: (.+)'
+    name: kafka_server_raft_metrics_current_state_$1
+    type: GAUGE
+    value: 1
   - pattern: 'kafka.server<type=(app-info), id=(\d+)><>(Version): ([-.~+\w\d]+)'
     name: kafka_server_$1_$3
     type: COUNTER

@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/banzaicloud/koperator/api/assets"
 	"github.com/banzaicloud/koperator/api/v1beta1"
 	"github.com/banzaicloud/koperator/pkg/resources/kafkamonitoring"
 	"github.com/banzaicloud/koperator/pkg/util"
@@ -390,6 +391,17 @@ func expectKafkaBrokerPod(ctx context.Context, kafkaCluster *v1beta1.KafkaCluste
 	Expect(container.Image).To(Equal("ghcr.io/banzaicloud/kafka:2.13-3.4.1"))
 	Expect(container.Lifecycle).NotTo(BeNil())
 	Expect(container.Lifecycle.PreStop).NotTo(BeNil())
+	if kafkaCluster.Spec.KRaftMode && broker.BrokerConfig.IsControllerNode() {
+		Expect(container.LivenessProbe).NotTo(BeNil())
+		Expect(container.LivenessProbe.Exec.Command).NotTo(BeEmpty())
+		Expect(container.LivenessProbe.Exec.Command[0]).To(Equal("/bin/bash"))
+		Expect(container.LivenessProbe.Exec.Command[1]).To(Equal("-c"))
+		Expect(container.LivenessProbe.Exec.Command[2]).To(Equal(assets.KraftControllerHealthcheckSh))
+		Expect(container.ReadinessProbe).NotTo(BeNil())
+	} else {
+		Expect(container.LivenessProbe).To(BeNil())
+		Expect(container.ReadinessProbe).To(BeNil())
+	}
 	getEnvName := func(c corev1.EnvVar) string { return c.Name }
 
 	// when passing a slice to ConsistOf(), the slice needs to be the only argument, which is not applicable here,

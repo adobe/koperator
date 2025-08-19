@@ -25,7 +25,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
+	"github.com/banzaicloud/koperator/api/assets"
 	apiutil "github.com/banzaicloud/koperator/api/util"
 	"github.com/banzaicloud/koperator/api/v1beta1"
 	"github.com/banzaicloud/koperator/pkg/k8sutil"
@@ -55,6 +57,86 @@ func (r *Reconciler) pod(id int32, brokerConfig *v1beta1.BrokerConfig, pvcs []co
 		podname = fmt.Sprintf("%s-controller-%d-", r.KafkaCluster.Name, id)
 	}
 
+	kafkaContainer := corev1.Container{
+		Name:  kafkaContainerName,
+		Image: util.GetBrokerImage(brokerConfig, r.KafkaCluster.Spec.GetClusterImage()),
+		Lifecycle: &corev1.Lifecycle{
+			PreStop: &corev1.LifecycleHandler{
+				Exec: &corev1.ExecAction{
+					Command: []string{"bash", "-c", `
+if [[ -n "$ENVOY_SIDECAR_STATUS" ]]; then
+HEALTHYSTATUSCODE="200"
+SC=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:15000/ready)
+if [[ "$SC" == "$HEALTHYSTATUSCODE" ]]; then
+kill -s TERM $(pidof java)
+else
+kill -s KILL $(pidof java)
+fi
+else
+kill -s TERM $(pidof java)
+fi`},
+				},
+			},
+		},
+		SecurityContext: brokerConfig.SecurityContext,
+		Env: generateEnvConfig(brokerConfig, []corev1.EnvVar{
+			{
+				Name:  "CLASSPATH",
+				Value: "/opt/kafka/libs/extensions/*",
+			},
+			{
+				Name:  "KAFKA_OPTS",
+				Value: "-javaagent:/opt/jmx-exporter/jmx_prometheus.jar=9020:/etc/jmx-exporter/config.yaml",
+			},
+			{
+				Name: "ENVOY_SIDECAR_STATUS",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{
+						FieldPath: `metadata.annotations['sidecar.istio.io/status']`,
+					},
+				},
+			},
+		}),
+
+		Command:      command,
+		Ports:        r.generateKafkaContainerPorts(log),
+		VolumeMounts: getVolumeMounts(brokerConfig.VolumeMounts, dataVolumeMount, r.KafkaCluster.Spec, r.KafkaCluster.Name),
+		Resources:    *brokerConfig.GetResources(),
+	}
+
+	if r.KafkaCluster.Spec.KRaftMode && brokerConfig.IsControllerNode() {
+		controllerlistenerPort, err := findControllerListenerPort(r.KafkaCluster)
+		if err != nil {
+			log.Error(err, "failed to find controller listener port")
+		} else {
+			kafkaContainer.ReadinessProbe = &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					TCPSocket: &corev1.TCPSocketAction{
+						Port: intstr.IntOrString{
+							Type:   intstr.Int,
+							IntVal: controllerlistenerPort,
+						},
+					},
+				},
+				InitialDelaySeconds: 0,
+				PeriodSeconds:       5,
+				TimeoutSeconds:      5,
+				FailureThreshold:    20,
+			}
+		}
+		kafkaContainer.LivenessProbe = &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				Exec: &corev1.ExecAction{
+					Command: []string{"/bin/bash", "-c", assets.KraftControllerHealthcheckSh},
+				},
+			},
+			InitialDelaySeconds: 30,
+			PeriodSeconds:       10,
+			TimeoutSeconds:      5,
+			FailureThreshold:    6,
+		}
+	}
+
 	pod := &corev1.Pod{
 		ObjectMeta: templates.ObjectMetaWithGeneratedNameAndAnnotations(
 			podname,
@@ -63,57 +145,10 @@ func (r *Reconciler) pod(id int32, brokerConfig *v1beta1.BrokerConfig, pvcs []co
 			r.KafkaCluster,
 		),
 		Spec: corev1.PodSpec{
-			SecurityContext: brokerConfig.PodSecurityContext,
-			InitContainers:  getInitContainers(brokerConfig, r.KafkaCluster.Spec),
-			Affinity:        getAffinity(brokerConfig, r.KafkaCluster),
-			Containers: append([]corev1.Container{
-				{
-					Name:  kafkaContainerName,
-					Image: util.GetBrokerImage(brokerConfig, r.KafkaCluster.Spec.GetClusterImage()),
-					Lifecycle: &corev1.Lifecycle{
-						PreStop: &corev1.LifecycleHandler{
-							Exec: &corev1.ExecAction{
-								Command: []string{"bash", "-c", `
-if [[ -n "$ENVOY_SIDECAR_STATUS" ]]; then
-  HEALTHYSTATUSCODE="200"
-  SC=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:15000/ready)
-  if [[ "$SC" == "$HEALTHYSTATUSCODE" ]]; then
-    kill -s TERM $(pidof java)
-  else
-    kill -s KILL $(pidof java)
-  fi
-else
-  kill -s TERM $(pidof java)
-fi`},
-							},
-						},
-					},
-					SecurityContext: brokerConfig.SecurityContext,
-					Env: generateEnvConfig(brokerConfig, []corev1.EnvVar{
-						{
-							Name:  "CLASSPATH",
-							Value: "/opt/kafka/libs/extensions/*",
-						},
-						{
-							Name:  "KAFKA_OPTS",
-							Value: "-javaagent:/opt/jmx-exporter/jmx_prometheus.jar=9020:/etc/jmx-exporter/config.yaml",
-						},
-						{
-							Name: "ENVOY_SIDECAR_STATUS",
-							ValueFrom: &corev1.EnvVarSource{
-								FieldRef: &corev1.ObjectFieldSelector{
-									FieldPath: `metadata.annotations['sidecar.istio.io/status']`,
-								},
-							},
-						},
-					}),
-
-					Command:      command,
-					Ports:        r.generateKafkaContainerPorts(log),
-					VolumeMounts: getVolumeMounts(brokerConfig.VolumeMounts, dataVolumeMount, r.KafkaCluster.Spec, r.KafkaCluster.Name),
-					Resources:    *brokerConfig.GetResources(),
-				},
-			}, brokerConfig.Containers...),
+			SecurityContext:               brokerConfig.PodSecurityContext,
+			InitContainers:                getInitContainers(brokerConfig, r.KafkaCluster.Spec),
+			Affinity:                      getAffinity(brokerConfig, r.KafkaCluster),
+			Containers:                    append([]corev1.Container{kafkaContainer}, brokerConfig.Containers...),
 			Volumes:                       getVolumes(brokerConfig.Volumes, dataVolume, r.KafkaCluster.Spec, r.KafkaCluster.Name, id),
 			RestartPolicy:                 corev1.RestartPolicyNever,
 			TerminationGracePeriodSeconds: util.Int64Pointer(brokerConfig.GetTerminationGracePeriod()),
@@ -604,4 +639,15 @@ func generateEnvConfig(brokerConfig *v1beta1.BrokerConfig, defaultEnvVars []core
 	}
 
 	return mergedEnv
+}
+
+func findControllerListenerPort(kc *v1beta1.KafkaCluster) (int32, error) {
+	for _, listener := range kc.Spec.ListenersConfig.InternalListeners {
+		if listener.UsedForControllerCommunication {
+			return listener.ContainerPort, nil
+		}
+	}
+
+	// If no controller listener is found, return an error
+	return 0, fmt.Errorf("no controller listener found")
 }
