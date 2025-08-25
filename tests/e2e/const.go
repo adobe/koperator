@@ -68,6 +68,11 @@ const (
 	zookeeperClusterTemplate = "templates/zookeeper_cluster.yaml.tmpl"
 
 	kubectlNotFoundErrorMsg = "NotFound"
+
+	kafkaLabelSelectorBrokers     = "app=kafka,isControllerNode=false"
+	kafkaLabelSelectorControllers = "app=kafka,isControllerNode=true"
+	kafkaLabelSelectorAll 				= "app=kafka"
+	jmxExporterPort               = "9020"
 )
 
 func apiGroupKoperatorDependencies() map[string]string {
