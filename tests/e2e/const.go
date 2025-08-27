@@ -71,7 +71,7 @@ const (
 
 	kafkaLabelSelectorBrokers     = "app=kafka,isControllerNode=false"
 	kafkaLabelSelectorControllers = "app=kafka,isControllerNode=true"
-	kafkaLabelSelectorAll 				= "app=kafka"
+	kafkaLabelSelectorAll         = "app=kafka"
 	jmxExporterPort               = "9020"
 )
 

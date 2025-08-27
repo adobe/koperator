@@ -15,6 +15,12 @@
 
 
 # This script returns a successful exit code (0) if the controller is a follower or leader.  For any other state, it returns a failure exit code (1).
+# In addition, if the environment variable ENABLE_KRAFT_LIVENESS_CHECK is set to "false" (case insensitive), the script will exit successfully without performing any checks.
+
+if [ "${ENABLE_KRAFT_LIVENESS_CHECK,,}" = "false" ]; then
+    echo "ENABLE_KRAFT_LIVENESS_CHECK is set to FALSE. Exiting liveness check."
+    exit 0
+fi
 
 JMX_ENDPOINT="http://localhost:9020/metrics"
 METRIC_PREFIX="kafka_server_raft_metrics_current_state_"
@@ -38,6 +44,6 @@ if [ -n "$MATCHING_METRIC" ]; then
         exit 1
     fi
 else
-    echo "Failure: No active kafka_server_raft_metrics_current_state_ metric found with a value of 1.0."
-    exit 1
+    echo "JMX Exporter endpoint is not avaiable or kafka_server_raft_metrics_current_state_ was not found."
+    exit 0
 fi

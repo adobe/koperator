@@ -15,11 +15,9 @@
 package e2e
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 
-	"github.com/banzaicloud/koperator/api/v1beta1"
 	coreV1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -39,32 +37,34 @@ func testJmxExporter() bool { //nolint:unparam // Note: respecting Ginkgo testin
 		})
 
 		kubectlOptions.Namespace = koperatorLocalHelmDescriptor.Namespace
-		It("Checking JMX Exporter metrics", func() {
-			requireJmxMetrics(kubectlOptions)
-		})
-
+		requireJmxMetrics(kubectlOptions)
 	})
 }
 
 func requireJmxMetrics(kubectlOptions k8s.KubectlOptions) {
+	var kRaftEnabled bool
+	var err error
 
+	It("Acquiring kRaftEnabled", func() {
+		kRaftEnabled, err = isKRaftEnabledForKafkaCluster(kubectlOptions, kafkaClusterName)
+		Expect(err).NotTo(HaveOccurred(), "Failed to determine if KRaft mode is enabled")
+	})
 
-	kRaftEnabled, err := isKRaftEnabled(kubectlOptions, kafkaClusterName)
-	Expect(err).NotTo(HaveOccurred(), "Failed to determine if KRaft mode is enabled")
+	It("All brokers should have kafka_server_ metrics available", func() {
+		checkMetricExistsForBrokers(kubectlOptions, kafkaLabelSelectorAll, "kafka_server_", true)
+	})
 
-	// should always have kafka_server_ metrics available for zk/kraft based clusters
-	checkMetricExistsForBrokers(kubectlOptions, kafkaLabelSelectorAll, "kafka_server_", true)
-
-	// should only have kafka_server_raft_metrics_current_state_ available for kraft based cluster
-	checkMetricExistsForBrokers(kubectlOptions, kafkaLabelSelectorBrokers, "kafka_server_raft_metrics_current_state_", kRaftEnabled)
-
-	if kRaftEnabled {
-		// only check controller pods if KRaft is enabled
-		checkMetricExistsForBrokers(kubectlOptions, kafkaLabelSelectorControllers, "kafka_server_raft_metrics_current_state_", true)
-	}
+	It("When kraft mode is enabled, brokers/controllers should have kafka_server_raft_metrics_current_state_ metric available", func() {
+		if kRaftEnabled {
+			checkMetricExistsForBrokers(kubectlOptions, kafkaLabelSelectorBrokers, "kafka_server_raft_metrics_current_state_", true)
+			checkMetricExistsForBrokers(kubectlOptions, kafkaLabelSelectorControllers, "kafka_server_raft_metrics_current_state_", true)
+		} else {
+			checkMetricExistsForBrokers(kubectlOptions, kafkaLabelSelectorBrokers, "kafka_server_raft_metrics_current_state_", false)
+		}
+	})
 }
 
-func checkMetricExistsForBrokers(kubectlOptions k8s.KubectlOptions, kafkaBrokerLabelSelector string, metricPrefix string, expectMetricExists bool) {
+func checkMetricExistsForBrokers(kubectlOptions k8s.KubectlOptions, kafkaBrokerLabelSelector string, metricPrefix string, expectedMetricExists bool) {
 	listOptions := metav1.ListOptions{
 		LabelSelector: kafkaBrokerLabelSelector,
 	}
@@ -78,45 +78,37 @@ func checkMetricExistsForBrokers(kubectlOptions k8s.KubectlOptions, kafkaBrokerL
 	)
 
 	for _, pod := range pods {
-		output, err := podExecJMXExporterMetrics(pod, kubectlOptions)
+		actualMetricExists, err := metricExistsInPod(pod, kubectlOptions, metricPrefix)
 		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to execute command inside pod %s", pod.Name))
 
-		if expectMetricExists {
-			Expect(strings.Contains(output, metricPrefix)).To(BeTrue())
-		} else {
-			Expect(strings.Contains(output, metricPrefix)).To(BeFalse())
-		}
+		Expect(actualMetricExists).To(Equal(expectedMetricExists))
 	}
 }
 
-func podExecJMXExporterMetrics(pod coreV1.Pod, kubectlOptions k8s.KubectlOptions) (string, error) {
-	return k8s.RunKubectlAndGetOutputE(GinkgoT(),
+func metricExistsInPod(pod coreV1.Pod, kubectlOptions k8s.KubectlOptions, metricPrefix string) (bool, error) {
+	baseCommand := fmt.Sprintf("exec %s --container kafka -- sh -c", pod.Name)
+	curlCommand := fmt.Sprintf("curl -s http://localhost:%s/metrics|grep ^%s|head -n 1", jmxExporterPort, metricPrefix)
+	output, err := k8s.RunKubectlAndGetOutputE(GinkgoT(),
 		&kubectlOptions,
-		"exec",
-		pod.Name,
-		"--container", "kafka",
-		"--",
-		"curl",
-		fmt.Sprintf("http://localhost:%s/metrics", jmxExporterPort))
+		append(strings.Split(baseCommand, " "), curlCommand)...)
+
+	if err != nil {
+		return false, fmt.Errorf("failed to exec into pod '%s': %w", pod.Name, err)
+	}
+	fmt.Printf("Metric %s* exists?: '%t'\n", metricPrefix, strings.Contains(output, metricPrefix))
+	return strings.Contains(output, metricPrefix), nil
 }
 
-func isKRaftEnabled(kubectlOptions k8s.KubectlOptions, kafkaClusterName string) (bool, error) {
-	jsonOutput, err := k8s.RunKubectlAndGetOutputE(GinkgoT(),
+func isKRaftEnabledForKafkaCluster(kubectlOptions k8s.KubectlOptions, kafkaClusterName string) (bool, error) {
+	command := fmt.Sprintf("get %s %s -o jsonpath={.spec.kRaft}", kafkaKind, kafkaClusterName)
+	kraftModeValue, err := k8s.RunKubectlAndGetOutputE(
+		GinkgoT(),
 		&kubectlOptions,
-		"get",
-		kafkaKind,
-		kafkaClusterName,
-		"-o",
-		"json")
+		strings.Split(command, " ")...)
 
 	if err != nil {
 		return false, fmt.Errorf("failed to get KafkaCluster '%s': %w", kafkaClusterName, err)
 	}
-
-	var kafkaCluster v1beta1.KafkaCluster
-	if err := json.Unmarshal([]byte(jsonOutput), &kafkaCluster); err != nil {
-		return false, fmt.Errorf("failed to unmarshal JSON output into KafkaCluster object: %w", err)
-	}
-
-	return kafkaCluster.Spec.KRaftMode, nil
+	fmt.Printf("Is KRaft enabled?: %s\n", kraftModeValue)
+	return strings.ToLower(kraftModeValue) == "true", nil
 }
