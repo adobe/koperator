@@ -17,8 +17,10 @@
 # This script returns a successful exit code (0) if the controller is a follower or leader.  For any other state, it returns a failure exit code (1).
 # In addition, if the environment variable KRAFT_HEALTH_CHECK_SKIP is set to "true" (case insensitive), the script will exit successfully without performing any checks.
 
-if [ "${KRAFT_HEALTH_CHECK_SKIP,,}" = "true" ]; then
-    echo "KRAFT_HEALTH_CHECK_SKIP is set to TRUE. Exiting liveness check."
+skip_check=$(echo "$KRAFT_HEALTH_CHECK_SKIP" | tr '[:upper:]' '[:lower:]')
+
+if [ "$skip_check" = "true" ]; then
+    echo "KRAFT_HEALTH_CHECK_SKIP is set to TRUE. Exiting health check."
     exit 0
 fi
 
