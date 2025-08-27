@@ -15,10 +15,10 @@
 
 
 # This script returns a successful exit code (0) if the controller is a follower or leader.  For any other state, it returns a failure exit code (1).
-# In addition, if the environment variable ENABLE_KRAFT_LIVENESS_CHECK is set to "false" (case insensitive), the script will exit successfully without performing any checks.
+# In addition, if the environment variable KRAFT_HEALTH_CHECK_SKIP is set to "true" (case insensitive), the script will exit successfully without performing any checks.
 
-if [ "${ENABLE_KRAFT_LIVENESS_CHECK,,}" = "false" ]; then
-    echo "ENABLE_KRAFT_LIVENESS_CHECK is set to FALSE. Exiting liveness check."
+if [ "${KRAFT_HEALTH_CHECK_SKIP,,}" = "true" ]; then
+    echo "KRAFT_HEALTH_CHECK_SKIP is set to TRUE. Exiting liveness check."
     exit 0
 fi
 
