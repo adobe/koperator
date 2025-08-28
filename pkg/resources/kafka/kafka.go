@@ -1164,6 +1164,22 @@ func (r *Reconciler) reconcileKafkaPvc(ctx context.Context, log logr.Logger, bro
 			return errorfactory.New(errorfactory.APIFailure{}, err, "getting resource failed", "kind", desiredType)
 		}
 
+		isController, err := r.isController(util.ConvertStringToInt32(brokerId))
+		if err != nil {
+			return errors.WrapIfWithDetails(err, "could not determine if broker is controller", "brokerId", brokerId)
+		}
+
+		if isController {
+			if len(desiredPvcs) != 1 {
+				return errors.New("controller broker can have only one volume")
+			}
+			// changing the controller's mount path leads to a new disk being added and the controller in an unrecoverable state
+			// due to the new disk not being initialized for kafka.  we want to avoid this situation.
+			if len(pvcList.Items) == 1 && pvcList.Items[0].Annotations["mountPath"] != desiredPvcs[0].Annotations["mountPath"] {
+				return errors.New("controller broker volume mount path cannot be changed")
+			}
+		}
+
 		// Handle disk removal
 		if len(pvcList.Items) > len(desiredPvcs) {
 			for _, pvc := range pvcList.Items {
@@ -1731,4 +1747,17 @@ func generateServicePortForAdditionalPorts(containerPorts []corev1.ContainerPort
 		})
 	}
 	return usedPorts
+}
+
+func (r *Reconciler) isController(brokerId int32) (bool, error) {
+	for _, broker := range r.KafkaCluster.Spec.Brokers {
+		if broker.Id == brokerId {
+			brokerConfig, err := broker.GetBrokerConfig(r.KafkaCluster.Spec)
+			if err != nil {
+				return false, errors.WrapIf(err, "failed to reconcile resource")
+			}
+			return brokerConfig.IsControllerNode(), nil
+		}
+	}
+	return false, errors.NewWithDetails("could not find broker in the spec", "brokerId", brokerId)
 }

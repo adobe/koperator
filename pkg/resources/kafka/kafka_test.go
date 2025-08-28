@@ -42,6 +42,19 @@ import (
 	"github.com/banzaicloud/koperator/pkg/scale"
 )
 
+type PvcTestCase struct {
+	testName            string
+	brokersDesiredPvcs  map[string][]*corev1.PersistentVolumeClaim
+	existingPvcs        []*corev1.PersistentVolumeClaim
+	kafkaClusterSpec    v1beta1.KafkaClusterSpec
+	kafkaClusterStatus  v1beta1.KafkaClusterStatus
+	expectedError       bool
+	expectedErrorMsg    string
+	expectedDeletePvc   bool
+	expectedCreatePvc      bool
+	expectedVolumeState map[string]v1beta1.CruiseControlVolumeState
+}
+
 func TestGetBrokersWithPendingOrRunningCCTask(t *testing.T) {
 	testCases := []struct {
 		testName     string
@@ -959,16 +972,7 @@ func TestGetServerPasswordKeysAndUsers(t *testing.T) { //nolint funlen
 
 func TestReconcileKafkaPvcDiskRemoval(t *testing.T) {
 	t.Parallel()
-	testCases := []struct {
-		testName            string
-		brokersDesiredPvcs  map[string][]*corev1.PersistentVolumeClaim
-		existingPvcs        []*corev1.PersistentVolumeClaim
-		kafkaClusterSpec    v1beta1.KafkaClusterSpec
-		kafkaClusterStatus  v1beta1.KafkaClusterStatus
-		expectedError       bool
-		expectedDeletePvc   bool
-		expectedVolumeState map[string]v1beta1.CruiseControlVolumeState
-	}{
+	testCases := []PvcTestCase{
 		{
 			testName: "If no disk removed, do nothing",
 			brokersDesiredPvcs: map[string][]*corev1.PersistentVolumeClaim{
@@ -1137,9 +1141,106 @@ func TestReconcileKafkaPvcDiskRemoval(t *testing.T) {
 		},
 	}
 
-	mockCtrl := gomock.NewController(t)
+	execPvcTest(t, testCases)
+}
 
+func TestReconcileKafkaPvcDisk(t *testing.T) {
+	t.Parallel()
+	testCases := []PvcTestCase{
+		{
+			testName: "broker with multiple disks is allowed",
+			brokersDesiredPvcs: map[string][]*corev1.PersistentVolumeClaim{
+				"0": {
+					createPvc("test-pvc-1", "0", "/path/to/mount1"),
+					createPvc("test-pvc-2", "0", "/path/to/mount2"),
+				},
+			},
+			existingPvcs: []*corev1.PersistentVolumeClaim{
+				createPvc("test-pvc-1", "0", "/path/to/mount1"),
+			},
+			kafkaClusterSpec: v1beta1.KafkaClusterSpec{
+				Brokers: []v1beta1.Broker{
+					{
+						Id: int32(0),
+						BrokerConfig: &v1beta1.BrokerConfig{
+							Roles: []string{"broker"},
+						},
+					},
+				},
+			},
+			expectedCreatePvc: true,
+			expectedError: false,
+		},
+		{
+			testName: "when a controller has more than 1 disk, it should fail",
+			brokersDesiredPvcs: map[string][]*corev1.PersistentVolumeClaim{
+				"0": {
+					createPvc("test-pvc-1", "0", "/path/to/mount1"),
+					createPvc("test-pvc-2", "0", "/path/to/mount2"),
+				},
+			},
+			existingPvcs: []*corev1.PersistentVolumeClaim{
+				createPvc("test-pvc-1", "0", "/path/to/mount1"),
+			},
+			kafkaClusterSpec: v1beta1.KafkaClusterSpec{
+				Brokers: []v1beta1.Broker{
+					{
+						Id: int32(0),
+						BrokerConfig: &v1beta1.BrokerConfig{
+							Roles: []string{"controller"},
+						},
+					},
+				},
+			},
+			expectedError: true,
+			expectedErrorMsg: "controller broker can have only one volume",
+		},
+		{
+			testName: "when a controller changes a mount path, it should fail",
+			brokersDesiredPvcs: map[string][]*corev1.PersistentVolumeClaim{
+				"0": {
+					createPvc("test-pvc-1", "0", "/path/to/mount1"),
+				},
+			},
+			existingPvcs: []*corev1.PersistentVolumeClaim{
+				createPvc("test-pvc-1", "0", "/path/to/mount2"),
+			},
+			kafkaClusterSpec: v1beta1.KafkaClusterSpec{
+				Brokers: []v1beta1.Broker{
+					{
+						Id: int32(0),
+						BrokerConfig: &v1beta1.BrokerConfig{
+							Roles: []string{"controller"},
+						},
+					},
+				},
+			},
+			expectedError:    true,
+			expectedErrorMsg: "controller broker volume mount path cannot be changed",
+		},
+	}
+	execPvcTest(t, testCases)
+}
+
+func execPvcTest(t *testing.T, testCases []PvcTestCase) {
+	kafkaClusterSpec := v1beta1.KafkaClusterSpec{
+		Brokers: []v1beta1.Broker{
+			{
+				Id: int32(0),
+				BrokerConfig: &v1beta1.BrokerConfig{
+					Roles: []string{"broker"},
+				},
+			},
+		},
+	}
+
+	mockCtrl := gomock.NewController(t)
 	for _, test := range testCases {
+
+		if test.kafkaClusterSpec.Brokers != nil {
+			kafkaClusterSpec = test.kafkaClusterSpec
+		}
+
 		mockClient := mocks.NewMockClient(mockCtrl)
 		mockSubResourceClient := mocks.NewMockSubResourceClient(mockCtrl)
 		t.Run(test.testName, func(t *testing.T) {
@@ -1151,6 +1252,7 @@ func TestReconcileKafkaPvcDiskRemoval(t *testing.T) {
 							Name:      "kafka",
 							Namespace: "kafka",
 						},
+						Spec: kafkaClusterSpec,
 					},
 				},
 			}
@@ -1176,6 +1278,10 @@ func TestReconcileKafkaPvcDiskRemoval(t *testing.T) {
 				mockClient.EXPECT().Delete(context.TODO(), gomock.AssignableToTypeOf(&corev1.PersistentVolumeClaim{})).Return(nil)
 			}
 
+			// Mock the client.Create call
+			if test.expectedCreatePvc {
+				mockClient.EXPECT().Create(context.TODO(), gomock.AssignableToTypeOf(&corev1.PersistentVolumeClaim{})).Return(nil)
+			}
 			// Mock the status update call
 			mockClient.EXPECT().Status().Return(mockSubResourceClient).AnyTimes()
 			mockSubResourceClient.EXPECT().Update(context.Background(), gomock.AssignableToTypeOf(&v1beta1.KafkaCluster{})).Do(func(ctx context.Context, kafkaCluster *v1beta1.KafkaCluster, opts ...client.SubResourceUpdateOption) {
@@ -1191,6 +1297,10 @@ func TestReconcileKafkaPvcDiskRemoval(t *testing.T) {
 			// Test that the expected error is returned
 			if test.expectedError {
 				assert.NotNil(t, err, "Expected an error but got nil")
+
+				if test.expectedErrorMsg != "" {
+					assert.Contains(t, err.Error(), test.expectedErrorMsg, "Error message does not contain expected text.\nActual:   %s\nExpected: %s", err.Error(), test.expectedErrorMsg)
+				}
 			} else {
 				assert.Nil(t, err, "Expected no error but got an error")
 			}
