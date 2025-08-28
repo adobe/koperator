@@ -1233,10 +1233,9 @@ func execPvcTest(t *testing.T, testCases []PvcTestCase) {
 			},
 		},
 	}
-
 	mockCtrl := gomock.NewController(t)
-	for _, test := range testCases {
 
+	for _, test := range testCases {
 		if test.kafkaClusterSpec.Brokers != nil {
 			kafkaClusterSpec = test.kafkaClusterSpec
 		}
