@@ -51,7 +51,7 @@ type PvcTestCase struct {
 	expectedError       bool
 	expectedErrorMsg    string
 	expectedDeletePvc   bool
-	expectedCreatePvc      bool
+	expectedCreatePvc   bool
 	expectedVolumeState map[string]v1beta1.CruiseControlVolumeState
 }
 
@@ -1169,7 +1169,7 @@ func TestReconcileKafkaPvcDisk(t *testing.T) {
 				},
 			},
 			expectedCreatePvc: true,
-			expectedError: false,
+			expectedError:     false,
 		},
 		{
 			testName: "when a controller has more than 1 disk, it should fail",
@@ -1192,7 +1192,7 @@ func TestReconcileKafkaPvcDisk(t *testing.T) {
 					},
 				},
 			},
-			expectedError: true,
+			expectedError:    true,
 			expectedErrorMsg: "controller broker can have only one volume",
 		},
 		{
