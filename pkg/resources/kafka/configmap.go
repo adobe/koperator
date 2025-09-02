@@ -63,7 +63,7 @@ func (r *Reconciler) getConfigProperties(bConfig *v1beta1.BrokerConfig, broker v
 	config.Merge(generalConfig)
 
 	// Cruise Control metrics reporter configuration
-	r.configCCMetricsReporter(broker, config, clientPass, log)
+	r.configCCMetricsReporter(broker, bConfig, config, clientPass, log)
 
 	brokerReadOnlyConfig := getBrokerReadOnlyConfig(broker, r.KafkaCluster, log)
 
@@ -112,7 +112,12 @@ func (r *Reconciler) getConfigProperties(bConfig *v1beta1.BrokerConfig, broker v
 	return config
 }
 
-func (r *Reconciler) configCCMetricsReporter(broker v1beta1.Broker, config *properties.Properties, clientPass string, log logr.Logger) {
+func (r *Reconciler) configCCMetricsReporter(broker v1beta1.Broker, bConfig *v1beta1.BrokerConfig, config *properties.Properties, clientPass string, log logr.Logger) {
+	// Cruise Control Metrics Reporter configuration is only needed for brokers
+	if bConfig.IsControllerOnlyNode() {
+		return
+	}
+
 	// Add Cruise Control Metrics Reporter SSL configuration
 	if util.IsSSLEnabledForInternalCommunication(r.KafkaCluster.Spec.ListenersConfig.InternalListeners) {
 		if !r.KafkaCluster.Spec.IsClientSSLSecretPresent() {
