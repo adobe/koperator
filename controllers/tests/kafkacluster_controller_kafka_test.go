@@ -262,17 +262,13 @@ process.roles=broker
 			fmt.Println("Controller-only mode line 187")
 			expectedBrokerConfig = fmt.Sprintf(`controller.listener.names=CONTROLLER
 controller.quorum.voters=1@%s-1.%s.svc.cluster.local:29093,2@%s-2.%s.svc.cluster.local:29093
-cruise.control.metrics.reporter.bootstrap.servers=%s-all-broker.%s.svc.cluster.local:29092
-cruise.control.metrics.reporter.kubernetes.mode=true
 inter.broker.listener.name=INTERNAL
 listener.security.protocol.map=TEST:PLAINTEXT,INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
 listeners=CONTROLLER://:29093
 log.dirs=/kafka-logs/kafka,/ephemeral-dir1/kafka
-metric.reporters=com.linkedin.kafka.cruisecontrol.metricsreporter.CruiseControlMetricsReporter
 node.id=%d
 process.roles=controller
-`, kafkaCluster.Name, kafkaCluster.Namespace, kafkaCluster.Name, kafkaCluster.Namespace, kafkaCluster.Name,
-				kafkaCluster.Namespace, broker.Id)
+`, kafkaCluster.Name, kafkaCluster.Namespace, kafkaCluster.Name, kafkaCluster.Namespace, broker.Id)
 		case 2:
 			// combined node
 			//debug
