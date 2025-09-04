@@ -440,7 +440,9 @@ func generateListenerSpecificConfig(kcs *v1beta1.KafkaClusterSpec, serverPasses 
 		brokerID := broker.Id
 
 		b := broker.ReadOnlyConfig
-		trimmedConfig := strings.TrimSpace(b)
+		krb := kcs.ReadOnlyConfig
+
+		trimmedConfig := strings.TrimSpace(b) + strings.TrimSpace(krb)
 
 		if strings.Contains(trimmedConfig, kafkautils.KafkaConfigSecurityInterBrokerProtocol+"=") {
 			log.Info("Security InterBrokerProtocol is set for this broker, skipping config update", "broker", broker)
