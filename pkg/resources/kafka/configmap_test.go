@@ -619,7 +619,6 @@ zookeeper.connect=example.zk:2181/`,
 broker.id=0
 cruise.control.metrics.reporter.bootstrap.servers=kafka-all-broker.kafka.svc.cluster.local:9092
 cruise.control.metrics.reporter.kubernetes.mode=true
-inter.broker.listener.name=INTERNAL
 listener.security.protocol.map=INTERNAL:PLAINTEXT
 listeners=INTERNAL://:9092
 security.inter.broker.protocol=SASL_SSL
