@@ -65,15 +65,15 @@ func (r *Reconciler) pod(id int32, brokerConfig *v1beta1.BrokerConfig, pvcs []co
 				Exec: &corev1.ExecAction{
 					Command: []string{"bash", "-c", `
 if [[ -n "$ENVOY_SIDECAR_STATUS" ]]; then
-HEALTHYSTATUSCODE="200"
-SC=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:15000/ready)
-if [[ "$SC" == "$HEALTHYSTATUSCODE" ]]; then
-kill -s TERM $(pidof java)
+  HEALTHYSTATUSCODE="200"
+  SC=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:15000/ready)
+  if [[ "$SC" == "$HEALTHYSTATUSCODE" ]]; then
+    kill -s TERM $(pidof java)
+  else
+    kill -s KILL $(pidof java)
+  fi
 else
-kill -s KILL $(pidof java)
-fi
-else
-kill -s TERM $(pidof java)
+  kill -s TERM $(pidof java)
 fi`},
 				},
 			},
