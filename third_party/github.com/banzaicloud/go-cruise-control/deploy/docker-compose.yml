@@ -1,0 +1,375 @@
+version: "3"
+
+services:
+  zookeeper:
+    image: zookeeper:3.6
+    restart: unless-stopped
+    hostname: zookeeper
+    container_name: zookeeper
+    ports:
+      - "12181:2181"
+    environment:
+      ZOO_MY_ID: 1
+      ZOO_STANDALONE_ENABLED: 'true'
+    expose:
+      - 2181
+    networks:
+      - kafka
+    volumes:
+      - type: volume
+        source: zookeeper_data
+        target: /data
+        volume:
+          nocopy: true
+      - type: volume
+        source: zookeeper_datalog
+        target: /datalog
+        volume:
+          nocopy: true
+    healthcheck:
+      test: [
+          "CMD",
+          "nc",
+          "-z",
+          "127.0.0.1",
+          "2181"
+      ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  cruisecontrolmetrics:
+    image: "${CRUISE_CONTROL_IMAGE}"
+    restart: "on-failure"
+    hostname: cruisecontrolmetrics
+    container_name: cruisecontrolmetrics
+    environment:
+      - METRICS_REPORTER_FILE=/opt/cruise-control/cruise-control/build/dependant-libs/cruise-control-metrics-reporter.jar
+    command: ["/run.sh"]
+    networks:
+      - kafka
+    volumes:
+      - type: volume
+        source: cruisecontrolmetrics
+        target: /metrics
+      - type: bind
+        source: ./cruisecontrolmetrics/run.sh
+        target: /run.sh
+    healthcheck:
+      test: [
+          "CMD",
+          "test",
+          "-f",
+          "/metrics/cruise-control-metrics-reporter.jar"
+      ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  kafka-0:
+    image: confluentinc/cp-kafka:6.2.2
+    restart: unless-stopped
+    user: root
+    hostname: kafka-0
+    container_name: kafka-0
+    command: ["/run.sh"]
+    environment:
+      - KAFKA_BROKER_ID=0
+      - KAFKA_ADVERTISED_LISTENERS=INTERNAL://kafka-0:9092,EXTERNAL://kafka-0:9093,CONTROLLER://kafka-0:9094
+      - CLASSPATH=/metrics/*
+      - KAFKA_BROKER_RACK=rack-0
+    env_file:
+      - kafka/kafka.env
+    ports:
+      - "19092:9092"
+      - "19093:9093"
+      - "19094:9094"
+    expose:
+      - 9092
+      - 9093
+      - 9094
+    networks:
+      - kafka
+    depends_on:
+      - zookeeper
+      - cruisecontrolmetrics
+    volumes:
+      - type: volume
+        source: kafka_0_data
+        target: /var/lib/kafka
+      - type: volume
+        source: kafka_0_secrets
+        target: /etc/kafka/secrets
+      - type: volume
+        source: cruisecontrolmetrics
+        target: /metrics
+      - type: bind
+        source: ./kafka/run.sh
+        target: /run.sh
+    healthcheck:
+      test: [
+          "CMD",
+          "nc",
+          "-z",
+          "127.0.0.1",
+          "9092"
+      ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  kafka-1:
+    image: confluentinc/cp-kafka:6.2.2
+    restart: unless-stopped
+    user: root
+    hostname: kafka-1
+    container_name: kafka-1
+    command: ["/run.sh"]
+    environment:
+      - KAFKA_BROKER_ID=1
+      - KAFKA_ADVERTISED_LISTENERS=INTERNAL://kafka-1:9092,EXTERNAL://kafka-1:9093,CONTROLLER://kafka-1:9094
+      - CLASSPATH=/metrics/*
+      - KAFKA_BROKER_RACK=rack-1
+    env_file:
+      - kafka/kafka.env
+    ports:
+      - "29092:9092"
+      - "29093:9093"
+      - "29094:9094"
+    expose:
+      - 9092
+      - 9093
+      - 9094
+    networks:
+      - kafka
+    depends_on:
+      - zookeeper
+      - cruisecontrolmetrics
+    volumes:
+      - type: volume
+        source: kafka_1_data
+        target: /var/lib/kafka
+      - type: volume
+        source: kafka_1_secrets
+        target: /etc/kafka/secrets
+      - type: volume
+        source: cruisecontrolmetrics
+        target: /metrics
+      - type: bind
+        source: ./kafka/run.sh
+        target: /run.sh
+    healthcheck:
+      test: [
+          "CMD",
+          "nc",
+          "-z",
+          "127.0.0.1",
+          "9092"
+      ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  kafka-2:
+    image: confluentinc/cp-kafka:6.2.2
+    restart: unless-stopped
+    user: root
+    hostname: kafka-2
+    container_name: kafka-2
+    command: ["/run.sh"]
+    environment:
+      - KAFKA_BROKER_ID=2
+      - KAFKA_ADVERTISED_LISTENERS=INTERNAL://kafka-2:9092,EXTERNAL://kafka-2:9093,CONTROLLER://kafka-2:9094
+      - CLASSPATH=/metrics/*
+      - KAFKA_BROKER_RACK=rack-2
+    env_file:
+      - kafka/kafka.env
+    ports:
+      - "39092:9092"
+      - "39093:9093"
+      - "39094:9094"
+    expose:
+      - 9092
+      - 9093
+      - 9094
+    networks:
+      - kafka
+    depends_on:
+      - zookeeper
+      - cruisecontrolmetrics
+    volumes:
+      - type: volume
+        source: kafka_2_data
+        target: /var/lib/kafka
+      - type: volume
+        source: kafka_2_secrets
+        target: /etc/kafka/secrets
+      - type: volume
+        source: cruisecontrolmetrics
+        target: /metrics
+      - type: bind
+        source: ./kafka/run.sh
+        target: /run.sh
+    healthcheck:
+      test: [
+          "CMD",
+          "nc",
+          "-z",
+          "127.0.0.1",
+          "9092"
+      ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  cruisecontrol:
+    image: "${CRUISE_CONTROL_IMAGE}"
+    restart: unless-stopped
+    hostname: cruisecontrol
+    container_name: cruisecontrol
+    command: "/opt/cruise-control/start.sh"
+    environment:
+      - BOOTSTRAP_SERVERS=kafka-0:9092,kafka-1:9092,kafka-2:9092
+    ports:
+      - "8090:8090"
+    expose:
+      - 8090
+    networks:
+      - kafka
+    depends_on:
+      - zookeeper
+      - kafka-0
+      - kafka-1
+      - kafka-2
+    volumes:
+      - type: bind
+        source: ./cruisecontrol
+        target: /opt/cruise-control/config
+    healthcheck:
+      # curl is not installed in the adobe image
+      test: [
+        "CMD-SHELL",
+        "bash -c 'echo > /dev/tcp/localhost/8090'",
+      ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      #start_period: 30s
+
+  producer:
+    image: confluentinc/cp-kafka:6.2.2
+    restart: unless-stopped
+    hostname: producer
+    container_name: producer
+    environment:
+      - KAFKA_BROKERS=kafka-0:9092,kafka-1:9092,kafka-2:9092
+      - TOPIC=airports
+    env_file:
+      - producer/producer.env
+    command: ["/wait-for-it", "-t", "120", "kafka-0:9092", "--", "/producer/run.sh"]
+    networks:
+      - kafka
+    depends_on:
+      - kafka-0
+      - kafka-1
+      - kafka-2
+    volumes:
+      - type: bind
+        source: ./producer
+        target: /producer
+      - type: bind
+        source: ./wait-for-it
+        target: /wait-for-it
+    healthcheck:
+      test: [
+          "CMD",
+          "test",
+          "-f",
+          "/tmp/producer.pid"
+      ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  consumer:
+    image: confluentinc/cp-kafka:6.2.2
+    restart: unless-stopped
+    hostname: consumer
+    container_name: consumer
+    environment:
+      - KAFKA_BROKERS=kafka-0:9092,kafka-1:9092,kafka-2:9092
+      - TOPIC=airports
+    env_file:
+      - consumer/consumer.env
+    command: ["/wait-for-it", "-t", "120", "kafka-0:9092", "--", "/consumer/run.sh"]
+    networks:
+      - kafka
+    depends_on:
+      - kafka-0
+      - kafka-1
+      - kafka-2
+    volumes:
+      - type: bind
+        source: ./consumer
+        target: /consumer
+      - type: bind
+        source: ./wait-for-it
+        target: /wait-for-it
+    healthcheck:
+      test: [
+          "CMD",
+          "test",
+          "-f",
+          "/tmp/consumer.pid"
+      ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  kafka-ui:
+    profiles:
+      - development
+    container_name: kafka-ui
+    image: provectuslabs/kafka-ui:latest
+    ports:
+      - "8080:8080"
+    networks:
+      - kafka
+    depends_on:
+      - zookeeper
+      - kafka-0
+      - kafka-1
+      - kafka-2
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka-0:9092,kafka-1:9092,kafka-2:9092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+      KAFKA_CLUSTERS_0_JMXPORT: 9997
+    healthcheck:
+      test: [
+        "CMD",
+        "wget",
+        "--spider",
+        "http://127.0.0.1:8080/"
+      ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  zookeeper_data:
+  zookeeper_datalog:
+  kafka_0_data:
+  kafka_0_secrets:
+  kafka_1_data:
+  kafka_1_secrets:
+  kafka_2_data:
+  kafka_2_secrets:
+  cruisecontrolmetrics:
+
+networks:
+  kafka:
+    ipam:
+      driver: default
+      config:
+        - subnet: 192.168.200.0/24

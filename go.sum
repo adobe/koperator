@@ -17,17 +17,8 @@ github.com/Masterminds/sprig/v3 v3.2.3/go.mod h1:rXcFaZ2zZbLRJv/xSysmlgIM1u11eBa
 github.com/NYTimes/gziphandler v0.0.0-20170623195520-56545f4a5d46/go.mod h1:3wb06e3pkSAbeQ52E9H9iFoQsEEwGN64994WTCIhntQ=
 github.com/PuerkitoBio/purell v1.0.0/go.mod h1:c11w/QuzBsJSee3cPx9rAFu61PvFxuPbtSwDGJws/X0=
 github.com/PuerkitoBio/urlesc v0.0.0-20160726150825-5bd2802263f2/go.mod h1:uGdkoq3SwY9Y+13GIhn11/XLaGBb4BfwItxLd5jeuXE=
-github.com/adobe/go-cruise-control v0.6.1-adbe h1:dTarO7nW+JrFdIIKHVvayoosUdszhTj63upa44Ytj2A=
-github.com/adobe/go-cruise-control v0.6.1-adbe/go.mod h1:S2hrm4FrQTvwg/MNzm2P1W1U2TuSw9YI/AQ9kDQiScY=
-github.com/banzaicloud/istio-client-go v0.0.17 h1:wiplbM7FDiIHopujInAnin3zuovtVcphtKy9En39q5I=
-github.com/banzaicloud/istio-client-go v0.0.17/go.mod h1:rpnEYYGHzisx8nARl2d30Oq38EeCX0/PPaxMaREfE9I=
-github.com/banzaicloud/istio-operator/api/v2 v2.17.2 h1:dvzPxXWALiCjaxseE/oK4yWfGAlmM/BQtJT4uaEbBWg=
-github.com/banzaicloud/istio-operator/api/v2 v2.17.2/go.mod h1:IEAImvDm2L4sY3hnNpsImg3ElcAY73KERmA+xoKVpW8=
-github.com/banzaicloud/k8s-objectmatcher v1.8.0 h1:Nugn25elKtPMTA2br+JgHNeSQ04sc05MDPmpJnd1N2A=
-github.com/banzaicloud/k8s-objectmatcher v1.8.0/go.mod h1:p2LSNAjlECf07fbhDyebTkPUIYnU05G+WfGgkTmgeMg=
 github.com/banzaicloud/operator-tools v0.28.10 h1:mm+LvL31GV9BL//zs/CTKVcFdHHyZ+KIbuNoXrOo3gA=
 github.com/banzaicloud/operator-tools v0.28.10/go.mod h1:PhwQ6bn1blX+SuH5ALj3Fwvvmsi1KdAwke8NufILY8I=
-github.com/benbjohnson/clock v1.1.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
 github.com/briandowns/spinner v1.23.0 h1:alDF2guRWqa/FOZZYWjlMIx2L6H0wyewPxo/CH4Pt2A=

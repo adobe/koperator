@@ -1,0 +1,411 @@
+// Copyright 2021 Cisco Systems, Inc. and/or its affiliates.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+import "api/v1alpha1/common.proto";
+import "api/v1alpha1/istiomeshgateway.proto";
+import "k8s.io/api/core/v1/generated.proto";
+import "mesh/v1alpha1/config.proto";
+import "mesh/v1alpha1/proxy.proto";
+import "google/api/field_behavior.proto";
+import "google/protobuf/wrappers.proto";
+
+// $schema: istio-operator.api.v1alpha1.IstioControlPlaneSpec
+// $title: Istio ControlPlane Spec
+// $description: Istio control plane descriptor
+
+package istio_operator.v2.api.v1alpha1;
+
+option go_package = "github.com/banzaicloud/istio-operator/v2/api/v1alpha1";
+
+// IstioControlPlane defines an Istio control plane
+//
+// <!-- crd generation tags
+// +cue-gen:IstioControlPlane:groupName:servicemesh.cisco.com
+// +cue-gen:IstioControlPlane:version:v1alpha1
+// +cue-gen:IstioControlPlane:storageVersion
+// +cue-gen:IstioControlPlane:annotations:helm.sh/resource-policy=keep
+// +cue-gen:IstioControlPlane:subresource:status
+// +cue-gen:IstioControlPlane:scope:Namespaced
+// +cue-gen:IstioControlPlane:resource:shortNames=icp,istiocp
+// +cue-gen:IstioControlPlane:printerColumn:name="Mode",type="string",JSONPath=".spec.mode",description="Mode for the Istio control plane"
+// +cue-gen:IstioControlPlane:printerColumn:name="Network",type="string",JSONPath=".spec.networkName",description="The network this cluster belongs to"
+// +cue-gen:IstioControlPlane:printerColumn:name="Status",type="string",JSONPath=".status.status",description="Status of the resource"
+// +cue-gen:IstioControlPlane:printerColumn:name="Mesh expansion",type="string",JSONPath=".spec.meshExpansion.enabled",description="Whether mesh expansion is enabled"
+// +cue-gen:IstioControlPlane:printerColumn:name="Expansion GW IPs",type="string",JSONPath=".status.gatewayAddress",description="IP addresses of the mesh expansion gateway"
+// +cue-gen:IstioControlPlane:printerColumn:name="Error",type="string",JSONPath=".status.errorMessage",description="Error message"
+// +cue-gen:IstioControlPlane:printerColumn:name=Age,type=date,JSONPath=.metadata.creationTimestamp,description="CreationTimestamp is a timestamp
+// representing the server time when this object was created. It is not guaranteed to be set in happens-before order across separate operations.
+// Clients may not set this value. It is represented in RFC3339 form and is in UTC.
+// Populated by the system. Read-only. Null for lists. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata"
+// +cue-gen:IstioControlPlane:preserveUnknownFields:false
+// +cue-gen:IstioControlPlane:aliases:PeerIstioControlPlane
+// -->
+//
+// <!-- go code generation tags
+// +genclient
+// +k8s:deepcopy-gen=true
+// -->
+message IstioControlPlaneSpec {
+    // Contains the intended version for the Istio control plane.
+    // +kubebuilder:validation:Pattern=^1\.
+    string version = 1 [(google.api.field_behavior) = REQUIRED];
+    // Configure the mode for this control plane.
+    // Currently, two options are supported: "ACTIVE" and "PASSIVE".
+    // ACTIVE mode means that a full-fledged Istio control plane will be deployed and operated
+    // (usually called primary cluster in upstream Istio terminology).
+    // PASSIVE mode means that only a few resources will be installed for sidecar injection and cross-cluster
+    // communication, it is used for multi cluster setups (this is the remote cluster in upstream Istio terminology).
+    // +kubebuilder:validation:Enum=ACTIVE;PASSIVE
+    ModeType mode = 2 [(google.api.field_behavior) = REQUIRED];
+    // Logging configurations.
+    LoggingConfiguration logging = 3;
+    // Use the user-specified, secret volume mounted key and certs for Pilot and workloads.
+    google.protobuf.BoolValue mountMtlsCerts = 4;
+    // Istiod configuration.
+    IstiodConfiguration istiod = 5;
+    // Proxy configuration options.
+    ProxyConfiguration proxy = 6;
+    // Proxy Init configuration options.
+    ProxyInitConfiguration proxyInit = 7;
+    // Telemetry V2 configuration.
+    TelemetryV2Configuration telemetryV2 = 8;
+    // If SDS is configured, mTLS certificates for the sidecars will be distributed through the
+    // SecretDiscoveryService instead of using K8S secrets to mount the certificates.
+    SDSConfiguration sds = 9;
+    // ProxyWasm configuration options.
+    ProxyWasmConfiguration proxyWasm = 10;
+    // Whether to restrict the applications namespace the controller manages.
+    // If not set, controller watches all namespaces
+    google.protobuf.BoolValue watchOneNamespace = 11;
+    // Configure the policy for validating JWT.
+    // Currently, two options are supported: "third-party-jwt" and "first-party-jwt".
+    // +kubebuilder:validation:Enum=THIRD_PARTY_JWT;FIRST_PARTY_JWT
+    JWTPolicyType jwtPolicy = 12;
+    // The customized CA address to retrieve certificates for the pods in the cluster.
+    // CSR clients such as the Istio Agent and ingress gateways can use this to specify the CA endpoint.
+    string caAddress = 13;
+    // The name of the CA for workload certificates.
+    string caProvider = 14;
+    // Contains the intended distribution for the Istio control plane.
+    // The official distribution is used by default unless special preserved distribution value is set.
+    // The only preserved distribution is "cisco" as of now.
+    string distribution = 15;
+    // Upstream HTTP proxy properties to be injected as environment variables to the pod containers.
+    HTTPProxyEnvsConfiguration httpProxyEnvs = 16;
+    // Defines mesh-wide settings for the Istio control plane.
+    istio.mesh.v1alpha1.MeshConfig meshConfig = 17;
+    // K8s resource overlay patches
+    repeated K8sResourceOverlayPatch k8sResourceOverlays = 18;
+    // Name of the Mesh to which this control plane belongs.
+    string meshID = 19;
+    // Global configuration for container images.
+    ContainerImageConfiguration containerImageConfiguration = 20;
+    // Mesh expansion configuration
+    MeshExpansionConfiguration meshExpansion = 21;
+    // Cluster ID
+    string clusterID = 22;
+    // Network defines the network this cluster belongs to. This name
+    // corresponds to the networks in the map of mesh networks.
+    // +default=network1
+    string networkName = 23;
+    // Standalone sidecar injector configuration.
+    SidecarInjectorConfiguration sidecarInjector = 24;
+    // Tracing defines configuration for the tracing performed by Envoy instances.
+    istio.mesh.v1alpha1.Tracing tracer = 25;
+}
+
+enum ModeType {
+    ModeType_UNSPECIFIED = 0;
+    ACTIVE = 1;
+    PASSIVE = 2;
+}
+
+message SidecarInjectorConfiguration {
+    // Deployment spec
+    BaseKubernetesResourceConfig deployment = 1;
+    // Service spec
+    Service service = 2;
+    // Fields to introduce sidecar injection template customizations
+    SidecarInjectionTemplates templates = 3;
+}
+
+message SidecarInjectionTemplates {
+    // Overrides for the default "sidecar" injection template. This template will be merged with the default "sidecar" template, overwriting values, if existing.
+    string sidecar = 1;
+    // Overrides for the default "gateway" injection template. This template will be merged with the default "gateway" template, overwriting values, if existing.
+    string gateway = 2;
+    // Custom templates can be defined for sidecar injection. These templates can be applied by annotating pods with "inject.istio.io/templates=<name of custom template>". See https://istio.io/latest/docs/setup/additional-setup/sidecar-injection/#custom-templates-experimental.
+    repeated CustomSidecarInjectionTemplates customTemplates = 3;
+}
+
+message CustomSidecarInjectionTemplates {
+    string name = 1;
+    string template = 2;
+}
+
+message MeshExpansionConfiguration {
+    google.protobuf.BoolValue enabled = 1;
+    message Istiod {
+        google.protobuf.BoolValue expose = 1;
+    }
+    message Webhook {
+        google.protobuf.BoolValue expose = 1;
+    }
+    message ClusterServices {
+        google.protobuf.BoolValue expose = 1;
+    }
+    message IstioMeshGatewayConfiguration {
+        // Istio Mesh gateway metadata
+        K8sObjectMeta metadata = 1;
+        // Deployment spec
+        BaseKubernetesResourceConfig deployment = 2;
+        // Service spec
+        UnprotectedService service = 3;
+        // Whether to run the gateway in a privileged container
+        google.protobuf.BoolValue runAsRoot = 4;
+        // K8s resource overlay patches
+        repeated K8sResourceOverlayPatch k8sResourceOverlays = 5;
+    }
+    IstioMeshGatewayConfiguration gateway = 2;
+    // istiod component configuration
+    Istiod istiod = 3;
+    // webhook component configuration
+    Webhook webhook = 4;
+    // cluster services configuration
+    ClusterServices clusterServices = 5;
+}
+
+// Comma-separated minimum per-scope logging level of messages to output, in the form of <scope>:<level>,<scope>:<level>
+// The control plane has different scopes depending on component, but can configure default log level across all components
+// If empty, default scope and level will be used as configured in code
+message LoggingConfiguration {
+    // +kubebuilder:validation:Pattern=`^([a-zA-Z]+:[a-zA-Z]+,?)+$`
+    string level = 1;
+}
+
+// SDSConfiguration defines Secret Discovery Service config options
+message SDSConfiguration {
+    // The JWT token for SDS and the aud field of such JWT. See RFC 7519, section 4.1.3.
+    // When a CSR is sent from Citadel Agent to the CA (e.g. Citadel), this aud is to make sure the
+    // 	JWT is intended for the CA.
+    string tokenAudience = 1;
+}
+
+// ProxyConfiguration defines config options for Proxy
+message ProxyConfiguration {
+    string image = 1;
+    // If set to true, istio-proxy container will have privileged securityContext
+    google.protobuf.BoolValue privileged = 2;
+    // If set, newly injected sidecars will have core dumps enabled.
+    google.protobuf.BoolValue enableCoreDump = 3;
+    // Log level for proxy, applies to gateways and sidecars. If left empty, "warning" is used.
+    // Expected values are: trace|debug|info|warning|error|critical|off
+    // +kubebuilder:validation:Enum=TRACE;DEBUG;INFO;WARNING;ERROR;CRITICAL;OFF
+    ProxyLogLevel logLevel = 4;
+    // Per Component log level for proxy, applies to gateways and sidecars. If a component level is
+    // not set, then the "LogLevel" will be used. If left empty, "misc:error" is used.
+    string componentLogLevel = 5;
+    // cluster domain. Default value is "cluster.local"
+    string clusterDomain = 6;
+    // Controls if sidecar is injected at the front of the container list and blocks
+    // the start of the other containers until the proxy is ready
+    // Default value is 'false'.
+    google.protobuf.BoolValue holdApplicationUntilProxyStarts = 7;
+    k8s.io.api.core.v1.Lifecycle lifecycle = 8;
+    ResourceRequirements resources = 9;
+    // IncludeIPRanges the range where to capture egress traffic
+    string includeIPRanges = 10;
+    // ExcludeIPRanges the range where not to capture egress traffic
+    string excludeIPRanges = 11;
+    // ExcludeInboundPorts the comma separated list of inbound ports to be excluded from redirection to Envoy
+    string excludeInboundPorts = 12;
+    // ExcludeOutboundPorts the comma separated list of outbound ports to be excluded from redirection to Envoy
+    string excludeOutboundPorts = 13;
+    // Specify which tracer to use. One of: zipkin, lightstep, datadog, stackdriver
+    optional string tracer = 14;
+}
+
+enum ProxyLogLevel {
+    ProxyLogLevel_UNSPECIFIED = 0;
+    TRACE = 1;
+    DEBUG = 2;
+    INFO = 3;
+    WARNING = 4;
+    ERROR = 5;
+    CRITICAL = 6;
+    OFF = 7;
+}
+
+// ProxyInitConfiguration defines config options for Proxy Init containers
+message ProxyInitConfiguration {
+    string image = 1;
+    ResourceRequirements resources = 2;
+    CNIConfiguration cni = 3;
+}
+
+message CNIConfiguration {
+    google.protobuf.BoolValue enabled = 1;
+    google.protobuf.BoolValue chained = 2;
+    string binDir = 4;
+    string confDir = 5;
+    repeated string excludeNamespaces = 6;
+    repeated string includeNamespaces = 7;
+    string logLevel = 8;
+    string confFileName = 9;
+    string pspClusterRoleName = 10;
+
+    message RepairConfiguration {
+        google.protobuf.BoolValue enabled = 1;
+        google.protobuf.BoolValue labelPods = 2;
+        google.protobuf.BoolValue deletePods = 3;
+        string initContainerName = 4;
+        string brokenPodLabelKey = 5;
+        string brokenPodLabelValue = 6;
+    }
+    RepairConfiguration repair = 11;
+
+    message TaintConfiguration {
+        google.protobuf.BoolValue enabled = 1;
+        BaseKubernetesContainerConfiguration container = 2;
+    }
+    TaintConfiguration taint = 12;
+
+    message ResourceQuotas {
+        google.protobuf.BoolValue enabled = 1;
+        string pods = 2;
+        repeated string priorityClasses = 3;
+    }
+    ResourceQuotas resourceQuotas = 13;
+
+    BaseKubernetesResourceConfig daemonset = 14;
+}
+
+// IstiodConfiguration defines config options for Istiod
+message IstiodConfiguration {
+    // Deployment spec
+    BaseKubernetesResourceConfig deployment = 1;
+    // If enabled, pilot will run Istio analyzers and write analysis errors to the Status field of any Istio Resources
+    google.protobuf.BoolValue enableAnalysis = 2;
+    // If enabled, pilot will update the CRD Status field of all Istio resources with reconciliation status
+    google.protobuf.BoolValue enableStatus = 3;
+    // Settings for local istiod to control remote clusters as well
+    ExternalIstiodConfiguration externalIstiod = 4;
+    google.protobuf.FloatValue traceSampling = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+    // If enabled, protocol sniffing will be used for outbound listeners whose port protocol is not specified or unsupported
+    google.protobuf.BoolValue enableProtocolSniffingOutbound = 6;
+    // If enabled, protocol sniffing will be used for inbound listeners whose port protocol is not specified or unsupported
+    google.protobuf.BoolValue enableProtocolSniffingInbound = 7;
+    // Configure the certificate provider for control plane communication.
+    // Currently, two providers are supported: "kubernetes" and "istiod".
+    // As some platforms may not have kubernetes signing APIs,
+    // Istiod is the default
+    // +kubebuilder:validation:Enum=KUBERNETES;ISTIOD
+    PilotCertProviderType certProvider = 8;
+    // SPIFFE configuration of Pilot
+    SPIFFEConfiguration spiffe = 9;
+}
+
+// ExternalIstiodConfiguration defines settings for local istiod to control remote clusters as well
+message ExternalIstiodConfiguration {
+    google.protobuf.BoolValue enabled = 1;
+}
+
+enum PilotCertProviderType {
+    PilotCertProviderType_UNSPECIFIED = 0;
+    KUBERNETES = 1;
+    ISTIOD = 2;
+}
+
+// SPIFFEConfiguration is for SPIFFE configuration of Pilot
+message SPIFFEConfiguration {
+    OperatorEndpointsConfiguration operatorEndpoints = 1;
+}
+
+// OperatorEndpointsConfiguration defines config options for automatic SPIFFE endpoints
+message OperatorEndpointsConfiguration {
+    google.protobuf.BoolValue enabled = 1;
+}
+
+message TelemetryV2Configuration {
+    google.protobuf.BoolValue enabled = 1;
+}
+
+// ProxyWasmConfiguration defines config options for Envoy wasm
+message ProxyWasmConfiguration {
+    google.protobuf.BoolValue enabled = 1;
+}
+
+// PDBConfiguration holds Pod Disruption Budget related config options
+message PDBConfiguration {
+    google.protobuf.BoolValue enabled = 1;
+}
+
+enum JWTPolicyType {
+    JWTPolicyType_UNSPECIFIED = 0;
+    THIRD_PARTY_JWT = 1;
+    FIRST_PARTY_JWT = 2;
+}
+
+message HTTPProxyEnvsConfiguration {
+    string httpProxy = 1;
+    string httpsProxy = 2;
+    string noProxy = 3;
+}
+
+// <!-- go code generation tags
+// +genclient
+// +k8s:deepcopy-gen=true
+// -->
+message IstioControlPlaneStatus {
+    // Reconciliation status of the Istio control plane
+    ConfigState status = 1;
+
+    // Cluster ID
+    string clusterID = 2;
+
+    // Name of the IstioControlPlane resource
+    // It is used on remote clusters in the PeerIstioControlPlane resource status
+    // to identify the original Istio control plane
+    string istioControlPlaneName = 3;
+
+    // Current addresses for the corresponding gateways
+    repeated string gatewayAddress = 4;
+
+    // Current addresses for the corresponding istiod pods
+    repeated string istiodAddresses = 5;
+
+    // Namespaces which are set for injection for this control plane
+    repeated string injectionNamespaces = 6;
+
+    // Istio CA root certificate
+    string caRootCertificate = 7;
+
+    // Reconciliation error message if any
+    string errorMessage = 8;
+
+    istio.mesh.v1alpha1.MeshConfig meshConfig = 9;
+
+    StatusChecksums checksums = 10;
+}
+
+// <!-- go code generation tags
+// +genclient
+// +k8s:deepcopy-gen=true
+// -->
+message StatusChecksums {
+    string meshConfig = 1;
+    string sidecarInjector = 2;
+}

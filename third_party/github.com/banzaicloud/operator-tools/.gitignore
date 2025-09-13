@@ -1,0 +1,10 @@
+bin/
+build/
+
+### Idea ###
+.idea/*
+!/.idea/copyright/
+!/.idea/runConfigurations/
+!/.idea/modules.xml
+!/.idea/*.iml
+
