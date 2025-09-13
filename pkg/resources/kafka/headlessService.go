@@ -1,4 +1,5 @@
 // Copyright © 2019 Cisco Systems, Inc. and/or its affiliates
+// Copyright 2025 Adobe. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -102,7 +103,7 @@ func (r *Reconciler) deleteHeadlessService() error {
 		},
 	}
 
-	err := r.Client.Delete(ctx, &svc)
+	err := r.Delete(ctx, &svc)
 	if err != nil {
 		err = client.IgnoreNotFound(err)
 	}
@@ -124,7 +125,7 @@ func (r *Reconciler) deleteNonHeadlessServices(ctx context.Context) error {
 		},
 	}
 
-	err := r.Client.Delete(ctx, &svc)
+	err := r.Delete(ctx, &svc)
 	if err != nil && client.IgnoreNotFound(err) != nil {
 		return err
 	}
@@ -147,7 +148,7 @@ func (r *Reconciler) deleteNonHeadlessServices(ctx context.Context) error {
 	labelSelector = labelSelector.Add(*req)
 
 	var services corev1.ServiceList
-	err = r.Client.List(ctx, &services,
+	err = r.List(ctx, &services,
 		client.InNamespace(r.KafkaCluster.GetNamespace()),
 		client.MatchingLabelsSelector{Selector: labelSelector},
 	)
@@ -169,7 +170,7 @@ func (r *Reconciler) deleteNonHeadlessServices(ctx context.Context) error {
 		if !svc.GetDeletionTimestamp().IsZero() {
 			continue
 		}
-		err = r.Client.Delete(ctx, &svc)
+		err = r.Delete(ctx, &svc)
 		if err != nil && client.IgnoreNotFound(err) != nil {
 			return err
 		}

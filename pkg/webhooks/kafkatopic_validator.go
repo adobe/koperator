@@ -1,4 +1,5 @@
 // Copyright © 2022 Cisco Systems, Inc. and/or its affiliates
+// Copyright 2025 Adobe. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -155,13 +156,13 @@ func (s *KafkaTopicValidator) checkKafka(ctx context.Context, topic *banzaicloud
 	broker, closeClient, err := s.NewKafkaFromCluster(s.Client, cluster)
 	if err != nil {
 		// Log as info to not cause stack traces when making CC topic
-		return nil, errors.WrapIff(err, fmt.Sprintf("%s: %s", cantConnectErrorMsg, topic.Spec.ClusterRef.Name))
+		return nil, errors.WrapIf(err, fmt.Sprintf("%s: %s", cantConnectErrorMsg, topic.Spec.ClusterRef.Name))
 	}
 	defer closeClient()
 
 	existing, err := broker.GetTopic(topic.Spec.Name)
 	if err != nil {
-		return nil, errors.WrapIff(err, fmt.Sprintf("failed to list topics for kafka cluster: %s", topic.Spec.ClusterRef.Name))
+		return nil, errors.WrapIf(err, fmt.Sprintf("failed to list topics for kafka cluster: %s", topic.Spec.ClusterRef.Name))
 	}
 
 	var allErrs field.ErrorList

@@ -1,4 +1,5 @@
 // Copyright © 2023 Cisco Systems, Inc. and/or its affiliates
+// Copyright 2025 Adobe. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,21 +20,21 @@ import (
 	"time"
 
 	"github.com/gruntwork-io/terratest/modules/k8s"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	ginkgo "github.com/onsi/ginkgo/v2"
+	gomega "github.com/onsi/gomega"
 )
 
 // requireDeleteKafkaTopic deletes kafkaTopic resource.
 func requireDeleteKafkaTopic(kubectlOptions k8s.KubectlOptions, topicName string) {
-	It("Deleting KafkaTopic CR", func() {
+	ginkgo.It("Deleting KafkaTopic CR", func() {
 		err := deleteK8sResource(kubectlOptions, defaultDeletionTimeout, kafkaTopicKind, "", topicName)
-		Expect(err).NotTo(HaveOccurred())
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	})
 }
 
 // requireDeployingKafkaTopic deploys a kafkaTopic resource from a template
 func requireDeployingKafkaTopic(kubectlOptions k8s.KubectlOptions, topicName string) {
-	It("Deploying KafkaTopic CR", func() {
+	ginkgo.It("Deploying KafkaTopic CR", func() {
 		err := applyK8sResourceFromTemplate(kubectlOptions,
 			kafkaTopicTemplate,
 			map[string]interface{}{
@@ -42,26 +43,26 @@ func requireDeployingKafkaTopic(kubectlOptions k8s.KubectlOptions, topicName str
 				"Namespace": kubectlOptions.Namespace,
 			},
 		)
-		Expect(err).ShouldNot(HaveOccurred())
+		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 
 		err = waitK8sResourceCondition(kubectlOptions, kafkaTopicKind,
 			"jsonpath={.status.state}=created", defaultTopicCreationWaitTime, "", topicName)
 
-		Expect(err).ShouldNot(HaveOccurred())
+		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 	})
 }
 
 // requireDeleteKafkaUser deletes a kafkaUser resource by name
 func requireDeleteKafkaUser(kubectlOptions k8s.KubectlOptions, userName string) {
-	It("Deleting KafkaUser CR", func() {
+	ginkgo.It("Deleting KafkaUser CR", func() {
 		err := deleteK8sResource(kubectlOptions, defaultDeletionTimeout, kafkaUserKind, "", userName)
-		Expect(err).NotTo(HaveOccurred())
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	})
 }
 
 // requireDeployingKafkaUser creates a KafkaUser resource from a template
 func requireDeployingKafkaUser(kubectlOptions k8s.KubectlOptions, userName string, tlsSecretName string) {
-	It("Deploying KafkaUser CR", func() {
+	ginkgo.It("Deploying KafkaUser CR", func() {
 		templateParameters := map[string]interface{}{
 			"Name":        userName,
 			"Namespace":   kubectlOptions.Namespace,
@@ -75,10 +76,10 @@ func requireDeployingKafkaUser(kubectlOptions k8s.KubectlOptions, userName strin
 			kafkaUserTemplate,
 			templateParameters,
 		)
-		Expect(err).ShouldNot(HaveOccurred())
+		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 
-		Eventually(context.Background(), func() bool {
+		gomega.Eventually(context.Background(), func() bool {
 			return isExistingK8SResource(kubectlOptions, "Secret", tlsSecretName)
-		}, defaultUserCreationWaitTime, 3*time.Second).Should(Equal(true))
+		}, defaultUserCreationWaitTime, 3*time.Second).Should(gomega.Equal(true))
 	})
 }

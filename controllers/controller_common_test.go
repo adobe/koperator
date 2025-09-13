@@ -1,4 +1,5 @@
 // Copyright © 2019 Cisco Systems, Inc. and/or its affiliates
+// Copyright 2025 Adobe. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -63,7 +64,7 @@ func TestReconciled(t *testing.T) {
 	if err != nil {
 		t.Error("Expected error to be nil, got:", err)
 	}
-	if res.Requeue {
+	if res.RequeueAfter > 0 {
 		t.Error("Expected requeue to be false, got true")
 	}
 }
@@ -133,7 +134,7 @@ func TestCheckBrokerConnectionError(t *testing.T) {
 	if res, err := checkBrokerConnectionError(log, err); err != nil {
 		t.Error("Expected no error in result, got:", err)
 	} else {
-		if !res.Requeue {
+		if res.RequeueAfter == 0 {
 			t.Error("Expected requeue to be true, got false")
 		}
 		if res.RequeueAfter != time.Duration(15)*time.Second {
@@ -146,7 +147,7 @@ func TestCheckBrokerConnectionError(t *testing.T) {
 	if res, err := checkBrokerConnectionError(log, err); err != nil {
 		t.Error("Expected no error in result, got:", err)
 	} else {
-		if !res.Requeue {
+		if res.RequeueAfter == 0 {
 			t.Error("Expected requeue to be true, got false")
 		}
 		if res.RequeueAfter != time.Duration(15)*time.Second {
@@ -159,7 +160,7 @@ func TestCheckBrokerConnectionError(t *testing.T) {
 	if res, err := checkBrokerConnectionError(log, err); err != nil {
 		t.Error("Expected no error in result, got:", err)
 	} else {
-		if !res.Requeue {
+		if res.RequeueAfter == 0 {
 			t.Error("Expected requeue to be true, got false")
 		}
 		if res.RequeueAfter != time.Duration(5)*time.Second {

@@ -1,4 +1,5 @@
 // Copyright © 2022 Cisco Systems, Inc. and/or its affiliates
+// Copyright 2025 Adobe. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,6 +17,7 @@ package scale
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 
 	"github.com/banzaicloud/koperator/api/v1beta1"
@@ -27,6 +29,10 @@ func brokerIDsFromStringSlice(brokerIDs []string) ([]int32, error) {
 		bid, err := strconv.Atoi(id)
 		if err != nil {
 			return nil, err
+		}
+		// Broker IDs are always within valid range for int32 conversion
+		if bid < 0 || bid > math.MaxInt32 {
+			return nil, fmt.Errorf("broker ID %d out of valid range for int32 conversion", bid)
 		}
 		brokers[idx] = int32(bid)
 	}

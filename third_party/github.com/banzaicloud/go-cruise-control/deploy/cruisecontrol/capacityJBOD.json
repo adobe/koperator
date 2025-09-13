@@ -1,0 +1,82 @@
+{
+  "brokerCapacities":[
+    {
+      "brokerId": "0",
+      "capacity": {
+        "DISK": {
+          "/var/lib/kafka/data0": "100000",
+          "/var/lib/kafka/data1": "100000"
+        },
+        "CPU": "100",
+        "NW_IN": "10000",
+        "NW_OUT": "10000"
+      },
+      "doc": "The default capacity for a broker with multiple logDirs each on a separate heterogeneous disk."
+    },
+    {
+      "brokerId": "1",
+      "capacity": {
+        "DISK": {
+          "/var/lib/kafka/data0": "100000",
+          "/var/lib/kafka/data1": "100000"
+        },
+        "CPU": "100",
+        "NW_IN": "10000",
+        "NW_OUT": "10000"
+      },
+      "doc": "The default capacity for a broker with multiple logDirs each on a separate heterogeneous disk."
+    },
+    {
+      "brokerId": "2",
+      "capacity": {
+        "DISK": {
+          "/var/lib/kafka/data0": "100000",
+          "/var/lib/kafka/data1": "100000"
+        },
+        "CPU": "100",
+        "NW_IN": "10000",
+        "NW_OUT": "10000"
+      },
+      "doc": "The default capacity for a broker with multiple logDirs each on a separate heterogeneous disk."
+    },
+    {
+      "brokerId": "0",
+      "capacity": {
+        "DISK": {
+          "/var/lib/kafka/data0": "100000",
+          "/var/lib/kafka/data1": "100000"
+        },
+        "CPU": "100",
+        "NW_IN": "10000",
+        "NW_OUT": "10000"
+      },
+      "doc": "The default capacity for a broker with multiple logDirs each on a separate heterogeneous disk."
+    },
+    {
+      "brokerId": "1",
+      "capacity": {
+        "DISK": {
+          "/var/lib/kafka/data0": "100000",
+          "/var/lib/kafka/data1": "100000"
+        },
+        "CPU": "100",
+        "NW_IN": "10000",
+        "NW_OUT": "10000"
+      },
+      "doc": "The default capacity for a broker with multiple logDirs each on a separate heterogeneous disk."
+    },
+    {
+      "brokerId": "2",
+      "capacity": {
+        "DISK": {
+          "/var/lib/kafka/data0": "100000",
+          "/var/lib/kafka/data1": "100000"
+        },
+        "CPU": "100",
+        "NW_IN": "10000",
+        "NW_OUT": "10000"
+      },
+      "doc": "The default capacity for a broker with multiple logDirs each on a separate heterogeneous disk."
+    }
+  ]
+}

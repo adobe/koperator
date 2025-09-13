@@ -1,4 +1,5 @@
 // Copyright © 2021 Cisco Systems, Inc. and/or its affiliates
+// Copyright 2025 Adobe. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -51,7 +52,7 @@ func Unmarshal(p *Properties, v interface{}) error {
 		vType = vValue.Type()
 	}
 
-	if reflect.PtrTo(vType).Implements(unmarshalerType) {
+	if reflect.PointerTo(vType).Implements(unmarshalerType) {
 		if u, ok := vValue.Interface().(Unmarshaler); ok {
 			return u.UnmarshalProperties(p)
 		}

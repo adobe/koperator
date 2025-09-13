@@ -1,4 +1,5 @@
 // Copyright © 2020 Cisco Systems, Inc. and/or its affiliates
+// Copyright 2025 Adobe. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -37,7 +38,10 @@ func UseSSL(cluster *v1beta1.KafkaCluster) bool {
 
 func getContainerPortForInnerCom(internalListeners []v1beta1.InternalListenerConfig, extListeners []v1beta1.ExternalListenerConfig) int32 {
 	for _, val := range internalListeners {
-		if val.UsedForKafkaAdminCommunication { // Optional override to return a port from a different listener. Needed if b2b communication is on an external listener and and you want the koperator to interact with kafka over a different port.
+		if val.UsedForKafkaAdminCommunication {
+			// Optional override to return a port from a different listener.
+			// Needed if b2b communication is on an external listener and you want
+			// the koperator to interact with kafka over a different port.
 			return val.ContainerPort
 		}
 		if val.UsedForInnerBrokerCommunication {

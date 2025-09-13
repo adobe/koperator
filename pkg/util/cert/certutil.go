@@ -1,4 +1,5 @@
 // Copyright © 2019 Cisco Systems, Inc. and/or its affiliates
+// Copyright 2025 Adobe. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -253,7 +254,7 @@ func GenerateTestCert() (cert, key []byte, expectedDn string, err error) {
 	}
 	buf := new(bytes.Buffer)
 	if err = pem.Encode(buf, &pem.Block{Type: "CERTIFICATE", Bytes: cert}); err != nil {
-		return //nolint:golint,nakedret
+		return //nolint:nakedret
 	}
 	cert = buf.Bytes()
 	key, err = encodePrivateKeyInPemFormat(priv)

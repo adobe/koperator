@@ -1,4 +1,5 @@
 // Copyright © 2020 Cisco Systems, Inc. and/or its affiliates
+// Copyright 2025 Adobe. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -914,8 +915,8 @@ func TestGetServerPasswordKeysAndUsers(t *testing.T) { //nolint funlen
 			expectedGetCount := 0
 			first := true
 			for _, listener := range test.internalListeners {
-				if listener.CommonListenerSpec.Type.IsSSL() {
-					if listener.CommonListenerSpec.GetServerSSLCertSecretName() != "" {
+				if listener.Type.IsSSL() {
+					if listener.GetServerSSLCertSecretName() != "" {
 						expectedGetCount++
 					} else if first {
 						first = false
@@ -927,8 +928,8 @@ func TestGetServerPasswordKeysAndUsers(t *testing.T) { //nolint funlen
 			}
 
 			for _, listener := range test.externalListeners {
-				if listener.CommonListenerSpec.Type.IsSSL() {
-					if listener.CommonListenerSpec.GetServerSSLCertSecretName() != "" {
+				if listener.Type.IsSSL() {
+					if listener.GetServerSSLCertSecretName() != "" {
 						expectedGetCount++
 					} else if first {
 						first = false

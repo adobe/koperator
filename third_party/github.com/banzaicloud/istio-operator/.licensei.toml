@@ -1,0 +1,51 @@
+approved = ["mit", "apache-2.0", "bsd-3-clause", "bsd-2-clause", "mpl-2.0"]
+
+ignored = [
+    "github.com/ghodss/yaml",
+    "github.com/gogo/protobuf",
+    "google.golang.org/protobuf",
+    "sigs.k8s.io/yaml",
+    "gopkg.in/fsnotify.v1",
+
+    "github.com/davecgh/go-spew",         # ISC license
+    "github.com/russross/blackfriday",    # BSD-2
+    "github.com/russross/blackfriday/v2", # BSD-2
+    "github.com/xeipuuv/gojsonpointer",   # Apache2
+    "github.com/xeipuuv/gojsonreference", # Apache2
+    "github.com/xeipuuv/gojsonschema",    # Apache2
+    "github.com/russross/blackfriday",    # Simplifed BSD
+    "gomodules.xyz/jsonpatch/v2",         # Apache2
+
+    # Unsupported VCS
+    "cloud.google.com/go",
+    "google.golang.org/api",
+]
+
+[header]
+ignorePaths = ["build", "vendor"]
+
+ignoreFiles = [
+    "*.pb.go",
+    "*.gen.go",
+    "*.gogen.go",
+    "generated.go",
+    "zz_generated.deepcopy.go",
+    "*_test.go",
+]
+
+template = """/*
+Copyright :YEAR: Cisco Systems, Inc. and/or its affiliates.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+"""

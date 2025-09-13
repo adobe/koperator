@@ -1,4 +1,5 @@
 // Copyright © 2019 Cisco Systems, Inc. and/or its affiliates
+// Copyright 2025 Adobe. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -168,7 +169,9 @@ func (cc *cruiseControlScaler) StatusTask(ctx context.Context, taskID string) (S
 	}
 
 	if len(resp.Result.UserTasks) != 1 {
-		return StatusTaskResult{}, fmt.Errorf("could not get the Cruise Control state, expected the response for 1 task (%s), but got %d responses", taskID, len(resp.Result.UserTasks))
+		return StatusTaskResult{}, fmt.Errorf(
+			"could not get the Cruise Control state, expected the response for 1 task (%s), but got %d responses",
+			taskID, len(resp.Result.UserTasks))
 	}
 
 	taskInfo := resp.Result.UserTasks[0]
@@ -505,6 +508,12 @@ func (cc *cruiseControlScaler) RemoveBrokers(ctx context.Context, brokerIDs ...s
 		bID, err = strconv.Atoi(brokerID)
 		if err != nil {
 			cc.log.Error(err, "failed to cast broker ID from string to integer", "broker_id", brokerID)
+			return nil, err
+		}
+		// Broker IDs are always within valid range for int32 conversion
+		if bID < 0 || bID > math.MaxInt32 {
+			err := fmt.Errorf("broker ID %d out of valid range for int32 conversion", bID)
+			cc.log.Error(err, "invalid broker ID detected", "broker_id", brokerID)
 			return nil, err
 		}
 		brokersToRemove = append(brokersToRemove, int32(bID))

@@ -1,4 +1,5 @@
 // Copyright © 2023 Cisco Systems, Inc. and/or its affiliates
+// Copyright 2025 Adobe. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,24 +17,24 @@ package e2e
 
 import (
 	"github.com/gruntwork-io/terratest/modules/k8s"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	ginkgo "github.com/onsi/ginkgo/v2"
+	gomega "github.com/onsi/gomega"
 )
 
 func testUninstall() bool {
-	return When("Uninstalling Koperator and dependencies", Ordered, func() {
+	return ginkgo.When("Uninstalling Koperator and dependencies", ginkgo.Ordered, func() {
 		var kubectlOptions k8s.KubectlOptions
 		var err error
 
-		When("Initializing", func() {
-			It("Acquiring K8s config and context", func() {
+		ginkgo.When("Initializing", func() {
+			ginkgo.It("Acquiring K8s config and context", func() {
 				kubectlOptions, err = kubectlOptionsForCurrentContext()
-				Expect(err).NotTo(HaveOccurred())
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			})
 
-			It("Setting globals", func() {
+			ginkgo.It("Setting globals", func() {
 				err := dependencyCRDs.Initialize(kubectlOptions)
-				Expect(err).NotTo(HaveOccurred())
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			})
 		})
 

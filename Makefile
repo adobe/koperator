@@ -7,7 +7,7 @@ BOILERPLATE_DIR := $(PROJECT_DIR)/hack/boilerplate
 
 # Image URL to use all building/pushing image targets
 TAG ?= $(shell git describe --tags --abbrev=0 --match 'v[0-9].*[0-9].*[0-9]' 2>/dev/null )
-IMG ?= ghcr.io/banzaicloud/kafka-operator:$(TAG)
+IMG ?= ghcr.io/adobe/kafka-operator:$(TAG)
 
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd"
@@ -17,14 +17,15 @@ RELEASE_MSG ?= "koperator release"
 
 REL_TAG = $(shell ./scripts/increment_version.sh -${RELEASE_TYPE} ${TAG})
 
-GOLANGCI_VERSION = 1.55.2
+GOLANGCI_VERSION = 2.4.0
 LICENSEI_VERSION = 0.9.0
 GOPROXY=https://proxy.golang.org
 
-CONTROLLER_GEN_VERSION = v0.13.0
-CONTROLLER_GEN = $(PWD)/bin/controller-gen
+CONTROLLER_GEN_VERSION = v0.19.0
+# Use BIN_DIR to form an absolute, stable path regardless of `cd` usage
+CONTROLLER_GEN = $(BIN_DIR)/controller-gen
 
-ENVTEST_K8S_VERSION = 1.27.x!
+ENVTEST_K8S_VERSION = 1.34.x!
 
 KUSTOMIZE_BASE = config/overlays/specific-manager-version
 
@@ -59,7 +60,7 @@ lint: bin/golangci-lint ## Run linter analysis.
 	bin/golangci-lint run -c ./.golangci.yml --timeout=5m
 	cd api && ../bin/golangci-lint run -c ../.golangci.yml --timeout=5m
 	cd properties && ../bin/golangci-lint run -c ../.golangci.yml --timeout=5m
-	cd tests/e2e && ../../bin/golangci-lint run -c ../../.golangci.yml --timeout=5m
+	cd tests/e2e && ../../bin/golangci-lint run -c .golangci.yml --timeout=5m
 
 .PHONY: lint-fix ## Run linter with automatic fixes.
 lint-fix: bin/golangci-lint ## Run linter
@@ -100,7 +101,7 @@ test: generate fmt vet bin/setup-envtest
 
 # Run e2e tests
 test-e2e:
-	 IMG_E2E=${IMG_E2E} go test github.com/banzaicloud/koperator/tests/e2e \
+	cd tests/e2e && IMG_E2E=${IMG_E2E} go test . \
 		-v \
 		-timeout 45m \
 		-tags e2e \
@@ -180,7 +181,7 @@ bin/controller-gen-$(CONTROLLER_GEN_VERSION): ## Download versioned controller-g
 # find or download setup-envtest
 
 # https://github.com/kubernetes-sigs/controller-runtime/commits/main/tools/setup-envtest
-SETUP_ENVTEST_VERSION := d4f1e822ca11e9ff149bf2d9b5285f375334eba5
+SETUP_ENVTEST_VERSION := 42a14a36c13b95dd6bc8b4ba69c181b16d50e3c0
 
 bin/setup-envtest: $(BIN_DIR)/setup-envtest-$(SETUP_ENVTEST_VERSION) ## Symlink setup-envtest-<version> into versionless setup-envtest.
 	@ln -sf setup-envtest-$(SETUP_ENVTEST_VERSION) $(BIN_DIR)/setup-envtest
@@ -198,7 +199,9 @@ release: check-release ## Tag and push a release.
 	git push origin ${REL_TAG}
 
 update-go-deps: ## Update Go modules dependencies.
-	for dir in api properties . test/e2e; do \
+	@echo "Finding all directories with go.mod files..."
+	@for gomod in $$(find . -name "go.mod" | sort); do \
+		dir=$$(dirname $$gomod); \
 		( \
 		echo "Updating $$dir deps"; \
 		cd $$dir; \
@@ -210,7 +213,7 @@ update-go-deps: ## Update Go modules dependencies.
 		) \
 	done
 
-ADDLICENSE_VERSION := 1.1.1
+ADDLICENSE_VERSION := 1.2.0
 
 bin/addlicense: $(BIN_DIR)/addlicense-$(ADDLICENSE_VERSION) ## Symlink addlicense-<version> into versionless addlicense.
 	@ln -sf addlicense-$(ADDLICENSE_VERSION) $(BIN_DIR)/addlicense
@@ -238,7 +241,7 @@ license-header-fix: gen-license-header bin/addlicense ## Fix missing license hea
 		$(ADDLICENSE_OPTS_IGNORE) \
 		$(ADDLICENSE_SOURCE_DIRS)
 
-GOTEMPLATE_VERSION := 3.7.5
+GOTEMPLATE_VERSION := 3.12.0
 
 bin/gotemplate: $(BIN_DIR)/gotemplate-$(GOTEMPLATE_VERSION) ## Symlink gotemplate-<version> into versionless gotemplate.
 	@ln -sf gotemplate-$(GOTEMPLATE_VERSION) $(BIN_DIR)/gotemplate
@@ -257,7 +260,7 @@ gen-license-header: bin/gotemplate ## Generate license header used in source cod
 		--source="$(BOILERPLATE_DIR)"
 
 
-MOCKGEN_VERSION := 0.2.0
+MOCKGEN_VERSION := 0.6.0
 
 bin/mockgen: $(BIN_DIR)/mockgen-$(MOCKGEN_VERSION) ## Symlink mockgen-<version> into versionless mockgen.
 	@ln -sf mockgen-$(MOCKGEN_VERSION) $(BIN_DIR)/mockgen

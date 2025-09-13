@@ -8,6 +8,9 @@ rules:
   - ""
   resources:
   - configmaps
+  - persistentvolumeclaims
+  - secrets
+  - services
   verbs:
   - create
   - delete
@@ -20,29 +23,10 @@ rules:
   - ""
   resources:
   - namespaces
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - ""
-  resources:
   - nodes
   verbs:
   - get
   - list
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - persistentvolumeclaims
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
   - watch
 - apiGroups:
   - ""
@@ -53,30 +37,6 @@ rules:
   - delete
   - get
   - list
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - secrets
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - services
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
   - update
   - watch
 - apiGroups:
@@ -103,29 +63,7 @@ rules:
   - cert-manager.io
   resources:
   - certificates
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - cert-manager.io
-  resources:
   - clusterissuers
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - cert-manager.io
-  resources:
   - issuers
   verbs:
   - create
@@ -175,6 +113,8 @@ rules:
   - kafka.banzaicloud.io
   resources:
   - cruisecontroloperations
+  - kafkatopics
+  - kafkausers
   verbs:
   - create
   - delete
@@ -188,6 +128,9 @@ rules:
   - kafka.banzaicloud.io
   resources:
   - cruisecontroloperations/finalizers
+  - kafkaclusters/finalizers
+  - kafkatopics/finalizers
+  - kafkausers/finalizers
   verbs:
   - create
   - delete
@@ -197,6 +140,9 @@ rules:
   - kafka.banzaicloud.io
   resources:
   - cruisecontroloperations/status
+  - kafkaclusters/status
+  - kafkatopics/status
+  - kafkausers/status
   verbs:
   - get
   - patch
@@ -213,83 +159,6 @@ rules:
   - patch
   - update
   - watch
-- apiGroups:
-  - kafka.banzaicloud.io
-  resources:
-  - kafkaclusters/finalizers
-  verbs:
-  - create
-  - delete
-  - patch
-  - update
-- apiGroups:
-  - kafka.banzaicloud.io
-  resources:
-  - kafkaclusters/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - kafka.banzaicloud.io
-  resources:
-  - kafkatopics
-  verbs:
-  - create
-  - delete
-  - deletecollection
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - kafka.banzaicloud.io
-  resources:
-  - kafkatopics/finalizers
-  verbs:
-  - create
-  - delete
-  - patch
-  - update
-- apiGroups:
-  - kafka.banzaicloud.io
-  resources:
-  - kafkatopics/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - kafka.banzaicloud.io
-  resources:
-  - kafkausers
-  verbs:
-  - create
-  - delete
-  - deletecollection
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - kafka.banzaicloud.io
-  resources:
-  - kafkausers/finalizers
-  verbs:
-  - create
-  - delete
-  - patch
-  - update
-- apiGroups:
-  - kafka.banzaicloud.io
-  resources:
-  - kafkausers/status
-  verbs:
-  - get
-  - patch
-  - update
 - apiGroups:
   - networking.istio.io
   resources:

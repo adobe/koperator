@@ -1,9 +1,9 @@
 <p align="center">
 
-![Koperator](https://img.shields.io/github/v/release/banzaicloud/koperator?label=Koperator&sort=semver)
-![Released](https://img.shields.io/github/release-date/banzaicloud/koperator?label=Released)
-![License](https://img.shields.io/github/license/banzaicloud/koperator?label=License)
-![Go version (latest release)](https://img.shields.io/github/go-mod/go-version/banzaicloud/koperator/v0.22.0)
+![Koperator](https://img.shields.io/github/v/release/adobe/koperator?label=Koperator)
+![Released](https://img.shields.io/github/release-date/adobe/koperator?label=Released)
+![License](https://img.shields.io/github/license/adobe/koperator?label=License)
+![Go version (latest release)](https://img.shields.io/github/go-mod/go-version/adobe/koperator/0.28.0-adobe-20250911)
 
 </p>
 
@@ -11,12 +11,13 @@
 
 <p align="center">
 
-![Go version](https://img.shields.io/github/go-mod/go-version/banzaicloud/koperator/master)
-[![Go Report Card](https://goreportcard.com/badge/github.com/banzaicloud/koperator)](https://goreportcard.com/report/github.com/banzaicloud/koperator)
-![CI](https://img.shields.io/github/actions/workflow/status/banzaicloud/koperator/ci.yml?branch=master&label=CI)
-![Image](https://img.shields.io/github/actions/workflow/status/banzaicloud/koperator/docker.yml?branch=master&label=Image)
-![Image (perf test)](https://img.shields.io/github/actions/workflow/status/banzaicloud/koperator/docker_perf_test_load.yml?branch=master&label=Image%20%28perf%20test%29)
-![Helm chart](https://img.shields.io/github/actions/workflow/status/banzaicloud/koperator/helm.yml?branch=master&label=Helm%20chart)
+![Go version](https://img.shields.io/github/go-mod/go-version/adobe/koperator/master)
+[![Go Report Card](https://goreportcard.com/badge/github.com/adobe/koperator)](https://goreportcard.com/report/github.com/adobe/koperator)
+![CI](https://img.shields.io/github/actions/workflow/status/adobe/koperator/ci.yml?branch=master&label=CI)
+![CI](https://img.shields.io/github/actions/workflow/status/adobe/koperator/codeql-analysis.yml?branch=master&label=CodeQL)
+![Image](https://img.shields.io/github/actions/workflow/status/adobe/koperator/e2e-test.yaml?branch=master&label=E2E)
+![Helm chart](https://img.shields.io/github/actions/workflow/status/adobe/koperator/helm.yml?branch=master&label=Helm%20chart)
+
 
 </p>
 
@@ -48,7 +49,7 @@ While StatefulSets provide unique Broker IDs generated during Pod startup, netwo
 *Koperator takes a different approach by using simple `Pods`, `ConfigMaps`, and `PersistentVolumeClaims` instead of `StatefulSets`. These resources allow us to build an Operator that is better suited to manage Apache Kafka.*
 With Koperator, you can modify the configuration of unique Brokers, remove specific Brokers from clusters, and use multiple Persistent Volumes for each Broker.
 
-If you want to learn more about our design motivations and the scenarios that drove us to create Koperator, please continue reading on our documentation page [here](https://banzaicloud.github.io/koperator-docs/docs/scenarios/).
+If you want to learn more about our design motivations and the scenarios that drove us to create Koperator, please continue reading on our [documentation page](https://opensource.adobe.com/koperator/docs/scenarios/).
 
 ![Koperator architecture](docs/img/kafka-operator-arch.png)
 
@@ -68,13 +69,13 @@ The version of Kafka that is installed by the operator requires Apache ZooKeeper
 
 1. Install ZooKeeper using [Pravega’s Zookeeper Operator](https://github.com/pravega/zookeeper-operator).
 
-```
+```sh
 helm install zookeeper-operator --repo https://charts.pravega.io zookeeper-operator --namespace=zookeeper --create-namespace
 ```
 
-2. Create a ZooKeeper cluster.
+1. Create a ZooKeeper cluster.
 
-```
+```sh
 kubectl create -f - <<EOF
 apiVersion: zookeeper.pravega.io/v1beta1
 kind: ZookeeperCluster
@@ -88,9 +89,9 @@ spec:
 EOF
 ```
 
-3. Verify that ZooKeeper has been deployed.
+1. Verify that ZooKeeper has been deployed.
 
-```
+```sh
 > kubectl get pods -n zookeeper
 
 NAME                                         READY   STATUS    RESTARTS   AGE
@@ -104,25 +105,28 @@ You can deploy Koperator using a Helm chart. Complete the following steps.
 
 1. Install the Koperator `CustomResourceDefinition` resources (adjust the version number to the Koperator release you want to install). This is performed in a separate step to allow you to uninstall and reinstall Koperator without deleting your already installed custom resources.
 
-```
-kubectl create --validate=false -f https://github.com/banzaicloud/koperator/releases/download/v0.25.1/kafka-operator.crds.yaml
+```sh
+kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_cruisecontroloperations.yaml
+kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_kafkaclusters.yaml
+kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_kafkatopics.yaml
+kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_kafkausers.yaml
 ```
 
-2. Install Koperator into the `kafka` namespace:
+1. Install Koperator into the `kafka` namespace:
 
-```
+```sh
 helm install kafka-operator --repo https://kubernetes-charts.banzaicloud.com kafka-operator --namespace=kafka --create-namespace
 ```
 
-3. Create the Kafka cluster using the `KafkaCluster` custom resource. The quick start uses a minimal custom resource, but there are other examples in the same directory.
+1. Create the Kafka cluster using the `KafkaCluster` custom resource. The quick start uses a minimal custom resource, but there are other examples in the same directory.
 
-```
-kubectl create -n kafka -f https://raw.githubusercontent.com/banzaicloud/koperator/master/config/samples/simplekafkacluster.yaml
+```sh
+kubectl create -n kafka -f https://raw.githubusercontent.com/adobe/koperator/master/config/samples/simplekafkacluster.yaml
 ```
 
-4. Verify that the Kafka cluster has been created.
+1. Verify that the Kafka cluster has been created.
 
-```
+```sh
 > kubectl get pods -n kafka
 
 kafka-0-nvx8c                             1/1     Running   0          16m
@@ -138,7 +142,7 @@ To test the Kafka cluster let's create a topic and send some messages.
 
 1. You can use the `KafkaTopic` CR to create a topic called `my-topic`:
 
-```
+```sh
 kubectl create -n kafka -f - <<EOF
 apiVersion: kafka.banzaicloud.io/v1alpha1
 kind: KafkaTopic
@@ -156,42 +160,41 @@ spec:
 EOF
 ```
 
-2. If SSL encryption is disabled for Kafka, you can use the following commands to send and receive messages within a Kubernetes cluster.
+1. If SSL encryption is disabled for Kafka, you can use the following commands to send and receive messages within a Kubernetes cluster.
 
 To send messages, run this command and type your test messages:
 
-```
-kubectl -n kafka run kafka-producer -it --image=ghcr.io/banzaicloud/kafka:2.13-3.1.0 --rm=true --restart=Never -- /opt/kafka/bin/kafka-console-producer.sh --bootstrap-server kafka-headless:29092 --topic my-topic
+```sh
+kubectl -n kafka run kafka-producer -it --image=adobe/kafka:2.13-3.9.1 --rm=true --restart=Never -- /opt/kafka/bin/kafka-console-producer.sh --bootstrap-server kafka-headless:29092 --topic my-topic
 ```
 
 To receive messages, run the following command:
 
-```
-kubectl -n kafka run kafka-consumer -it --image=ghcr.io/banzaicloud/kafka:2.13-3.1.0 --rm=true --restart=Never -- /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server kafka-headless:29092 --topic my-topic --from-beginning
+```sh
+kubectl -n kafka run kafka-consumer -it --image=adobe/kafka:2.13-3.9.1 --rm=true --restart=Never -- /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server kafka-headless:29092 --topic my-topic --from-beginning
 ```
 
 ## Documentation
 
-For detailed documentation on the Koperator project, see the [Koperator documentation website](https://banzaicloud.github.io/koperator-docs/).
+For detailed documentation on the Koperator project, see the [Koperator documentation website](https://opensource.adobe.com/koperator/).
 
 ## Issues and contributions
 
 We use GitHub to track issues and accept contributions.
 If you would like to raise an issue or open a pull request, please refer to our [contribution guide](./CONTRIBUTING.md).
 
-If you use Koperator in a production environment, we encourage you to add yourself to the list of production [adopters](https://github.com/banzaicloud/koperator/blob/master/ADOPTERS.md).
+If you use Koperator in a production environment, we encourage you to add yourself to the list of production [adopters](https://github.com/adobe/koperator/blob/master/ADOPTERS.md).
 
 ## Community
 
-Find us on [Slack](https://eti.cisco.com/slack) for more fun about Kafka on Kubernetes!
+Engage with the Adobe OSS maintainers of this repo via Github issues in this repo.
 
-<a href="https://github.com/banzaicloud/koperator/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=banzaicloud/koperator&max=30" />
-</a>
+[![Contributors](https://contrib.rocks/image?repo=adobe/koperator&max=30)](https://github.com/adobe/koperator/graphs/contributors)
 
 ## License
 
 Copyright (c) 2023 [Cisco Systems, Inc.](https://www.cisco.com) and/or its affiliates
+Copyright (c) 2025 Adobe. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

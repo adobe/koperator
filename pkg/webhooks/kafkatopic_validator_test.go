@@ -1,4 +1,5 @@
 // Copyright © 2022 Cisco Systems, Inc. and/or its affiliates
+// Copyright 2025 Adobe. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -85,7 +86,7 @@ func newMockClients(cluster *v1beta1.KafkaCluster) (runtimeClient.WithWatch, kaf
 
 	kafkaClient, _, _ := kafkaclient.NewMockFromCluster(client, cluster)
 	returnMockedKafkaClient := func(client runtimeClient.Client, cluster *v1beta1.KafkaCluster) (kafkaclient.KafkaClient, func(), error) {
-		return kafkaClient, func() { kafkaClient.Close() }, nil
+		return kafkaClient, func() { _ = kafkaClient.Close() }, nil
 	}
 	return client, kafkaClient, returnMockedKafkaClient
 }

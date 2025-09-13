@@ -1,4 +1,5 @@
 // Copyright © 2019 Cisco Systems, Inc. and/or its affiliates
+// Copyright 2025 Adobe. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,8 +21,13 @@ import (
 	"time"
 
 	"github.com/IBM/sarama"
-	"github.com/banzaicloud/koperator/api/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/banzaicloud/koperator/api/v1beta1"
+)
+
+const (
+	testTopicName = "test-topic"
 )
 
 type mockClusterAdmin struct {
@@ -33,9 +39,15 @@ type mockClusterAdmin struct {
 	mockACLs   map[sarama.Resource]*sarama.ResourceAcls
 }
 
+// Coordinator resolves the ambiguity between sarama.ClusterAdmin.Coordinator and sarama.Client.Coordinator
+func (m *mockClusterAdmin) Coordinator(coordinatorType string) (*sarama.Broker, error) {
+	// Return a default mock coordinator
+	return &sarama.Broker{}, nil
+}
+
 func NewMockFromCluster(client client.Client, cluster *v1beta1.KafkaCluster) (KafkaClient, func(), error) {
 	cl := newOpenedMockClient()
-	return cl, func() { cl.Close() }, nil
+	return cl, func() { _ = cl.Close() }, nil
 }
 
 func newEmptyMockClusterAdmin(failOps bool) *mockClusterAdmin {
@@ -79,7 +91,7 @@ func newMockClient() *kafkaClient {
 
 func newOpenedMockClient() *kafkaClient {
 	client := newMockClient()
-	client.Open()
+	_ = client.Open()
 	return client
 }
 
@@ -121,7 +133,7 @@ func (m *mockClusterAdmin) DescribeTopics(topics []string) ([]*sarama.TopicMetad
 		return []*sarama.TopicMetadata{}, errors.New("bad describe topics")
 	}
 	switch topics[0] {
-	case "test-topic", "already-created-topic":
+	case testTopicName, "already-created-topic":
 		return []*sarama.TopicMetadata{
 			{
 				Name:       topics[0],

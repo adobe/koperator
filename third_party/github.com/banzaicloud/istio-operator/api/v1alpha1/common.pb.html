@@ -1,0 +1,2855 @@
+---
+title: istio_operator.v2.api.v1alpha1
+layout: protoc-gen-docs
+generator: protoc-gen-docs
+number_of_entries: 36
+---
+<h2 id="K8sObjectMeta">K8sObjectMeta</h2>
+<section>
+<p>Generic k8s resource metadata</p>
+
+<table class="message-fields">
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+<th>Required</th>
+</tr>
+</thead>
+<tbody>
+<tr id="K8sObjectMeta-labels">
+<td><code>labels</code></td>
+<td><code>map&lt;string,&nbsp;string&gt;</code></td>
+<td>
+<p>Map of string keys and values that can be used to organize and categorize
+(scope and select) objects. May match selectors of replication controllers
+and services.
+More info: http://kubernetes.io/docs/user-guide/labels
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="K8sObjectMeta-annotations">
+<td><code>annotations</code></td>
+<td><code>map&lt;string,&nbsp;string&gt;</code></td>
+<td>
+<p>Annotations is an unstructured key value map stored with a resource that may be
+set by external tools to store and retrieve arbitrary metadata. They are not
+queryable and should be preserved when modifying objects.
+More info: http://kubernetes.io/docs/user-guide/annotations
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+</tbody>
+</table>
+</section>
+<h2 id="ContainerImageConfiguration">ContainerImageConfiguration</h2>
+<section>
+<table class="message-fields">
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+<th>Required</th>
+</tr>
+</thead>
+<tbody>
+<tr id="ContainerImageConfiguration-hub">
+<td><code>hub</code></td>
+<td><code>string</code></td>
+<td>
+<p>Default hub for container images.</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="ContainerImageConfiguration-tag">
+<td><code>tag</code></td>
+<td><code>string</code></td>
+<td>
+<p>Default tag for container images.</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="ContainerImageConfiguration-imagePullPolicy">
+<td><code>imagePullPolicy</code></td>
+<td><code>string</code></td>
+<td>
+<p>Image pull policy.
+One of Always, Never, IfNotPresent.
+Defaults to Always if :latest tag is specified, or IfNotPresent otherwise.
++optional
++kubebuilder:validation:Enum=Always;Never;IfNotPresent</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="ContainerImageConfiguration-imagePullSecrets">
+<td><code>imagePullSecrets</code></td>
+<td><code><a href="#k8s-io-api-core-v1-LocalObjectReference">LocalObjectReference[]</a></code></td>
+<td>
+<p>ImagePullSecrets is an optional list of references to secrets to use for pulling any of the images.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+</tbody>
+</table>
+</section>
+<h2 id="BaseKubernetesContainerConfiguration">BaseKubernetesContainerConfiguration</h2>
+<section>
+<table class="message-fields">
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+<th>Required</th>
+</tr>
+</thead>
+<tbody>
+<tr id="BaseKubernetesContainerConfiguration-image">
+<td><code>image</code></td>
+<td><code>string</code></td>
+<td>
+<p>Standard Kubernetes container image configuration</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="BaseKubernetesContainerConfiguration-env">
+<td><code>env</code></td>
+<td><code><a href="#k8s-io-api-core-v1-EnvVar">EnvVar[]</a></code></td>
+<td>
+<p>If present will be appended to the environment variables of the container</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="BaseKubernetesContainerConfiguration-resources">
+<td><code>resources</code></td>
+<td><code><a href="#ResourceRequirements">ResourceRequirements</a></code></td>
+<td>
+<p>Standard Kubernetes resource configuration, memory and CPU resource requirements</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="BaseKubernetesContainerConfiguration-securityContext">
+<td><code>securityContext</code></td>
+<td><code><a href="#k8s-io-api-core-v1-SecurityContext">SecurityContext</a></code></td>
+<td>
+<p>Standard Kubernetes security context configuration</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="BaseKubernetesContainerConfiguration-volumeMounts">
+<td><code>volumeMounts</code></td>
+<td><code><a href="#k8s-io-api-core-v1-VolumeMount">VolumeMount[]</a></code></td>
+<td>
+<p>Pod volumes to mount into the container&rsquo;s filesystem.
+Cannot be updated.
++optional
++patchMergeKey=mountPath
++patchStrategy=merge</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+</tbody>
+</table>
+</section>
+<h2 id="BaseKubernetesResourceConfig">BaseKubernetesResourceConfig</h2>
+<section>
+<table class="message-fields">
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+<th>Required</th>
+</tr>
+</thead>
+<tbody>
+<tr id="BaseKubernetesResourceConfig-metadata">
+<td><code>metadata</code></td>
+<td><code><a href="#K8sObjectMeta">K8sObjectMeta</a></code></td>
+<td>
+<p>Generic k8s resource metadata</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="BaseKubernetesResourceConfig-image">
+<td><code>image</code></td>
+<td><code>string</code></td>
+<td>
+<p>Standard Kubernetes container image configuration</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="BaseKubernetesResourceConfig-env">
+<td><code>env</code></td>
+<td><code><a href="#k8s-io-api-core-v1-EnvVar">EnvVar[]</a></code></td>
+<td>
+<p>If present will be appended to the environment variables of the container</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="BaseKubernetesResourceConfig-resources">
+<td><code>resources</code></td>
+<td><code><a href="#ResourceRequirements">ResourceRequirements</a></code></td>
+<td>
+<p>Standard Kubernetes resource configuration, memory and CPU resource requirements</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="BaseKubernetesResourceConfig-nodeSelector">
+<td><code>nodeSelector</code></td>
+<td><code>map&lt;string,&nbsp;string&gt;</code></td>
+<td>
+<p>Standard Kubernetes node selector configuration</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="BaseKubernetesResourceConfig-affinity">
+<td><code>affinity</code></td>
+<td><code><a href="#k8s-io-api-core-v1-Affinity">Affinity</a></code></td>
+<td>
+<p>Standard Kubernetes affinity configuration</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="BaseKubernetesResourceConfig-securityContext">
+<td><code>securityContext</code></td>
+<td><code><a href="#k8s-io-api-core-v1-SecurityContext">SecurityContext</a></code></td>
+<td>
+<p>Standard Kubernetes security context configuration</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="BaseKubernetesResourceConfig-imagePullPolicy">
+<td><code>imagePullPolicy</code></td>
+<td><code>string</code></td>
+<td>
+<p>Image pull policy.
+One of Always, Never, IfNotPresent.
+Defaults to Always if :latest tag is specified, or IfNotPresent otherwise.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="BaseKubernetesResourceConfig-imagePullSecrets">
+<td><code>imagePullSecrets</code></td>
+<td><code><a href="#k8s-io-api-core-v1-LocalObjectReference">LocalObjectReference[]</a></code></td>
+<td>
+<p>ImagePullSecrets is an optional list of references to secrets to use for pulling any of the images.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="BaseKubernetesResourceConfig-priorityClassName">
+<td><code>priorityClassName</code></td>
+<td><code>string</code></td>
+<td>
+<p>If specified, indicates the pod&rsquo;s priority. &ldquo;system-node-critical&rdquo; and
+&ldquo;system-cluster-critical&rdquo; are two special keywords which indicate the
+highest priorities with the former being the highest priority. Any other
+name must be defined by creating a PriorityClass object with that name.
+If not specified, the pod priority will be default or zero if there is no
+default.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="BaseKubernetesResourceConfig-tolerations">
+<td><code>tolerations</code></td>
+<td><code><a href="#k8s-io-api-core-v1-Toleration">Toleration[]</a></code></td>
+<td>
+<p>If specified, the pod&rsquo;s tolerations.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="BaseKubernetesResourceConfig-volumes">
+<td><code>volumes</code></td>
+<td><code><a href="#k8s-io-api-core-v1-Volume">Volume[]</a></code></td>
+<td>
+<p>List of volumes that can be mounted by containers belonging to the pod.
+More info: https://kubernetes.io/docs/concepts/storage/volumes
++optional
++patchMergeKey=name
++patchStrategy=merge,retainKeys</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="BaseKubernetesResourceConfig-volumeMounts">
+<td><code>volumeMounts</code></td>
+<td><code><a href="#k8s-io-api-core-v1-VolumeMount">VolumeMount[]</a></code></td>
+<td>
+<p>Pod volumes to mount into the container&rsquo;s filesystem.
+Cannot be updated.
++optional
++patchMergeKey=mountPath
++patchStrategy=merge</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="BaseKubernetesResourceConfig-replicas">
+<td><code>replicas</code></td>
+<td><code><a href="#Replicas">Replicas</a></code></td>
+<td>
+<p>Replica configuration</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="BaseKubernetesResourceConfig-podMetadata">
+<td><code>podMetadata</code></td>
+<td><code><a href="#K8sObjectMeta">K8sObjectMeta</a></code></td>
+<td>
+<p>Standard Kubernetes pod annotation and label configuration</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="BaseKubernetesResourceConfig-podDisruptionBudget">
+<td><code>podDisruptionBudget</code></td>
+<td><code><a href="#PodDisruptionBudget">PodDisruptionBudget</a></code></td>
+<td>
+<p>PodDisruptionBudget configuration</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="BaseKubernetesResourceConfig-deploymentStrategy">
+<td><code>deploymentStrategy</code></td>
+<td><code><a href="#DeploymentStrategy">DeploymentStrategy</a></code></td>
+<td>
+<p>DeploymentStrategy configuration</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="BaseKubernetesResourceConfig-podSecurityContext">
+<td><code>podSecurityContext</code></td>
+<td><code><a href="#k8s-io-api-core-v1-PodSecurityContext">PodSecurityContext</a></code></td>
+<td>
+<p>Standard Kubernetes pod security context configuration</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="BaseKubernetesResourceConfig-livenessProbe">
+<td><code>livenessProbe</code></td>
+<td><code><a href="#Probe">Probe</a></code></td>
+<td>
+<p>Periodic probe of container liveness.
+Container will be restarted if the probe fails.
+Cannot be updated.
+More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="BaseKubernetesResourceConfig-readinessProbe">
+<td><code>readinessProbe</code></td>
+<td><code><a href="#Probe">Probe</a></code></td>
+<td>
+<p>Periodic probe of container service readiness.
+Container will be removed from service endpoints if the probe fails.
+Cannot be updated.
+More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="BaseKubernetesResourceConfig-topologySpreadConstraints">
+<td><code>topologySpreadConstraints</code></td>
+<td><code><a href="#k8s-io-api-core-v1-TopologySpreadConstraint">TopologySpreadConstraint[]</a></code></td>
+<td>
+<p>Used to control how Pods are spread across a cluster among failure-domains.
+This can help to achieve high availability as well as efficient resource utilization.
+More info: https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constraints
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+</tbody>
+</table>
+</section>
+<h2 id="DeploymentStrategy">DeploymentStrategy</h2>
+<section>
+<table class="message-fields">
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+<th>Required</th>
+</tr>
+</thead>
+<tbody>
+<tr id="DeploymentStrategy-type">
+<td><code>type</code></td>
+<td><code>string</code></td>
+<td>
+<p>Type of deployment. Can be &ldquo;Recreate&rdquo; or &ldquo;RollingUpdate&rdquo;. Default is RollingUpdate.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="DeploymentStrategy-rollingUpdate">
+<td><code>rollingUpdate</code></td>
+<td><code><a href="#DeploymentStrategy-RollingUpdateDeployment">RollingUpdateDeployment</a></code></td>
+<td>
+<p>Rolling update config params. Present only if DeploymentStrategyType =
+RollingUpdate.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+</tbody>
+</table>
+</section>
+<h2 id="PodDisruptionBudget">PodDisruptionBudget</h2>
+<section>
+<p>PodDisruptionBudget is a description of a PodDisruptionBudget</p>
+
+<table class="message-fields">
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+<th>Required</th>
+</tr>
+</thead>
+<tbody>
+<tr id="PodDisruptionBudget-minAvailable">
+<td><code>minAvailable</code></td>
+<td><code><a href="#IntOrString">IntOrString</a></code></td>
+<td>
+<p>An eviction is allowed if at least &ldquo;minAvailable&rdquo; pods selected by
+&ldquo;selector&rdquo; will still be available after the eviction, i.e. even in the
+absence of the evicted pod.  So for example you can prevent all voluntary
+evictions by specifying &ldquo;100%&rdquo;.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="PodDisruptionBudget-maxUnavailable">
+<td><code>maxUnavailable</code></td>
+<td><code><a href="#IntOrString">IntOrString</a></code></td>
+<td>
+<p>An eviction is allowed if at most &ldquo;maxUnavailable&rdquo; pods selected by
+&ldquo;selector&rdquo; are unavailable after the eviction, i.e. even in absence of
+the evicted pod. For example, one can prevent all voluntary evictions
+by specifying 0. This is a mutually exclusive setting with &ldquo;minAvailable&rdquo;.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+</tbody>
+</table>
+</section>
+<h2 id="Probe">Probe</h2>
+<section>
+<p>Probe describes a health check to be performed against a container to determine whether it is
+alive or ready to receive traffic.</p>
+
+<table class="message-fields">
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+<th>Required</th>
+</tr>
+</thead>
+<tbody>
+<tr id="Probe-exec" class="oneof oneof-start">
+<td><code>exec</code></td>
+<td><code><a href="#k8s-io-api-core-v1-ExecAction">ExecAction (oneof)</a></code></td>
+<td>
+<p>Exec specifies the action to take.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="Probe-httpGet" class="oneof">
+<td><code>httpGet</code></td>
+<td><code><a href="#HTTPGetAction">HTTPGetAction (oneof)</a></code></td>
+<td>
+<p>HTTPGet specifies the http request to perform.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="Probe-tcpSocket" class="oneof">
+<td><code>tcpSocket</code></td>
+<td><code><a href="#TCPSocketAction">TCPSocketAction (oneof)</a></code></td>
+<td>
+<p>TCPSocket specifies an action involving a TCP port.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="Probe-grpc" class="oneof">
+<td><code>grpc</code></td>
+<td><code><a href="#k8s-io-api-core-v1-GRPCAction">GRPCAction (oneof)</a></code></td>
+<td>
+<p>GRPC specifies an action involving a GRPC port.
+This is a beta field and requires enabling GRPCContainerProbe feature gate.
++featureGate=GRPCContainerProbe
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="Probe-initialDelaySeconds">
+<td><code>initialDelaySeconds</code></td>
+<td><code>int32</code></td>
+<td>
+<p>Number of seconds after the container has started before liveness probes are initiated.
+More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="Probe-timeoutSeconds">
+<td><code>timeoutSeconds</code></td>
+<td><code>int32</code></td>
+<td>
+<p>Number of seconds after which the probe times out.
+Defaults to 1 second. Minimum value is 1.
+More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="Probe-periodSeconds">
+<td><code>periodSeconds</code></td>
+<td><code>int32</code></td>
+<td>
+<p>How often (in seconds) to perform the probe.
+Default to 10 seconds. Minimum value is 1.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="Probe-successThreshold">
+<td><code>successThreshold</code></td>
+<td><code>int32</code></td>
+<td>
+<p>Minimum consecutive successes for the probe to be considered successful after having failed.
+Defaults to 1. Must be 1 for liveness and startup. Minimum value is 1.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="Probe-failureThreshold">
+<td><code>failureThreshold</code></td>
+<td><code>int32</code></td>
+<td>
+<p>Minimum consecutive failures for the probe to be considered failed after having succeeded.
+Defaults to 3. Minimum value is 1.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="Probe-terminationGracePeriodSeconds">
+<td><code>terminationGracePeriodSeconds</code></td>
+<td><code>int64</code></td>
+<td>
+<p>Optional duration in seconds the pod needs to terminate gracefully upon probe failure.
+The grace period is the duration in seconds after the processes running in the pod are sent
+a termination signal and the time when the processes are forcibly halted with a kill signal.
+Set this value longer than the expected cleanup time for your process.
+If this value is nil, the pod&rsquo;s terminationGracePeriodSeconds will be used. Otherwise, this
+value overrides the value provided by the pod spec.
+Value must be non-negative integer. The value zero indicates stop immediately via
+the kill signal (no opportunity to shut down).
+This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate.
+Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+</tbody>
+</table>
+</section>
+<h2 id="HTTPGetAction">HTTPGetAction</h2>
+<section>
+<p>HTTPGetAction describes an action based on HTTP Get requests.</p>
+
+<table class="message-fields">
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+<th>Required</th>
+</tr>
+</thead>
+<tbody>
+<tr id="HTTPGetAction-path">
+<td><code>path</code></td>
+<td><code>string</code></td>
+<td>
+<p>Path to access on the HTTP server.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="HTTPGetAction-port">
+<td><code>port</code></td>
+<td><code><a href="#IntOrString">IntOrString</a></code></td>
+<td>
+<p>Name or number of the port to access on the container.
+Number must be in the range 1 to 65535.
+Name must be an IANA_SVC_NAME.</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="HTTPGetAction-host">
+<td><code>host</code></td>
+<td><code>string</code></td>
+<td>
+<p>Host name to connect to, defaults to the pod IP. You probably want to set
+&ldquo;Host&rdquo; in httpHeaders instead.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="HTTPGetAction-scheme">
+<td><code>scheme</code></td>
+<td><code>string</code></td>
+<td>
+<p>Scheme to use for connecting to the host.
+Defaults to HTTP.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="HTTPGetAction-httpHeaders">
+<td><code>httpHeaders</code></td>
+<td><code><a href="#k8s-io-api-core-v1-HTTPHeader">HTTPHeader[]</a></code></td>
+<td>
+<p>Custom headers to set in the request. HTTP allows repeated headers.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+</tbody>
+</table>
+</section>
+<h2 id="TCPSocketAction">TCPSocketAction</h2>
+<section>
+<p>TCPSocketAction describes an action based on opening a socket</p>
+
+<table class="message-fields">
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+<th>Required</th>
+</tr>
+</thead>
+<tbody>
+<tr id="TCPSocketAction-port">
+<td><code>port</code></td>
+<td><code><a href="#IntOrString">IntOrString</a></code></td>
+<td>
+<p>Number or name of the port to access on the container.
+Number must be in the range 1 to 65535.
+Name must be an IANA_SVC_NAME.</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="TCPSocketAction-host">
+<td><code>host</code></td>
+<td><code>string</code></td>
+<td>
+<p>Optional: Host name to connect to, defaults to the pod IP.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+</tbody>
+</table>
+</section>
+<h2 id="Service">Service</h2>
+<section>
+<p>Service describes the attributes that a user creates on a service.</p>
+
+<table class="message-fields">
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+<th>Required</th>
+</tr>
+</thead>
+<tbody>
+<tr id="Service-metadata">
+<td><code>metadata</code></td>
+<td><code><a href="#K8sObjectMeta">K8sObjectMeta</a></code></td>
+<td>
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="Service-ports">
+<td><code>ports</code></td>
+<td><code><a href="#ServicePort">ServicePort[]</a></code></td>
+<td>
+<p>The list of ports that are exposed by this service.
+More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
++patchMergeKey=port
++patchStrategy=merge
++listType=map
++listMapKey=port
++listMapKey=protocol
++kubebuilder:validation:MinItems=1</p>
+
+</td>
+<td>
+Yes
+</td>
+</tr>
+<tr id="Service-selector">
+<td><code>selector</code></td>
+<td><code>map&lt;string,&nbsp;string&gt;</code></td>
+<td>
+<p>Route service traffic to pods with label keys and values matching this
+selector. If empty or not present, the service is assumed to have an
+external process managing its endpoints, which Kubernetes will not
+modify. Only applies to types ClusterIP, NodePort, and LoadBalancer.
+Ignored if type is ExternalName.
+More info: https://kubernetes.io/docs/concepts/services-networking/service/
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="Service-clusterIP">
+<td><code>clusterIP</code></td>
+<td><code>string</code></td>
+<td>
+<p>clusterIP is the IP address of the service and is usually assigned
+randomly by the master. If an address is specified manually and is not in
+use by others, it will be allocated to the service; otherwise, creation
+of the service will fail. This field can not be changed through updates.
+Valid values are &ldquo;None&rdquo;, empty string (&ldquo;&rdquo;), or a valid IP address. &ldquo;None&rdquo;
+can be specified for headless services when proxying is not required.
+Only applies to types ClusterIP, NodePort, and LoadBalancer. Ignored if
+type is ExternalName.
+More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="Service-type">
+<td><code>type</code></td>
+<td><code>string</code></td>
+<td>
+<p>type determines how the Service is exposed. Defaults to ClusterIP. Valid
+options are ExternalName, ClusterIP, NodePort, and LoadBalancer.
+&ldquo;ExternalName&rdquo; maps to the specified externalName.
+&ldquo;ClusterIP&rdquo; allocates a cluster-internal IP address for load-balancing to
+endpoints. Endpoints are determined by the selector or if that is not
+specified, by manual construction of an Endpoints object. If clusterIP is
+&ldquo;None&rdquo;, no virtual IP is allocated and the endpoints are published as a
+set of endpoints rather than a stable IP.
+&ldquo;NodePort&rdquo; builds on ClusterIP and allocates a port on every node which
+routes to the clusterIP.
+&ldquo;LoadBalancer&rdquo; builds on NodePort and creates an
+external load-balancer (if supported in the current cloud) which routes
+to the clusterIP.
+More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
++optional
++kubebuilder:validation:Enum=ClusterIP;NodePort;LoadBalancer</p>
+
+</td>
+<td>
+Yes
+</td>
+</tr>
+<tr id="Service-externalIPs">
+<td><code>externalIPs</code></td>
+<td><code>string[]</code></td>
+<td>
+<p>externalIPs is a list of IP addresses for which nodes in the cluster
+will also accept traffic for this service.  These IPs are not managed by
+Kubernetes.  The user is responsible for ensuring that traffic arrives
+at a node with this IP.  A common example is external load-balancers
+that are not part of the Kubernetes system.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="Service-sessionAffinity">
+<td><code>sessionAffinity</code></td>
+<td><code>string</code></td>
+<td>
+<p>Supports &ldquo;ClientIP&rdquo; and &ldquo;None&rdquo;. Used to maintain session affinity.
+Enable client IP based session affinity.
+Must be ClientIP or None.
+Defaults to None.
+More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="Service-loadBalancerIP">
+<td><code>loadBalancerIP</code></td>
+<td><code>string</code></td>
+<td>
+<p>Only applies to Service Type: LoadBalancer
+LoadBalancer will get created with the IP specified in this field.
+This feature depends on whether the underlying cloud-provider supports specifying
+the loadBalancerIP when a load balancer is created.
+This field will be ignored if the cloud-provider does not support the feature.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="Service-loadBalancerSourceRanges">
+<td><code>loadBalancerSourceRanges</code></td>
+<td><code>string[]</code></td>
+<td>
+<p>If specified and supported by the platform, this will restrict traffic through the cloud-provider
+load-balancer will be restricted to the specified client IPs. This field will be ignored if the
+cloud-provider does not support the feature.&rdquo;
+More info: https://kubernetes.io/docs/tasks/access-application-cluster/configure-cloud-provider-firewall/
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="Service-externalName">
+<td><code>externalName</code></td>
+<td><code>string</code></td>
+<td>
+<p>externalName is the external reference that kubedns or equivalent will
+return as a CNAME record for this service. No proxying will be involved.
+Must be a valid RFC-1123 hostname (https://tools.ietf.org/html/rfc1123)
+and requires Type to be ExternalName.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="Service-externalTrafficPolicy">
+<td><code>externalTrafficPolicy</code></td>
+<td><code>string</code></td>
+<td>
+<p>externalTrafficPolicy denotes if this Service desires to route external
+traffic to node-local or cluster-wide endpoints. &ldquo;Local&rdquo; preserves the
+client source IP and avoids a second hop for LoadBalancer and Nodeport
+type services, but risks potentially imbalanced traffic spreading.
+&ldquo;Cluster&rdquo; obscures the client source IP and may cause a second hop to
+another node, but should have good overall load-spreading.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="Service-healthCheckNodePort">
+<td><code>healthCheckNodePort</code></td>
+<td><code>int32</code></td>
+<td>
+<p>healthCheckNodePort specifies the healthcheck nodePort for the service.
+If not specified, HealthCheckNodePort is created by the service api
+backend with the allocated nodePort. Will use user-specified nodePort value
+if specified by the client. Only effects when Type is set to LoadBalancer
+and ExternalTrafficPolicy is set to Local.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="Service-publishNotReadyAddresses">
+<td><code>publishNotReadyAddresses</code></td>
+<td><code><a href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue">BoolValue</a></code></td>
+<td>
+<p>publishNotReadyAddresses, when set to true, indicates that DNS implementations
+must publish the notReadyAddresses of subsets for the Endpoints associated with
+the Service. The default value is false.
+The primary use case for setting this field is to use a StatefulSet&rsquo;s Headless Service
+to propagate SRV records for its Pods without respect to their readiness for purpose
+of peer discovery.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="Service-sessionAffinityConfig">
+<td><code>sessionAffinityConfig</code></td>
+<td><code><a href="#k8s-io-api-core-v1-SessionAffinityConfig">SessionAffinityConfig</a></code></td>
+<td>
+<p>sessionAffinityConfig contains the configurations of session affinity.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="Service-ipFamily">
+<td><code>ipFamily</code></td>
+<td><code>string</code></td>
+<td>
+<p>ipFamily specifies whether this Service has a preference for a particular IP family (e.g. IPv4 vs.
+IPv6).  If a specific IP family is requested, the clusterIP field will be allocated from that family, if it is
+available in the cluster.  If no IP family is requested, the cluster&rsquo;s primary IP family will be used.
+Other IP fields (loadBalancerIP, loadBalancerSourceRanges, externalIPs) and controllers which
+allocate external load-balancers should use the same IP family.  Endpoints for this Service will be of
+this family.  This field is immutable after creation. Assigning a ServiceIPFamily not available in the
+cluster (e.g. IPv6 in IPv4 only cluster) is an error condition and will fail during clusterIP assignment.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+</tbody>
+</table>
+</section>
+<h2 id="UnprotectedService">UnprotectedService</h2>
+<section>
+<p>Service describes the attributes that a user creates on a service.</p>
+
+<table class="message-fields">
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+<th>Required</th>
+</tr>
+</thead>
+<tbody>
+<tr id="UnprotectedService-metadata">
+<td><code>metadata</code></td>
+<td><code><a href="#K8sObjectMeta">K8sObjectMeta</a></code></td>
+<td>
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="UnprotectedService-ports">
+<td><code>ports</code></td>
+<td><code><a href="#ServicePort">ServicePort[]</a></code></td>
+<td>
+<p>The list of ports that are exposed by this service.
+More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
++patchMergeKey=port
++patchStrategy=merge
++listType=map
++listMapKey=port
++listMapKey=protocol</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="UnprotectedService-selector">
+<td><code>selector</code></td>
+<td><code>map&lt;string,&nbsp;string&gt;</code></td>
+<td>
+<p>Route service traffic to pods with label keys and values matching this
+selector. If empty or not present, the service is assumed to have an
+external process managing its endpoints, which Kubernetes will not
+modify. Only applies to types ClusterIP, NodePort, and LoadBalancer.
+Ignored if type is ExternalName.
+More info: https://kubernetes.io/docs/concepts/services-networking/service/
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="UnprotectedService-clusterIP">
+<td><code>clusterIP</code></td>
+<td><code>string</code></td>
+<td>
+<p>clusterIP is the IP address of the service and is usually assigned
+randomly by the master. If an address is specified manually and is not in
+use by others, it will be allocated to the service; otherwise, creation
+of the service will fail. This field can not be changed through updates.
+Valid values are &ldquo;None&rdquo;, empty string (&ldquo;&rdquo;), or a valid IP address. &ldquo;None&rdquo;
+can be specified for headless services when proxying is not required.
+Only applies to types ClusterIP, NodePort, and LoadBalancer. Ignored if
+type is ExternalName.
+More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="UnprotectedService-type">
+<td><code>type</code></td>
+<td><code>string</code></td>
+<td>
+<p>type determines how the Service is exposed. Defaults to ClusterIP. Valid
+options are ExternalName, ClusterIP, NodePort, and LoadBalancer.
+&ldquo;ExternalName&rdquo; maps to the specified externalName.
+&ldquo;ClusterIP&rdquo; allocates a cluster-internal IP address for load-balancing to
+endpoints. Endpoints are determined by the selector or if that is not
+specified, by manual construction of an Endpoints object. If clusterIP is
+&ldquo;None&rdquo;, no virtual IP is allocated and the endpoints are published as a
+set of endpoints rather than a stable IP.
+&ldquo;NodePort&rdquo; builds on ClusterIP and allocates a port on every node which
+routes to the clusterIP.
+&ldquo;LoadBalancer&rdquo; builds on NodePort and creates an
+external load-balancer (if supported in the current cloud) which routes
+to the clusterIP.
+More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
++optional
++kubebuilder:validation:Enum=ClusterIP;NodePort;LoadBalancer</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="UnprotectedService-externalIPs">
+<td><code>externalIPs</code></td>
+<td><code>string[]</code></td>
+<td>
+<p>externalIPs is a list of IP addresses for which nodes in the cluster
+will also accept traffic for this service.  These IPs are not managed by
+Kubernetes.  The user is responsible for ensuring that traffic arrives
+at a node with this IP.  A common example is external load-balancers
+that are not part of the Kubernetes system.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="UnprotectedService-sessionAffinity">
+<td><code>sessionAffinity</code></td>
+<td><code>string</code></td>
+<td>
+<p>Supports &ldquo;ClientIP&rdquo; and &ldquo;None&rdquo;. Used to maintain session affinity.
+Enable client IP based session affinity.
+Must be ClientIP or None.
+Defaults to None.
+More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="UnprotectedService-loadBalancerIP">
+<td><code>loadBalancerIP</code></td>
+<td><code>string</code></td>
+<td>
+<p>Only applies to Service Type: LoadBalancer
+LoadBalancer will get created with the IP specified in this field.
+This feature depends on whether the underlying cloud-provider supports specifying
+the loadBalancerIP when a load balancer is created.
+This field will be ignored if the cloud-provider does not support the feature.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="UnprotectedService-loadBalancerSourceRanges">
+<td><code>loadBalancerSourceRanges</code></td>
+<td><code>string[]</code></td>
+<td>
+<p>If specified and supported by the platform, this will restrict traffic through the cloud-provider
+load-balancer will be restricted to the specified client IPs. This field will be ignored if the
+cloud-provider does not support the feature.&rdquo;
+More info: https://kubernetes.io/docs/tasks/access-application-cluster/configure-cloud-provider-firewall/
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="UnprotectedService-externalName">
+<td><code>externalName</code></td>
+<td><code>string</code></td>
+<td>
+<p>externalName is the external reference that kubedns or equivalent will
+return as a CNAME record for this service. No proxying will be involved.
+Must be a valid RFC-1123 hostname (https://tools.ietf.org/html/rfc1123)
+and requires Type to be ExternalName.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="UnprotectedService-externalTrafficPolicy">
+<td><code>externalTrafficPolicy</code></td>
+<td><code>string</code></td>
+<td>
+<p>externalTrafficPolicy denotes if this Service desires to route external
+traffic to node-local or cluster-wide endpoints. &ldquo;Local&rdquo; preserves the
+client source IP and avoids a second hop for LoadBalancer and Nodeport
+type services, but risks potentially imbalanced traffic spreading.
+&ldquo;Cluster&rdquo; obscures the client source IP and may cause a second hop to
+another node, but should have good overall load-spreading.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="UnprotectedService-healthCheckNodePort">
+<td><code>healthCheckNodePort</code></td>
+<td><code>int32</code></td>
+<td>
+<p>healthCheckNodePort specifies the healthcheck nodePort for the service.
+If not specified, HealthCheckNodePort is created by the service api
+backend with the allocated nodePort. Will use user-specified nodePort value
+if specified by the client. Only effects when Type is set to LoadBalancer
+and ExternalTrafficPolicy is set to Local.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="UnprotectedService-publishNotReadyAddresses">
+<td><code>publishNotReadyAddresses</code></td>
+<td><code><a href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#boolvalue">BoolValue</a></code></td>
+<td>
+<p>publishNotReadyAddresses, when set to true, indicates that DNS implementations
+must publish the notReadyAddresses of subsets for the Endpoints associated with
+the Service. The default value is false.
+The primary use case for setting this field is to use a StatefulSet&rsquo;s Headless Service
+to propagate SRV records for its Pods without respect to their readiness for purpose
+of peer discovery.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="UnprotectedService-sessionAffinityConfig">
+<td><code>sessionAffinityConfig</code></td>
+<td><code><a href="#k8s-io-api-core-v1-SessionAffinityConfig">SessionAffinityConfig</a></code></td>
+<td>
+<p>sessionAffinityConfig contains the configurations of session affinity.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="UnprotectedService-ipFamily">
+<td><code>ipFamily</code></td>
+<td><code>string</code></td>
+<td>
+<p>ipFamily specifies whether this Service has a preference for a particular IP family (e.g. IPv4 vs.
+IPv6).  If a specific IP family is requested, the clusterIP field will be allocated from that family, if it is
+available in the cluster.  If no IP family is requested, the cluster&rsquo;s primary IP family will be used.
+Other IP fields (loadBalancerIP, loadBalancerSourceRanges, externalIPs) and controllers which
+allocate external load-balancers should use the same IP family.  Endpoints for this Service will be of
+this family.  This field is immutable after creation. Assigning a ServiceIPFamily not available in the
+cluster (e.g. IPv6 in IPv4 only cluster) is an error condition and will fail during clusterIP assignment.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+</tbody>
+</table>
+</section>
+<h2 id="ServicePort">ServicePort</h2>
+<section>
+<p>ServicePort contains information on service&rsquo;s port.</p>
+
+<table class="message-fields">
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+<th>Required</th>
+</tr>
+</thead>
+<tbody>
+<tr id="ServicePort-name">
+<td><code>name</code></td>
+<td><code>string</code></td>
+<td>
+<p>The name of this port within the service. This must be a DNS_LABEL.
+All ports within a ServiceSpec must have unique names. When considering
+the endpoints for a Service, this must match the &lsquo;name&rsquo; field in the
+EndpointPort.
+if only one ServicePort is defined on this service.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="ServicePort-protocol">
+<td><code>protocol</code></td>
+<td><code>string</code></td>
+<td>
+<p>The IP protocol for this port. Supports &ldquo;TCP&rdquo;, &ldquo;UDP&rdquo;, and &ldquo;SCTP&rdquo;.
+Default is TCP.
++optional
++kubebuilder:default=TCP</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="ServicePort-port">
+<td><code>port</code></td>
+<td><code>int32</code></td>
+<td>
+<p>The port that will be exposed by this service.</p>
+
+</td>
+<td>
+Yes
+</td>
+</tr>
+<tr id="ServicePort-targetPort">
+<td><code>targetPort</code></td>
+<td><code><a href="#IntOrString">IntOrString</a></code></td>
+<td>
+<p>Number or name of the port to access on the pods targeted by the service.
+Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.
+If this is a string, it will be looked up as a named port in the
+target Pod&rsquo;s container ports. If this is not specified, the value
+of the &lsquo;port&rsquo; field is used (an identity map).
+This field is ignored for services with clusterIP=None, and should be
+omitted or set equal to the &lsquo;port&rsquo; field.
+More info: https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="ServicePort-nodePort">
+<td><code>nodePort</code></td>
+<td><code>int32</code></td>
+<td>
+<p>The port on each node on which this service is exposed when type=NodePort or LoadBalancer.
+Usually assigned by the system. If specified, it will be allocated to the service
+if unused or else creation of the service will fail.
+Default is to auto-allocate a port if the ServiceType of this Service requires one.
+More info: https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+</tbody>
+</table>
+</section>
+<h2 id="NamespacedName">NamespacedName</h2>
+<section>
+<table class="message-fields">
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+<th>Required</th>
+</tr>
+</thead>
+<tbody>
+<tr id="NamespacedName-name">
+<td><code>name</code></td>
+<td><code>string</code></td>
+<td>
+<p>Name of the referenced Kubernetes resource</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="NamespacedName-namespace">
+<td><code>namespace</code></td>
+<td><code>string</code></td>
+<td>
+<p>Namespace of the referenced Kubernetes resource</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+</tbody>
+</table>
+</section>
+<h2 id="ResourceRequirements">ResourceRequirements</h2>
+<section>
+<p>ResourceRequirements describes the compute resource requirements.</p>
+
+<table class="message-fields">
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+<th>Required</th>
+</tr>
+</thead>
+<tbody>
+<tr id="ResourceRequirements-limits">
+<td><code>limits</code></td>
+<td><code>map&lt;string,&nbsp;<a href="#Quantity">Quantity</a>&gt;</code></td>
+<td>
+<p>Limits describes the maximum amount of compute resources allowed.
+More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="ResourceRequirements-requests">
+<td><code>requests</code></td>
+<td><code>map&lt;string,&nbsp;<a href="#Quantity">Quantity</a>&gt;</code></td>
+<td>
+<p>Requests describes the minimum amount of compute resources required.
+If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+otherwise to an implementation-defined value.
+More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+</tbody>
+</table>
+</section>
+<h2 id="Replicas">Replicas</h2>
+<section>
+<p>Replicas contains pod replica configuration</p>
+
+<table class="message-fields">
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+<th>Required</th>
+</tr>
+</thead>
+<tbody>
+<tr id="Replicas-count">
+<td><code>count</code></td>
+<td><code><a href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#int32value">Int32Value</a></code></td>
+<td>
+<p>Standard Kubernetes replica count configuration
++kubebuilder:validation:Minimum=0</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="Replicas-min">
+<td><code>min</code></td>
+<td><code><a href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#int32value">Int32Value</a></code></td>
+<td>
+<p>min is the lower limit for the number of replicas to which the autoscaler
+can scale down.
+min and max both need to be set the turn on autoscaling.
++kubebuilder:validation:Minimum=0</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="Replicas-max">
+<td><code>max</code></td>
+<td><code><a href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#int32value">Int32Value</a></code></td>
+<td>
+<p>max is the upper limit for the number of replicas to which the autoscaler can scale up.
+min and max both need to be set the turn on autoscaling.
+It cannot be less than min.
++kubebuilder:validation:Minimum=1</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="Replicas-targetCPUUtilizationPercentage">
+<td><code>targetCPUUtilizationPercentage</code></td>
+<td><code><a href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#int32value">Int32Value</a></code></td>
+<td>
+<p>target average CPU utilization (represented as a percentage of requested CPU) over all the pods;
+default 80% will be used if not specified.
++optional
++kubebuilder:validation:Minimum=0</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+</tbody>
+</table>
+</section>
+<h2 id="K8sResourceOverlayPatch">K8sResourceOverlayPatch</h2>
+<section>
+<table class="message-fields">
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+<th>Required</th>
+</tr>
+</thead>
+<tbody>
+<tr id="K8sResourceOverlayPatch-groupVersionKind">
+<td><code>groupVersionKind</code></td>
+<td><code><a href="#K8sResourceOverlayPatch-GroupVersionKind">GroupVersionKind</a></code></td>
+<td>
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="K8sResourceOverlayPatch-objectKey">
+<td><code>objectKey</code></td>
+<td><code><a href="#NamespacedName">NamespacedName</a></code></td>
+<td>
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="K8sResourceOverlayPatch-patches">
+<td><code>patches</code></td>
+<td><code><a href="#K8sResourceOverlayPatch-Patch">Patch[]</a></code></td>
+<td>
+</td>
+<td>
+No
+</td>
+</tr>
+</tbody>
+</table>
+</section>
+<h2 id="Quantity">Quantity</h2>
+<section>
+<p>Quantity is a fixed-point representation of a number. It provides convenient marshaling/unmarshaling in JSON and YAML, in addition to String() and Int64() accessors.
++cue-gen-param:intorstring=true
++cue-gen-param:set=pattern:^(\+|-)?(([0-9]+(\.[0-9]<em>)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|(<a href="\+|-">eE</a>?(([0-9]+(\.[0-9]</em>)?)|(\.[0-9]+))))?$
+GOTYPE: *Quantity</p>
+
+</section>
+<h2 id="IntOrString">IntOrString</h2>
+<section>
+<p>IntOrString is a type that can hold an int32 or a string. When used in JSON or YAML marshalling and unmarshalling, it produces or consumes the inner type. This allows you to have, for example, a JSON field that can accept a name or number.
++cue-gen-param:intorstring=true
+GOTYPE: *IntOrString</p>
+
+</section>
+<h2 id="DeploymentStrategy-RollingUpdateDeployment">DeploymentStrategy.RollingUpdateDeployment</h2>
+<section>
+<table class="message-fields">
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+<th>Required</th>
+</tr>
+</thead>
+<tbody>
+<tr id="DeploymentStrategy-RollingUpdateDeployment-maxUnavailable">
+<td><code>maxUnavailable</code></td>
+<td><code><a href="#IntOrString">IntOrString</a></code></td>
+<td>
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="DeploymentStrategy-RollingUpdateDeployment-maxSurge">
+<td><code>maxSurge</code></td>
+<td><code><a href="#IntOrString">IntOrString</a></code></td>
+<td>
+</td>
+<td>
+No
+</td>
+</tr>
+</tbody>
+</table>
+</section>
+<h2 id="K8sResourceOverlayPatch-GroupVersionKind">K8sResourceOverlayPatch.GroupVersionKind</h2>
+<section>
+<table class="message-fields">
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+<th>Required</th>
+</tr>
+</thead>
+<tbody>
+<tr id="K8sResourceOverlayPatch-GroupVersionKind-kind">
+<td><code>kind</code></td>
+<td><code>string</code></td>
+<td>
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="K8sResourceOverlayPatch-GroupVersionKind-version">
+<td><code>version</code></td>
+<td><code>string</code></td>
+<td>
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="K8sResourceOverlayPatch-GroupVersionKind-group">
+<td><code>group</code></td>
+<td><code>string</code></td>
+<td>
+</td>
+<td>
+No
+</td>
+</tr>
+</tbody>
+</table>
+</section>
+<h2 id="K8sResourceOverlayPatch-Patch">K8sResourceOverlayPatch.Patch</h2>
+<section>
+<table class="message-fields">
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+<th>Required</th>
+</tr>
+</thead>
+<tbody>
+<tr id="K8sResourceOverlayPatch-Patch-path">
+<td><code>path</code></td>
+<td><code>string</code></td>
+<td>
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="K8sResourceOverlayPatch-Patch-value">
+<td><code>value</code></td>
+<td><code>string</code></td>
+<td>
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="K8sResourceOverlayPatch-Patch-parseValue">
+<td><code>parseValue</code></td>
+<td><code>bool</code></td>
+<td>
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="K8sResourceOverlayPatch-Patch-type">
+<td><code>type</code></td>
+<td><code><a href="#K8sResourceOverlayPatch-Type">Type</a></code></td>
+<td>
+</td>
+<td>
+No
+</td>
+</tr>
+</tbody>
+</table>
+</section>
+<h2 id="k8s-io-api-core-v1-LocalObjectReference">k8s.io.api.core.v1.LocalObjectReference</h2>
+<section>
+<p>LocalObjectReference contains enough information to let you locate the
+referenced object inside the same namespace.
++structType=atomic</p>
+
+<table class="message-fields">
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+<th>Required</th>
+</tr>
+</thead>
+<tbody>
+<tr id="k8s-io-api-core-v1-LocalObjectReference-name">
+<td><code>name</code></td>
+<td><code>string</code></td>
+<td>
+<p>Name of the referent.
+More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+TODO: Add other useful fields. apiVersion, kind, uid?
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+</tbody>
+</table>
+</section>
+<h2 id="k8s-io-api-core-v1-EnvVar">k8s.io.api.core.v1.EnvVar</h2>
+<section>
+<p>EnvVar represents an environment variable present in a Container.</p>
+
+<table class="message-fields">
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+<th>Required</th>
+</tr>
+</thead>
+<tbody>
+<tr id="k8s-io-api-core-v1-EnvVar-name">
+<td><code>name</code></td>
+<td><code>string</code></td>
+<td>
+<p>Name of the environment variable. Must be a C_IDENTIFIER.</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="k8s-io-api-core-v1-EnvVar-value">
+<td><code>value</code></td>
+<td><code>string</code></td>
+<td>
+<p>Variable references $(VAR_NAME) are expanded
+using the previously defined environment variables in the container and
+any service environment variables. If a variable cannot be resolved,
+the reference in the input string will be unchanged. Double $$ are reduced
+to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e.
+&ldquo;$$(VAR_NAME)&rdquo; will produce the string literal &ldquo;$(VAR_NAME)&rdquo;.
+Escaped references will never be expanded, regardless of whether the variable
+exists or not.
+Defaults to &ldquo;&rdquo;.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="k8s-io-api-core-v1-EnvVar-valueFrom">
+<td><code>valueFrom</code></td>
+<td><code><a href="#k8s-io-api-core-v1-EnvVarSource">EnvVarSource</a></code></td>
+<td>
+<p>Source for the environment variable&rsquo;s value. Cannot be used if value is not empty.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+</tbody>
+</table>
+</section>
+<h2 id="k8s-io-api-core-v1-SecurityContext">k8s.io.api.core.v1.SecurityContext</h2>
+<section>
+<p>SecurityContext holds security configuration that will be applied to a container.
+Some fields are present in both SecurityContext and PodSecurityContext.  When both
+are set, the values in SecurityContext take precedence.</p>
+
+<table class="message-fields">
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+<th>Required</th>
+</tr>
+</thead>
+<tbody>
+<tr id="k8s-io-api-core-v1-SecurityContext-capabilities">
+<td><code>capabilities</code></td>
+<td><code><a href="#k8s-io-api-core-v1-Capabilities">Capabilities</a></code></td>
+<td>
+<p>The capabilities to add/drop when running containers.
+Defaults to the default set of capabilities granted by the container runtime.
+Note that this field cannot be set when spec.os.name is windows.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="k8s-io-api-core-v1-SecurityContext-privileged">
+<td><code>privileged</code></td>
+<td><code>bool</code></td>
+<td>
+<p>Run container in privileged mode.
+Processes in privileged containers are essentially equivalent to root on the host.
+Defaults to false.
+Note that this field cannot be set when spec.os.name is windows.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="k8s-io-api-core-v1-SecurityContext-seLinuxOptions">
+<td><code>seLinuxOptions</code></td>
+<td><code><a href="#k8s-io-api-core-v1-SELinuxOptions">SELinuxOptions</a></code></td>
+<td>
+<p>The SELinux context to be applied to the container.
+If unspecified, the container runtime will allocate a random SELinux context for each
+container.  May also be set in PodSecurityContext.  If set in both SecurityContext and
+PodSecurityContext, the value specified in SecurityContext takes precedence.
+Note that this field cannot be set when spec.os.name is windows.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="k8s-io-api-core-v1-SecurityContext-windowsOptions">
+<td><code>windowsOptions</code></td>
+<td><code><a href="#k8s-io-api-core-v1-WindowsSecurityContextOptions">WindowsSecurityContextOptions</a></code></td>
+<td>
+<p>The Windows specific settings applied to all containers.
+If unspecified, the options from the PodSecurityContext will be used.
+If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.
+Note that this field cannot be set when spec.os.name is linux.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="k8s-io-api-core-v1-SecurityContext-runAsUser">
+<td><code>runAsUser</code></td>
+<td><code>int64</code></td>
+<td>
+<p>The UID to run the entrypoint of the container process.
+Defaults to user specified in image metadata if unspecified.
+May also be set in PodSecurityContext.  If set in both SecurityContext and
+PodSecurityContext, the value specified in SecurityContext takes precedence.
+Note that this field cannot be set when spec.os.name is windows.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="k8s-io-api-core-v1-SecurityContext-runAsGroup">
+<td><code>runAsGroup</code></td>
+<td><code>int64</code></td>
+<td>
+<p>The GID to run the entrypoint of the container process.
+Uses runtime default if unset.
+May also be set in PodSecurityContext.  If set in both SecurityContext and
+PodSecurityContext, the value specified in SecurityContext takes precedence.
+Note that this field cannot be set when spec.os.name is windows.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="k8s-io-api-core-v1-SecurityContext-runAsNonRoot">
+<td><code>runAsNonRoot</code></td>
+<td><code>bool</code></td>
+<td>
+<p>Indicates that the container must run as a non-root user.
+If true, the Kubelet will validate the image at runtime to ensure that it
+does not run as UID 0 (root) and fail to start the container if it does.
+If unset or false, no such validation will be performed.
+May also be set in PodSecurityContext.  If set in both SecurityContext and
+PodSecurityContext, the value specified in SecurityContext takes precedence.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="k8s-io-api-core-v1-SecurityContext-readOnlyRootFilesystem">
+<td><code>readOnlyRootFilesystem</code></td>
+<td><code>bool</code></td>
+<td>
+<p>Whether this container has a read-only root filesystem.
+Default is false.
+Note that this field cannot be set when spec.os.name is windows.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="k8s-io-api-core-v1-SecurityContext-allowPrivilegeEscalation">
+<td><code>allowPrivilegeEscalation</code></td>
+<td><code>bool</code></td>
+<td>
+<p>AllowPrivilegeEscalation controls whether a process can gain more
+privileges than its parent process. This bool directly controls if
+the no_new_privs flag will be set on the container process.
+AllowPrivilegeEscalation is true always when the container is:
+1) run as Privileged
+2) has CAP_SYS_ADMIN
+Note that this field cannot be set when spec.os.name is windows.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="k8s-io-api-core-v1-SecurityContext-procMount">
+<td><code>procMount</code></td>
+<td><code>string</code></td>
+<td>
+<p>procMount denotes the type of proc mount to use for the containers.
+The default is DefaultProcMount which uses the container runtime defaults for
+readonly paths and masked paths.
+This requires the ProcMountType feature flag to be enabled.
+Note that this field cannot be set when spec.os.name is windows.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="k8s-io-api-core-v1-SecurityContext-seccompProfile">
+<td><code>seccompProfile</code></td>
+<td><code><a href="#k8s-io-api-core-v1-SeccompProfile">SeccompProfile</a></code></td>
+<td>
+<p>The seccomp options to use by this container. If seccomp options are
+provided at both the pod &amp; container level, the container options
+override the pod options.
+Note that this field cannot be set when spec.os.name is windows.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+</tbody>
+</table>
+</section>
+<h2 id="k8s-io-api-core-v1-VolumeMount">k8s.io.api.core.v1.VolumeMount</h2>
+<section>
+<p>VolumeMount describes a mounting of a Volume within a container.</p>
+
+<table class="message-fields">
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+<th>Required</th>
+</tr>
+</thead>
+<tbody>
+<tr id="k8s-io-api-core-v1-VolumeMount-name">
+<td><code>name</code></td>
+<td><code>string</code></td>
+<td>
+<p>This must match the Name of a Volume.</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="k8s-io-api-core-v1-VolumeMount-readOnly">
+<td><code>readOnly</code></td>
+<td><code>bool</code></td>
+<td>
+<p>Mounted read-only if true, read-write otherwise (false or unspecified).
+Defaults to false.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="k8s-io-api-core-v1-VolumeMount-mountPath">
+<td><code>mountPath</code></td>
+<td><code>string</code></td>
+<td>
+<p>Path within the container at which the volume should be mounted.  Must
+not contain &lsquo;:&rsquo;.</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="k8s-io-api-core-v1-VolumeMount-subPath">
+<td><code>subPath</code></td>
+<td><code>string</code></td>
+<td>
+<p>Path within the volume from which the container&rsquo;s volume should be mounted.
+Defaults to &ldquo;&rdquo; (volume&rsquo;s root).
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="k8s-io-api-core-v1-VolumeMount-mountPropagation">
+<td><code>mountPropagation</code></td>
+<td><code>string</code></td>
+<td>
+<p>mountPropagation determines how mounts are propagated from the host
+to container and the other way around.
+When not set, MountPropagationNone is used.
+This field is beta in 1.10.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="k8s-io-api-core-v1-VolumeMount-subPathExpr">
+<td><code>subPathExpr</code></td>
+<td><code>string</code></td>
+<td>
+<p>Expanded path within the volume from which the container&rsquo;s volume should be mounted.
+Behaves similarly to SubPath but environment variable references $(VAR_NAME) are expanded using the container&rsquo;s environment.
+Defaults to &ldquo;&rdquo; (volume&rsquo;s root).
+SubPathExpr and SubPath are mutually exclusive.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+</tbody>
+</table>
+</section>
+<h2 id="k8s-io-api-core-v1-Affinity">k8s.io.api.core.v1.Affinity</h2>
+<section>
+<p>Affinity is a group of affinity scheduling rules.</p>
+
+<table class="message-fields">
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+<th>Required</th>
+</tr>
+</thead>
+<tbody>
+<tr id="k8s-io-api-core-v1-Affinity-nodeAffinity">
+<td><code>nodeAffinity</code></td>
+<td><code><a href="#k8s-io-api-core-v1-NodeAffinity">NodeAffinity</a></code></td>
+<td>
+<p>Describes node affinity scheduling rules for the pod.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="k8s-io-api-core-v1-Affinity-podAffinity">
+<td><code>podAffinity</code></td>
+<td><code><a href="#k8s-io-api-core-v1-PodAffinity">PodAffinity</a></code></td>
+<td>
+<p>Describes pod affinity scheduling rules (e.g. co-locate this pod in the same node, zone, etc. as some other pod(s)).
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="k8s-io-api-core-v1-Affinity-podAntiAffinity">
+<td><code>podAntiAffinity</code></td>
+<td><code><a href="#k8s-io-api-core-v1-PodAntiAffinity">PodAntiAffinity</a></code></td>
+<td>
+<p>Describes pod anti-affinity scheduling rules (e.g. avoid putting this pod in the same node, zone, etc. as some other pod(s)).
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+</tbody>
+</table>
+</section>
+<h2 id="k8s-io-api-core-v1-Toleration">k8s.io.api.core.v1.Toleration</h2>
+<section>
+<p>The pod this Toleration is attached to tolerates any taint that matches
+the triple <key,value,effect> using the matching operator <operator>.</p>
+
+<table class="message-fields">
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+<th>Required</th>
+</tr>
+</thead>
+<tbody>
+<tr id="k8s-io-api-core-v1-Toleration-key">
+<td><code>key</code></td>
+<td><code>string</code></td>
+<td>
+<p>Key is the taint key that the toleration applies to. Empty means match all taint keys.
+If the key is empty, operator must be Exists; this combination means to match all values and all keys.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="k8s-io-api-core-v1-Toleration-operator">
+<td><code>operator</code></td>
+<td><code>string</code></td>
+<td>
+<p>Operator represents a key&rsquo;s relationship to the value.
+Valid operators are Exists and Equal. Defaults to Equal.
+Exists is equivalent to wildcard for value, so that a pod can
+tolerate all taints of a particular category.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="k8s-io-api-core-v1-Toleration-value">
+<td><code>value</code></td>
+<td><code>string</code></td>
+<td>
+<p>Value is the taint value the toleration matches to.
+If the operator is Exists, the value should be empty, otherwise just a regular string.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="k8s-io-api-core-v1-Toleration-effect">
+<td><code>effect</code></td>
+<td><code>string</code></td>
+<td>
+<p>Effect indicates the taint effect to match. Empty means match all taint effects.
+When specified, allowed values are NoSchedule, PreferNoSchedule and NoExecute.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="k8s-io-api-core-v1-Toleration-tolerationSeconds">
+<td><code>tolerationSeconds</code></td>
+<td><code>int64</code></td>
+<td>
+<p>TolerationSeconds represents the period of time the toleration (which must be
+of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default,
+it is not set, which means tolerate the taint forever (do not evict). Zero and
+negative values will be treated as 0 (evict immediately) by the system.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+</tbody>
+</table>
+</section>
+<h2 id="k8s-io-api-core-v1-Volume">k8s.io.api.core.v1.Volume</h2>
+<section>
+<p>Volume represents a named volume in a pod that may be accessed by any container in the pod.</p>
+
+<table class="message-fields">
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+<th>Required</th>
+</tr>
+</thead>
+<tbody>
+<tr id="k8s-io-api-core-v1-Volume-name">
+<td><code>name</code></td>
+<td><code>string</code></td>
+<td>
+<p>name of the volume.
+Must be a DNS_LABEL and unique within the pod.
+More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="k8s-io-api-core-v1-Volume-volumeSource">
+<td><code>volumeSource</code></td>
+<td><code><a href="#k8s-io-api-core-v1-VolumeSource">VolumeSource</a></code></td>
+<td>
+<p>volumeSource represents the location and type of the mounted volume.
+If not specified, the Volume is implied to be an EmptyDir.
+This implied behavior is deprecated and will be removed in a future version.</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+</tbody>
+</table>
+</section>
+<h2 id="k8s-io-api-core-v1-PodSecurityContext">k8s.io.api.core.v1.PodSecurityContext</h2>
+<section>
+<p>PodSecurityContext holds pod-level security attributes and common container settings.
+Some fields are also present in container.securityContext.  Field values of
+container.securityContext take precedence over field values of PodSecurityContext.</p>
+
+<table class="message-fields">
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+<th>Required</th>
+</tr>
+</thead>
+<tbody>
+<tr id="k8s-io-api-core-v1-PodSecurityContext-seLinuxOptions">
+<td><code>seLinuxOptions</code></td>
+<td><code><a href="#k8s-io-api-core-v1-SELinuxOptions">SELinuxOptions</a></code></td>
+<td>
+<p>The SELinux context to be applied to all containers.
+If unspecified, the container runtime will allocate a random SELinux context for each
+container.  May also be set in SecurityContext.  If set in
+both SecurityContext and PodSecurityContext, the value specified in SecurityContext
+takes precedence for that container.
+Note that this field cannot be set when spec.os.name is windows.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="k8s-io-api-core-v1-PodSecurityContext-windowsOptions">
+<td><code>windowsOptions</code></td>
+<td><code><a href="#k8s-io-api-core-v1-WindowsSecurityContextOptions">WindowsSecurityContextOptions</a></code></td>
+<td>
+<p>The Windows specific settings applied to all containers.
+If unspecified, the options within a container&rsquo;s SecurityContext will be used.
+If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.
+Note that this field cannot be set when spec.os.name is linux.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="k8s-io-api-core-v1-PodSecurityContext-runAsUser">
+<td><code>runAsUser</code></td>
+<td><code>int64</code></td>
+<td>
+<p>The UID to run the entrypoint of the container process.
+Defaults to user specified in image metadata if unspecified.
+May also be set in SecurityContext.  If set in both SecurityContext and
+PodSecurityContext, the value specified in SecurityContext takes precedence
+for that container.
+Note that this field cannot be set when spec.os.name is windows.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="k8s-io-api-core-v1-PodSecurityContext-runAsGroup">
+<td><code>runAsGroup</code></td>
+<td><code>int64</code></td>
+<td>
+<p>The GID to run the entrypoint of the container process.
+Uses runtime default if unset.
+May also be set in SecurityContext.  If set in both SecurityContext and
+PodSecurityContext, the value specified in SecurityContext takes precedence
+for that container.
+Note that this field cannot be set when spec.os.name is windows.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="k8s-io-api-core-v1-PodSecurityContext-runAsNonRoot">
+<td><code>runAsNonRoot</code></td>
+<td><code>bool</code></td>
+<td>
+<p>Indicates that the container must run as a non-root user.
+If true, the Kubelet will validate the image at runtime to ensure that it
+does not run as UID 0 (root) and fail to start the container if it does.
+If unset or false, no such validation will be performed.
+May also be set in SecurityContext.  If set in both SecurityContext and
+PodSecurityContext, the value specified in SecurityContext takes precedence.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="k8s-io-api-core-v1-PodSecurityContext-supplementalGroups">
+<td><code>supplementalGroups</code></td>
+<td><code>int64[]</code></td>
+<td>
+<p>A list of groups applied to the first process run in each container, in addition
+to the container&rsquo;s primary GID.  If unspecified, no groups will be added to
+any container.
+Note that this field cannot be set when spec.os.name is windows.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="k8s-io-api-core-v1-PodSecurityContext-fsGroup">
+<td><code>fsGroup</code></td>
+<td><code>int64</code></td>
+<td>
+<p>A special supplemental group that applies to all containers in a pod.
+Some volume types allow the Kubelet to change the ownership of that volume
+to be owned by the pod:</p>
+
+<ol>
+<li>The owning GID will be the FSGroup</li>
+<li>The setgid bit is set (new files created in the volume will be owned by FSGroup)</li>
+<li>The permission bits are OR&rsquo;d with rw-rw&mdash;-</li>
+</ol>
+
+<p>If unset, the Kubelet will not modify the ownership and permissions of any volume.
+Note that this field cannot be set when spec.os.name is windows.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="k8s-io-api-core-v1-PodSecurityContext-sysctls">
+<td><code>sysctls</code></td>
+<td><code><a href="#k8s-io-api-core-v1-Sysctl">Sysctl[]</a></code></td>
+<td>
+<p>Sysctls hold a list of namespaced sysctls used for the pod. Pods with unsupported
+sysctls (by the container runtime) might fail to launch.
+Note that this field cannot be set when spec.os.name is windows.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="k8s-io-api-core-v1-PodSecurityContext-fsGroupChangePolicy">
+<td><code>fsGroupChangePolicy</code></td>
+<td><code>string</code></td>
+<td>
+<p>fsGroupChangePolicy defines behavior of changing ownership and permission of the volume
+before being exposed inside Pod. This field will only apply to
+volume types which support fsGroup based ownership(and permissions).
+It will have no effect on ephemeral volume types such as: secret, configmaps
+and emptydir.
+Valid values are &ldquo;OnRootMismatch&rdquo; and &ldquo;Always&rdquo;. If not specified, &ldquo;Always&rdquo; is used.
+Note that this field cannot be set when spec.os.name is windows.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="k8s-io-api-core-v1-PodSecurityContext-seccompProfile">
+<td><code>seccompProfile</code></td>
+<td><code><a href="#k8s-io-api-core-v1-SeccompProfile">SeccompProfile</a></code></td>
+<td>
+<p>The seccomp options to use by the containers in this pod.
+Note that this field cannot be set when spec.os.name is windows.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+</tbody>
+</table>
+</section>
+<h2 id="k8s-io-api-core-v1-TopologySpreadConstraint">k8s.io.api.core.v1.TopologySpreadConstraint</h2>
+<section>
+<p>TopologySpreadConstraint specifies how to spread matching pods among the given topology.</p>
+
+<table class="message-fields">
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+<th>Required</th>
+</tr>
+</thead>
+<tbody>
+<tr id="k8s-io-api-core-v1-TopologySpreadConstraint-maxSkew">
+<td><code>maxSkew</code></td>
+<td><code>int32</code></td>
+<td>
+<p>MaxSkew describes the degree to which pods may be unevenly distributed.
+When <code>whenUnsatisfiable=DoNotSchedule</code>, it is the maximum permitted difference
+between the number of matching pods in the target topology and the global minimum.
+For example, in a 3-zone cluster, MaxSkew is set to 1, and pods with the same
+labelSelector spread as 1/1/0:
++&mdash;&mdash;-+&mdash;&mdash;-+&mdash;&mdash;-+
+| zone1 | zone2 | zone3 |
++&mdash;&mdash;-+&mdash;&mdash;-+&mdash;&mdash;-+
+|   P   |   P   |       |
++&mdash;&mdash;-+&mdash;&mdash;-+&mdash;&mdash;-+
+- if MaxSkew is 1, incoming pod can only be scheduled to zone3 to become 1/1/1;
+scheduling it onto zone1(zone2) would make the ActualSkew(2-0) on zone1(zone2)
+violate MaxSkew(1).
+- if MaxSkew is 2, incoming pod can be scheduled onto any zone.
+When <code>whenUnsatisfiable=ScheduleAnyway</code>, it is used to give higher precedence
+to topologies that satisfy it.
+It&rsquo;s a required field. Default value is 1 and 0 is not allowed.</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="k8s-io-api-core-v1-TopologySpreadConstraint-topologyKey">
+<td><code>topologyKey</code></td>
+<td><code>string</code></td>
+<td>
+<p>TopologyKey is the key of node labels. Nodes that have a label with this key
+and identical values are considered to be in the same topology.
+We consider each <key, value> as a &ldquo;bucket&rdquo;, and try to put balanced number
+of pods into each bucket.
+It&rsquo;s a required field.</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="k8s-io-api-core-v1-TopologySpreadConstraint-whenUnsatisfiable">
+<td><code>whenUnsatisfiable</code></td>
+<td><code>string</code></td>
+<td>
+<p>WhenUnsatisfiable indicates how to deal with a pod if it doesn&rsquo;t satisfy
+the spread constraint.
+- DoNotSchedule (default) tells the scheduler not to schedule it.
+- ScheduleAnyway tells the scheduler to schedule the pod in any location,
+  but giving higher precedence to topologies that would help reduce the
+  skew.
+A constraint is considered &ldquo;Unsatisfiable&rdquo; for an incoming pod
+if and only if every possible node assignment for that pod would violate
+&ldquo;MaxSkew&rdquo; on some topology.
+For example, in a 3-zone cluster, MaxSkew is set to 1, and pods with the same
+labelSelector spread as 3/1/1:
++&mdash;&mdash;-+&mdash;&mdash;-+&mdash;&mdash;-+
+| zone1 | zone2 | zone3 |
++&mdash;&mdash;-+&mdash;&mdash;-+&mdash;&mdash;-+
+| P P P |   P   |   P   |
++&mdash;&mdash;-+&mdash;&mdash;-+&mdash;&mdash;-+
+If WhenUnsatisfiable is set to DoNotSchedule, incoming pod can only be scheduled
+to zone2(zone3) to become 3/2/1(3/1/2) as ActualSkew(2-1) on zone2(zone3) satisfies
+MaxSkew(1). In other words, the cluster can still be imbalanced, but scheduler
+won&rsquo;t make it <em>more</em> imbalanced.
+It&rsquo;s a required field.</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="k8s-io-api-core-v1-TopologySpreadConstraint-labelSelector">
+<td><code>labelSelector</code></td>
+<td><code><a href="#k8s-io-apimachinery-pkg-apis-meta-v1-LabelSelector">LabelSelector</a></code></td>
+<td>
+<p>LabelSelector is used to find matching pods.
+Pods that match this label selector are counted to determine the number of pods
+in their corresponding topology domain.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+</tbody>
+</table>
+</section>
+<h2 id="k8s-io-api-core-v1-ExecAction">k8s.io.api.core.v1.ExecAction</h2>
+<section>
+<p>ExecAction describes a &ldquo;run in container&rdquo; action.</p>
+
+<table class="message-fields">
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+<th>Required</th>
+</tr>
+</thead>
+<tbody>
+<tr id="k8s-io-api-core-v1-ExecAction-command">
+<td><code>command</code></td>
+<td><code>string[]</code></td>
+<td>
+<p>Command is the command line to execute inside the container, the working directory for the
+command  is root (&lsquo;/&rsquo;) in the container&rsquo;s filesystem. The command is simply exec&rsquo;d, it is
+not run inside a shell, so traditional shell instructions (&lsquo;|&rsquo;, etc) won&rsquo;t work. To use
+a shell, you need to explicitly call out to that shell.
+Exit status of 0 is treated as live/healthy and non-zero is unhealthy.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+</tbody>
+</table>
+</section>
+<h2 id="k8s-io-api-core-v1-GRPCAction">k8s.io.api.core.v1.GRPCAction</h2>
+<section>
+<table class="message-fields">
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+<th>Required</th>
+</tr>
+</thead>
+<tbody>
+<tr id="k8s-io-api-core-v1-GRPCAction-port">
+<td><code>port</code></td>
+<td><code>int32</code></td>
+<td>
+<p>Port number of the gRPC service. Number must be in the range 1 to 65535.</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="k8s-io-api-core-v1-GRPCAction-service">
+<td><code>service</code></td>
+<td><code>string</code></td>
+<td>
+<p>Service is the name of the service to place in the gRPC HealthCheckRequest
+(see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).</p>
+
+<p>If this is not specified, the default behavior is defined by gRPC.
++optional
++default=&ldquo;&rdquo;</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+</tbody>
+</table>
+</section>
+<h2 id="k8s-io-api-core-v1-HTTPHeader">k8s.io.api.core.v1.HTTPHeader</h2>
+<section>
+<p>HTTPHeader describes a custom header to be used in HTTP probes</p>
+
+<table class="message-fields">
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+<th>Required</th>
+</tr>
+</thead>
+<tbody>
+<tr id="k8s-io-api-core-v1-HTTPHeader-name">
+<td><code>name</code></td>
+<td><code>string</code></td>
+<td>
+<p>The header field name</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+<tr id="k8s-io-api-core-v1-HTTPHeader-value">
+<td><code>value</code></td>
+<td><code>string</code></td>
+<td>
+<p>The header field value</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+</tbody>
+</table>
+</section>
+<h2 id="k8s-io-api-core-v1-SessionAffinityConfig">k8s.io.api.core.v1.SessionAffinityConfig</h2>
+<section>
+<p>SessionAffinityConfig represents the configurations of session affinity.</p>
+
+<table class="message-fields">
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+<th>Required</th>
+</tr>
+</thead>
+<tbody>
+<tr id="k8s-io-api-core-v1-SessionAffinityConfig-clientIP">
+<td><code>clientIP</code></td>
+<td><code><a href="#k8s-io-api-core-v1-ClientIPConfig">ClientIPConfig</a></code></td>
+<td>
+<p>clientIP contains the configurations of Client IP based session affinity.
++optional</p>
+
+</td>
+<td>
+No
+</td>
+</tr>
+</tbody>
+</table>
+</section>
+<h2 id="K8sResourceOverlayPatch-Type">K8sResourceOverlayPatch.Type</h2>
+<section>
+<table class="enum-values">
+<thead>
+<tr>
+<th>Name</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr id="K8sResourceOverlayPatch-Type-unspecified">
+<td><code>unspecified</code></td>
+<td>
+</td>
+</tr>
+<tr id="K8sResourceOverlayPatch-Type-replace">
+<td><code>replace</code></td>
+<td>
+</td>
+</tr>
+<tr id="K8sResourceOverlayPatch-Type-remove">
+<td><code>remove</code></td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+</section>
+<h2 id="ConfigState">ConfigState</h2>
+<section>
+<table class="enum-values">
+<thead>
+<tr>
+<th>Name</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr id="ConfigState-Unspecified">
+<td><code>Unspecified</code></td>
+<td>
+</td>
+</tr>
+<tr id="ConfigState-Created">
+<td><code>Created</code></td>
+<td>
+</td>
+</tr>
+<tr id="ConfigState-ReconcileFailed">
+<td><code>ReconcileFailed</code></td>
+<td>
+</td>
+</tr>
+<tr id="ConfigState-Reconciling">
+<td><code>Reconciling</code></td>
+<td>
+</td>
+</tr>
+<tr id="ConfigState-Available">
+<td><code>Available</code></td>
+<td>
+</td>
+</tr>
+<tr id="ConfigState-Unmanaged">
+<td><code>Unmanaged</code></td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+</section>

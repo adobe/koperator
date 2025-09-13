@@ -1,4 +1,5 @@
 Copyright {{ date "2006" now }} {{ .copyright.owner }}
+Copyright {{ date "2006" now }} {{ .copyright.adobe.notice }}
 
 {{ .license.content }}
 @-if(.spdx.enabled)

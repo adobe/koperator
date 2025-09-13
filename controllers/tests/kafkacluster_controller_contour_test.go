@@ -1,4 +1,5 @@
 // Copyright © 2020 Cisco Systems, Inc. and/or its affiliates
+// Copyright 2025 Adobe. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -109,7 +110,7 @@ var _ = Describe("KafkaClusterWithContourIngressController", Label("contour"), f
 
 func expectContourClusterIpAnycastSvc(ctx context.Context, kafkaCluster *v1beta1.KafkaCluster, eListener v1beta1.ExternalListenerConfig) {
 	var svc corev1.Service
-	var ingressConfigName string = "ingress1"
+	var ingressConfigName = "ingress1"
 
 	serviceName := fmt.Sprintf(contourutils.ContourServiceNameWithScope, eListener.Name, ingressConfigName, kafkaCluster.GetName())
 	Eventually(ctx, func() error {
@@ -148,8 +149,8 @@ func expectContourClusterIpBrokerSvc(ctx context.Context, kafkaCluster *v1beta1.
 
 func expectContourAnycastHttpProxy(ctx context.Context, kafkaCluster *v1beta1.KafkaCluster, eListener v1beta1.ExternalListenerConfig) {
 	var proxy v1.HTTPProxy
-	var proxyName string = "kafka.cluster.local"
-	var ingressConfigName string = "ingress1"
+	var proxyName = "kafka.cluster.local"
+	var ingressConfigName = "ingress1"
 	serviceName := fmt.Sprintf(contourutils.ContourServiceNameWithScope, eListener.Name, ingressConfigName, kafkaCluster.GetName())
 	Eventually(ctx, func() error {
 		err := k8sClient.Get(ctx, types.NamespacedName{Namespace: kafkaCluster.Namespace, Name: proxyName}, &proxy)

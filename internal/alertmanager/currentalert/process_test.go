@@ -1,4 +1,5 @@
 // Copyright © 2020 Cisco Systems, Inc. and/or its affiliates
+// Copyright 2025 Adobe. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -78,7 +79,7 @@ func Test_resizePvc(t *testing.T) {
 				},
 				Spec: corev1.PersistentVolumeClaimSpec{
 					StorageClassName: util.StringPointer("gp2"),
-					Resources: corev1.ResourceRequirements{
+					Resources: corev1.VolumeResourceRequirements{
 						Requests: corev1.ResourceList{
 							corev1.ResourceStorage: resource.MustParse("2Gi"),
 						},
@@ -97,7 +98,7 @@ func Test_resizePvc(t *testing.T) {
 								{
 									MountPath: "/kafka-logs",
 									PvcSpec: &corev1.PersistentVolumeClaimSpec{
-										Resources: corev1.ResourceRequirements{
+										Resources: corev1.VolumeResourceRequirements{
 											Requests: corev1.ResourceList{
 												corev1.ResourceStorage: resource.MustParse("4Gi"),
 											},
@@ -146,7 +147,7 @@ func Test_resizePvc(t *testing.T) {
 				},
 				Spec: corev1.PersistentVolumeClaimSpec{
 					StorageClassName: util.StringPointer("gp2"),
-					Resources: corev1.ResourceRequirements{
+					Resources: corev1.VolumeResourceRequirements{
 						Requests: corev1.ResourceList{
 							corev1.ResourceStorage: resource.MustParse("2Gi"),
 						},
@@ -165,7 +166,7 @@ func Test_resizePvc(t *testing.T) {
 								{
 									MountPath: "/kafka-logs",
 									PvcSpec: &corev1.PersistentVolumeClaimSpec{
-										Resources: corev1.ResourceRequirements{
+										Resources: corev1.VolumeResourceRequirements{
 											Requests: corev1.ResourceList{
 												corev1.ResourceStorage: resource.MustParse("1Gi"),
 											},
@@ -183,7 +184,7 @@ func Test_resizePvc(t *testing.T) {
 									{
 										MountPath: "/kafka-logs",
 										PvcSpec: &corev1.PersistentVolumeClaimSpec{
-											Resources: corev1.ResourceRequirements{
+											Resources: corev1.VolumeResourceRequirements{
 												Requests: corev1.ResourceList{
 													corev1.ResourceStorage: resource.MustParse("4Gi"),
 												},
@@ -467,7 +468,7 @@ func Test_upScale(t *testing.T) {
 									MountPath: "/kafka-logs",
 									PvcSpec: &corev1.PersistentVolumeClaimSpec{
 										AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-										Resources: corev1.ResourceRequirements{
+										Resources: corev1.VolumeResourceRequirements{
 											Requests: corev1.ResourceList{
 												corev1.ResourceStorage: resource.MustParse("4Gi"),
 											},
@@ -508,7 +509,7 @@ func Test_upScale(t *testing.T) {
 								{
 									MountPath: "/kafka-logs",
 									PvcSpec: &corev1.PersistentVolumeClaimSpec{
-										Resources: corev1.ResourceRequirements{
+										Resources: corev1.VolumeResourceRequirements{
 											Requests: corev1.ResourceList{
 												corev1.ResourceStorage: resource.MustParse("4Gi"),
 											},
@@ -548,7 +549,7 @@ func Test_upScale(t *testing.T) {
 							PvcSpec: &corev1.PersistentVolumeClaimSpec{
 								StorageClassName: util.StringPointer("gp2"),
 								AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-								Resources: corev1.ResourceRequirements{
+								Resources: corev1.VolumeResourceRequirements{
 									Requests: map[corev1.ResourceName]resource.Quantity{
 										corev1.ResourceStorage: resource.MustParse("10G"),
 									},
@@ -623,7 +624,7 @@ func Test_downScale(t *testing.T) {
 									MountPath: "/kafka-logs",
 									PvcSpec: &corev1.PersistentVolumeClaimSpec{
 										AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-										Resources: corev1.ResourceRequirements{
+										Resources: corev1.VolumeResourceRequirements{
 											Requests: corev1.ResourceList{
 												corev1.ResourceStorage: resource.MustParse("4Gi"),
 											},
@@ -743,7 +744,7 @@ func setupEnvironment(t *testing.T, testClient client.Client) {
 								AccessModes: []corev1.PersistentVolumeAccessMode{
 									"ReadWriteOnce",
 								},
-								Resources: corev1.ResourceRequirements{
+								Resources: corev1.VolumeResourceRequirements{
 									Requests: map[corev1.ResourceName]resource.Quantity{
 										"storage": storageResourceQuantity,
 									},

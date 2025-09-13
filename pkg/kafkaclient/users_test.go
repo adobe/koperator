@@ -1,4 +1,5 @@
 // Copyright © 2019 Cisco Systems, Inc. and/or its affiliates
+// Copyright 2025 Adobe. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,6 +19,7 @@ import (
 	"testing"
 
 	"github.com/IBM/sarama"
+
 	"github.com/banzaicloud/koperator/api/v1alpha1"
 )
 
@@ -30,7 +32,8 @@ func TestCreateUserACLs(t *testing.T) {
 	invalidAccessTypes := []v1alpha1.KafkaAccessType{
 		"",
 		"helloWorld"}
-	allAccessTypes := append(validAccessTypes, invalidAccessTypes...)
+	allAccessTypes := append([]v1alpha1.KafkaAccessType{}, validAccessTypes...)
+	allAccessTypes = append(allAccessTypes, invalidAccessTypes...)
 
 	validPatternTypes := []v1alpha1.KafkaPatternType{
 		"any",
@@ -40,7 +43,8 @@ func TestCreateUserACLs(t *testing.T) {
 		""}
 	invalidPatternTypes := []v1alpha1.KafkaPatternType{
 		"helloWorld"}
-	allPatternTypes := append(validPatternTypes, invalidPatternTypes...)
+	allPatternTypes := append([]v1alpha1.KafkaPatternType{}, validPatternTypes...)
+	allPatternTypes = append(allPatternTypes, invalidPatternTypes...)
 
 	// Test all valid combinations of accessType and patternType
 	for _, accessType := range validAccessTypes {

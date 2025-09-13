@@ -1,0 +1,99 @@
+// Copyright 2021 Cisco Systems, Inc. and/or its affiliates.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+import "google/protobuf/wrappers.proto";
+import "api/v1alpha1/common.proto";
+import "google/api/field_behavior.proto";
+import "k8s.io/api/core/v1/generated.proto";
+
+// $schema: istio-operator.api.v1alpha1.IstioMeshGatewaySpec
+// $title: Istio Mesh Gateway Spec
+// $description: Istio Mesh Gateway descriptor
+
+package istio_operator.v2.api.v1alpha1;
+
+option go_package = "github.com/banzaicloud/istio-operator/v2/api/v1alpha1";
+
+// IstioMeshGateway defines an Istio ingress or egress gateway
+//
+// <!-- crd generation tags
+// +cue-gen:IstioMeshGateway:groupName:servicemesh.cisco.com
+// +cue-gen:IstioMeshGateway:version:v1alpha1
+// +cue-gen:IstioMeshGateway:storageVersion
+// +cue-gen:IstioMeshGateway:annotations:helm.sh/resource-policy=keep
+// +cue-gen:IstioMeshGateway:subresource:status
+// +cue-gen:IstioMeshGateway:scope:Namespaced
+// +cue-gen:IstioMeshGateway:resource:shortNames=imgw,istiomgw
+// +cue-gen:IstioMeshGateway:printerColumn:name="Type",type="string",JSONPath=".spec.type",description="Type of the gateway"
+// +cue-gen:IstioMeshGateway:printerColumn:name="Service Type",type="string",JSONPath=".spec.service.type",description="Type of the service"
+// +cue-gen:IstioMeshGateway:printerColumn:name="Status",type="string",JSONPath=".status.Status",description="Status of the resource"
+// +cue-gen:IstioMeshGateway:printerColumn:name="Ingress IPs",type="string",JSONPath=".status.GatewayAddress",description="Ingress gateway addresses of the resource"
+// +cue-gen:IstioMeshGateway:printerColumn:name="Error",type="string",JSONPath=".status.ErrorMessage",description="Error message"
+// +cue-gen:IstioMeshGateway:printerColumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
+// +cue-gen:IstioMeshGateway:printerColumn:name="Control Plane",type="string",JSONPath=".spec.istioControlPlane"
+// +cue-gen:IstioMeshGateway:preserveUnknownFields:false
+// +cue-gen:IstioMeshGateway:specIsRequired
+// -->
+//
+// <!-- go code generation tags
+// +genclient
+// +k8s:deepcopy-gen=true
+// -->
+message IstioMeshGatewaySpec {
+    // Deployment spec
+    BaseKubernetesResourceConfig deployment = 1;
+
+    // Service spec
+    Service service = 2 [(google.api.field_behavior) = REQUIRED];
+
+    // Whether to run the gateway in a privileged container
+    google.protobuf.BoolValue runAsRoot = 3;
+
+    // Type of gateway, either ingress or egress
+    // +kubebuilder:validation:Enum=ingress;egress
+    GatewayType type = 4 [(google.api.field_behavior) = REQUIRED];
+
+    // Istio CR to which this gateway belongs to
+    NamespacedName istioControlPlane = 5 [(google.api.field_behavior) = REQUIRED];
+
+    // K8s resource overlay patches
+    repeated K8sResourceOverlayPatch k8sResourceOverlays = 6;
+}
+
+message Properties {
+    string name = 1;
+}
+
+enum GatewayType {
+    unspecified = 0;
+    ingress = 1;
+    egress = 2;
+}
+
+// <!-- go code generation tags
+// +genclient
+// +k8s:deepcopy-gen=true
+// -->
+message IstioMeshGatewayStatus {
+    // Reconciliation status of the istio mesh gateway
+    ConfigState Status = 1;
+
+    // Current address for the gateway
+    repeated string GatewayAddress = 2;
+
+    // Reconciliation error message if any
+    string ErrorMessage = 3;
+}

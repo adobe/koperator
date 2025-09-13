@@ -1,4 +1,5 @@
 // Copyright © 2019 Cisco Systems, Inc. and/or its affiliates
+// Copyright 2025 Adobe. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -45,19 +46,20 @@ func (r *Reconciler) podDisruptionBudget(log logr.Logger, extListener v1beta1.Ex
 
 	// We use intstr.Parse so that the proper structure is used when passing to PDB spec validator, otherwise
 	// an improper regex will be used to verify the value
-	budget := intstr.Parse(pdbConfig.DisruptionBudget.Budget)
+	budget := intstr.Parse(pdbConfig.Budget)
 
 	var spec policyv1.PodDisruptionBudgetSpec
 	var matchLabels = labelsForEnvoyIngress(r.KafkaCluster.GetName(), eListenerLabelName)
 
-	if pdbConfig.Strategy == MIN_AVAILABLE {
+	switch pdbConfig.Strategy {
+	case MIN_AVAILABLE:
 		spec = policyv1.PodDisruptionBudgetSpec{
 			MinAvailable: &budget,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: matchLabels,
 			},
 		}
-	} else if pdbConfig.Strategy == MAX_UNAVAILABLE {
+	case MAX_UNAVAILABLE:
 		spec = policyv1.PodDisruptionBudgetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: matchLabels,

@@ -1,5 +1,5 @@
 # Build the manager binary
-FROM --platform=${BUILDPLATFORM:-linux/amd64} golang:1.21 as builder
+FROM --platform=${BUILDPLATFORM:-linux/amd64} golang:1.25 AS builder
 
 ARG BUILDPLATFORM
 ARG TARGETPLATFORM
@@ -11,6 +11,8 @@ WORKDIR /workspace
 # Copy the Go Modules manifests
 COPY go.mod go.mod
 COPY go.sum go.sum
+# Copy third_party directory which contains local replacements referenced in go.mod
+COPY third_party third_party
 # cache deps before building and copying source so that we don't need to re-download as much
 # and so that source changes don't invalidate our downloaded layer
 COPY api api

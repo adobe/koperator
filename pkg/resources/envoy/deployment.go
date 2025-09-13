@@ -1,4 +1,5 @@
 // Copyright © 2019 Cisco Systems, Inc. and/or its affiliates
+// Copyright 2025 Adobe. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,6 +19,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"math"
 	"strconv"
 
 	"github.com/go-logr/logr"
@@ -38,9 +40,9 @@ func (r *Reconciler) deployment(log logr.Logger, extListener v1beta1.ExternalLis
 	ingressConfig v1beta1.IngressConfig, ingressConfigName, defaultIngressConfigName string) runtime.Object {
 	eListenerLabelName := util.ConstructEListenerLabelName(ingressConfigName, extListener.Name)
 
-	var configMapName string = util.GenerateEnvoyResourceName(envoyutils.EnvoyVolumeAndConfigName, envoyutils.EnvoyVolumeAndConfigNameWithScope,
+	var configMapName = util.GenerateEnvoyResourceName(envoyutils.EnvoyVolumeAndConfigName, envoyutils.EnvoyVolumeAndConfigNameWithScope,
 		extListener, ingressConfig, ingressConfigName, r.KafkaCluster.GetName())
-	var deploymentName string = util.GenerateEnvoyResourceName(envoyutils.EnvoyDeploymentName, envoyutils.EnvoyDeploymentNameWithScope,
+	var deploymentName = util.GenerateEnvoyResourceName(envoyutils.EnvoyDeploymentName, envoyutils.EnvoyDeploymentNameWithScope,
 		extListener, ingressConfig, ingressConfigName, r.KafkaCluster.GetName())
 
 	exposedPorts := getExposedContainerPorts(extListener,
@@ -157,9 +159,17 @@ func getExposedContainerPorts(extListener v1beta1.ExternalListenerConfig, broker
 		}
 		if util.ShouldIncludeBroker(brokerConfig, kafkaCluster.Status, brokerId, defaultIngressConfigName, ingressConfigName) && !extListener.TLSEnabled() {
 			exposedPorts = append(exposedPorts, corev1.ContainerPort{
-				Name:          fmt.Sprintf("broker-%d", brokerId),
-				ContainerPort: extListener.GetBrokerPort(int32(brokerId)),
-				Protocol:      corev1.ProtocolTCP,
+				Name: fmt.Sprintf("broker-%d", brokerId),
+				ContainerPort: func() int32 {
+					// Broker IDs are always within valid range for int32 conversion
+					if brokerId < 0 || brokerId > math.MaxInt32 {
+						// This should never happen as broker IDs are small positive integers
+						log.Error(fmt.Errorf("broker ID %d out of valid range for int32 conversion", brokerId), "Invalid broker ID detected in envoy deployment container port")
+						return 0
+					}
+					return extListener.GetBrokerPort(int32(brokerId))
+				}(),
+				Protocol: corev1.ProtocolTCP,
 			})
 		}
 	}

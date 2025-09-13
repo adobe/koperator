@@ -1,0 +1,95 @@
+run:
+  skip-dirs:
+    - .gen
+    - build
+  skip-files:
+    - ".*zz_.*\\.go$"
+
+linters:
+  enable-all: true
+  disable:
+    - lll
+    - gochecknoinits
+    - gochecknoglobals
+    - funlen
+    - godot
+    - godox
+    - wsl
+    - dupl
+    - wrapcheck
+    - forbidigo
+    - golint
+    - exhaustive
+    - varnamelen
+    - ireturn
+    - gci
+    - forcetypeassert
+
+    # - goconst
+    # - gocritic
+    # - gocognit
+    # - gomnd
+    # - nestif
+    # - testpackage
+
+    - mirror
+    - revive
+    - contextcheck
+    - depguard
+    - exhaustruct
+    - nonamedreturns
+
+    # special cases only
+    - exhaustivestruct
+
+    # deprecated
+    - maligned
+    - interfacer
+    - scopelint
+    - varcheck
+    - structcheck
+    - nosnakecase
+    - deadcode
+    - ifshort
+
+linters-settings:
+  gomnd:
+    settings:
+      mnd:
+        checks: [case,operation,return,assign]
+  gocognit:
+    min-complexity: 50
+  cyclop:
+    max-complexity: 40
+  golint:
+    min-confidence: 0.1
+  gocyclo:
+    min-complexity: 40
+  goimports:
+    local-prefixes: github.com/banzaicloud,github.com/cisco-open
+  gocritic:
+    disabled-checks:
+      - ifElseChain
+  maintidx:
+    under: 10 # todo: set a valid value
+  gomoddirectives:
+    replace-local: true
+    replace-allow-list:
+      - github.com/golang/protobuf
+
+issues:
+  # mainly because of the operator, but we are using helm chart names
+  # as package names
+  exclude:
+    - underscore in package name
+    - should not use underscores in package names
+
+  exclude-rules:
+  # zz_ files are messing up the receiver name
+  - linters:
+    - stylecheck
+    text: "ST1016:"
+  # fake client is still alive
+  - linters:
+    - staticcheck
+    text: "SA1019:"

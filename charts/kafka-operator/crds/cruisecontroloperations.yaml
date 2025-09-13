@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.13.0
+    controller-gen.kubebuilder.io/version: v0.19.0
   name: cruisecontroloperations.kafka.banzaicloud.io
 spec:
   group: kafka.banzaicloud.io
@@ -21,14 +21,19 @@ spec:
           API.
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
@@ -37,22 +42,21 @@ spec:
             properties:
               errorPolicy:
                 default: retry
-                description: ErrorPolicy defines how failed Cruise Control operation
-                  should be handled. When it is "retry", the Koperator re-executes
-                  the failed task in every 30 sec (by default). When it is "ignore",
-                  the Koperator handles the failed task as completed.
+                description: |-
+                  ErrorPolicy defines how failed Cruise Control operation should be handled.
+                  When it is "retry", the Koperator re-executes the failed task in every 30 sec (by default).
+                  When it is "ignore", the Koperator handles the failed task as completed.
                 enum:
                 - ignore
                 - retry
                 type: string
               ttlSecondsAfterFinished:
-                description: 'When TTLSecondsAfterFinished is specified, the created
-                  and finished (completed successfully or completedWithError and errorPolicy:
-                  ignore) cruiseControlOperation custom resource will be deleted after
-                  the given time elapsed. When it is 0 then the resource is going
-                  to be deleted instantly after the operation is finished. When it
-                  is not specified the resource is not going to be removed. Value
-                  can be only zero and positive integers'
+                description: |-
+                  When TTLSecondsAfterFinished is specified, the created and finished (completed successfully or completedWithError and errorPolicy: ignore)
+                  cruiseControlOperation custom resource will be deleted after the given time elapsed.
+                  When it is 0 then the resource is going to be deleted instantly after the operation is finished.
+                  When it is not specified the resource is not going to be removed.
+                  Value can be only zero and positive integers
                 minimum: 0
                 type: integer
             type: object

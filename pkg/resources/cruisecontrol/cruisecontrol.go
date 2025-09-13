@@ -1,4 +1,5 @@
 // Copyright © 2019 Cisco Systems, Inc. and/or its affiliates
+// Copyright 2025 Adobe. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -117,7 +118,7 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 					Namespace: r.KafkaCluster.Namespace,
 				}
 				config = &corev1.ConfigMap{}
-				err := r.Client.Get(context.Background(), key, config)
+				err := r.Get(context.Background(), key, config)
 				if err != nil && !apierrors.IsNotFound(err) {
 					return errorfactory.New(
 						errorfactory.APIFailure{},
@@ -172,7 +173,7 @@ func (r *Reconciler) getClientSecret() (*corev1.Secret, error) {
 		clientNamespacedName = types.NamespacedName{Name: r.KafkaCluster.Spec.GetClientSSLCertSecretName(), Namespace: r.KafkaCluster.Namespace}
 	}
 
-	if err := r.Client.Get(context.Background(), clientNamespacedName, clientSecret); err != nil {
+	if err := r.Get(context.Background(), clientNamespacedName, clientSecret); err != nil {
 		// We only return with ResourceNotReady (which is going to retry after a period time)
 		// when we use our cert generation for client cert
 		if apierrors.IsNotFound(err) && r.KafkaCluster.Spec.GetClientSSLCertSecretName() == "" {

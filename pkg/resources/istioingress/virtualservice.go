@@ -1,4 +1,5 @@
 // Copyright © 2020 Cisco Systems, Inc. and/or its affiliates
+// Copyright 2025 Adobe. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,6 +17,7 @@ package istioingress
 
 import (
 	"fmt"
+	"math"
 
 	istioclientv1beta1 "github.com/banzaicloud/istio-client-go/pkg/networking/v1beta1"
 
@@ -79,7 +81,22 @@ func generateTlsRoutes(kc *v1beta1.KafkaCluster, externalListenerConfig v1beta1.
 			tlsRoutes = append(tlsRoutes, istioclientv1beta1.TLSRoute{
 				Match: []istioclientv1beta1.TLSMatchAttributes{
 					{
-						Port:     util.IntPointer(int(externalListenerConfig.GetBrokerPort(int32(brokerId)))),
+						Port: func() *int {
+							// Broker IDs are always within valid range for int32 conversion
+							if brokerId < 0 || brokerId > math.MaxInt32 {
+								// This should never happen as broker IDs are small positive integers
+								log.Error(fmt.Errorf("broker ID %d out of valid range for int32 conversion", brokerId), "Invalid broker ID detected in TLS route port")
+								return util.IntPointer(0)
+							}
+							brokerPort := externalListenerConfig.GetBrokerPort(int32(brokerId))
+							// Port numbers are always within valid range for int conversion
+							if brokerPort < 0 || brokerPort > 65535 {
+								// This should never happen as GetBrokerPort returns valid port numbers
+								log.Error(fmt.Errorf("broker port %d out of valid range [0-65535] for broker %d", brokerPort, brokerId), "Invalid broker port detected in TLS route")
+								return util.IntPointer(0)
+							}
+							return util.IntPointer(int(brokerPort))
+						}(),
 						SniHosts: []string{"*"},
 					},
 				},
@@ -132,7 +149,22 @@ func generateTcpRoutes(kc *v1beta1.KafkaCluster, externalListenerConfig v1beta1.
 			tcpRoutes = append(tcpRoutes, istioclientv1beta1.TCPRoute{
 				Match: []istioclientv1beta1.L4MatchAttributes{
 					{
-						Port: util.IntPointer(int(externalListenerConfig.GetBrokerPort(int32(brokerId)))),
+						Port: func() *int {
+							// Broker IDs are always within valid range for int32 conversion
+							if brokerId < 0 || brokerId > math.MaxInt32 {
+								// This should never happen as broker IDs are small positive integers
+								log.Error(fmt.Errorf("broker ID %d out of valid range for int32 conversion", brokerId), "Invalid broker ID detected in TCP route port")
+								return util.IntPointer(0)
+							}
+							brokerPort := externalListenerConfig.GetBrokerPort(int32(brokerId))
+							// Port numbers are always within valid range for int conversion
+							if brokerPort < 0 || brokerPort > 65535 {
+								// This should never happen as GetBrokerPort returns valid port numbers
+								log.Error(fmt.Errorf("broker port %d out of valid range [0-65535] for broker %d", brokerPort, brokerId), "Invalid broker port detected in TCP route")
+								return util.IntPointer(0)
+							}
+							return util.IntPointer(int(brokerPort))
+						}(),
 					},
 				},
 				Route: []*istioclientv1beta1.RouteDestination{

@@ -1,4 +1,5 @@
 // Copyright © 2019 Cisco Systems, Inc. and/or its affiliates
+// Copyright 2025 Adobe. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -222,7 +223,7 @@ func addPvc(log logr.Logger, alertLabels model.LabelSet, alertAnnotations model.
 				corev1.ReadWriteOnce,
 			},
 			StorageClassName: storageClassName,
-			Resources: corev1.ResourceRequirements{
+			Resources: corev1.VolumeResourceRequirements{
 				Requests: corev1.ResourceList{
 					"storage": resource.MustParse(string(alertAnnotations["diskSize"])),
 				},
@@ -399,7 +400,7 @@ func upScale(log logr.Logger, labels model.LabelSet, annotations model.LabelSet,
 								corev1.ReadWriteOnce,
 							},
 							StorageClassName: storageClassName,
-							Resources: corev1.ResourceRequirements{
+							Resources: corev1.VolumeResourceRequirements{
 								Requests: corev1.ResourceList{
 									"storage": resource.MustParse(string(annotations["diskSize"])),
 								},

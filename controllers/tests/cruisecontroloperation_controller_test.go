@@ -1,4 +1,5 @@
 // Copyright © 2022 Cisco Systems, Inc. and/or its affiliates
+// Copyright 2025 Adobe. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +17,6 @@ package tests
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync/atomic"
 	"time"
@@ -70,10 +70,24 @@ var _ = Describe("CruiseControlTaskReconciler", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 	})
-	JustAfterEach(func() {
-		cruiseControlOperationReconciler.ScaleFactory = func(ctx context.Context, kafkaCluster *v1beta1.KafkaCluster) (scale.CruiseControlScaler, error) {
-			return nil, errors.New("there is no scale mock CC test")
-		}
+	JustAfterEach(func(ctx SpecContext) {
+		// Clean up any CruiseControlOperations first
+		err := k8sClient.DeleteAllOf(ctx, &v1alpha1.CruiseControlOperation{}, client.InNamespace(namespace))
+		Expect(err).NotTo(HaveOccurred())
+
+		// Wait for operations to be deleted before resetting the factory
+		Eventually(ctx, func() int {
+			operationList := &v1alpha1.CruiseControlOperationList{}
+			err := k8sClient.List(ctx, operationList, client.InNamespace(namespace))
+			if err != nil {
+				return -1
+			}
+			return len(operationList.Items)
+		}).Should(Equal(0))
+
+		// Reset the ScaleFactory to prevent interference with other tests
+		// Use NoopScaleFactory instead of error-returning factory to avoid race conditions
+		cruiseControlOperationReconciler.ScaleFactory = mocks.NewNoopScaleFactory()
 	})
 	When("there is an add_broker operation for execution", Serial, func() {
 		JustBeforeEach(func(ctx SpecContext) {

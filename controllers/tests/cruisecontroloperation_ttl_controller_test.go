@@ -1,4 +1,5 @@
 // Copyright © 2022 Cisco Systems, Inc. and/or its affiliates
+// Copyright 2025 Adobe. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -45,7 +46,7 @@ var _ = Describe("CruiseControlTaskReconciler", func() {
 		namespaceObj       *corev1.Namespace
 		kafkaClusterCRName string
 		kafkaCluster       *v1beta1.KafkaCluster
-		opName             string = "operation1"
+		opName             = "operation1"
 	)
 	BeforeEach(func() {
 		atomic.AddUint64(&count, 1)

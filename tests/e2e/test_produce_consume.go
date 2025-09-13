@@ -1,4 +1,5 @@
 // Copyright © 2023 Cisco Systems, Inc. and/or its affiliates
+// Copyright 2025 Adobe. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,18 +17,18 @@ package e2e
 
 import (
 	"github.com/gruntwork-io/terratest/modules/k8s"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	ginkgo "github.com/onsi/ginkgo/v2"
+	gomega "github.com/onsi/gomega"
 )
 
 func testProduceConsumeInternal() bool { //nolint:unparam // Note: respecting Ginkgo testing interface by returning bool.
-	return When("Internally produce and consume message to/from Kafka cluster", func() {
+	return ginkgo.When("Internally produce and consume message to/from Kafka cluster", func() {
 		var kubectlOptions k8s.KubectlOptions
 		var err error
 
-		It("Acquiring K8s config and context", func() {
+		ginkgo.It("Acquiring K8s config and context", func() {
 			kubectlOptions, err = kubectlOptionsForCurrentContext()
-			Expect(err).NotTo(HaveOccurred())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 
 		kubectlOptions.Namespace = koperatorLocalHelmDescriptor.Namespace
@@ -41,13 +42,13 @@ func testProduceConsumeInternal() bool { //nolint:unparam // Note: respecting Gi
 }
 
 func testProduceConsumeInternalSSL(tlsSecretName string) bool {
-	return When("Internally produce and consume message to/from Kafka cluster using SSL", func() {
+	return ginkgo.When("Internally produce and consume message to/from Kafka cluster using SSL", func() {
 		var kubectlOptions k8s.KubectlOptions
 		var err error
 
-		It("Acquiring K8s config and context", func() {
+		ginkgo.It("Acquiring K8s config and context", func() {
 			kubectlOptions, err = kubectlOptionsForCurrentContext()
-			Expect(err).NotTo(HaveOccurred())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 
 		kubectlOptions.Namespace = koperatorLocalHelmDescriptor.Namespace
@@ -63,13 +64,13 @@ func testProduceConsumeInternalSSL(tlsSecretName string) bool {
 }
 
 func testProduceConsumeExternal(tlsSecretName string) bool { //nolint:unused // Note: unused linter disabled until External e2e tests are turned on.
-	return When("Externally produce and consume message to/from Kafka cluster", func() {
+	return ginkgo.When("Externally produce and consume message to/from Kafka cluster", func() {
 		var kubectlOptions k8s.KubectlOptions
 		var err error
 
-		It("Acquiring K8s config and context", func() {
+		ginkgo.It("Acquiring K8s config and context", func() {
 			kubectlOptions, err = kubectlOptionsForCurrentContext()
-			Expect(err).NotTo(HaveOccurred())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 
 		kubectlOptions.Namespace = koperatorLocalHelmDescriptor.Namespace

@@ -1,4 +1,5 @@
 // Copyright © 2019 Cisco Systems, Inc. and/or its affiliates
+// Copyright 2025 Adobe. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -503,13 +504,13 @@ func generateVolumeForListenersCertsFromCommonSpec(commonSpec v1beta1.CommonList
 
 func generateVolumesForListenerCerts(listenerConfig v1beta1.ListenersConfig, clusterName string) (ret []corev1.Volume) {
 	for _, iListener := range listenerConfig.InternalListeners {
-		if iListener.CommonListenerSpec.Type != v1beta1.SecurityProtocolSSL {
+		if iListener.Type != v1beta1.SecurityProtocolSSL {
 			continue
 		}
 		ret = append(ret, generateVolumeForListenersCertsFromCommonSpec(iListener.CommonListenerSpec, clusterName))
 	}
 	for _, eListener := range listenerConfig.ExternalListeners {
-		if eListener.CommonListenerSpec.Type != v1beta1.SecurityProtocolSSL {
+		if eListener.Type != v1beta1.SecurityProtocolSSL {
 			continue
 		}
 		ret = append(ret, generateVolumeForListenersCertsFromCommonSpec(eListener.CommonListenerSpec, clusterName))
@@ -536,22 +537,22 @@ func generateVolumeForClientSSLCert(kafkaClusterSpec v1beta1.KafkaClusterSpec, c
 
 func generateVolumeMountForListenerCerts(listenerConfig v1beta1.ListenersConfig) (ret []corev1.VolumeMount) {
 	for _, iListener := range listenerConfig.InternalListeners {
-		if iListener.CommonListenerSpec.Type != v1beta1.SecurityProtocolSSL {
+		if iListener.Type != v1beta1.SecurityProtocolSSL {
 			continue
 		}
 		vm := corev1.VolumeMount{
 			Name:      fmt.Sprintf(listenerSSLCertVolumeNameTemplate, iListener.Name),
-			MountPath: fmt.Sprintf(listenerServerKeyStorePathTemplate, serverKeystorePath, iListener.CommonListenerSpec.Name),
+			MountPath: fmt.Sprintf(listenerServerKeyStorePathTemplate, serverKeystorePath, iListener.Name),
 		}
 		ret = append(ret, vm)
 	}
 	for _, eListener := range listenerConfig.ExternalListeners {
-		if eListener.CommonListenerSpec.Type != v1beta1.SecurityProtocolSSL {
+		if eListener.Type != v1beta1.SecurityProtocolSSL {
 			continue
 		}
 		vm := corev1.VolumeMount{
 			Name:      fmt.Sprintf(listenerSSLCertVolumeNameTemplate, eListener.Name),
-			MountPath: fmt.Sprintf(listenerServerKeyStorePathTemplate, serverKeystorePath, eListener.CommonListenerSpec.Name),
+			MountPath: fmt.Sprintf(listenerServerKeyStorePathTemplate, serverKeystorePath, eListener.Name),
 		}
 		ret = append(ret, vm)
 	}

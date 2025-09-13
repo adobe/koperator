@@ -1,4 +1,5 @@
 // Copyright © 2019 Cisco Systems, Inc. and/or its affiliates
+// Copyright 2025 Adobe. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -178,7 +179,7 @@ func (c *certManager) clusterCertificateForUser(
 			},
 		}
 	}
-	if user.Spec.DNSNames != nil && len(user.Spec.DNSNames) > 0 {
+	if len(user.Spec.DNSNames) > 0 {
 		cert.Spec.DNSNames = user.Spec.DNSNames
 	}
 	return cert

@@ -1,4 +1,5 @@
 // Copyright © 2019 Cisco Systems, Inc. and/or its affiliates
+// Copyright 2025 Adobe. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,9 +18,11 @@ package kafkaclient
 import (
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/IBM/sarama"
+
 	"github.com/banzaicloud/koperator/pkg/errorfactory"
 )
 
@@ -90,17 +93,15 @@ func (k *kafkaClient) DeleteTopic(topicName string, wait bool) error {
 	}
 	// TODO (tinyzimmer): Check here if we actually support topic deletion
 	if wait {
-		ticker := time.NewTicker(time.Duration(1) * time.Second)
-		for {
-			select {
-			case <-ticker.C:
-				if topic, err := k.GetTopic(topicName); err != nil {
-					return err
-				} else if topic == nil {
-					return nil
-				} else {
-					log.Info(fmt.Sprintf("Topic %s still going down for deletion", topicName))
-				}
+		ticker := time.NewTicker(1 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			if topic, err := k.GetTopic(topicName); err != nil {
+				return err
+			} else if topic == nil {
+				return nil
+			} else {
+				log.Info(fmt.Sprintf("Topic %s still going down for deletion", topicName))
 			}
 		}
 	}
@@ -123,7 +124,13 @@ func (k *kafkaClient) EnsurePartitionCount(topic string, desired int32) (changed
 		return
 	}
 
-	if desired != int32(len(meta[0].Partitions)) {
+	currentPartitions := len(meta[0].Partitions)
+	// Partition count should always be within valid range for int32 conversion
+	if currentPartitions < 0 || currentPartitions > math.MaxInt32 {
+		err = errorfactory.New(errorfactory.BrokersRequestError{}, fmt.Errorf("partition count %d out of valid range for int32 conversion", currentPartitions), "invalid partition count")
+		return
+	}
+	if desired != int32(currentPartitions) {
 		// TODO (tinyzimmer): maybe let the user specify partition assignments
 		assn := make([][]int32, 0)
 		changed = true

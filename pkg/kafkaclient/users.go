@@ -1,4 +1,5 @@
 // Copyright © 2019 Cisco Systems, Inc. and/or its affiliates
+// Copyright 2025 Adobe. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,6 +19,7 @@ import (
 	"fmt"
 
 	"github.com/IBM/sarama"
+
 	"github.com/banzaicloud/koperator/api/v1alpha1"
 	"github.com/banzaicloud/koperator/pkg/errorfactory"
 )
@@ -93,7 +95,7 @@ func (k *kafkaClient) DeleteUserACLs(dn string, patternType v1alpha1.KafkaPatter
 
 func (k *kafkaClient) createReadACLs(dn string, topic string, patternType sarama.AclResourcePatternType) (err error) {
 	if err = k.createCommonACLs(dn, topic, patternType); err != nil {
-		return
+		return err
 	}
 
 	// READ on topic
@@ -107,7 +109,7 @@ func (k *kafkaClient) createReadACLs(dn string, topic string, patternType sarama
 		Operation:      sarama.AclOperationRead,
 		PermissionType: sarama.AclPermissionAllow,
 	}); err != nil {
-		return
+		return err
 	}
 
 	// READ on groups
@@ -122,12 +124,12 @@ func (k *kafkaClient) createReadACLs(dn string, topic string, patternType sarama
 		PermissionType: sarama.AclPermissionAllow,
 	})
 
-	return
+	return err
 }
 
 func (k *kafkaClient) createWriteACLs(dn string, topic string, patternType sarama.AclResourcePatternType) (err error) {
 	if err = k.createCommonACLs(dn, topic, patternType); err != nil {
-		return
+		return err
 	}
 
 	// WRITE on topic
@@ -141,7 +143,7 @@ func (k *kafkaClient) createWriteACLs(dn string, topic string, patternType saram
 		Operation:      sarama.AclOperationWrite,
 		PermissionType: sarama.AclPermissionAllow,
 	}); err != nil {
-		return
+		return err
 	}
 
 	// CREATE on topic
@@ -156,7 +158,7 @@ func (k *kafkaClient) createWriteACLs(dn string, topic string, patternType saram
 		PermissionType: sarama.AclPermissionAllow,
 	})
 
-	return
+	return err
 }
 
 func (k *kafkaClient) createCommonACLs(dn string, topic string, patternType sarama.AclResourcePatternType) (err error) {
@@ -171,7 +173,7 @@ func (k *kafkaClient) createCommonACLs(dn string, topic string, patternType sara
 		Operation:      sarama.AclOperationDescribe,
 		PermissionType: sarama.AclPermissionAllow,
 	}); err != nil {
-		return
+		return err
 	}
 
 	// DESCRIBE_CONFIGS on topic
@@ -185,7 +187,7 @@ func (k *kafkaClient) createCommonACLs(dn string, topic string, patternType sara
 		Operation:      sarama.AclOperationDescribeConfigs,
 		PermissionType: sarama.AclPermissionAllow,
 	}); err != nil {
-		return
+		return err
 	}
-	return
+	return err
 }
