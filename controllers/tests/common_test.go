@@ -26,39 +26,39 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/banzaicloud/koperator/api/v1beta1"
+	banzaicloudv1beta1 "github.com/banzaicloud/koperator/api/v1beta1"
 	"github.com/banzaicloud/koperator/pkg/kafkaclient"
 )
 
 const defaultBrokerConfigGroup = "default"
 
-func createMinimalKafkaClusterCR(name, namespace string) *v1beta1.KafkaCluster {
-	return &v1beta1.KafkaCluster{
+func createMinimalKafkaClusterCR(name, namespace string) *banzaicloudv1beta1.KafkaCluster {
+	return &banzaicloudv1beta1.KafkaCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
 			Namespace:   namespace,
 			Annotations: map[string]string{},
 		},
-		Spec: v1beta1.KafkaClusterSpec{
+		Spec: banzaicloudv1beta1.KafkaClusterSpec{
 			KRaftMode: false,
-			ListenersConfig: v1beta1.ListenersConfig{
-				ExternalListeners: []v1beta1.ExternalListenerConfig{
+			ListenersConfig: banzaicloudv1beta1.ListenersConfig{
+				ExternalListeners: []banzaicloudv1beta1.ExternalListenerConfig{
 					{
-						CommonListenerSpec: v1beta1.CommonListenerSpec{
+						CommonListenerSpec: banzaicloudv1beta1.CommonListenerSpec{
 							Name:          "test",
 							ContainerPort: 9094,
 							Type:          "plaintext",
 						},
 						ExternalStartingPort: 19090,
-						IngressServiceSettings: v1beta1.IngressServiceSettings{
+						IngressServiceSettings: banzaicloudv1beta1.IngressServiceSettings{
 							HostnameOverride: "test-host",
 						},
 						AccessMethod: corev1.ServiceTypeLoadBalancer,
 					},
 				},
-				InternalListeners: []v1beta1.InternalListenerConfig{
+				InternalListeners: []banzaicloudv1beta1.InternalListenerConfig{
 					{
-						CommonListenerSpec: v1beta1.CommonListenerSpec{
+						CommonListenerSpec: banzaicloudv1beta1.CommonListenerSpec{
 							Type:                            "plaintext",
 							Name:                            "internal",
 							ContainerPort:                   29092,
@@ -66,7 +66,7 @@ func createMinimalKafkaClusterCR(name, namespace string) *v1beta1.KafkaCluster {
 						},
 					},
 					{
-						CommonListenerSpec: v1beta1.CommonListenerSpec{
+						CommonListenerSpec: banzaicloudv1beta1.CommonListenerSpec{
 							Type:                            "plaintext",
 							Name:                            "controller",
 							ContainerPort:                   29093,
@@ -76,16 +76,16 @@ func createMinimalKafkaClusterCR(name, namespace string) *v1beta1.KafkaCluster {
 					},
 				},
 			},
-			BrokerConfigGroups: map[string]v1beta1.BrokerConfig{
+			BrokerConfigGroups: map[string]banzaicloudv1beta1.BrokerConfig{
 				defaultBrokerConfigGroup: {
-					StorageConfigs: []v1beta1.StorageConfig{
+					StorageConfigs: []banzaicloudv1beta1.StorageConfig{
 						{
 							MountPath: "/kafka-logs",
 							PvcSpec: &corev1.PersistentVolumeClaimSpec{
 								AccessModes: []corev1.PersistentVolumeAccessMode{
 									corev1.ReadWriteOnce,
 								},
-								Resources: corev1.ResourceRequirements{
+								Resources: corev1.VolumeResourceRequirements{
 									Requests: map[corev1.ResourceName]resource.Quantity{
 										corev1.ResourceStorage: resource.MustParse("10Gi"),
 									},
@@ -105,7 +105,7 @@ func createMinimalKafkaClusterCR(name, namespace string) *v1beta1.KafkaCluster {
 					},
 				},
 			},
-			Brokers: []v1beta1.Broker{
+			Brokers: []banzaicloudv1beta1.Broker{
 				{
 					Id:                0,
 					BrokerConfigGroup: defaultBrokerConfigGroup,
@@ -121,16 +121,16 @@ func createMinimalKafkaClusterCR(name, namespace string) *v1beta1.KafkaCluster {
 			},
 			ClusterImage: "ghcr.io/banzaicloud/kafka:2.13-3.4.1",
 			ZKAddresses:  []string{},
-			MonitoringConfig: v1beta1.MonitoringConfig{
+			MonitoringConfig: banzaicloudv1beta1.MonitoringConfig{
 				CCJMXExporterConfig: "custom_property: custom_value",
 			},
 			ReadOnlyConfig:       "cruise.control.metrics.topic.auto.create=true",
-			RollingUpgradeConfig: v1beta1.RollingUpgradeConfig{FailureThreshold: 1, ConcurrentBrokerRestartCountPerRack: 1},
+			RollingUpgradeConfig: banzaicloudv1beta1.RollingUpgradeConfig{FailureThreshold: 1, ConcurrentBrokerRestartCountPerRack: 1},
 		},
 	}
 }
 
-func waitForClusterRunningState(ctx context.Context, kafkaCluster *v1beta1.KafkaCluster, namespace string) {
+func waitForClusterRunningState(ctx context.Context, kafkaCluster *banzaicloudv1beta1.KafkaCluster, namespace string) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -146,9 +146,9 @@ func waitForClusterRunningState(ctx context.Context, kafkaCluster *v1beta1.Kafka
 			case <-ctx.Done():
 				return
 			default:
-				createdKafkaCluster := &v1beta1.KafkaCluster{}
+				createdKafkaCluster := &banzaicloudv1beta1.KafkaCluster{}
 				err := k8sClient.Get(ctx, types.NamespacedName{Name: kafkaCluster.Name, Namespace: namespace}, createdKafkaCluster)
-				if err != nil || createdKafkaCluster.Status.State != v1beta1.KafkaClusterRunning {
+				if err != nil || createdKafkaCluster.Status.State != banzaicloudv1beta1.KafkaClusterRunning {
 					consecutiveRunningState = 0
 					continue
 				}
@@ -163,20 +163,20 @@ func waitForClusterRunningState(ctx context.Context, kafkaCluster *v1beta1.Kafka
 	Eventually(ch, 240*time.Second, 50*time.Millisecond).Should(Receive())
 }
 
-func getMockedKafkaClientForCluster(kafkaCluster *v1beta1.KafkaCluster) (kafkaclient.KafkaClient, func()) {
+func getMockedKafkaClientForCluster(kafkaCluster *banzaicloudv1beta1.KafkaCluster) (kafkaclient.KafkaClient, func()) {
 	name := types.NamespacedName{
 		Name:      kafkaCluster.Name,
 		Namespace: kafkaCluster.Namespace,
 	}
 	if val, ok := mockKafkaClients[name]; ok {
-		return val, func() { val.Close() }
+		return val, func() { _ = val.Close() }
 	}
 	mockKafkaClient, _, _ := kafkaclient.NewMockFromCluster(k8sClient, kafkaCluster)
 	mockKafkaClients[name] = mockKafkaClient
-	return mockKafkaClient, func() { mockKafkaClient.Close() }
+	return mockKafkaClient, func() { _ = mockKafkaClient.Close() }
 }
 
-func resetMockKafkaClient(kafkaCluster *v1beta1.KafkaCluster) {
+func resetMockKafkaClient(kafkaCluster *banzaicloudv1beta1.KafkaCluster) {
 	// delete all topics
 	mockKafkaClient, _ := getMockedKafkaClientForCluster(kafkaCluster)
 	topics, _ := mockKafkaClient.ListTopics()

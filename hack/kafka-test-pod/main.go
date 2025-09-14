@@ -104,14 +104,14 @@ func consume(config *sarama.Config, signals chan os.Signal) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer consumer.Close()
+	defer func() { _ = consumer.Close() }()
 
 	// Setup a channel for messages from our topic
 	partitionConsumer, err := consumer.ConsumePartition(kafkaTopic, 0, sarama.OffsetNewest)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer partitionConsumer.Close()
+	defer func() { _ = partitionConsumer.Close() }()
 
 	consumed := 0
 ConsumerLoop:
@@ -135,7 +135,7 @@ func produce(config *sarama.Config, signals chan os.Signal) {
 	if err := broker.Open(config); err != nil {
 		log.Fatal(err)
 	}
-	defer broker.Close()
+	defer func() { _ = broker.Close() }()
 
 	// Create a time ticker to trigger a message every 5 seconds
 	ticker := time.NewTicker(time.Duration(5) * time.Second)

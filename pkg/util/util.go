@@ -540,7 +540,7 @@ func GzipAndBase64BrokerConfiguration(broker *v1beta1.Broker) (string, error) {
 	if _, err := gz.Write(configJSON); err != nil {
 		return "", err
 	}
-	gz.Close()
+	_ = gz.Close()
 	return base64.StdEncoding.EncodeToString(buff.Bytes()), nil
 }
 
@@ -561,7 +561,7 @@ func GetBrokerFromBrokerConfigurationBackup(config string) (v1beta1.Broker, erro
 	if err != nil {
 		return v1beta1.Broker{}, err
 	}
-	gzipReader.Close()
+	_ = gzipReader.Close()
 	broker := v1beta1.Broker{}
 	if err := json.Unmarshal(configJSON, &broker); err != nil {
 		return v1beta1.Broker{}, err

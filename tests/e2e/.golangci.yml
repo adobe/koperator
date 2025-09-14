@@ -77,10 +77,44 @@ linters:
       - linters:
           - goconst
         path: (.+)_test\.go
+      - linters:
+          - unused
+        path: .*
     paths:
       - third_party$
       - builtin$
       - examples$
+
+# Preserve e2e-specific issue exclusions
+issues:
+  exclude-rules:
+    - path: zz_generated.deepcopy.go
+      linters:
+        - lll
+    - path: "(.+)_test.go"
+      linters:
+        - funlen
+        - goconst
+        - interfacer
+        - dupl
+        - lll
+        - gocritic
+    # Ignore unused across e2e helpers/tests
+    - path: ".*"
+      linters:
+        - unused
+    - linters:
+        - staticcheck
+      text: "SA9003:"
+    - linters:
+        - lll
+      source: "^//go:generate "
+  exclude:
+    - 'Error return value of .((os\.)?std(out|err)\..*|.*Close|.*Flush|os\.Remove(All)?|.*print.*|os\.(Un)?Setenv). is not checked'
+    - "should have a package comment, unless it's in another file for this package"
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
 formatters:
   enable:
     - gofmt

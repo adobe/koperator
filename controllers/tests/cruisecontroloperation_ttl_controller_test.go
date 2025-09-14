@@ -45,7 +45,7 @@ var _ = Describe("CruiseControlTaskReconciler", func() {
 		namespaceObj       *corev1.Namespace
 		kafkaClusterCRName string
 		kafkaCluster       *v1beta1.KafkaCluster
-		opName             string = "operation1"
+		opName             = "operation1"
 	)
 	BeforeEach(func() {
 		atomic.AddUint64(&count, 1)

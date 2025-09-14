@@ -131,7 +131,7 @@ func (r *CruiseControlOperationReconciler) Reconcile(ctx context.Context, reques
 	err = r.Get(ctx, kafkaClusterRef, kafkaCluster)
 	if err != nil {
 		if apiErrors.IsNotFound(err) {
-			if !currentCCOperation.ObjectMeta.DeletionTimestamp.IsZero() {
+			if !currentCCOperation.DeletionTimestamp.IsZero() {
 				log.Info("kafka cluster has been removed, now removing finalizer from CruiseControlOperation")
 				controllerutil.RemoveFinalizer(currentCCOperation, ccOperationFinalizerGroup)
 				if err := r.Update(ctx, currentCCOperation); err != nil {
@@ -255,7 +255,7 @@ func (r *CruiseControlOperationReconciler) Reconcile(ctx context.Context, reques
 
 func (r *CruiseControlOperationReconciler) addFinalizer(ctx context.Context, currentCCOperation *banzaiv1alpha1.CruiseControlOperation) error {
 	// examine DeletionTimestamp to determine if object is under deletion
-	if currentCCOperation.ObjectMeta.DeletionTimestamp.IsZero() {
+	if currentCCOperation.DeletionTimestamp.IsZero() {
 		// The object is not being deleted, so if it does not have our finalizer,
 		// then lets add the finalizer and update the object. This is equivalent
 		// registering our finalizer.
@@ -341,7 +341,7 @@ func (r *CruiseControlOperationReconciler) selectOperationForExecution(ccOperati
 				if opFirstExecution.CurrentTaskOperation() == banzaiv1alpha1.OperationRebalance {
 					// Mark the remove disk operation as paused, so it is not retried
 					op.Labels[banzaiv1alpha1.PauseLabel] = True
-					err := r.Client.Update(context.TODO(), op)
+					err := r.Update(context.TODO(), op)
 					if err != nil {
 						return nil, errors.WrapIfWithDetails(err, "failed to update Cruise Control operation", "name", op.Name, "namespace", op.Namespace)
 					}
@@ -383,7 +383,7 @@ func SetupCruiseControlOperationWithManager(mgr ctrl.Manager) *ctrl.Builder {
 			CreateFunc: func(e event.CreateEvent) bool {
 				obj := e.Object.(*banzaiv1alpha1.CruiseControlOperation)
 				// Doesn't need to reconcile when the operation is done and finalizing is not needed
-				return !(obj.IsDone() && obj.GetDeletionTimestamp().IsZero()) && obj.CurrentTaskOperation() != ""
+				return (!obj.IsDone() || !obj.GetDeletionTimestamp().IsZero()) && obj.CurrentTaskOperation() != ""
 			},
 			UpdateFunc: func(e event.UpdateEvent) bool {
 				oldObj := e.ObjectOld.(*banzaiv1alpha1.CruiseControlOperation)
@@ -406,7 +406,7 @@ func SetupCruiseControlOperationWithManager(mgr ctrl.Manager) *ctrl.Builder {
 }
 
 func isFinalizerNeeded(operation *banzaiv1alpha1.CruiseControlOperation) bool {
-	return controllerutil.ContainsFinalizer(operation, ccOperationFinalizerGroup) && !operation.ObjectMeta.DeletionTimestamp.IsZero()
+	return controllerutil.ContainsFinalizer(operation, ccOperationFinalizerGroup) && !operation.DeletionTimestamp.IsZero()
 }
 
 func kafkaClusterReference(operation *banzaiv1alpha1.CruiseControlOperation) (client.ObjectKey, error) {
@@ -556,7 +556,7 @@ func (r *CruiseControlOperationReconciler) getStatus(
 		}
 
 		if statusOperation.CurrentTask().Finished != nil &&
-			statusOperation.CurrentTask().Finished.Time.Sub(statusOperation.CurrentTask().Started.Time) > defaultCruiseControlStatusOperationMaxDuration {
+			statusOperation.CurrentTask().Finished.Sub(statusOperation.CurrentTask().Started.Time) > defaultCruiseControlStatusOperationMaxDuration {
 			return scale.CruiseControlStatus{}, errors.New("the Cruise Control status operation took too long to finish")
 		}
 
@@ -613,7 +613,7 @@ func (r *CruiseControlOperationReconciler) createCCOperation(
 	if err := controllerutil.SetControllerReference(kafkaCluster, operation, r.Scheme); err != nil {
 		return nil, err
 	}
-	if err := r.Client.Create(ctx, operation); err != nil {
+	if err := r.Create(ctx, operation); err != nil {
 		return nil, err
 	}
 
@@ -629,7 +629,7 @@ func (r *CruiseControlOperationReconciler) createCCOperation(
 }
 
 func isWaitingForFinalization(ccOperation *banzaiv1alpha1.CruiseControlOperation) bool {
-	return ccOperation.IsCurrentTaskRunning() && !ccOperation.ObjectMeta.DeletionTimestamp.IsZero() && controllerutil.ContainsFinalizer(ccOperation, ccOperationFinalizerGroup)
+	return ccOperation.IsCurrentTaskRunning() && !ccOperation.DeletionTimestamp.IsZero() && controllerutil.ContainsFinalizer(ccOperation, ccOperationFinalizerGroup)
 }
 
 func formatSummary(res *types.OptimizationResult) map[string]string {

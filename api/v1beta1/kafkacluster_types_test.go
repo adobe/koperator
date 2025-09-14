@@ -250,7 +250,7 @@ func TestGetBrokerConfig(t *testing.T) {
 				MountPath: "kafka-test/log",
 				PvcSpec: &corev1.PersistentVolumeClaimSpec{
 					AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-					Resources: corev1.ResourceRequirements{
+					Resources: corev1.VolumeResourceRequirements{
 						Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("10Gi")},
 					},
 				},
@@ -259,7 +259,7 @@ func TestGetBrokerConfig(t *testing.T) {
 				MountPath: "kafka-test1/log",
 				PvcSpec: &corev1.PersistentVolumeClaimSpec{
 					AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-					Resources: corev1.ResourceRequirements{
+					Resources: corev1.VolumeResourceRequirements{
 						Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("10Gi")},
 					},
 				},
@@ -275,7 +275,7 @@ func TestGetBrokerConfig(t *testing.T) {
 					MountPath: "kafka-test/log",
 					PvcSpec: &corev1.PersistentVolumeClaimSpec{
 						AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-						Resources: corev1.ResourceRequirements{
+						Resources: corev1.VolumeResourceRequirements{
 							Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("10Gi")},
 						},
 					},
@@ -291,7 +291,7 @@ func TestGetBrokerConfig(t *testing.T) {
 						MountPath: "kafka-test1/log",
 						PvcSpec: &corev1.PersistentVolumeClaimSpec{
 							AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-							Resources: corev1.ResourceRequirements{
+							Resources: corev1.VolumeResourceRequirements{
 								Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("10Gi")},
 							},
 						},
@@ -317,7 +317,7 @@ func TestGetBrokerConfigUniqueStorage(t *testing.T) {
 				MountPath: "kafka-test/log",
 				PvcSpec: &corev1.PersistentVolumeClaimSpec{
 					AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-					Resources: corev1.ResourceRequirements{
+					Resources: corev1.VolumeResourceRequirements{
 						Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("20Gi")},
 					},
 				},
@@ -326,7 +326,7 @@ func TestGetBrokerConfigUniqueStorage(t *testing.T) {
 				MountPath: "kafka-test1/log",
 				PvcSpec: &corev1.PersistentVolumeClaimSpec{
 					AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-					Resources: corev1.ResourceRequirements{
+					Resources: corev1.VolumeResourceRequirements{
 						Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("10Gi")},
 					},
 				},
@@ -342,7 +342,7 @@ func TestGetBrokerConfigUniqueStorage(t *testing.T) {
 					MountPath: "kafka-test/log",
 					PvcSpec: &corev1.PersistentVolumeClaimSpec{
 						AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-						Resources: corev1.ResourceRequirements{
+						Resources: corev1.VolumeResourceRequirements{
 							Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("20Gi")},
 						},
 					},
@@ -359,7 +359,7 @@ func TestGetBrokerConfigUniqueStorage(t *testing.T) {
 						MountPath: "kafka-test1/log",
 						PvcSpec: &corev1.PersistentVolumeClaimSpec{
 							AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-							Resources: corev1.ResourceRequirements{
+							Resources: corev1.VolumeResourceRequirements{
 								Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("10Gi")},
 							},
 						},
@@ -368,7 +368,7 @@ func TestGetBrokerConfigUniqueStorage(t *testing.T) {
 						MountPath: "kafka-test/log",
 						PvcSpec: &corev1.PersistentVolumeClaimSpec{
 							AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-							Resources: corev1.ResourceRequirements{
+							Resources: corev1.VolumeResourceRequirements{
 								Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("10Gi")},
 							},
 						},

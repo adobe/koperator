@@ -22,22 +22,22 @@ import (
 	koperator_v1beta1 "github.com/banzaicloud/koperator/api/v1beta1"
 
 	"github.com/gruntwork-io/terratest/modules/k8s"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	ginkgo "github.com/onsi/ginkgo/v2"
+	gomega "github.com/onsi/gomega"
 )
 
 // requireDeleteKafkaCluster deletes KafkaCluster resource and
 // checks the removal of the Kafka cluster related resources
 func requireDeleteKafkaCluster(kubectlOptions k8s.KubectlOptions, name string) {
-	It("Delete KafkaCluster custom resource", func() {
+	ginkgo.It("Delete KafkaCluster custom resource", func() {
 		err := deleteK8sResourceNoErrNotFound(kubectlOptions, defaultDeletionTimeout, kafkaKind, name)
-		Expect(err).ShouldNot(HaveOccurred())
-		Eventually(context.Background(), func() []string {
-			By("Verifying the Kafka cluster resource cleanup")
+		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
+		gomega.Eventually(context.Background(), func() []string {
+			ginkgo.By("Verifying the Kafka cluster resource cleanup")
 
 			// Check only those Koperator related resource types we have in K8s (istio usecase)
 			k8sResourceKinds, err := listK8sResourceKinds(kubectlOptions, "")
-			Expect(err).ShouldNot(HaveOccurred())
+			gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 
 			koperatorAvailableResourceKinds := stringSlicesInstersect(koperatorRelatedResourceKinds(), k8sResourceKinds)
 			koperatorAvailableResourceKinds = append(koperatorAvailableResourceKinds, basicK8sResourceKinds()...)
@@ -47,21 +47,21 @@ func requireDeleteKafkaCluster(kubectlOptions k8s.KubectlOptions, name string) {
 				fmt.Sprintf("%s=%s", koperator_v1beta1.KafkaCRLabelKey, name),
 				"",
 				"--all-namespaces", kubectlArgGoTemplateKindNameNamespace)
-			Expect(err).ShouldNot(HaveOccurred())
+			gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 
 			return resources
-		}, kafkaClusterResourceCleanupTimeout, 1*time.Second).Should(BeEmpty())
+		}, kafkaClusterResourceCleanupTimeout, 1*time.Second).Should(gomega.BeEmpty())
 	})
 }
 
 // requireDeleteZookeeperCluster deletes the ZookeeperCluster CR and verify the corresponding resources cleanup
 func requireDeleteZookeeperCluster(kubectlOptions k8s.KubectlOptions, name string) {
-	It("Delete ZookeeperCluster custom resource", func() {
+	ginkgo.It("Delete ZookeeperCluster custom resource", func() {
 		err := deleteK8sResourceNoErrNotFound(kubectlOptions, defaultDeletionTimeout, zookeeperKind, name)
-		Expect(err).ShouldNot(HaveOccurred())
+		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 
-		Eventually(context.Background(), func() []string {
-			By("Verifying the Zookeeper cluster resource cleanup")
+		gomega.Eventually(context.Background(), func() []string {
+			ginkgo.By("Verifying the Zookeeper cluster resource cleanup")
 
 			zookeeperK8sResources := basicK8sResourceKinds()
 			zookeeperK8sResources = append(zookeeperK8sResources, dependencyCRDs.Zookeeper()...)
@@ -71,8 +71,8 @@ func requireDeleteZookeeperCluster(kubectlOptions k8s.KubectlOptions, name strin
 				fmt.Sprintf("app=%s", name),
 				"",
 				"--all-namespaces", kubectlArgGoTemplateKindNameNamespace)
-			Expect(err).ShouldNot(HaveOccurred())
+			gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 			return resources
-		}, zookeeperClusterResourceCleanupTimeout, 1*time.Second).Should(BeEmpty())
+		}, zookeeperClusterResourceCleanupTimeout, 1*time.Second).Should(gomega.BeEmpty())
 	})
 }

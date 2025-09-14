@@ -57,7 +57,7 @@ func (r *Reconciler) configMap(log logr.Logger, extListener v1beta1.ExternalList
 	ingressConfig v1beta1.IngressConfig, ingressConfigName, defaultIngressConfigName string) runtime.Object {
 	eListenerLabelName := util.ConstructEListenerLabelName(ingressConfigName, extListener.Name)
 
-	var configMapName string = util.GenerateEnvoyResourceName(envoyutils.EnvoyVolumeAndConfigName, envoyutils.EnvoyVolumeAndConfigNameWithScope,
+	var configMapName = util.GenerateEnvoyResourceName(envoyutils.EnvoyVolumeAndConfigName, envoyutils.EnvoyVolumeAndConfigNameWithScope,
 		extListener, ingressConfig, ingressConfigName, r.KafkaCluster.GetName())
 
 	configMap := &corev1.ConfigMap{

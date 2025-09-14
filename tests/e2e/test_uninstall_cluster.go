@@ -16,18 +16,18 @@ package e2e
 
 import (
 	"github.com/gruntwork-io/terratest/modules/k8s"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	ginkgo "github.com/onsi/ginkgo/v2"
+	gomega "github.com/onsi/gomega"
 )
 
 func testUninstallZookeeperCluster() bool {
-	return When("Uninstalling Zookeeper cluster", func() {
+	return ginkgo.When("Uninstalling Zookeeper cluster", func() {
 		var kubectlOptions k8s.KubectlOptions
 		var err error
 
-		It("Acquiring K8s config and context", func() {
+		ginkgo.It("Acquiring K8s config and context", func() {
 			kubectlOptions, err = kubectlOptionsForCurrentContext()
-			Expect(err).NotTo(HaveOccurred())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 
 		kubectlOptions.Namespace = zookeeperOperatorHelmDescriptor.Namespace
@@ -36,13 +36,13 @@ func testUninstallZookeeperCluster() bool {
 }
 
 func testUninstallKafkaCluster() bool { //nolint:unparam // Note: respecting Ginkgo testing interface by returning bool.
-	return When("Uninstalling Kafka cluster", func() {
+	return ginkgo.When("Uninstalling Kafka cluster", func() {
 		var kubectlOptions k8s.KubectlOptions
 		var err error
 
-		It("Acquiring K8s config and context", func() {
+		ginkgo.It("Acquiring K8s config and context", func() {
 			kubectlOptions, err = kubectlOptionsForCurrentContext()
-			Expect(err).NotTo(HaveOccurred())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 
 		kubectlOptions.Namespace = koperatorLocalHelmDescriptor.Namespace

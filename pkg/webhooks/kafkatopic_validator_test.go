@@ -85,7 +85,7 @@ func newMockClients(cluster *v1beta1.KafkaCluster) (runtimeClient.WithWatch, kaf
 
 	kafkaClient, _, _ := kafkaclient.NewMockFromCluster(client, cluster)
 	returnMockedKafkaClient := func(client runtimeClient.Client, cluster *v1beta1.KafkaCluster) (kafkaclient.KafkaClient, func(), error) {
-		return kafkaClient, func() { kafkaClient.Close() }, nil
+		return kafkaClient, func() { _ = kafkaClient.Close() }, nil
 	}
 	return client, kafkaClient, returnMockedKafkaClient
 }

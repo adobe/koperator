@@ -215,7 +215,7 @@ func expectKafkaPVC(ctx context.Context, kafkaCluster *v1beta1.KafkaCluster) {
 		Expect(pvc.Labels).To(HaveKeyWithValue(v1beta1.KafkaCRLabelKey, kafkaCluster.Name))
 		Expect(pvc.Annotations).To(HaveKeyWithValue("mountPath", "/kafka-logs"))
 		Expect(pvc.Spec.AccessModes).To(ConsistOf(corev1.ReadWriteOnce))
-		Expect(pvc.Spec.Resources).To(Equal(corev1.ResourceRequirements{
+		Expect(pvc.Spec.Resources).To(Equal(corev1.VolumeResourceRequirements{
 			Requests: corev1.ResourceList{
 				"storage": resource.MustParse("10Gi"),
 			},

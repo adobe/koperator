@@ -51,7 +51,7 @@ func Unmarshal(p *Properties, v interface{}) error {
 		vType = vValue.Type()
 	}
 
-	if reflect.PtrTo(vType).Implements(unmarshalerType) {
+	if reflect.PointerTo(vType).Implements(unmarshalerType) {
 		if u, ok := vValue.Interface().(Unmarshaler); ok {
 			return u.UnmarshalProperties(p)
 		}

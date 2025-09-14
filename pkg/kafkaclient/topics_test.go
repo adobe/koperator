@@ -42,7 +42,7 @@ func TestGetTopic(t *testing.T) {
 		t.Error("Expected nil got:", topic)
 	}
 
-	client.admin.CreateTopic("test-topic", &sarama.TopicDetail{}, false)
+	_ = client.admin.CreateTopic("test-topic", &sarama.TopicDetail{}, false)
 
 	if topic, err := client.GetTopic("test-topic"); err != nil {
 		t.Error("Expected to get test-topic without error, got:", err)
@@ -143,7 +143,7 @@ func TestEnsurePartitionCount(t *testing.T) {
 		t.Error("Expected to attempt partition increase, got no change")
 	}
 	if _, err := client.EnsurePartitionCount("not-exists", 9000); err == nil {
-		t.Error("Expected error for non-existant topic, got nil")
+		t.Error("Expected error for non-existent topic, got nil")
 	}
 
 	client.admin, _ = newMockClusterAdminFailOps([]string{}, sarama.NewConfig())

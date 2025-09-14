@@ -218,7 +218,7 @@ func (r *KafkaClusterReconciler) checkFinalizers(ctx context.Context, cluster *v
 		// Fetch a list of all namespaces for DeleteAllOf requests
 		namespaces = make([]string, 0)
 		var namespaceList corev1.NamespaceList
-		if err := r.Client.List(ctx, &namespaceList); err != nil {
+		if err := r.List(ctx, &namespaceList); err != nil {
 			return requeueWithError(log, "failed to get namespace list", err)
 		}
 		for _, ns := range namespaceList.Items {
@@ -234,7 +234,7 @@ func (r *KafkaClusterReconciler) checkFinalizers(ctx context.Context, cluster *v
 	if apiutil.StringSliceContains(cluster.GetFinalizers(), clusterTopicsFinalizer) {
 		log.Info(fmt.Sprintf("Sending delete kafkatopics request to all namespaces for cluster %s/%s", cluster.Namespace, cluster.Name))
 		for _, ns := range namespaces {
-			if err := r.Client.DeleteAllOf(
+			if err := r.DeleteAllOf(
 				ctx,
 				&v1alpha1.KafkaTopic{},
 				client.InNamespace(ns),
@@ -257,7 +257,7 @@ func (r *KafkaClusterReconciler) checkFinalizers(ctx context.Context, cluster *v
 	// our controller certificate.
 	log.Info("Ensuring all topics have finished cleaning up")
 	var childTopics v1alpha1.KafkaTopicList
-	if err = r.Client.List(
+	if err = r.List(
 		ctx,
 		&childTopics,
 		client.InNamespace(metav1.NamespaceAll),
@@ -278,7 +278,7 @@ func (r *KafkaClusterReconciler) checkFinalizers(ctx context.Context, cluster *v
 	if apiutil.StringSliceContains(cluster.GetFinalizers(), clusterUsersFinalizer) {
 		log.Info(fmt.Sprintf("Sending delete kafkausers request to all namespaces for cluster %s/%s", cluster.Namespace, cluster.Name))
 		for _, ns := range namespaces {
-			if err := r.Client.DeleteAllOf(
+			if err := r.DeleteAllOf(
 				ctx,
 				&v1alpha1.KafkaUser{},
 				client.InNamespace(ns),
@@ -351,7 +351,7 @@ func (r *KafkaClusterReconciler) removeFinalizer(ctx context.Context, cluster *v
 
 func (r *KafkaClusterReconciler) updateAndFetchLatest(ctx context.Context, cluster *v1beta1.KafkaCluster) (*v1beta1.KafkaCluster, error) {
 	typeMeta := cluster.TypeMeta
-	err := r.Client.Update(ctx, cluster)
+	err := r.Update(ctx, cluster)
 	if err != nil {
 		return nil, err
 	}

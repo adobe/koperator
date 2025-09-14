@@ -31,8 +31,8 @@ package tests
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"math/rand/v2"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -40,7 +40,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"golang.org/x/exp/rand"
 
 	corev1 "k8s.io/api/core/v1"
 	apiv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -64,12 +63,11 @@ import (
 	contour "github.com/projectcontour/contour/apis/projectcontour/v1"
 
 	banzaicloudv1alpha1 "github.com/banzaicloud/koperator/api/v1alpha1"
-	"github.com/banzaicloud/koperator/api/v1beta1"
 	banzaicloudv1beta1 "github.com/banzaicloud/koperator/api/v1beta1"
 	"github.com/banzaicloud/koperator/controllers"
+	controllerMocks "github.com/banzaicloud/koperator/controllers/tests/mocks"
 	"github.com/banzaicloud/koperator/pkg/jmxextractor"
 	"github.com/banzaicloud/koperator/pkg/kafkaclient"
-	"github.com/banzaicloud/koperator/pkg/scale"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -196,9 +194,7 @@ var _ = BeforeSuite(func(ctx SpecContext) {
 		Client:       mgr.GetClient(),
 		DirectClient: mgr.GetAPIReader(),
 		Scheme:       mgr.GetScheme(),
-		ScaleFactory: func(ctx context.Context, kafkaCluster *v1beta1.KafkaCluster) (scale.CruiseControlScaler, error) {
-			return nil, errors.New("there is no scale mock KafkaCluster Reconciler")
-		},
+		ScaleFactory: controllerMocks.NewNoopScaleFactory(),
 	}
 
 	err = controllers.SetupCruiseControlWithManager(mgr).Complete(&kafkaClusterCCReconciler)
@@ -208,9 +204,7 @@ var _ = BeforeSuite(func(ctx SpecContext) {
 		Client:       mgr.GetClient(),
 		DirectClient: mgr.GetAPIReader(),
 		Scheme:       mgr.GetScheme(),
-		ScaleFactory: func(ctx context.Context, kafkaCluster *v1beta1.KafkaCluster) (scale.CruiseControlScaler, error) {
-			return nil, errors.New("there is no scale mock CCOperation Reconciler")
-		},
+		ScaleFactory: controllerMocks.NewNoopScaleFactory(),
 	}
 
 	err = controllers.SetupCruiseControlOperationWithManager(mgr).Complete(&cruiseControlOperationReconciler)
@@ -301,7 +295,12 @@ func GetNodePort(portAmount int32) int32 {
 
 	attempts := 0
 	for attempts = 0; attempts < 100; attempts++ {
-		port := minPort + rand.Int31n(int32(portRange))
+		port := minPort + rand.Int32N(int32(portRange))
+
+		// Avoid the problematic range around 32030 that often causes conflicts
+		if port >= 32025 && port <= 32035 {
+			continue
+		}
 
 		allAvailable := true
 		for i := int32(0); i <= portAmount; i++ {

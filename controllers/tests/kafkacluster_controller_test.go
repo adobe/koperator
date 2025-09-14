@@ -32,6 +32,8 @@ import (
 	"github.com/banzaicloud/koperator/pkg/util"
 )
 
+const testHostName = "test.host.com"
+
 var _ = Describe("KafkaCluster", func() {
 	var (
 		count                    uint64 = 0
@@ -238,10 +240,10 @@ var _ = Describe("KafkaCluster", func() {
 	When("using default configuration", func() {
 		BeforeEach(func() {
 			loadBalancerServiceName = fmt.Sprintf("envoy-loadbalancer-test-%s", kafkaCluster.Name)
-			externalListenerHostName = "test.host.com"
+			externalListenerHostName = testHostName
 
 			loadBalancerServiceNameKRaft = fmt.Sprintf("envoy-loadbalancer-test-%s", kafkaClusterKRaft.Name)
-			externalListenerHostNameKRaft = "test.host.com"
+			externalListenerHostNameKRaft = testHostName
 		})
 		It("should reconciles objects properly", func(ctx SpecContext) {
 			expectEnvoy(ctx, kafkaCluster, []string{"test"})
@@ -262,10 +264,10 @@ var _ = Describe("KafkaCluster", func() {
 	When("configuring Kafka cluster in KRaft mode with CLUSTER_ID env var", func() {
 		BeforeEach(func() {
 			loadBalancerServiceName = fmt.Sprintf("envoy-loadbalancer-test-%s", kafkaCluster.Name)
-			externalListenerHostName = "test.host.com"
+			externalListenerHostName = testHostName
 
 			loadBalancerServiceNameKRaft = fmt.Sprintf("envoy-loadbalancer-test-%s", kafkaClusterKRaft.Name)
-			externalListenerHostNameKRaft = "test.host.com"
+			externalListenerHostNameKRaft = testHostName
 			kafkaClusterKRaft.Spec.Envs = append(kafkaClusterKRaft.Spec.Envs, corev1.EnvVar{
 				Name:  "CLUSTER_ID",
 				Value: "test-cluster-id",

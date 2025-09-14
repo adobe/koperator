@@ -155,13 +155,13 @@ func (s *KafkaTopicValidator) checkKafka(ctx context.Context, topic *banzaicloud
 	broker, closeClient, err := s.NewKafkaFromCluster(s.Client, cluster)
 	if err != nil {
 		// Log as info to not cause stack traces when making CC topic
-		return nil, errors.WrapIff(err, fmt.Sprintf("%s: %s", cantConnectErrorMsg, topic.Spec.ClusterRef.Name))
+		return nil, errors.WrapIf(err, fmt.Sprintf("%s: %s", cantConnectErrorMsg, topic.Spec.ClusterRef.Name))
 	}
 	defer closeClient()
 
 	existing, err := broker.GetTopic(topic.Spec.Name)
 	if err != nil {
-		return nil, errors.WrapIff(err, fmt.Sprintf("failed to list topics for kafka cluster: %s", topic.Spec.ClusterRef.Name))
+		return nil, errors.WrapIf(err, fmt.Sprintf("failed to list topics for kafka cluster: %s", topic.Spec.ClusterRef.Name))
 	}
 
 	var allErrs field.ErrorList

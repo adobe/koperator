@@ -16,52 +16,52 @@ package e2e
 
 import (
 	"github.com/gruntwork-io/terratest/modules/k8s"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	ginkgo "github.com/onsi/ginkgo/v2"
+	gomega "github.com/onsi/gomega"
 )
 
 func testInstall() bool {
-	return When("Installing Koperator and dependencies", Ordered, func() {
+	return ginkgo.When("Installing Koperator and dependencies", ginkgo.Ordered, func() {
 		var kubectlOptions k8s.KubectlOptions
 		var err error
 
-		It("Acquiring K8s config and context", func() {
+		ginkgo.It("Acquiring K8s config and context", func() {
 			kubectlOptions, err = kubectlOptionsForCurrentContext()
-			Expect(err).NotTo(HaveOccurred())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 
-		When("Installing cert-manager", func() {
-			It("Installing cert-manager Helm chart", func() {
+		ginkgo.When("Installing cert-manager", func() {
+			ginkgo.It("Installing cert-manager Helm chart", func() {
 				err = certManagerHelmDescriptor.installHelmChart(kubectlOptions)
-				Expect(err).NotTo(HaveOccurred())
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			})
 		})
 
-		When("Installing contour ingress controller", func() {
-			It("Installing contour Helm chart", func() {
+		ginkgo.When("Installing contour ingress controller", func() {
+			ginkgo.It("Installing contour Helm chart", func() {
 				err = contourIngressControllerHelmDescriptor.installHelmChart(kubectlOptions)
-				Expect(err).NotTo(HaveOccurred())
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			})
 		})
 
-		When("Installing zookeeper-operator", func() {
-			It("Installing zookeeper-operator Helm chart", func() {
+		ginkgo.When("Installing zookeeper-operator", func() {
+			ginkgo.It("Installing zookeeper-operator Helm chart", func() {
 				err = zookeeperOperatorHelmDescriptor.installHelmChart(kubectlOptions)
-				Expect(err).NotTo(HaveOccurred())
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			})
 		})
 
-		When("Installing prometheus-operator", func() {
-			It("Installing prometheus-operator Helm chart", func() {
+		ginkgo.When("Installing prometheus-operator", func() {
+			ginkgo.It("Installing prometheus-operator Helm chart", func() {
 				err = prometheusOperatorHelmDescriptor.installHelmChart(kubectlOptions)
-				Expect(err).NotTo(HaveOccurred())
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			})
 		})
 
-		When("Installing Koperator", func() {
-			It("Installing Koperator Helm chart", func() {
+		ginkgo.When("Installing Koperator", func() {
+			ginkgo.It("Installing Koperator Helm chart", func() {
 				err = koperatorLocalHelmDescriptor.installHelmChart(kubectlOptions)
-				Expect(err).NotTo(HaveOccurred())
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			})
 		})
 	})

@@ -29,7 +29,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	"github.com/banzaicloud/koperator/api/v1beta1"
 	banzaicloudv1beta1 "github.com/banzaicloud/koperator/api/v1beta1"
 	"github.com/banzaicloud/koperator/pkg/util"
 	clientutil "github.com/banzaicloud/koperator/pkg/util/client"
@@ -495,7 +494,7 @@ func CreateInternalListenerStatuses(kafkaCluster *banzaicloudv1beta1.KafkaCluste
 	return intListenerStatuses, controllerIntListenerStatuses, nil
 }
 
-func getHostnameForBrokerId(eListenerStatusList v1beta1.ListenerStatusList, brokerId int32) string {
+func getHostnameForBrokerId(eListenerStatusList banzaicloudv1beta1.ListenerStatusList, brokerId int32) string {
 	for _, eListenerStatus := range eListenerStatusList {
 		if eListenerStatus.Name == fmt.Sprintf("broker-%d", brokerId) {
 			return strings.Split(eListenerStatus.Address, ":")[0]

@@ -21,8 +21,8 @@ import (
 
 	"github.com/gruntwork-io/terratest/modules/k8s"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	ginkgo "github.com/onsi/ginkgo/v2"
+	gomega "github.com/onsi/gomega"
 
 	"github.com/banzaicloud/koperator/api/v1beta1"
 )
@@ -30,41 +30,41 @@ import (
 // requireCreatingKafkaCluster creates a KafkaCluster and
 // checks the success of that operation.
 func requireCreatingKafkaCluster(kubectlOptions k8s.KubectlOptions, manifestPath string) {
-	It("Deploying a KafkaCluster", func() {
-		By("Checking existing KafkaClusters")
+	ginkgo.It("Deploying a KafkaCluster", func() {
+		ginkgo.By("Checking existing KafkaClusters")
 		found := isExistingK8SResource(kubectlOptions, kafkaKind, kafkaClusterName)
 		if found {
-			By(fmt.Sprintf("KafkaCluster %s already exists\n", kafkaClusterName))
+			ginkgo.By(fmt.Sprintf("KafkaCluster %s already exists\n", kafkaClusterName))
 		} else {
-			By("Deploying a KafkaCluster")
+			ginkgo.By("Deploying a KafkaCluster")
 			applyK8sResourceManifest(kubectlOptions, manifestPath)
 		}
 
-		By("Verifying the KafkaCluster state")
+		ginkgo.By("Verifying the KafkaCluster state")
 		err := waitK8sResourceCondition(kubectlOptions, kafkaKind, fmt.Sprintf("jsonpath={.status.state}=%s", string(v1beta1.KafkaClusterRunning)), kafkaClusterCreateTimeout, "", kafkaClusterName)
-		Expect(err).NotTo(HaveOccurred())
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		By("Verifying the CruiseControl pod")
-		Eventually(context.Background(), func() error {
+		ginkgo.By("Verifying the CruiseControl pod")
+		gomega.Eventually(context.Background(), func() error {
 			return waitK8sResourceCondition(kubectlOptions, "pod", "condition=Ready", cruiseControlPodReadinessTimeout, v1beta1.KafkaCRLabelKey+"="+kafkaClusterName+",app=cruisecontrol", "")
-		}, kafkaClusterResourceReadinessTimeout, 3*time.Second).ShouldNot(HaveOccurred())
+		}, kafkaClusterResourceReadinessTimeout, 3*time.Second).ShouldNot(gomega.HaveOccurred())
 
-		By("Verifying all Kafka pods")
+		ginkgo.By("Verifying all Kafka pods")
 		err = waitK8sResourceCondition(kubectlOptions, "pod", "condition=Ready", defaultPodReadinessWaitTime, v1beta1.KafkaCRLabelKey+"="+kafkaClusterName, "")
-		Expect(err).NotTo(HaveOccurred())
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	})
 }
 
 // requireCreatingZookeeperCluster creates a ZookeeperCluster and
 // checks the success of that operation.
 func requireCreatingZookeeperCluster(kubectlOptions k8s.KubectlOptions) {
-	It("Deploying a ZookeeperCluster", func() {
-		By("Checking existing ZookeeperClusters")
+	ginkgo.It("Deploying a ZookeeperCluster", func() {
+		ginkgo.By("Checking existing ZookeeperClusters")
 		found := isExistingK8SResource(kubectlOptions, zookeeperKind, zookeeperClusterName)
 		if found {
-			By(fmt.Sprintf("ZookeeperCluster %s already exists\n", zookeeperClusterName))
+			ginkgo.By(fmt.Sprintf("ZookeeperCluster %s already exists\n", zookeeperClusterName))
 		} else {
-			By("Deploying the sample ZookeeperCluster")
+			ginkgo.By("Deploying the sample ZookeeperCluster")
 			err := applyK8sResourceFromTemplate(kubectlOptions,
 				zookeeperClusterTemplate,
 				map[string]interface{}{
@@ -73,15 +73,15 @@ func requireCreatingZookeeperCluster(kubectlOptions k8s.KubectlOptions) {
 					"Replicas":  zookeeperClusterReplicaCount,
 				},
 			)
-			Expect(err).NotTo(HaveOccurred())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		}
 
-		By("Verifying the ZookeeperCluster resource")
+		ginkgo.By("Verifying the ZookeeperCluster resource")
 		err := waitK8sResourceCondition(kubectlOptions, zookeeperKind, "jsonpath={.status.readyReplicas}=1", zookeeperClusterCreateTimeout, "", zookeeperClusterName)
-		Expect(err).NotTo(HaveOccurred())
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		By("Verifying the ZookeeperCluster's pods")
+		ginkgo.By("Verifying the ZookeeperCluster's pods")
 		err = waitK8sResourceCondition(kubectlOptions, "pod", "condition=Ready", defaultPodReadinessWaitTime, "app="+zookeeperClusterName, "")
-		Expect(err).NotTo(HaveOccurred())
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	})
 }

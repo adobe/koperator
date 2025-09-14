@@ -20,6 +20,7 @@ import (
 
 	"emperror.dev/errors"
 	"github.com/IBM/sarama"
+
 	"github.com/banzaicloud/koperator/pkg/errorfactory"
 )
 
@@ -40,7 +41,7 @@ func (k *kafkaClient) AlterPerBrokerConfig(brokerId int32, configChange map[stri
 	if err != nil {
 		return errors.WrapIf(err, "could not open connection to broker")
 	}
-	defer broker.Close()
+	defer func() { _ = broker.Close() }()
 
 	_, err = broker.AlterConfigs(&sarama.AlterConfigsRequest{
 		ValidateOnly: validateOnly,
@@ -64,7 +65,7 @@ func (k *kafkaClient) DescribePerBrokerConfig(brokerId int32, config []string) (
 	if err != nil {
 		return nil, errors.WrapIf(err, "could not open connection to broker")
 	}
-	defer broker.Close()
+	defer func() { _ = broker.Close() }()
 
 	currentConfig, err := broker.DescribeConfigs(&sarama.DescribeConfigsRequest{
 		Resources: []*sarama.ConfigResource{{Type: sarama.BrokerResource, Name: strconv.Itoa(int(brokerId)), ConfigNames: config}},

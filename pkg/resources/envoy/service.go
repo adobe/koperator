@@ -36,7 +36,7 @@ func (r *Reconciler) service(log logr.Logger, extListener v1beta1.ExternalListen
 	eListenerLabelName := util.ConstructEListenerLabelName(ingressConfigName, extListener.Name)
 
 	// Determine Service Name from the configuration
-	var serviceName string = util.GenerateEnvoyResourceName(envoyutils.EnvoyServiceName, envoyutils.EnvoyServiceNameWithScope,
+	var serviceName = util.GenerateEnvoyResourceName(envoyutils.EnvoyServiceName, envoyutils.EnvoyServiceNameWithScope,
 		extListener, ingressConfig, ingressConfigName, r.KafkaCluster.GetName())
 
 	exposedPorts := getExposedServicePorts(extListener,
@@ -47,7 +47,7 @@ func (r *Reconciler) service(log logr.Logger, extListener v1beta1.ExternalListen
 		ObjectMeta: templates.ObjectMetaWithAnnotations(
 			serviceName,
 			labelsForEnvoyIngress(r.KafkaCluster.GetName(), eListenerLabelName),
-			ingressConfig.IngressServiceSettings.GetServiceAnnotations(), r.KafkaCluster),
+			ingressConfig.GetServiceAnnotations(), r.KafkaCluster),
 		Spec: corev1.ServiceSpec{
 			Selector:                 labelsForEnvoyIngress(r.KafkaCluster.GetName(), eListenerLabelName),
 			Type:                     ingressConfig.GetServiceType(),

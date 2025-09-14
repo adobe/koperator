@@ -29,7 +29,7 @@ import (
 	"github.com/Masterminds/sprig"
 	"github.com/cisco-open/k8s-objectmatcher/patch"
 	"github.com/gruntwork-io/terratest/modules/k8s"
-	. "github.com/onsi/ginkgo/v2"
+	ginkgo "github.com/onsi/ginkgo/v2"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/yaml"
@@ -47,8 +47,8 @@ const (
 // applyK8sResourceManifests applies the specified manifest to the provided
 // kubectl context and namespace.
 func applyK8sResourceManifest(kubectlOptions k8s.KubectlOptions, manifestPath string) { //nolint:unused // Note: this might come in handy for manual K8s resource operations.
-	By(fmt.Sprintf("Applying k8s manifest %s", manifestPath))
-	k8s.KubectlApply(GinkgoT(), &kubectlOptions, manifestPath)
+	ginkgo.By(fmt.Sprintf("Applying k8s manifest %s", manifestPath))
+	k8s.KubectlApply(ginkgo.GinkgoT(), &kubectlOptions, manifestPath)
 }
 
 // isExistingK8SResource queries a Resource by it's kind, namespace and name and
@@ -58,10 +58,10 @@ func isExistingK8SResource(
 	resourceKind string,
 	resourceName string,
 ) bool {
-	By(fmt.Sprintf("Checking the existence of resource %s in namespace %s (kind: %s)", resourceName, kubectlOptions.Namespace, resourceKind))
-	err := k8s.RunKubectlE(GinkgoT(), &kubectlOptions, "get", resourceKind, resourceName)
+	ginkgo.By(fmt.Sprintf("Checking the existence of resource %s in namespace %s (kind: %s)", resourceName, kubectlOptions.Namespace, resourceKind))
+	err := k8s.RunKubectlE(ginkgo.GinkgoT(), &kubectlOptions, "get", resourceKind, resourceName)
 	if err != nil {
-		By(fmt.Sprintf("Received error when getting resource: %s", err))
+		ginkgo.By(fmt.Sprintf("Received error when getting resource: %s", err))
 		return false
 	}
 	return true
@@ -77,22 +77,22 @@ func createOrReplaceK8sResourcesFromManifest( //nolint:unused // Note: this migh
 	resourceManifest string,
 	shouldBeValidated bool,
 ) {
-	By(fmt.Sprintf("Checking the existence of resource %s", resourceName))
-	err := k8s.RunKubectlE(GinkgoT(), &kubectlOptions, "get", resourceKind, resourceName)
+	ginkgo.By(fmt.Sprintf("Checking the existence of resource %s", resourceName))
+	err := k8s.RunKubectlE(ginkgo.GinkgoT(), &kubectlOptions, "get", resourceKind, resourceName)
 
 	if err == nil {
-		By(fmt.Sprintf("Replacing k8s resources from manifest %s", resourceManifest))
+		ginkgo.By(fmt.Sprintf("Replacing k8s resources from manifest %s", resourceManifest))
 		k8s.RunKubectl(
-			GinkgoT(),
+			ginkgo.GinkgoT(),
 			&kubectlOptions,
 			"replace",
 			fmt.Sprintf("--validate=%t", shouldBeValidated),
 			"--filename", resourceManifest,
 		)
 	} else {
-		By(fmt.Sprintf("Creating k8s resources from manifest %s", resourceManifest))
+		ginkgo.By(fmt.Sprintf("Creating k8s resources from manifest %s", resourceManifest))
 		k8s.RunKubectl(
-			GinkgoT(),
+			ginkgo.GinkgoT(),
 			&kubectlOptions,
 			"create",
 			fmt.Sprintf("--validate=%t", shouldBeValidated),
@@ -148,9 +148,9 @@ func getK8sCRD(kubectlOptions k8s.KubectlOptions, crdName string) ([]byte, error
 		return nil, errors.Errorf("invalid empty CRD name")
 	}
 
-	By(fmt.Sprintf("Getting CRD %s", crdName))
+	ginkgo.By(fmt.Sprintf("Getting CRD %s", crdName))
 	output, err := k8s.RunKubectlAndGetOutputE(
-		GinkgoT(),
+		ginkgo.GinkgoT(),
 		&kubectlOptions,
 		[]string{"get", "crd", "--output", "json", crdName}...,
 	)
@@ -247,7 +247,7 @@ func installK8sCRDs(kubectlOptions k8s.KubectlOptions, crdManifestPaths ...strin
 				return errors.WrapIfWithDetails(err, "retrieving K8s CRD failed", "crdName", crdName)
 			}
 
-			By(fmt.Sprintf("Comparing existing and desired CRD %s", crdName))
+			ginkgo.By(fmt.Sprintf("Comparing existing and desired CRD %s", crdName))
 
 			typedClusterCRD := new(apiextensionsv1.CustomResourceDefinition)
 			err = yaml.Unmarshal(clusterCRD, typedClusterCRD)
@@ -275,7 +275,7 @@ func installK8sCRDs(kubectlOptions k8s.KubectlOptions, crdManifestPaths ...strin
 				return errors.NewWithDetails("actual and desired CRDs mismatch", "patch", patchResult.String())
 			}
 		} else {
-			By(fmt.Sprintf("Installing CRD %s", crdName))
+			ginkgo.By(fmt.Sprintf("Installing CRD %s", crdName))
 			err := installK8sCRD(kubectlOptions, crd, false)
 			if err != nil {
 				return errors.WrapIfWithDetails(err, "installing CRD failed", "crd", crd)
@@ -393,14 +393,14 @@ func kubectlOptionsForCurrentContext() (k8s.KubectlOptions, error) {
 // namespace optionally filtering for the specified CRD names.
 func listK8sCRDs(kubectlOptions k8s.KubectlOptions, crdNames ...string) ([]string, error) { //nolint:unused // Note: this might come in handy for manual CRD operations.
 	if len(crdNames) == 0 {
-		By("Listing CRDs")
+		ginkgo.By("Listing CRDs")
 	} else {
-		By(fmt.Sprintf("Listing CRDs filtered for CRD names %+v", crdNames))
+		ginkgo.By(fmt.Sprintf("Listing CRDs filtered for CRD names %+v", crdNames))
 	}
 
 	args := append([]string{"get", "crd", "--output", "name"}, crdNames...)
 	output, err := k8s.RunKubectlAndGetOutputE(
-		GinkgoT(),
+		ginkgo.GinkgoT(),
 		&kubectlOptions,
 		args...,
 	)
@@ -429,10 +429,10 @@ func deleteK8sResource(
 
 	logMsg := fmt.Sprintf("Deleting k8s resource: kind: '%s' ", kind)
 	logMsg, args = kubectlArgExtender(args, logMsg, selector, name, kubectlOptions.Namespace, extraArgs)
-	By(logMsg)
+	ginkgo.By(logMsg)
 
 	_, err := k8s.RunKubectlAndGetOutputE(
-		GinkgoT(),
+		ginkgo.GinkgoT(),
 		&kubectlOptions,
 		args...,
 	)
@@ -447,7 +447,7 @@ func deleteK8sResource(
 func deleteK8sResourceNoErrNotFound(kubectlOptions k8s.KubectlOptions, timeout time.Duration, kind string, name string, extraArgs ...string) error { //nolint:unparam // Note: library function with timeout argument currently always using the same const.
 	err := deleteK8sResource(kubectlOptions, timeout, kind, "", name, extraArgs...)
 	if isKubectlNotFoundError(err) {
-		By(fmt.Sprintf("K8s resource %s not found", name))
+		ginkgo.By(fmt.Sprintf("K8s resource %s not found", name))
 		return nil
 	}
 	return err
@@ -456,14 +456,14 @@ func deleteK8sResourceNoErrNotFound(kubectlOptions k8s.KubectlOptions, timeout t
 // applyK8sResourceManifestFromString applies the specified manifest in string format to the provided
 // kubectl context and namespace.
 func applyK8sResourceManifestFromString(kubectlOptions k8s.KubectlOptions, manifest string) error {
-	By(fmt.Sprintf("Applying k8s manifest\n%s", manifest))
-	return k8s.KubectlApplyFromStringE(GinkgoT(), &kubectlOptions, manifest)
+	ginkgo.By(fmt.Sprintf("Applying k8s manifest\n%s", manifest))
+	return k8s.KubectlApplyFromStringE(ginkgo.GinkgoT(), &kubectlOptions, manifest)
 }
 
 // applyK8sResourceFromTemplate generates manifest from the specified go-template based on values
 // and applies the specified manifest to the provided kubectl context and namespace.
 func applyK8sResourceFromTemplate(kubectlOptions k8s.KubectlOptions, templateFile string, values map[string]interface{}) error {
-	By(fmt.Sprintf("Generating K8s manifest from template %s", templateFile))
+	ginkgo.By(fmt.Sprintf("Generating K8s manifest from template %s", templateFile))
 	var manifest bytes.Buffer
 	rawTemplate, err := os.ReadFile(templateFile)
 	if err != nil {
@@ -490,7 +490,7 @@ func listK8sResourceKinds(kubectlOptions k8s.KubectlOptions, apiGroupSelector st
 	args = append(args, extraArgs...)
 
 	output, err := k8s.RunKubectlAndGetOutputE(
-		GinkgoT(),
+		ginkgo.GinkgoT(),
 		&kubectlOptions,
 		args...,
 	)
@@ -516,10 +516,10 @@ func getK8sResources(kubectlOptions k8s.KubectlOptions, resourceKind []string, s
 
 	args := []string{"get", strings.Join(resourceKind, ",")}
 	logMsg, args = kubectlArgExtender(args, logMsg, selector, names, kubectlOptions.Namespace, extraArgs)
-	By(logMsg)
+	ginkgo.By(logMsg)
 
 	output, err := k8s.RunKubectlAndGetOutputE(
-		GinkgoT(),
+		ginkgo.GinkgoT(),
 		&kubectlOptions,
 		args...,
 	)
@@ -555,10 +555,10 @@ func waitK8sResourceCondition(kubectlOptions k8s.KubectlOptions, resourceKind, w
 	}
 
 	logMsg, args = kubectlArgExtender(args, logMsg, selector, names, kubectlOptions.Namespace, extraArgs)
-	By(logMsg)
+	ginkgo.By(logMsg)
 
 	_, err := k8s.RunKubectlAndGetOutputE(
-		GinkgoT(),
+		ginkgo.GinkgoT(),
 		&kubectlOptions,
 		args...,
 	)

@@ -18,13 +18,13 @@ import (
 	"fmt"
 
 	"github.com/gruntwork-io/terratest/modules/k8s"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	ginkgo "github.com/onsi/ginkgo/v2"
+	gomega "github.com/onsi/gomega"
 )
 
 // requireUninstallingKoperator uninstall koperator Helm chart and removes Koperator's CRDs.
 func requireUninstallingKoperator(kubectlOptions k8s.KubectlOptions) {
-	When("Uninstalling Koperator", func() {
+	ginkgo.When("Uninstalling Koperator", func() {
 		requireUninstallingKoperatorHelmChart(kubectlOptions)
 		requireRemoveKoperatorCRDs(kubectlOptions)
 		requireRemoveNamespace(kubectlOptions, koperatorLocalHelmDescriptor.Namespace)
@@ -34,13 +34,13 @@ func requireUninstallingKoperator(kubectlOptions k8s.KubectlOptions) {
 // requireUninstallingKoperatorHelmChart uninstall Koperator Helm chart
 // and checks the success of that operation.
 func requireUninstallingKoperatorHelmChart(kubectlOptions k8s.KubectlOptions) {
-	It("Uninstalling Koperator Helm chart", func() {
+	ginkgo.It("Uninstalling Koperator Helm chart", func() {
 		err := koperatorLocalHelmDescriptor.uninstallHelmChart(kubectlOptions, true)
-		Expect(err).NotTo(HaveOccurred())
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		By("Verifying Koperator helm chart resources cleanup")
+		ginkgo.By("Verifying Koperator helm chart resources cleanup")
 		k8sResourceKinds, err := listK8sResourceKinds(kubectlOptions, "")
-		Expect(err).ShouldNot(HaveOccurred())
+		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 
 		koperatorAvailableResourceKinds := stringSlicesInstersect(koperatorCRDs(), k8sResourceKinds)
 		koperatorAvailableResourceKinds = append(koperatorAvailableResourceKinds, basicK8sResourceKinds()...)
@@ -52,17 +52,17 @@ func requireUninstallingKoperatorHelmChart(kubectlOptions k8s.KubectlOptions) {
 			kubectlArgGoTemplateKindNameNamespace,
 			"--all-namespaces")
 
-		Expect(err).ShouldNot(HaveOccurred())
-		Expect(remainedResources).Should(BeEmpty())
+		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
+		gomega.Expect(remainedResources).Should(gomega.BeEmpty())
 	})
 }
 
 // requireRemoveKoperatorCRDs deletes the koperator CRDs
 func requireRemoveKoperatorCRDs(kubectlOptions k8s.KubectlOptions) {
-	It("Removing koperator CRDs", func() {
+	ginkgo.It("Removing koperator CRDs", func() {
 		for _, crd := range koperatorCRDs() {
 			err := deleteK8sResourceNoErrNotFound(kubectlOptions, defaultDeletionTimeout, crdKind, crd)
-			Expect(err).ShouldNot(HaveOccurred())
+			gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 		}
 	})
 }
@@ -70,7 +70,7 @@ func requireRemoveKoperatorCRDs(kubectlOptions k8s.KubectlOptions) {
 // requireUninstallingZookeeperOperator uninstall Zookeeper-operator Helm chart
 // and remove CRDs.
 func requireUninstallingZookeeperOperator(kubectlOptions k8s.KubectlOptions) {
-	When("Uninstalling zookeeper-operator", func() {
+	ginkgo.When("Uninstalling zookeeper-operator", func() {
 		requireUninstallingZookeeperOperatorHelmChart(kubectlOptions)
 		requireRemoveZookeeperOperatorCRDs(kubectlOptions)
 		requireRemoveNamespace(kubectlOptions, zookeeperOperatorHelmDescriptor.Namespace)
@@ -80,13 +80,13 @@ func requireUninstallingZookeeperOperator(kubectlOptions k8s.KubectlOptions) {
 // requireUninstallingZookeeperOperatorHelmChart uninstall Zookeeper-operator Helm chart
 // and checks the success of that operation.
 func requireUninstallingZookeeperOperatorHelmChart(kubectlOptions k8s.KubectlOptions) {
-	It("Uninstalling zookeeper-operator Helm chart", func() {
+	ginkgo.It("Uninstalling zookeeper-operator Helm chart", func() {
 		err := zookeeperOperatorHelmDescriptor.uninstallHelmChart(kubectlOptions, true)
-		Expect(err).NotTo(HaveOccurred())
-		By("Verifying Zookeeper-operator helm chart resources cleanup")
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		ginkgo.By("Verifying Zookeeper-operator helm chart resources cleanup")
 
 		k8sResourceKinds, err := listK8sResourceKinds(kubectlOptions, "")
-		Expect(err).ShouldNot(HaveOccurred())
+		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 
 		zookeeperAvailableResourceKinds := stringSlicesInstersect(dependencyCRDs.Zookeeper(), k8sResourceKinds)
 		zookeeperAvailableResourceKinds = append(zookeeperAvailableResourceKinds, basicK8sResourceKinds()...)
@@ -97,18 +97,18 @@ func requireUninstallingZookeeperOperatorHelmChart(kubectlOptions k8s.KubectlOpt
 			"",
 			kubectlArgGoTemplateKindNameNamespace,
 			"--all-namespaces")
-		Expect(err).ShouldNot(HaveOccurred())
+		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 
-		Expect(remainedResources).Should(BeEmpty())
+		gomega.Expect(remainedResources).Should(gomega.BeEmpty())
 	})
 }
 
 // requireRemoveZookeeperOperatorCRDs deletes the zookeeper-operator CRDs
 func requireRemoveZookeeperOperatorCRDs(kubectlOptions k8s.KubectlOptions) {
-	It("Removing zookeeper-operator CRDs", func() {
+	ginkgo.It("Removing zookeeper-operator CRDs", func() {
 		for _, crd := range dependencyCRDs.Zookeeper() {
 			err := deleteK8sResourceNoErrNotFound(kubectlOptions, defaultDeletionTimeout, crdKind, crd)
-			Expect(err).ShouldNot(HaveOccurred())
+			gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 		}
 	})
 }
@@ -116,7 +116,7 @@ func requireRemoveZookeeperOperatorCRDs(kubectlOptions k8s.KubectlOptions) {
 // requireUninstallingPrometheusOperator uninstall prometheus-operator Helm chart and
 // remove CRDs.
 func requireUninstallingPrometheusOperator(kubectlOptions k8s.KubectlOptions) {
-	When("Uninstalling prometheus-operator", func() {
+	ginkgo.When("Uninstalling prometheus-operator", func() {
 		requireUninstallingPrometheusOperatorHelmChart(kubectlOptions)
 		requireRemovePrometheusOperatorCRDs(kubectlOptions)
 		requireRemoveNamespace(kubectlOptions, prometheusOperatorHelmDescriptor.Namespace)
@@ -126,14 +126,14 @@ func requireUninstallingPrometheusOperator(kubectlOptions k8s.KubectlOptions) {
 // requireUninstallingPrometheusOperatorHelmChart uninstall prometheus-operator Helm chart
 // and checks the success of that operation.
 func requireUninstallingPrometheusOperatorHelmChart(kubectlOptions k8s.KubectlOptions) {
-	It("Uninstalling Prometheus-operator Helm chart", func() {
+	ginkgo.It("Uninstalling Prometheus-operator Helm chart", func() {
 		err := prometheusOperatorHelmDescriptor.uninstallHelmChart(kubectlOptions, true)
-		Expect(err).NotTo(HaveOccurred())
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		By("Verifying Prometheus-operator helm chart resources cleanup")
+		ginkgo.By("Verifying Prometheus-operator helm chart resources cleanup")
 
 		k8sResourceKinds, err := listK8sResourceKinds(kubectlOptions, "")
-		Expect(err).ShouldNot(HaveOccurred())
+		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 
 		prometheusAvailableResourceKinds := stringSlicesInstersect(dependencyCRDs.Prometheus(), k8sResourceKinds)
 		prometheusAvailableResourceKinds = append(prometheusAvailableResourceKinds, basicK8sResourceKinds()...)
@@ -144,18 +144,18 @@ func requireUninstallingPrometheusOperatorHelmChart(kubectlOptions k8s.KubectlOp
 			"",
 			kubectlArgGoTemplateKindNameNamespace,
 			"--all-namespaces")
-		Expect(err).ShouldNot(HaveOccurred())
+		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 
-		Expect(remainedResources).Should(BeEmpty())
+		gomega.Expect(remainedResources).Should(gomega.BeEmpty())
 	})
 }
 
 // requireRemovePrometheusOperatorCRDs deletes the Prometheus-operator CRDs
 func requireRemovePrometheusOperatorCRDs(kubectlOptions k8s.KubectlOptions) {
-	It("Removing prometheus-operator CRDs", func() {
+	ginkgo.It("Removing prometheus-operator CRDs", func() {
 		for _, crd := range dependencyCRDs.Prometheus() {
 			err := deleteK8sResourceNoErrNotFound(kubectlOptions, defaultDeletionTimeout, crdKind, crd)
-			Expect(err).ShouldNot(HaveOccurred())
+			gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 		}
 	})
 }
@@ -163,7 +163,7 @@ func requireRemovePrometheusOperatorCRDs(kubectlOptions k8s.KubectlOptions) {
 // requireUninstallingCertManager uninstall Cert-manager Helm chart and
 // remove CRDs.
 func requireUninstallingCertManager(kubectlOptions k8s.KubectlOptions) {
-	When("Uninstalling zookeeper-operator", func() {
+	ginkgo.When("Uninstalling zookeeper-operator", func() {
 		requireUninstallingCertManagerHelmChart(kubectlOptions)
 		requireRemoveCertManagerCRDs(kubectlOptions)
 		requireRemoveNamespace(kubectlOptions, certManagerHelmDescriptor.Namespace)
@@ -173,14 +173,14 @@ func requireUninstallingCertManager(kubectlOptions k8s.KubectlOptions) {
 // requireUninstallingCertManagerHelmChart uninstalls cert-manager helm chart
 // and checks the success of that operation.
 func requireUninstallingCertManagerHelmChart(kubectlOptions k8s.KubectlOptions) {
-	It("Uninstalling Cert-manager Helm chart", func() {
+	ginkgo.It("Uninstalling Cert-manager Helm chart", func() {
 		err := certManagerHelmDescriptor.uninstallHelmChart(kubectlOptions, true)
-		Expect(err).NotTo(HaveOccurred())
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		By("Verifying Cert-manager helm chart resources cleanup")
+		ginkgo.By("Verifying Cert-manager helm chart resources cleanup")
 
 		k8sResourceKinds, err := listK8sResourceKinds(kubectlOptions, "")
-		Expect(err).ShouldNot(HaveOccurred())
+		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 
 		certManagerAvailableResourceKinds := stringSlicesInstersect(dependencyCRDs.CertManager(), k8sResourceKinds)
 		certManagerAvailableResourceKinds = append(certManagerAvailableResourceKinds, basicK8sResourceKinds()...)
@@ -191,23 +191,23 @@ func requireUninstallingCertManagerHelmChart(kubectlOptions k8s.KubectlOptions) 
 			"",
 			kubectlArgGoTemplateKindNameNamespace,
 			"--all-namespaces")
-		Expect(err).ShouldNot(HaveOccurred())
+		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 
-		Expect(remainedResources).Should(BeEmpty())
+		gomega.Expect(remainedResources).Should(gomega.BeEmpty())
 	})
 }
 
 // requireRemoveKoperatorCRDs deletes the cert-manager CRDs
 func requireRemoveCertManagerCRDs(kubectlOptions k8s.KubectlOptions) {
-	It("Removing cert-manager CRDs", func() {
+	ginkgo.It("Removing cert-manager CRDs", func() {
 		for _, crd := range dependencyCRDs.CertManager() {
 			err := deleteK8sResourceNoErrNotFound(kubectlOptions, defaultDeletionTimeout, crdKind, crd)
-			Expect(err).ShouldNot(HaveOccurred())
+			gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 		}
 	})
 }
 func requireUninstallingContour(kubectlOptions k8s.KubectlOptions) {
-	When("Uninstalling zookeeper-operator", func() {
+	ginkgo.When("Uninstalling zookeeper-operator", func() {
 		requireUninstallingContourHelmChart(kubectlOptions)
 		requireRemoveContourCRDs(kubectlOptions)
 		requireRemoveNamespace(kubectlOptions, contourIngressControllerHelmDescriptor.Namespace)
@@ -217,14 +217,14 @@ func requireUninstallingContour(kubectlOptions k8s.KubectlOptions) {
 // requireUninstallingCertManagerHelmChart uninstalls cert-manager helm chart
 // and checks the success of that operation.
 func requireUninstallingContourHelmChart(kubectlOptions k8s.KubectlOptions) {
-	It("Uninstalling Project Contour Helm chart", func() {
+	ginkgo.It("Uninstalling Project Contour Helm chart", func() {
 		err := contourIngressControllerHelmDescriptor.uninstallHelmChart(kubectlOptions, true)
-		Expect(err).NotTo(HaveOccurred())
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		By("Verifying Project Contour helm chart resources cleanup")
+		ginkgo.By("Verifying Project Contour helm chart resources cleanup")
 
 		k8sResourceKinds, err := listK8sResourceKinds(kubectlOptions, "")
-		Expect(err).ShouldNot(HaveOccurred())
+		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 
 		contourAvailableResourceKinds := stringSlicesInstersect(dependencyCRDs.Contour(), k8sResourceKinds)
 		contourAvailableResourceKinds = append(contourAvailableResourceKinds, basicK8sResourceKinds()...)
@@ -235,25 +235,25 @@ func requireUninstallingContourHelmChart(kubectlOptions k8s.KubectlOptions) {
 			"",
 			kubectlArgGoTemplateKindNameNamespace,
 			"--all-namespaces")
-		Expect(err).ShouldNot(HaveOccurred())
+		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 
-		Expect(remainedResources).Should(BeEmpty())
+		gomega.Expect(remainedResources).Should(gomega.BeEmpty())
 	})
 }
 
 func requireRemoveContourCRDs(kubectlOptions k8s.KubectlOptions) {
-	It("Removing Contour Ingress Controller CRDs", func() {
+	ginkgo.It("Removing Contour Ingress Controller CRDs", func() {
 		for _, crd := range dependencyCRDs.Contour() {
 			err := deleteK8sResourceNoErrNotFound(kubectlOptions, defaultDeletionTimeout, crdKind, crd)
-			Expect(err).ShouldNot(HaveOccurred())
+			gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 		}
 	})
 }
 
 // requireRemoveNamespace deletes the indicated namespace object
 func requireRemoveNamespace(kubectlOptions k8s.KubectlOptions, namespace string) {
-	It(fmt.Sprintf("Removing namespace %s", namespace), func() {
+	ginkgo.It(fmt.Sprintf("Removing namespace %s", namespace), func() {
 		err := deleteK8sResourceNoErrNotFound(kubectlOptions, defaultDeletionTimeout, "namespace", namespace, "--wait")
-		Expect(err).ShouldNot(HaveOccurred())
+		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 	})
 }

@@ -407,7 +407,7 @@ func (r *CruiseControlTaskReconciler) createCCOperation(
 	if err := controllerutil.SetControllerReference(kafkaCluster, operation, r.Scheme); err != nil {
 		return corev1.LocalObjectReference{}, err
 	}
-	if err := r.Client.Create(ctx, operation); err != nil {
+	if err := r.Create(ctx, operation); err != nil {
 		return corev1.LocalObjectReference{}, err
 	}
 
@@ -421,13 +421,13 @@ func (r *CruiseControlTaskReconciler) createCCOperation(
 		operation.Status.CurrentTask.Parameters[scale.ParamExcludeRemoved] = True
 	}
 
-	switch {
-	case operationType == banzaiv1alpha1.OperationRebalance:
+	switch operationType {
+	case banzaiv1alpha1.OperationRebalance:
 		operation.Status.CurrentTask.Parameters[scale.ParamDestbrokerIDs] = strings.Join(brokerIDs, ",")
 		if isJBOD {
 			operation.Status.CurrentTask.Parameters[scale.ParamRebalanceDisk] = True
 		}
-	case operationType == banzaiv1alpha1.OperationRemoveDisks:
+	case banzaiv1alpha1.OperationRemoveDisks:
 		pairs := make([]string, 0, len(logDirsByBrokerID))
 		for brokerID, logDirs := range logDirsByBrokerID {
 			for _, logDir := range logDirs {
@@ -436,6 +436,14 @@ func (r *CruiseControlTaskReconciler) createCCOperation(
 			}
 		}
 		operation.Status.CurrentTask.Parameters[scale.ParamBrokerIDAndLogDirs] = strings.Join(pairs, ",")
+	case banzaiv1alpha1.OperationStopExecution:
+		// No additional parameters needed for stop execution
+	case banzaiv1alpha1.OperationAddBroker:
+		operation.Status.CurrentTask.Parameters[scale.ParamBrokerID] = strings.Join(brokerIDs, ",")
+	case banzaiv1alpha1.OperationRemoveBroker:
+		operation.Status.CurrentTask.Parameters[scale.ParamBrokerID] = strings.Join(brokerIDs, ",")
+	case banzaiv1alpha1.OperationStatus:
+		// No additional parameters needed for status operation
 	default:
 		operation.Status.CurrentTask.Parameters[scale.ParamBrokerID] = strings.Join(brokerIDs, ",")
 	}
@@ -529,7 +537,7 @@ func (r *CruiseControlTaskReconciler) UpdateStatus(ctx context.Context, instance
 		log.Info("Updating status....")
 		err := r.Status().Update(ctx, instance)
 		if apiErrors.IsConflict(err) {
-			err := r.Client.Get(ctx, types.NamespacedName{Name: instance.Name, Namespace: instance.Namespace}, instance)
+			err := r.Get(ctx, types.NamespacedName{Name: instance.Name, Namespace: instance.Namespace}, instance)
 			if err != nil {
 				return errors.WithMessage(err, "failed to get updated Kafka Cluster CR before updating its status")
 			}

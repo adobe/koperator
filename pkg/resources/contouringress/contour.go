@@ -183,7 +183,7 @@ func (r *Reconciler) brokerService(_ logr.Logger, id int32, extListener v1beta1.
 // generate service for anycast port
 func (r *Reconciler) clusterService(_ logr.Logger, extListener v1beta1.ExternalListenerConfig,
 	ingressConfig v1beta1.IngressConfig, ingressConfigName, _ string) runtime.Object {
-	var serviceName string = util.GenerateEnvoyResourceName(contourutils.ContourServiceName, contourutils.ContourServiceNameWithScope,
+	var serviceName = util.GenerateEnvoyResourceName(contourutils.ContourServiceName, contourutils.ContourServiceNameWithScope,
 		extListener, ingressConfig, ingressConfigName, r.KafkaCluster.GetName())
 
 	service := &corev1.Service{

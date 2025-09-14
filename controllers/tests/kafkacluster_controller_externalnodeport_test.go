@@ -40,7 +40,7 @@ var (
 				AccessModes: []corev1.PersistentVolumeAccessMode{
 					corev1.ReadWriteOnce,
 				},
-				Resources: corev1.ResourceRequirements{
+				Resources: corev1.VolumeResourceRequirements{
 					Requests: map[corev1.ResourceName]resource.Quantity{
 						corev1.ResourceStorage: resource.MustParse("10Gi"),
 					},
@@ -102,6 +102,7 @@ var _ = Describe("KafkaClusterNodeportExternalAccess", Ordered, func() {
 
 	When("hostnameOverride is configured with externalStartingPort 0", func() {
 		BeforeEach(func() {
+			allocatedNodePorts = nil
 			kafkaCluster.Spec.ListenersConfig.ExternalListeners = []v1beta1.ExternalListenerConfig{
 				{
 					CommonListenerSpec: v1beta1.CommonListenerSpec{
@@ -336,7 +337,10 @@ var _ = Describe("KafkaClusterNodeportExternalAccess", Ordered, func() {
 		BeforeEach(func() {
 			allocatedNodePorts = nil
 			safePort = GetNodePort(3)
-			allocatedNodePorts = append(allocatedNodePorts, safePort)
+			// Allocate all 3 ports for the 3 brokers to avoid conflicts
+			for i := int32(0); i < 3; i++ {
+				allocatedNodePorts = append(allocatedNodePorts, safePort+i)
+			}
 			kafkaCluster.Spec.ListenersConfig.ExternalListeners = []v1beta1.ExternalListenerConfig{
 				{
 					CommonListenerSpec: v1beta1.CommonListenerSpec{

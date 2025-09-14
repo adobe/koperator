@@ -63,7 +63,7 @@ func TestReconciled(t *testing.T) {
 	if err != nil {
 		t.Error("Expected error to be nil, got:", err)
 	}
-	if res.Requeue {
+	if res.RequeueAfter > 0 {
 		t.Error("Expected requeue to be false, got true")
 	}
 }
@@ -133,7 +133,7 @@ func TestCheckBrokerConnectionError(t *testing.T) {
 	if res, err := checkBrokerConnectionError(log, err); err != nil {
 		t.Error("Expected no error in result, got:", err)
 	} else {
-		if !res.Requeue {
+		if res.RequeueAfter == 0 {
 			t.Error("Expected requeue to be true, got false")
 		}
 		if res.RequeueAfter != time.Duration(15)*time.Second {
@@ -146,7 +146,7 @@ func TestCheckBrokerConnectionError(t *testing.T) {
 	if res, err := checkBrokerConnectionError(log, err); err != nil {
 		t.Error("Expected no error in result, got:", err)
 	} else {
-		if !res.Requeue {
+		if res.RequeueAfter == 0 {
 			t.Error("Expected requeue to be true, got false")
 		}
 		if res.RequeueAfter != time.Duration(15)*time.Second {
@@ -159,7 +159,7 @@ func TestCheckBrokerConnectionError(t *testing.T) {
 	if res, err := checkBrokerConnectionError(log, err); err != nil {
 		t.Error("Expected no error in result, got:", err)
 	} else {
-		if !res.Requeue {
+		if res.RequeueAfter == 0 {
 			t.Error("Expected requeue to be true, got false")
 		}
 		if res.RequeueAfter != time.Duration(5)*time.Second {

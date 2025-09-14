@@ -20,40 +20,39 @@ import (
 	"testing"
 
 	"github.com/gruntwork-io/terratest/modules/k8s"
-	"github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	ginkgo "github.com/onsi/ginkgo/v2"
+	gomega "github.com/onsi/gomega"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestKoperator(t *testing.T) {
-	RegisterFailHandler(Fail) // Note: Ginkgo - Gomega connector.
-	RunSpecs(t, "Koperator end to end test suite")
+	gomega.RegisterFailHandler(ginkgo.Fail) // Note: Ginkgo - Gomega connector.
+	ginkgo.RunSpecs(t, "Koperator end to end test suite")
 }
 
-var _ = BeforeSuite(func() {
-	By("Acquiring K8s cluster")
+var _ = ginkgo.BeforeSuite(func() {
+	ginkgo.By("Acquiring K8s cluster")
 	var kubeconfigPath string
 	var kubecontextName string
 
-	By("Acquiring K8s config and context", func() {
+	ginkgo.By("Acquiring K8s config and context", func() {
 		var err error
 		kubeconfigPath, kubecontextName, err = currentEnvK8sContext()
-		Expect(err).NotTo(HaveOccurred())
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	})
 
-	By("Listing kube-system pods", func() {
+	ginkgo.By("Listing kube-system pods", func() {
 		pods := k8s.ListPods(
 			ginkgo.GinkgoT(),
 			k8s.NewKubectlOptions(kubecontextName, kubeconfigPath, "kube-system"),
 			v1.ListOptions{},
 		)
 
-		Expect(len(pods)).To(Not(BeZero()))
+		gomega.Expect(len(pods)).To(gomega.Not(gomega.BeZero()))
 	})
 })
 
-var _ = When("Testing e2e test altogether", Ordered, func() {
+var _ = ginkgo.When("Testing e2e test altogether", ginkgo.Ordered, func() {
 	var snapshottedInfo = &clusterSnapshot{}
 	snapshotCluster(snapshottedInfo)
 	testInstall()

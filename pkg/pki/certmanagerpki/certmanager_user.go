@@ -178,7 +178,7 @@ func (c *certManager) clusterCertificateForUser(
 			},
 		}
 	}
-	if user.Spec.DNSNames != nil && len(user.Spec.DNSNames) > 0 {
+	if len(user.Spec.DNSNames) > 0 {
 		cert.Spec.DNSNames = user.Spec.DNSNames
 	}
 	return cert

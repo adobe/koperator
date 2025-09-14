@@ -914,8 +914,8 @@ func TestGetServerPasswordKeysAndUsers(t *testing.T) { //nolint funlen
 			expectedGetCount := 0
 			first := true
 			for _, listener := range test.internalListeners {
-				if listener.CommonListenerSpec.Type.IsSSL() {
-					if listener.CommonListenerSpec.GetServerSSLCertSecretName() != "" {
+				if listener.Type.IsSSL() {
+					if listener.GetServerSSLCertSecretName() != "" {
 						expectedGetCount++
 					} else if first {
 						first = false
@@ -927,8 +927,8 @@ func TestGetServerPasswordKeysAndUsers(t *testing.T) { //nolint funlen
 			}
 
 			for _, listener := range test.externalListeners {
-				if listener.CommonListenerSpec.Type.IsSSL() {
-					if listener.CommonListenerSpec.GetServerSSLCertSecretName() != "" {
+				if listener.Type.IsSSL() {
+					if listener.GetServerSSLCertSecretName() != "" {
 						expectedGetCount++
 					} else if first {
 						first = false

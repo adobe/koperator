@@ -253,7 +253,7 @@ func GenerateTestCert() (cert, key []byte, expectedDn string, err error) {
 	}
 	buf := new(bytes.Buffer)
 	if err = pem.Encode(buf, &pem.Block{Type: "CERTIFICATE", Bytes: cert}); err != nil {
-		return //nolint:golint,nakedret
+		return //nolint:nakedret
 	}
 	cert = buf.Bytes()
 	key, err = encodePrivateKeyInPemFormat(priv)

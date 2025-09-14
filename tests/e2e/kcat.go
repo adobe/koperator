@@ -18,20 +18,20 @@ import (
 	"fmt"
 
 	"github.com/gruntwork-io/terratest/modules/k8s"
-	. "github.com/onsi/ginkgo/v2"
+	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
 // consumingMessagesInternally consuming messages based on parameters from Kafka cluster.
 // It returns messages in string slice.
 func consumingMessagesInternally(kubectlOptions k8s.KubectlOptions, kcatPodName string, internalKafkaAddress string, topicName string, tlsMode bool) (string, error) {
-	By(fmt.Sprintf("Consuming messages from internalKafkaAddress: '%s' topicName: '%s'", internalKafkaAddress, topicName))
+	ginkgo.By(fmt.Sprintf("Consuming messages from internalKafkaAddress: '%s' topicName: '%s'", internalKafkaAddress, topicName))
 
 	kcatTLSParameters := ""
 	if tlsMode {
 		kcatTLSParameters += "-X security.protocol=SSL -X ssl.key.location=/ssl/certs/tls.key -X ssl.certificate.location=/ssl/certs/tls.crt -X ssl.ca.location=/ssl/certs/ca.crt"
 	}
 
-	consumedMessages, err := k8s.RunKubectlAndGetOutputE(GinkgoT(),
+	consumedMessages, err := k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(),
 		k8s.NewKubectlOptions(kubectlOptions.ContextName, kubectlOptions.ConfigPath, ""),
 		"exec", kcatPodName,
 		"-n", kubectlOptions.Namespace,
@@ -48,14 +48,14 @@ func consumingMessagesInternally(kubectlOptions k8s.KubectlOptions, kcatPodName 
 
 // producingMessagesInternally produces messages based on the parameters into kafka cluster.
 func producingMessagesInternally(kubectlOptions k8s.KubectlOptions, kcatPodName string, internalKafkaAddress string, topicName string, message string, tlsMode bool) error {
-	By(fmt.Sprintf("Producing messages: '%s' to internalKafkaAddress: '%s' topicName: '%s'", message, internalKafkaAddress, topicName))
+	ginkgo.By(fmt.Sprintf("Producing messages: '%s' to internalKafkaAddress: '%s' topicName: '%s'", message, internalKafkaAddress, topicName))
 
 	kcatTLSParameters := ""
 	if tlsMode {
 		kcatTLSParameters += "-X security.protocol=SSL -X ssl.key.location=/ssl/certs/tls.key -X ssl.certificate.location=/ssl/certs/tls.crt -X ssl.ca.location=/ssl/certs/ca.crt"
 	}
 
-	_, err := k8s.RunKubectlAndGetOutputE(GinkgoT(),
+	_, err := k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(),
 		k8s.NewKubectlOptions(kubectlOptions.ContextName, kubectlOptions.ConfigPath, ""),
 		"exec", kcatPodName,
 		"-n", kubectlOptions.Namespace,

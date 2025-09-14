@@ -19,11 +19,12 @@ import (
 	"time"
 
 	"github.com/IBM/sarama"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
+
 	"github.com/banzaicloud/koperator/api/v1alpha1"
 	"github.com/banzaicloud/koperator/api/v1beta1"
 	"github.com/banzaicloud/koperator/pkg/errorfactory"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var log = logf.Log.WithName("kafka_util")
@@ -97,7 +98,7 @@ func (k *kafkaClient) Open() error {
 	}
 
 	if k.brokers, _, err = k.DescribeCluster(); err != nil {
-		k.admin.Close()
+		_ = k.admin.Close()
 		err = errorfactory.New(errorfactory.BrokersNotReady{}, err, "could not describe kafka cluster")
 		return err
 	}
@@ -110,7 +111,7 @@ func (k *kafkaClient) Open() error {
 }
 
 func (k *kafkaClient) Close() error {
-	k.client.Close()
+	_ = k.client.Close()
 	return k.admin.Close()
 }
 

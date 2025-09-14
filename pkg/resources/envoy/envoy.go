@@ -80,7 +80,7 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 				r.deployment,
 			)
 
-			if r.KafkaCluster.Spec.EnvoyConfig.GetDistruptionBudget().DisruptionBudget.Create {
+			if r.KafkaCluster.Spec.EnvoyConfig.GetDistruptionBudget().Create {
 				externalListenerResources = append(externalListenerResources, r.podDisruptionBudget)
 			}
 			for name, ingressConfig := range ingressConfigs {

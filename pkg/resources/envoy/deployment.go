@@ -38,9 +38,9 @@ func (r *Reconciler) deployment(log logr.Logger, extListener v1beta1.ExternalLis
 	ingressConfig v1beta1.IngressConfig, ingressConfigName, defaultIngressConfigName string) runtime.Object {
 	eListenerLabelName := util.ConstructEListenerLabelName(ingressConfigName, extListener.Name)
 
-	var configMapName string = util.GenerateEnvoyResourceName(envoyutils.EnvoyVolumeAndConfigName, envoyutils.EnvoyVolumeAndConfigNameWithScope,
+	var configMapName = util.GenerateEnvoyResourceName(envoyutils.EnvoyVolumeAndConfigName, envoyutils.EnvoyVolumeAndConfigNameWithScope,
 		extListener, ingressConfig, ingressConfigName, r.KafkaCluster.GetName())
-	var deploymentName string = util.GenerateEnvoyResourceName(envoyutils.EnvoyDeploymentName, envoyutils.EnvoyDeploymentNameWithScope,
+	var deploymentName = util.GenerateEnvoyResourceName(envoyutils.EnvoyDeploymentName, envoyutils.EnvoyDeploymentNameWithScope,
 		extListener, ingressConfig, ingressConfigName, r.KafkaCluster.GetName())
 
 	exposedPorts := getExposedContainerPorts(extListener,

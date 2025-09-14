@@ -20,8 +20,8 @@ import (
 	"strings"
 
 	"github.com/gruntwork-io/terratest/modules/k8s"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	ginkgo "github.com/onsi/ginkgo/v2"
+	gomega "github.com/onsi/gomega"
 	"github.com/onsi/gomega/format"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -60,30 +60,30 @@ type localComparisonPartialObjectMetadataType struct {
 // snapshotCluster takes a clusterSnapshot of a K8s cluster and
 // stores it into the snapshotCluster instance referenced as input
 func snapshotCluster(snapshottedInfo *clusterSnapshot) bool { //nolint:unparam // Note: respecting Ginkgo testing interface by returning bool.
-	return When("Get cluster resources state", Ordered, func() {
+	return ginkgo.When("Get cluster resources state", ginkgo.Ordered, func() {
 		var kubectlOptions k8s.KubectlOptions
 		var err error
 
-		BeforeAll(func() {
-			By("Acquiring K8s config and context")
+		ginkgo.BeforeAll(func() {
+			ginkgo.By("Acquiring K8s config and context")
 			kubectlOptions, err = kubectlOptionsForCurrentContext()
-			Expect(err).NotTo(HaveOccurred())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 
 		var clusterResourceNames []string
 		var namespacedResourceNames []string
 
-		When("Get api-resources names", func() {
-			It("Get cluster-scoped api-resources names", func() {
+		ginkgo.When("Get api-resources names", func() {
+			ginkgo.It("Get cluster-scoped api-resources names", func() {
 				clusterResourceNames, err = listK8sResourceKinds(kubectlOptions, "", "--namespaced=false")
-				Expect(err).NotTo(HaveOccurred())
-				Expect(clusterResourceNames).NotTo(BeNil())
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(clusterResourceNames).NotTo(gomega.BeNil())
 				clusterResourceNames = pruneUnnecessaryClusterResourceNames(clusterResourceNames)
 			})
-			It("Get namespaced api-resources names", func() {
+			ginkgo.It("Get namespaced api-resources names", func() {
 				namespacedResourceNames, err = listK8sResourceKinds(kubectlOptions, "", "--namespaced=true")
-				Expect(err).NotTo(HaveOccurred())
-				Expect(namespacedResourceNames).NotTo(BeNil())
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(namespacedResourceNames).NotTo(gomega.BeNil())
 				namespacedResourceNames = pruneUnnecessaryNamespacedResourceNames(namespacedResourceNames)
 			})
 		})
@@ -92,32 +92,32 @@ func snapshotCluster(snapshottedInfo *clusterSnapshot) bool { //nolint:unparam /
 
 		var namespacesForNamespacedResources = []string{"default"}
 
-		When("Snapshotting objects", func() {
-			It("Recording cluster-scoped resource objects", func() {
-				By(fmt.Sprintf("Getting cluster-scoped resources %v as json", clusterResourceNames))
+		ginkgo.When("Snapshotting objects", func() {
+			ginkgo.It("Recording cluster-scoped resource objects", func() {
+				ginkgo.By(fmt.Sprintf("Getting cluster-scoped resources %v as json", clusterResourceNames))
 				output, err := getK8sResources(kubectlOptions, clusterResourceNames, "", "", "--output=json")
-				Expect(err).NotTo(HaveOccurred())
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-				By(fmt.Sprintf("Unmarshalling cluster-scoped resources %v from json", clusterResourceNames))
+				ginkgo.By(fmt.Sprintf("Unmarshalling cluster-scoped resources %v from json", clusterResourceNames))
 				var resourceList metav1.PartialObjectMetadataList
 				err = json.Unmarshal([]byte(strings.Join(output, "\n")), &resourceList)
-				Expect(err).NotTo(HaveOccurred())
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 				resources = append(resources, resourceList.Items...)
 			})
-			It("Recording namespaced resource objects", func() {
+			ginkgo.It("Recording namespaced resource objects", func() {
 				initialNS := kubectlOptions.Namespace
 				for _, ns := range namespacesForNamespacedResources {
 					kubectlOptions.Namespace = ns
 
-					By(fmt.Sprintf("Getting namespaced resources %v as json for namespace %s", namespacedResourceNames, ns))
+					ginkgo.By(fmt.Sprintf("Getting namespaced resources %v as json for namespace %s", namespacedResourceNames, ns))
 					output, err := getK8sResources(kubectlOptions, namespacedResourceNames, "", "", "--output=json")
-					Expect(err).NotTo(HaveOccurred())
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-					By(fmt.Sprintf("Unmarshalling namespaced resources %v from json for namespace %s", namespacedResourceNames, ns))
+					ginkgo.By(fmt.Sprintf("Unmarshalling namespaced resources %v from json for namespace %s", namespacedResourceNames, ns))
 					var resourceList metav1.PartialObjectMetadataList
 					err = json.Unmarshal([]byte(strings.Join(output, "\n")), &resourceList)
-					Expect(err).NotTo(HaveOccurred())
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 					resources = append(resources, resourceList.Items...)
 				}
@@ -125,8 +125,8 @@ func snapshotCluster(snapshottedInfo *clusterSnapshot) bool { //nolint:unparam /
 			})
 		})
 
-		AfterAll(func() {
-			By("Storing recorded objects into the input snapshot object")
+		ginkgo.AfterAll(func() {
+			ginkgo.By("Storing recorded objects into the input snapshot object")
 			snapshottedInfo.resources = resources
 		})
 	})
@@ -135,18 +135,18 @@ func snapshotCluster(snapshottedInfo *clusterSnapshot) bool { //nolint:unparam /
 // snapshotClusterAndCompare takes a current snapshot of the K8s cluster and
 // compares it against a snapshot provided as input
 func snapshotClusterAndCompare(snapshottedInitialInfo *clusterSnapshot) bool {
-	return When("Verifying cluster resources state", Ordered, func() {
+	return ginkgo.When("Verifying cluster resources state", ginkgo.Ordered, func() {
 		var snapshottedCurrentInfo = &clusterSnapshot{}
 		snapshotCluster(snapshottedCurrentInfo)
 
-		It("Checking resources list", func() {
+		ginkgo.It("Checking resources list", func() {
 			// Temporarily increase maximum output length (default 4000) to fit more objects in the printed diff.
 			// Only doing this here because other assertions typically don't run against objects with this many elements.
 			initialMaxLength := format.MaxLength
 			defer func() { format.MaxLength = initialMaxLength }()
 			format.MaxLength = 9000
 
-			Expect(snapshottedCurrentInfo.ResourcesAsComparisonType()).To(ConsistOf(snapshottedInitialInfo.ResourcesAsComparisonType()))
+			gomega.Expect(snapshottedCurrentInfo.ResourcesAsComparisonType()).To(gomega.ConsistOf(snapshottedInitialInfo.ResourcesAsComparisonType()))
 		})
 	})
 }

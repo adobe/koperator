@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/IBM/sarama"
+
 	"github.com/banzaicloud/koperator/pkg/errorfactory"
 )
 
@@ -90,17 +91,15 @@ func (k *kafkaClient) DeleteTopic(topicName string, wait bool) error {
 	}
 	// TODO (tinyzimmer): Check here if we actually support topic deletion
 	if wait {
-		ticker := time.NewTicker(time.Duration(1) * time.Second)
-		for {
-			select {
-			case <-ticker.C:
-				if topic, err := k.GetTopic(topicName); err != nil {
-					return err
-				} else if topic == nil {
-					return nil
-				} else {
-					log.Info(fmt.Sprintf("Topic %s still going down for deletion", topicName))
-				}
+		ticker := time.NewTicker(1 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			if topic, err := k.GetTopic(topicName); err != nil {
+				return err
+			} else if topic == nil {
+				return nil
+			} else {
+				log.Info(fmt.Sprintf("Topic %s still going down for deletion", topicName))
 			}
 		}
 	}

@@ -25,7 +25,7 @@ import (
 	"emperror.dev/errors"
 	"github.com/gruntwork-io/terratest/modules/helm"
 	"github.com/gruntwork-io/terratest/modules/k8s"
-	. "github.com/onsi/ginkgo/v2"
+	ginkgo "github.com/onsi/ginkgo/v2"
 	"sigs.k8s.io/yaml"
 )
 
@@ -59,7 +59,7 @@ func (helmDescriptor *helmDescriptor) crdPath() (string, error) { //nolint:unuse
 	}
 
 	localCRDsBytes := []byte(helm.RenderTemplate(
-		GinkgoT(),
+		ginkgo.GinkgoT(),
 		&helm.Options{
 			SetValues: helmDescriptor.LocalCRDTemplateRenderValues,
 		},
@@ -89,7 +89,7 @@ func (helmDescriptor *helmDescriptor) installHelmChart(kubectlOptions k8s.Kubect
 	kubectlOptions.Namespace = helmDescriptor.Namespace
 
 	if !helmDescriptor.IsRemote() { // Note: local chart with directory path in helmDescriptor.Repository.
-		By("Discovering local chart name and version")
+		ginkgo.By("Discovering local chart name and version")
 
 		chartYAMLPath := path.Join(helmDescriptor.Repository, "Chart.yaml")
 		chartYAMLBytes, err := os.ReadFile(chartYAMLPath)
@@ -121,7 +121,7 @@ func (helmDescriptor *helmDescriptor) installHelmChart(kubectlOptions k8s.Kubect
 		}
 	}
 
-	By(fmt.Sprintf("Checking for existing Helm release named %s", helmDescriptor.ReleaseName))
+	ginkgo.By(fmt.Sprintf("Checking for existing Helm release named %s", helmDescriptor.ReleaseName))
 	helmRelease, isInstalled, err := lookUpInstalledHelmReleaseByName(kubectlOptions, helmDescriptor.ReleaseName)
 	if err != nil {
 		return errors.WrapIfWithDetails(
@@ -149,14 +149,14 @@ func (helmDescriptor *helmDescriptor) installHelmChart(kubectlOptions k8s.Kubect
 			)
 		}
 
-		By(fmt.Sprintf(
+		ginkgo.By(fmt.Sprintf(
 			"Skipping the installation of existing Helm release %s, with the same chart name (%s) and version (%s)",
 			helmDescriptor.ReleaseName, helmDescriptor.ChartName, helmDescriptor.ChartVersion,
 		))
 
 		return nil
 	case !isInstalled:
-		By(
+		ginkgo.By(
 			fmt.Sprintf(
 				"Installing Helm chart %s from %s with version %s by name %s",
 				helmDescriptor.ChartName,
@@ -181,7 +181,7 @@ func (helmDescriptor *helmDescriptor) installHelmChart(kubectlOptions k8s.Kubect
 		}
 
 		helm.Install(
-			GinkgoT(),
+			ginkgo.GinkgoT(),
 			&helm.Options{
 				SetValues:      helmDescriptor.SetValues,
 				KubectlOptions: &kubectlOptions,
@@ -210,7 +210,7 @@ func (helmDescriptor *helmDescriptor) uninstallHelmChart(kubectlOptions k8s.Kube
 
 	kubectlOptions.Namespace = helmDescriptor.Namespace
 
-	By(fmt.Sprintf("Checking for existing Helm release named %s", helmDescriptor.ReleaseName))
+	ginkgo.By(fmt.Sprintf("Checking for existing Helm release named %s", helmDescriptor.ReleaseName))
 	_, isInstalled, err := lookUpInstalledHelmReleaseByName(kubectlOptions, helmDescriptor.ReleaseName)
 	if err != nil {
 		return errors.WrapIfWithDetails(
@@ -225,13 +225,13 @@ func (helmDescriptor *helmDescriptor) uninstallHelmChart(kubectlOptions k8s.Kube
 			return errors.Errorf("Helm release: '%s' not found", helmDescriptor.ReleaseName)
 		}
 
-		By(fmt.Sprintf(
+		ginkgo.By(fmt.Sprintf(
 			"skipping the uninstallation of %s, because the Helm release is not present.",
 			helmDescriptor.ReleaseName,
 		))
 		return nil
 	}
-	By(
+	ginkgo.By(
 		fmt.Sprintf(
 			"uninstalling Helm chart by name %s",
 			helmDescriptor.ReleaseName,
@@ -246,7 +246,7 @@ func (helmDescriptor *helmDescriptor) uninstallHelmChart(kubectlOptions k8s.Kube
 	purge := true
 
 	return helm.DeleteE(
-		GinkgoT(),
+		ginkgo.GinkgoT(),
 		&helm.Options{
 			KubectlOptions: &kubectlOptions,
 			ExtraArgs: map[string][]string{
@@ -309,9 +309,9 @@ func (helmRelease *HelmRelease) chartNameAndVersion() (string, string) {
 // listHelmReleases returns a slice of Helm releases retrieved from the cluster
 // using the specified kubectl context and namespace.
 func listHelmReleases(kubectlOptions k8s.KubectlOptions) ([]*HelmRelease, error) {
-	By("Listing Helm releases")
+	ginkgo.By("Listing Helm releases")
 	output, err := helm.RunHelmCommandAndGetOutputE(
-		GinkgoT(),
+		ginkgo.GinkgoT(),
 		&helm.Options{
 			KubectlOptions: &kubectlOptions,
 		},

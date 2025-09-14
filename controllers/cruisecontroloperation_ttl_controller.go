@@ -60,7 +60,7 @@ func (r *CruiseControlOperationTTLReconciler) Reconcile(ctx context.Context, req
 
 	operationTTL := time.Duration(*ccOperation.GetTTLSecondsAfterFinished()) * time.Second
 	finishedAt := ccOperation.CurrentTaskFinished()
-	cleanupTime := finishedAt.Time.Add(operationTTL)
+	cleanupTime := finishedAt.Add(operationTTL)
 
 	if IsExpired(operationTTL, finishedAt.Time) {
 		log.V(1).Info("cleaning up finished CruiseControlOperation", "finished", finishedAt.Time, "clean-up time", cleanupTime)

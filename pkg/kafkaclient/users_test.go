@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	"github.com/IBM/sarama"
+
 	"github.com/banzaicloud/koperator/api/v1alpha1"
 )
 
@@ -30,7 +31,8 @@ func TestCreateUserACLs(t *testing.T) {
 	invalidAccessTypes := []v1alpha1.KafkaAccessType{
 		"",
 		"helloWorld"}
-	allAccessTypes := append(validAccessTypes, invalidAccessTypes...)
+	allAccessTypes := append([]v1alpha1.KafkaAccessType{}, validAccessTypes...)
+	allAccessTypes = append(allAccessTypes, invalidAccessTypes...)
 
 	validPatternTypes := []v1alpha1.KafkaPatternType{
 		"any",
@@ -40,7 +42,8 @@ func TestCreateUserACLs(t *testing.T) {
 		""}
 	invalidPatternTypes := []v1alpha1.KafkaPatternType{
 		"helloWorld"}
-	allPatternTypes := append(validPatternTypes, invalidPatternTypes...)
+	allPatternTypes := append([]v1alpha1.KafkaPatternType{}, validPatternTypes...)
+	allPatternTypes = append(allPatternTypes, invalidPatternTypes...)
 
 	// Test all valid combinations of accessType and patternType
 	for _, accessType := range validAccessTypes {

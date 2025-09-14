@@ -168,7 +168,9 @@ func (cc *cruiseControlScaler) StatusTask(ctx context.Context, taskID string) (S
 	}
 
 	if len(resp.Result.UserTasks) != 1 {
-		return StatusTaskResult{}, fmt.Errorf("could not get the Cruise Control state, expected the response for 1 task (%s), but got %d responses", taskID, len(resp.Result.UserTasks))
+		return StatusTaskResult{}, fmt.Errorf(
+			"could not get the Cruise Control state, expected the response for 1 task (%s), but got %d responses",
+			taskID, len(resp.Result.UserTasks))
 	}
 
 	taskInfo := resp.Result.UserTasks[0]

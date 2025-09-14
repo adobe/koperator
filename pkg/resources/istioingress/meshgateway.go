@@ -57,8 +57,6 @@ func (r *Reconciler) meshgateway(log logr.Logger, externalListenerConfig v1beta1
 				Resources:    istioOperatorApi.InitResourceRequirementsFromK8sRR(ingressConfig.IstioIngressConfig.GetResources()),
 				NodeSelector: ingressConfig.IstioIngressConfig.NodeSelector,
 				SecurityContext: &corev1.SecurityContext{
-					RunAsUser:    util.Int64Pointer(0),
-					RunAsGroup:   util.Int64Pointer(0),
 					RunAsNonRoot: util.BoolPointer(false),
 				},
 				Tolerations: ingressConfig.IstioIngressConfig.Tolerations,

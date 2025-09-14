@@ -59,10 +59,21 @@ type ResourceWithLogAndExternalListenerSpecificInfosAndIstioRevision func(log lo
 	ingressConfigName, defaultIngressConfigName, istioRevision string) runtime.Object
 
 // ResourceWithBrokerConfigAndVolume function with brokerConfig, persistentVolumeClaims and log parameters
-type ResourceWithBrokerConfigAndVolume func(id int32, brokerConfig *v1beta1.BrokerConfig, pvcs []corev1.PersistentVolumeClaim, log logr.Logger) runtime.Object
+type ResourceWithBrokerConfigAndVolume func(
+	id int32,
+	brokerConfig *v1beta1.BrokerConfig,
+	pvcs []corev1.PersistentVolumeClaim,
+	log logr.Logger,
+) runtime.Object
 
 // ResourceWithBrokerConfigAndString function with brokerConfig, string and log parameters
-type ResourceWithBrokerConfigAndString func(id int32, brokerConfig *v1beta1.BrokerConfig, t string, su []string, log logr.Logger) runtime.Object
+type ResourceWithBrokerConfigAndString func(
+	id int32,
+	brokerConfig *v1beta1.BrokerConfig,
+	t string,
+	su []string,
+	log logr.Logger,
+) runtime.Object
 
 // ResourceWithBrokerIDAndStorage function with brokerConfig, storageConfig and log parameters
 type ResourceWithBrokerIDAndStorage func(id int32, storage v1beta1.StorageConfig, log logr.Logger) runtime.Object

@@ -70,7 +70,11 @@ func ObjectMetaWithoutOwnerRef(name string, labels map[string]string, cluster *v
 }
 
 // ObjectMetaWithGeneratedName returns a metav1.ObjectMeta object with labels, ownerReference and generatedname
-func ObjectMetaWithGeneratedName(namePrefix string, labels map[string]string, cluster *v1beta1.KafkaCluster) metav1.ObjectMeta {
+func ObjectMetaWithGeneratedName(
+	namePrefix string,
+	labels map[string]string,
+	cluster *v1beta1.KafkaCluster,
+) metav1.ObjectMeta {
 	return metav1.ObjectMeta{
 		GenerateName: namePrefix,
 		Namespace:    cluster.Namespace,
@@ -96,14 +100,24 @@ func ObjectMetaLabels(cluster *v1beta1.KafkaCluster, l map[string]string) map[st
 }
 
 // ObjectMetaWithAnnotations returns a metav1.ObjectMeta object with labels, ownerReference, name and annotations
-func ObjectMetaWithAnnotations(name string, labels map[string]string, annotations map[string]string, cluster *v1beta1.KafkaCluster) metav1.ObjectMeta {
+func ObjectMetaWithAnnotations(
+	name string,
+	labels map[string]string,
+	annotations map[string]string,
+	cluster *v1beta1.KafkaCluster,
+) metav1.ObjectMeta {
 	o := ObjectMeta(name, labels, cluster)
 	o.Annotations = annotations
 	return o
 }
 
 // ObjectMetaWithGeneratedNameAndAnnotations returns a metav1.ObjectMeta object with labels, ownerReference, generatedName and annotations
-func ObjectMetaWithGeneratedNameAndAnnotations(namePrefix string, labels map[string]string, annotations map[string]string, cluster *v1beta1.KafkaCluster) metav1.ObjectMeta {
+func ObjectMetaWithGeneratedNameAndAnnotations(
+	namePrefix string,
+	labels map[string]string,
+	annotations map[string]string,
+	cluster *v1beta1.KafkaCluster,
+) metav1.ObjectMeta {
 	o := ObjectMetaWithGeneratedName(namePrefix, labels, cluster)
 	o.Annotations = annotations
 	return o

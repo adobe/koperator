@@ -99,6 +99,7 @@ var _ = Describe("KafkaClusterIstioIngressController", func() {
 				Namespace: namespace,
 			},
 			Spec: corev1.ServiceSpec{
+				Type: corev1.ServiceTypeLoadBalancer,
 				Ports: []corev1.ServicePort{
 					// other ports omitted
 					{
@@ -753,6 +754,7 @@ func createMeshGatewayService(ctx context.Context, extListenerName, extListenerS
 			Namespace: namespace,
 		},
 		Spec: corev1.ServiceSpec{
+			Type: corev1.ServiceTypeLoadBalancer,
 			Ports: []corev1.ServicePort{
 				// other ports omitted
 				{

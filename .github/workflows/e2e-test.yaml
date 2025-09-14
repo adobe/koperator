@@ -6,27 +6,46 @@ on:
       - master
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   REPOSITORY: koperator_e2e_test  
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Clean workspace
+        run: |
+          # Remove any existing go.work files to ensure clean module resolution
+          rm -f go.work go.work.sum
+
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
-          go-version: 1.21
+          go-version: '1.25'
+          
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('go.sum', 'api/go.sum', 'properties/go.sum', 'tests/e2e/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
           
       # Enable Tmate Session if you'd like to Debut the E2E Kind Cluster
       # - name: Setup tmate session
       #   uses: mxschmitt/action-tmate@v3
       #   with:
       #     detached: true
-
-      - name: Checkout code
-        uses: actions/checkout@v4
       
       - name: Build docker image
         run: |
@@ -41,10 +60,18 @@ jobs:
           kind load docker-image $REPOSITORY:$GITHUB_SHA --name e2e-kind
 
 
+      - name: Download dependencies
+        run: |
+          # Download dependencies for all modules
+          go mod download
+          cd api && go mod download && cd ..
+          cd properties && go mod download && cd ..
+          cd tests/e2e && go mod download && cd ../..
+          
       - name: Run E2E tests
         env:
            KUBECONFIG: ${{ steps.setup-kind.outputs.kubeconfig }}
         run: |
-          go work init
-          go work use -r .
+          # Clean any existing go.work files to avoid workspace conflicts
+          rm -f go.work go.work.sum
           IMG_E2E=$REPOSITORY:$GITHUB_SHA make test-e2e

@@ -29,7 +29,6 @@ import (
 	zookeeperutils "github.com/banzaicloud/koperator/pkg/util/zookeeper"
 
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 
 	apiutil "github.com/banzaicloud/koperator/api/util"
 	"github.com/banzaicloud/koperator/api/v1alpha1"
@@ -76,8 +75,8 @@ func (r *Reconciler) getConfigProperties(bConfig *v1beta1.BrokerConfig, broker v
 
 	// This logic prevents the removal of the mountPath from the broker configmap
 	brokerConfigMapName := fmt.Sprintf(brokerConfigTemplate+"-"+"%d", r.KafkaCluster.Name, broker.Id)
-	var brokerConfigMapOld v1.ConfigMap
-	err := r.Client.Get(context.Background(), client.ObjectKey{Name: brokerConfigMapName, Namespace: r.KafkaCluster.GetNamespace()}, &brokerConfigMapOld)
+	var brokerConfigMapOld corev1.ConfigMap
+	err := r.Get(context.Background(), client.ObjectKey{Name: brokerConfigMapName, Namespace: r.KafkaCluster.GetNamespace()}, &brokerConfigMapOld)
 	if err != nil && !apierrors.IsNotFound(err) {
 		log.Error(err, "getting broker configmap from the Kubernetes API server resulted an error")
 	}
@@ -373,7 +372,7 @@ func appendListenerConfigs(advertisedListenerConfig []string, id int32,
 	return advertisedListenerConfig
 }
 
-func getMountPathsFromBrokerConfigMap(configMap *v1.ConfigMap) ([]string, error) {
+func getMountPathsFromBrokerConfigMap(configMap *corev1.ConfigMap) ([]string, error) {
 	if configMap == nil {
 		return nil, nil
 	}

@@ -20,14 +20,14 @@ import (
 	"time"
 
 	"github.com/gruntwork-io/terratest/modules/k8s"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	ginkgo "github.com/onsi/ginkgo/v2"
+	gomega "github.com/onsi/gomega"
 	"github.com/twmb/franz-go/pkg/kgo"
 )
 
 // requireDeployingKcatPod deploys kcat pod form a template and checks the pod readiness
 func requireDeployingKcatPod(kubectlOptions k8s.KubectlOptions, podName string, tlsSecretName string) {
-	It("Deploying Kcat Pod", func() {
+	ginkgo.It("Deploying Kcat Pod", func() {
 		templateParameters := map[string]interface{}{
 			"Name":      podName,
 			"Namespace": kubectlOptions.Namespace,
@@ -40,20 +40,20 @@ func requireDeployingKcatPod(kubectlOptions k8s.KubectlOptions, podName string, 
 			kcatPodTemplate,
 			templateParameters,
 		)
-		Expect(err).ShouldNot(HaveOccurred())
+		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 
 		err = waitK8sResourceCondition(kubectlOptions, "pods",
 			"condition=Ready", defaultPodReadinessWaitTime, "", podName)
 
-		Expect(err).ShouldNot(HaveOccurred())
+		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 	})
 }
 
 // requireDeleteKcatPod deletes kcat pod.
 func requireDeleteKcatPod(kubectlOptions k8s.KubectlOptions, podName string) {
-	It("Deleting Kcat pod", func() {
+	ginkgo.It("Deleting Kcat pod", func() {
 		err := deleteK8sResource(kubectlOptions, kcatDeleetionTimeout, "pods", "", podName)
-		Expect(err).NotTo(HaveOccurred())
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	})
 }
 
@@ -62,9 +62,9 @@ func requireDeleteKcatPod(kubectlOptions k8s.KubectlOptions, podName string) {
 // When internalAddress parameter is empty, it gets the internal address from the kafkaCluster CR status.
 // When tlsSecretName is set
 func requireInternalProducingConsumingMessage(kubectlOptions k8s.KubectlOptions, internalAddress, kcatPodName, topicName string, tlsSecretName string) {
-	It(fmt.Sprintf("Producing and consuming messages to/from topicName: '%s", topicName), func() {
+	ginkgo.It(fmt.Sprintf("Producing and consuming messages to/from topicName: '%s", topicName), func() {
 		if internalAddress == "" {
-			By("Getting Kafka cluster internal addresses")
+			ginkgo.By("Getting Kafka cluster internal addresses")
 			internalListenerNames, err := getK8sResources(kubectlOptions,
 				[]string{kafkaKind},
 				"",
@@ -72,8 +72,8 @@ func requireInternalProducingConsumingMessage(kubectlOptions k8s.KubectlOptions,
 				kubectlArgGoTemplateInternalListenersName,
 			)
 
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(internalListenerNames).ShouldNot(BeEmpty())
+			gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
+			gomega.Expect(internalListenerNames).ShouldNot(gomega.BeEmpty())
 
 			internalListenerAddresses, err := getK8sResources(kubectlOptions,
 				[]string{kafkaKind},
@@ -81,37 +81,34 @@ func requireInternalProducingConsumingMessage(kubectlOptions k8s.KubectlOptions,
 				kafkaClusterName,
 				fmt.Sprintf(kubectlArgGoTemplateInternalListenerAddressesTemplate, internalListenerNames[0]),
 			)
-			Expect(err).ShouldNot(HaveOccurred())
+			gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 
-			Expect(internalListenerAddresses).ShouldNot(BeEmpty())
+			gomega.Expect(internalListenerAddresses).ShouldNot(gomega.BeEmpty())
 
 			internalAddress = internalListenerAddresses[0]
 		}
 
-		tlsMode := false
-		if tlsSecretName != "" {
-			tlsMode = true
-		}
+		tlsMode := tlsSecretName != ""
 
 		currentTime := time.Now()
 		err := producingMessagesInternally(kubectlOptions, kcatPodName, internalAddress, topicName, currentTime.String(), tlsMode)
-		Expect(err).NotTo(HaveOccurred())
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		consumedMessages, err := consumingMessagesInternally(kubectlOptions, kcatPodName, internalAddress, topicName, tlsMode)
 
-		Expect(err).NotTo(HaveOccurred())
-		Expect(consumedMessages).Should(ContainSubstring(currentTime.String()))
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(consumedMessages).Should(gomega.ContainSubstring(currentTime.String()))
 	})
 }
 
 // requireExternalProducingConsumingMessage gets the Kafka cluster external addresses from the kafkaCluster CR status
 // when externalAddresses is not specified. It also produces and consumes messages and makes a comparison between them.
 func requireExternalProducingConsumingMessage(kubectlOptions k8s.KubectlOptions, topicName, tlsSecretName string, externalAddresses ...string) { //nolint:unused // Note: unused linter disabled until External e2e tests are turned on.
-	It("Producing and consuming messages", func() {
+	ginkgo.It("Producing and consuming messages", func() {
 		if len(externalAddresses) == 0 {
 			var err error
 			externalAddresses, err = getExternalListenerAddresses(kubectlOptions, "", kafkaClusterName)
-			Expect(err).ShouldNot(HaveOccurred())
+			gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 		}
 
 		var tlsConfig *tls.Config
@@ -119,19 +116,19 @@ func requireExternalProducingConsumingMessage(kubectlOptions k8s.KubectlOptions,
 		if tlsSecretName != "" {
 			var err error
 			tlsConfig, err = getTLSConfigFromSecret(kubectlOptions, tlsSecretName)
-			Expect(err).ShouldNot(HaveOccurred())
+			gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 			clientOptions = append(clientOptions, kgo.DialTLSConfig(tlsConfig))
 		}
 
 		message := time.Now().String()
 
 		err := producingMessagesExternally(externalAddresses, topicName, []string{message}, clientOptions...)
-		Expect(err).ShouldNot(HaveOccurred())
+		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 
 		consumedMessages, err := consumingMessagesExternally(externalAddresses, topicName, clientOptions...)
-		Expect(err).ShouldNot(HaveOccurred())
+		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 
-		By(fmt.Sprintf("Comparing produced: '%s' and consumed message: '%s'", message, consumedMessages))
+		ginkgo.By(fmt.Sprintf("Comparing produced: '%s' and consumed message: '%s'", message, consumedMessages))
 		found := false
 		for i := range consumedMessages {
 			if consumedMessages[i] == message {
@@ -139,13 +136,13 @@ func requireExternalProducingConsumingMessage(kubectlOptions k8s.KubectlOptions,
 				break
 			}
 		}
-		Expect(found).Should(BeTrue())
+		gomega.Expect(found).Should(gomega.BeTrue())
 	})
 }
 
 // getExternalListenerNames gets the names of the KafkaCluster CR's external listeners.
 func getExternalListenerNames(kubectlOptions k8s.KubectlOptions, kafkaClusterName string) ([]string, error) { //nolint:unused // Note: unused linter disabled until External e2e tests are turned on.
-	By("Getting external listener names from KafkaCluster status")
+	ginkgo.By("Getting external listener names from KafkaCluster status")
 	externalListenerNames, err := getK8sResources(kubectlOptions,
 		[]string{kafkaKind},
 		"",
@@ -161,16 +158,16 @@ func getExternalListenerNames(kubectlOptions k8s.KubectlOptions, kafkaClusterNam
 // getExternalListenerAddresses gets the Kafka cluster external addresses from the kafkaCluster CR.
 // When externalListenerName is not specified it uses the first externalListener name in the CR to get addresses.
 func getExternalListenerAddresses(kubectlOptions k8s.KubectlOptions, externalListenerName, kafkaClusterName string) ([]string, error) { //nolint:unused // Note: unused linter disabled until External e2e tests are turned on.
-	By(fmt.Sprintf("Getting Kafka cluster '%s' external listener addresses", kafkaClusterName))
+	ginkgo.By(fmt.Sprintf("Getting Kafka cluster '%s' external listener addresses", kafkaClusterName))
 	if externalListenerName == "" {
 		externalListenerNames, err := getExternalListenerNames(kubectlOptions, kafkaClusterName)
 		if err != nil {
 			return nil, err
 		}
-		Expect(getExternalListenerNames).ShouldNot(BeEmpty())
+		gomega.Expect(getExternalListenerNames).ShouldNot(gomega.BeEmpty())
 		externalListenerName = externalListenerNames[0]
 	}
-	By(fmt.Sprintf("Using external listener name: '%s'", externalListenerName))
+	ginkgo.By(fmt.Sprintf("Using external listener name: '%s'", externalListenerName))
 	externalListenerAddresses, err := getK8sResources(kubectlOptions,
 		[]string{kafkaKind},
 		"",
@@ -189,8 +186,8 @@ func getExternalListenerAddresses(kubectlOptions k8s.KubectlOptions, externalLis
 
 // requireAvailableExternalKafkaAddress checks that is there any available external address for the Kafka cluster.
 func requireAvailableExternalKafkaAddress(kubectlOptions k8s.KubectlOptions, externalListenerName, kafkaClusterName string) { //nolint:unused // Note: unused linter disabled until External e2e tests are turned on.
-	It(fmt.Sprintf("Checks that the KafkaCluster '%s' has external address", kafkaClusterName), func() {
+	ginkgo.It(fmt.Sprintf("Checks that the KafkaCluster '%s' has external address", kafkaClusterName), func() {
 		_, err := getExternalListenerAddresses(kubectlOptions, externalListenerName, kafkaClusterName)
-		Expect(err).ShouldNot(HaveOccurred())
+		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 	})
 }
