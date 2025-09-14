@@ -1,6 +1,6 @@
 module github.com/banzaicloud/koperator/tests/e2e
 
-go 1.21
+go 1.22
 
 require (
 	emperror.dev/errors v0.8.1
@@ -15,7 +15,7 @@ require (
 	k8s.io/api v0.28.4
 	k8s.io/apiextensions-apiserver v0.28.4
 	k8s.io/apimachinery v0.28.4
-	sigs.k8s.io/yaml v1.4.0
+	sigs.k8s.io/yaml v1.6.0
 )
 
 require (
@@ -105,6 +105,7 @@ require (
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.26.0 // indirect
+	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	golang.org/x/crypto v0.15.0 // indirect
 	golang.org/x/exp v0.0.0-20231110203233-9a3e6036ecaa // indirect
 	golang.org/x/net v0.18.0 // indirect
