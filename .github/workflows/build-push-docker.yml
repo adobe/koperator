@@ -13,7 +13,7 @@ jobs:
       - name: Get tag name
         id: vars
         run: echo ::set-output name=tag::${GITHUB_REF:10}
-      - uses: docker/build-push-action@v1
+      - uses: docker/build-push-action@v6
         if: ${{ !startsWith( steps.vars.outputs.tag, 'kafka-' ) }}
         with:
           dockerfile: Dockerfile
