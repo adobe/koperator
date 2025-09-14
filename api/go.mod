@@ -3,7 +3,7 @@ module github.com/banzaicloud/koperator/api
 go 1.21
 
 require (
-	dario.cat/mergo v1.0.0
+	dario.cat/mergo v1.0.2
 	emperror.dev/errors v0.8.1
 	github.com/banzaicloud/istio-client-go v0.0.17
 	github.com/cert-manager/cert-manager v1.13.2
