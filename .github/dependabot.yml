@@ -1,0 +1,127 @@
+# To get started with Dependabot version updates, you'll need to specify which
+# package ecosystems to update and where the package manifests are located.
+# Please see the documentation for all configuration options:
+# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+updates:
+  # GitHub Actions dependencies
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+
+  # Tool versions tracking via Docker ecosystem
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "wednesday"
+      time: "09:00"
+      timezone: "UTC"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+
+
+  # =============================================================================
+  # GO MODULES CONFIGURATION
+  # =============================================================================
+  # Note: Dependabot requires explicit directory configuration for each go.mod file.
+  # When adding new Go modules, copy one of the blocks below and update:
+  # 1. The directory path
+  # 2. The time (to avoid conflicts)
+  #
+  # Current go.mod files detected:
+  # - / (root)
+  # - /api
+  # - /properties
+  # - /tests/e2e
+  # =============================================================================
+
+  # Go modules in root directory
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "09:00"
+      timezone: "UTC"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+
+  # Go modules in api directory
+  - package-ecosystem: "gomod"
+    directory: "/api"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "10:00"
+      timezone: "UTC"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+
+  # Go modules in properties directory
+  - package-ecosystem: "gomod"
+    directory: "/properties"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "11:00"
+      timezone: "UTC"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+
+  # Go modules in tests/e2e directory
+  - package-ecosystem: "gomod"
+    directory: "/tests/e2e"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "12:00"
+      timezone: "UTC"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+
+  # =============================================================================
+  # TO ADD NEW GO MODULE DIRECTORIES:
+  # Copy the template below, uncomment, and update the directory and time:
+  # =============================================================================
+  # - package-ecosystem: "gomod"
+  #   directory: "/your-new-directory"
+  #   schedule:
+  #     interval: "weekly"
+  #     day: "tuesday"
+  #     time: "13:00"  # Use next available hour
+  #     timezone: "UTC"
+  #   commit-message:
+  #     prefix: "chore"
+  #     include: "scope"
+
+# =============================================================================
+# TOOL VERSIONS TRACKING
+# =============================================================================
+# Tool versions are now extracted to versions.env and tracked via tools.Dockerfile
+# When Dependabot updates tools.Dockerfile, you'll need to manually sync versions.env
+#
+# The following versions are tracked:
+# - golangci-lint (via Docker image)
+# - licensei (via Docker image)
+# - controller-gen (via Go install)
+# - setup-envtest (via Go install)
+# - addlicense (via Go install)
+# - gotemplate (via Go install)
+# - mockgen (via Go install)
+#
+# Note: ENVTEST_K8S_VERSION = 1.27.x! is not tracked as it's a Kubernetes version pattern
+
