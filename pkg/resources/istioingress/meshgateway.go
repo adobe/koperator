@@ -16,6 +16,7 @@ package istioingress
 
 import (
 	"fmt"
+	"math"
 
 	istioOperatorApi "github.com/banzaicloud/istio-operator/api/v2/v1alpha1"
 	"github.com/go-logr/logr"
@@ -99,10 +100,33 @@ func generateExternalPorts(kc *v1beta1.KafkaCluster, brokerIds []int,
 		}
 		if util.ShouldIncludeBroker(brokerConfig, kc.Status, brokerId, defaultIngressConfigName, ingressConfigName) {
 			generatedPorts = append(generatedPorts, &istioOperatorApi.ServicePort{
-				Name:       fmt.Sprintf("tcp-broker-%d", brokerId),
-				Protocol:   string(corev1.ProtocolTCP),
-				Port:       externalListenerConfig.GetBrokerPort(int32(brokerId)),
-				TargetPort: &istioOperatorApi.IntOrString{IntOrString: intstr.FromInt(int(externalListenerConfig.GetBrokerPort(int32(brokerId))))},
+				Name:     fmt.Sprintf("tcp-broker-%d", brokerId),
+				Protocol: string(corev1.ProtocolTCP),
+				Port: func() int32 {
+					// Broker IDs are always within valid range for int32 conversion
+					if brokerId < 0 || brokerId > math.MaxInt32 {
+						// This should never happen as broker IDs are small positive integers
+						log.Error(fmt.Errorf("broker ID %d out of valid range for int32 conversion", brokerId), "Invalid broker ID detected in mesh gateway port")
+						return 0
+					}
+					return externalListenerConfig.GetBrokerPort(int32(brokerId))
+				}(),
+				TargetPort: func() *istioOperatorApi.IntOrString {
+					// Broker IDs are always within valid range for int32 conversion
+					if brokerId < 0 || brokerId > math.MaxInt32 {
+						// This should never happen as broker IDs are small positive integers
+						log.Error(fmt.Errorf("broker ID %d out of valid range for int32 conversion", brokerId), "Invalid broker ID detected in mesh gateway target port")
+						return &istioOperatorApi.IntOrString{IntOrString: intstr.FromInt(0)}
+					}
+					brokerPort := externalListenerConfig.GetBrokerPort(int32(brokerId))
+					// Port numbers are always within valid range for int conversion
+					if brokerPort < 0 || brokerPort > 65535 {
+						// This should never happen as GetBrokerPort returns valid port numbers
+						log.Error(fmt.Errorf("broker port %d out of valid range [0-65535] for broker %d", brokerPort, brokerId), "Invalid broker port detected in mesh gateway target port")
+						return &istioOperatorApi.IntOrString{IntOrString: intstr.FromInt(0)}
+					}
+					return &istioOperatorApi.IntOrString{IntOrString: intstr.FromInt(int(brokerPort))}
+				}(),
 			})
 		}
 	}

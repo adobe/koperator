@@ -16,6 +16,7 @@ package envoy
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -72,10 +73,33 @@ func getExposedServicePorts(extListener v1beta1.ExternalListenerConfig, brokersI
 			}
 			if util.ShouldIncludeBroker(brokerConfig, kafkaCluster.Status, brokerId, defaultIngressConfigName, ingressConfigName) {
 				exposedPorts = append(exposedPorts, corev1.ServicePort{
-					Name:       fmt.Sprintf("broker-%d", brokerId),
-					Port:       extListener.GetBrokerPort(int32(brokerId)),
-					TargetPort: intstr.FromInt(int(extListener.GetBrokerPort(int32(brokerId)))),
-					Protocol:   corev1.ProtocolTCP,
+					Name: fmt.Sprintf("broker-%d", brokerId),
+					Port: func() int32 {
+						// Broker IDs are always within valid range for int32 conversion
+						if brokerId < 0 || brokerId > math.MaxInt32 {
+							// This should never happen as broker IDs are small positive integers
+							log.Error(fmt.Errorf("broker ID %d out of valid range for int32 conversion", brokerId), "Invalid broker ID detected in envoy service port")
+							return 0
+						}
+						return extListener.GetBrokerPort(int32(brokerId))
+					}(),
+					TargetPort: func() intstr.IntOrString {
+						// Broker IDs are always within valid range for int32 conversion
+						if brokerId < 0 || brokerId > math.MaxInt32 {
+							// This should never happen as broker IDs are small positive integers
+							log.Error(fmt.Errorf("broker ID %d out of valid range for int32 conversion", brokerId), "Invalid broker ID detected in envoy service target port")
+							return intstr.FromInt(0)
+						}
+						brokerPort := extListener.GetBrokerPort(int32(brokerId))
+						// Port numbers are always within valid range for int conversion
+						if brokerPort < 0 || brokerPort > 65535 {
+							// This should never happen as GetBrokerPort returns valid port numbers
+							log.Error(fmt.Errorf("broker port %d out of valid range [0-65535] for broker %d", brokerPort, brokerId), "Invalid broker port detected in envoy service target port")
+							return intstr.FromInt(0)
+						}
+						return intstr.FromInt(int(brokerPort))
+					}(),
+					Protocol: corev1.ProtocolTCP,
 				})
 			}
 		}

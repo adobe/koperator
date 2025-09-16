@@ -16,6 +16,7 @@ package scale
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 
 	"github.com/banzaicloud/koperator/api/v1beta1"
@@ -27,6 +28,10 @@ func brokerIDsFromStringSlice(brokerIDs []string) ([]int32, error) {
 		bid, err := strconv.Atoi(id)
 		if err != nil {
 			return nil, err
+		}
+		// Broker IDs are always within valid range for int32 conversion
+		if bid < 0 || bid > math.MaxInt32 {
+			return nil, fmt.Errorf("broker ID %d out of valid range for int32 conversion", bid)
 		}
 		brokers[idx] = int32(bid)
 	}

@@ -16,6 +16,7 @@ package envoy
 
 import (
 	"fmt"
+	"math"
 	"sort"
 
 	envoyaccesslog "github.com/envoyproxy/go-control-plane/envoy/config/accesslog/v3"
@@ -339,7 +340,15 @@ func GenerateEnvoyConfig(kc *v1beta1.KafkaCluster, elistener v1beta1.ExternalLis
 			}
 
 			if elistener.TLSEnabled() {
-				filterChain, err = GenerateEnvoyTLSFilterChain(tcpProxy, ingressConfig.EnvoyConfig.GetBrokerHostname(int32(brokerId)), log)
+				filterChain, err = GenerateEnvoyTLSFilterChain(tcpProxy, func() string {
+					// Broker IDs are always within valid range for int32 conversion
+					if brokerId < 0 || brokerId > math.MaxInt32 {
+						// This should never happen as broker IDs are small positive integers
+						log.Error(fmt.Errorf("broker ID %d out of valid range for int32 conversion", brokerId), "Invalid broker ID detected in envoy TLS filter chain")
+						return ""
+					}
+					return ingressConfig.EnvoyConfig.GetBrokerHostname(int32(brokerId))
+				}(), log)
 				if err != nil {
 					log.Error(err, "Unable to generate broker envoy tls filter chain")
 					return ""
@@ -352,7 +361,15 @@ func GenerateEnvoyConfig(kc *v1beta1.KafkaCluster, elistener v1beta1.ExternalLis
 				}
 			}
 
-			brokerPort := elistener.GetBrokerPort(int32(brokerId))
+			brokerPort := func() int32 {
+				// Broker IDs are always within valid range for int32 conversion
+				if brokerId < 0 || brokerId > math.MaxInt32 {
+					// This should never happen as broker IDs are small positive integers
+					log.Error(fmt.Errorf("broker ID %d out of valid range for int32 conversion", brokerId), "Invalid broker ID detected in envoy broker port assignment")
+					return 0
+				}
+				return elistener.GetBrokerPort(int32(brokerId))
+			}()
 			tempListeners[brokerPort] = append(tempListeners[brokerPort], filterChain)
 
 			clusters = append(clusters, &envoycluster.Cluster{
