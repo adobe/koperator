@@ -79,7 +79,16 @@ func generateTlsRoutes(kc *v1beta1.KafkaCluster, externalListenerConfig v1beta1.
 			tlsRoutes = append(tlsRoutes, istioclientv1beta1.TLSRoute{
 				Match: []istioclientv1beta1.TLSMatchAttributes{
 					{
-						Port:     util.IntPointer(int(externalListenerConfig.GetBrokerPort(int32(brokerId)))),
+						Port: func() *int {
+							brokerPort := externalListenerConfig.GetBrokerPort(int32(brokerId))
+							// Port numbers are always within valid range for int conversion
+							if brokerPort < 0 || brokerPort > 65535 {
+								// This should never happen as GetBrokerPort returns valid port numbers
+								log.Error(fmt.Errorf("broker port %d out of valid range [0-65535] for broker %d", brokerPort, brokerId), "Invalid broker port detected in TLS route")
+								return util.IntPointer(0)
+							}
+							return util.IntPointer(int(brokerPort))
+						}(),
 						SniHosts: []string{"*"},
 					},
 				},
@@ -132,7 +141,16 @@ func generateTcpRoutes(kc *v1beta1.KafkaCluster, externalListenerConfig v1beta1.
 			tcpRoutes = append(tcpRoutes, istioclientv1beta1.TCPRoute{
 				Match: []istioclientv1beta1.L4MatchAttributes{
 					{
-						Port: util.IntPointer(int(externalListenerConfig.GetBrokerPort(int32(brokerId)))),
+						Port: func() *int {
+							brokerPort := externalListenerConfig.GetBrokerPort(int32(brokerId))
+							// Port numbers are always within valid range for int conversion
+							if brokerPort < 0 || brokerPort > 65535 {
+								// This should never happen as GetBrokerPort returns valid port numbers
+								log.Error(fmt.Errorf("broker port %d out of valid range [0-65535] for broker %d", brokerPort, brokerId), "Invalid broker port detected in TCP route")
+								return util.IntPointer(0)
+							}
+							return util.IntPointer(int(brokerPort))
+						}(),
 					},
 				},
 				Route: []*istioclientv1beta1.RouteDestination{

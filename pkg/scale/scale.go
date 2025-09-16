@@ -509,6 +509,12 @@ func (cc *cruiseControlScaler) RemoveBrokers(ctx context.Context, brokerIDs ...s
 			cc.log.Error(err, "failed to cast broker ID from string to integer", "broker_id", brokerID)
 			return nil, err
 		}
+		// Broker IDs are always within valid range for int32 conversion
+		if bID < 0 || bID > math.MaxInt32 {
+			err := fmt.Errorf("broker ID %d out of valid range for int32 conversion", bID)
+			cc.log.Error(err, "invalid broker ID detected", "broker_id", brokerID)
+			return nil, err
+		}
 		brokersToRemove = append(brokersToRemove, int32(bID))
 	}
 
