@@ -16,6 +16,7 @@ package istioingress
 
 import (
 	"fmt"
+	"math"
 
 	istioclientv1beta1 "github.com/banzaicloud/istio-client-go/pkg/networking/v1beta1"
 
@@ -80,6 +81,12 @@ func generateTlsRoutes(kc *v1beta1.KafkaCluster, externalListenerConfig v1beta1.
 				Match: []istioclientv1beta1.TLSMatchAttributes{
 					{
 						Port: func() *int {
+							// Broker IDs are always within valid range for int32 conversion
+							if brokerId < 0 || brokerId > math.MaxInt32 {
+								// This should never happen as broker IDs are small positive integers
+								log.Error(fmt.Errorf("broker ID %d out of valid range for int32 conversion", brokerId), "Invalid broker ID detected in TLS route port")
+								return util.IntPointer(0)
+							}
 							brokerPort := externalListenerConfig.GetBrokerPort(int32(brokerId))
 							// Port numbers are always within valid range for int conversion
 							if brokerPort < 0 || brokerPort > 65535 {
@@ -142,6 +149,12 @@ func generateTcpRoutes(kc *v1beta1.KafkaCluster, externalListenerConfig v1beta1.
 				Match: []istioclientv1beta1.L4MatchAttributes{
 					{
 						Port: func() *int {
+							// Broker IDs are always within valid range for int32 conversion
+							if brokerId < 0 || brokerId > math.MaxInt32 {
+								// This should never happen as broker IDs are small positive integers
+								log.Error(fmt.Errorf("broker ID %d out of valid range for int32 conversion", brokerId), "Invalid broker ID detected in TCP route port")
+								return util.IntPointer(0)
+							}
 							brokerPort := externalListenerConfig.GetBrokerPort(int32(brokerId))
 							// Port numbers are always within valid range for int conversion
 							if brokerPort < 0 || brokerPort > 65535 {

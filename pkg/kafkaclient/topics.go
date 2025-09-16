@@ -17,6 +17,7 @@ package kafkaclient
 import (
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/IBM/sarama"
@@ -122,7 +123,13 @@ func (k *kafkaClient) EnsurePartitionCount(topic string, desired int32) (changed
 		return
 	}
 
-	if desired != int32(len(meta[0].Partitions)) {
+	currentPartitions := len(meta[0].Partitions)
+	// Partition count should always be within valid range for int32 conversion
+	if currentPartitions < 0 || currentPartitions > math.MaxInt32 {
+		err = errorfactory.New(errorfactory.BrokersRequestError{}, fmt.Errorf("partition count %d out of valid range for int32 conversion", currentPartitions), "invalid partition count")
+		return
+	}
+	if desired != int32(currentPartitions) {
 		// TODO (tinyzimmer): maybe let the user specify partition assignments
 		assn := make([][]int32, 0)
 		changed = true
