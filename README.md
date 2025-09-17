@@ -1,9 +1,9 @@
 <p align="center">
 
-![Koperator](https://img.shields.io/github/v/release/banzaicloud/koperator?label=Koperator&sort=semver)
-![Released](https://img.shields.io/github/release-date/banzaicloud/koperator?label=Released)
-![License](https://img.shields.io/github/license/banzaicloud/koperator?label=License)
-![Go version (latest release)](https://img.shields.io/github/go-mod/go-version/banzaicloud/koperator/v0.22.0)
+![Koperator](https://img.shields.io/github/v/release/adobe/koperator?label=Koperator)
+![Released](https://img.shields.io/github/release-date/adobe/koperator?label=Released)
+![License](https://img.shields.io/github/license/adobe/koperator?label=License)
+![Go version (latest release)](https://img.shields.io/github/go-mod/go-version/adobe/koperator/0.28.0-adobe-20250911)
 
 </p>
 
@@ -11,12 +11,13 @@
 
 <p align="center">
 
-![Go version](https://img.shields.io/github/go-mod/go-version/banzaicloud/koperator/master)
-[![Go Report Card](https://goreportcard.com/badge/github.com/banzaicloud/koperator)](https://goreportcard.com/report/github.com/banzaicloud/koperator)
-![CI](https://img.shields.io/github/actions/workflow/status/banzaicloud/koperator/ci.yml?branch=master&label=CI)
-![Image](https://img.shields.io/github/actions/workflow/status/banzaicloud/koperator/docker.yml?branch=master&label=Image)
-![Image (perf test)](https://img.shields.io/github/actions/workflow/status/banzaicloud/koperator/docker_perf_test_load.yml?branch=master&label=Image%20%28perf%20test%29)
-![Helm chart](https://img.shields.io/github/actions/workflow/status/banzaicloud/koperator/helm.yml?branch=master&label=Helm%20chart)
+![Go version](https://img.shields.io/github/go-mod/go-version/adobe/koperator/master)
+[![Go Report Card](https://goreportcard.com/badge/github.com/adobe/koperator)](https://goreportcard.com/report/github.com/adobe/koperator)
+![CI](https://img.shields.io/github/actions/workflow/status/adobe/koperator/ci.yml?branch=master&label=CI)
+![CI](https://img.shields.io/github/actions/workflow/status/adobe/koperator/codeql-analysis.yml?branch=master&label=CodeQL)
+![Image](https://img.shields.io/github/actions/workflow/status/adobe/koperator/e2e-test.yaml?branch=master&label=E2E)
+![Helm chart](https://img.shields.io/github/actions/workflow/status/adobe/koperator/helm.yml?branch=master&label=Helm%20chart)
+
 
 </p>
 
