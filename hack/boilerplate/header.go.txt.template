@@ -1,5 +1,6 @@
 /*
 Copyright {{ date "2006" now }} {{ .copyright.owner }}
+Copyright {{ date "2025" now }} Adobe. All rights reserved.
 
 {{ .license.content }}
 @-if(.spdx.enabled)
