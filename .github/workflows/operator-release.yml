@@ -97,6 +97,7 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
           build-args: |
             VERSION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
             BUILT_AT=${{ needs.prepare.outputs.built_at }}
@@ -115,13 +116,16 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
-      - name: Update Chart.yaml version and values.yaml image tag
+      - name: Update Chart.yaml version, values.yaml image tag, and README.md
         run: |
           sed -i "s/^version:.*/version: \"${{ needs.prepare.outputs.tag }}\"/" charts/kafka-operator/Chart.yaml
           sed -i "s/^appVersion:.*/appVersion: \"${{ needs.prepare.outputs.tag }}\"/" charts/kafka-operator/Chart.yaml
           # Ensure consistent space-based indentation and update tag
           sed -i 's/\t/  /g' charts/kafka-operator/values.yaml
           sed -i "/^operator:/,/^[^[:space:]]/ { /^[[:space:]]*image:/,/^[[:space:]]*[^[:space:]]/ s/^[[:space:]]*tag:.*/    tag: \"${{ needs.prepare.outputs.tag }}\"/; }" charts/kafka-operator/values.yaml
+          # Update README.md version references
+          sed -i "s/--version [0-9]\+\.[0-9]\+\.[0-9]\+-[a-zA-Z0-9-]\+/--version ${{ needs.prepare.outputs.tag }}/g" charts/kafka-operator/README.md
+          sed -i "s/\`[0-9]\+\.[0-9]\+\.[0-9]\+-[a-zA-Z0-9-]\+\`/\`${{ needs.prepare.outputs.tag }}\`/g" charts/kafka-operator/README.md
       - name: Push Helm Chart to GHCR
         uses: appany/helm-oci-chart-releaser@v0.5.0
         with:

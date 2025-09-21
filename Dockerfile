@@ -36,6 +36,11 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} GO111MODUL
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
 FROM gcr.io/distroless/static-debian11:nonroot
 
+# Redeclare ARG variables for the second stage
+ARG VERSION
+ARG BUILT_AT
+ARG GIT_SHA
+
 # Add metadata labels
 LABEL org.opencontainers.image.title="Kafka Operator"
 LABEL org.opencontainers.image.description="Kafka Operator for Kubernetes"
