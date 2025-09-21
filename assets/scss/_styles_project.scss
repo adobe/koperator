@@ -1,0 +1,65 @@
+/*
+
+Nothing defined here. The Hugo project that uses this theme can override Bootstrap by adding a file to:
+
+assets/scss/_styles_project.scss
+
+*/
+@import "tocbot";
+
+.warning-block {
+    border-left: 6px solid red;
+    background: #FFFFFF;
+    padding: 16px;
+  }
+
+/*
+h3[class*="type-"]::before {
+  background-color: $primary;
+  content: "type";
+  font-size: 14px;
+  line-height: 22px;
+  padding: 3px 6px;
+  text-transform: uppercase;
+}
+*/
+
+.property-optional::after {
+  content: "optional";
+  background-color: $secondary;
+  font-size: 14px;
+  line-height: 22px;
+  padding: 3px 6px;
+  text-transform: uppercase;
+}
+.property-required::after {
+  content: "required";
+  background-color: $primary;
+  color: white;
+  font-size: 14px;
+  line-height: 22px;
+  padding: 3px 6px;
+  text-transform: uppercase;
+}
+
+.main-lead {
+  line-height: 1.5;
+}
+
+// Match fontsize of sections with code in their titles for CRD reference pages
+.td-content > h4 > em {
+	font-size: 87.5%;
+  }
+
+.td-content * a {
+  &[href*="//"]:not([href*="localhost"]):not([href*="bank-vaults.dev"]):not([href*="github.com/bank-vaults"]):after {
+    display: inline-block;
+    width: .6em;
+    height: .6em;
+    background-image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0Ij48cGF0aCBkPSJNMjEgMTN2MTBoLTIxdi0xOWgxMnYyaC0xMHYxNWgxN3YtOGgyem0zLTEyaC0xMC45ODhsNC4wMzUgNC02Ljk3NyA3LjA3IDIuODI4IDIuODI4IDYuOTc3LTcuMDcgNC4xMjUgNC4xNzJ2LTExeiIvPjwvc3ZnPg==);
+    content: " ";
+    margin-left: .2em;
+    margin-right: .2em;
+    background-size: cover;
+  }
+}

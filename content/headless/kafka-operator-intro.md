@@ -1,0 +1,1 @@
+The **Koperator** helps you create production-ready Apache Kafka cluster on Kubernetes, with scaling, rebalancing, and alerts based self healing.

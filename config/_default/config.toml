@@ -1,0 +1,230 @@
+
+title = "Koperator"
+
+#theme = ["docsy"]
+
+baseurl = "/"
+
+languageCode = "en-us"
+
+# Language settings
+contentDir = "content"
+defaultContentLanguage = "en"
+defaultContentLanguageInSubdir = false
+# Useful when translating.
+enableMissingTranslationPlaceholders = true
+
+enableGitInfo = true
+
+[languages]
+[languages.en]
+title = "Koperator"
+description = "Documentation for Koperator"
+languageName ="English"
+# Weight used for sorting.
+weight = 1
+
+[outputs]
+    home = ["HTML", "print"]
+    # Enable print this section menu item
+    section = [ "HTML", "print" ]
+
+[social]
+# Used as twitter:site in page metadata
+# twitter = "FIXME"
+
+[markup]
+  [markup.goldmark]
+    [markup.goldmark.renderer]
+      unsafe = true
+  [markup.highlight]
+    # See a complete list of available styles at https://xyproto.github.io/splash/docs/all.html
+    style = "tango"
+    # Uncomment if you want your chosen highlight style used for code blocks without a specified language
+    # guessSyntax = "true"
+
+[params]
+
+  # email = "mailto:team@FIXME"
+
+  copyright = "Koperator maintainers"
+
+  relativeURLs = true
+
+  # Add project name to the header
+  project_name = "Koperator"
+  product_name = "Koperator"
+
+  latest_version = "0.25.1" # Used in some installation commands
+
+  ###############################################################################
+  # Docsy-theme specific config customizations
+  ###############################################################################
+
+  # Flag used in the "version-banner" partial to decide whether to display a
+  # banner on every page indicating that this is an archived version of the docs.
+  # Set this flag to "true" if you want to display the banner.
+  archived_version = false
+
+  # The version number for the version of the docs represented in this doc set.
+  # Used in the "version-banner" partial to display a version number for the
+  # current doc set.
+  version = "0.25.1"
+  version_menu_canonicallinks = true
+
+  # A link to latest version of the docs. Used in the "version-banner" partial to
+  # point people to the main doc site.
+  url_latest_version = "/"
+
+  # Repository configuration (URLs for in-page links to opening issues and suggesting changes)
+  github_repo = "https://github.com/banzaicloud/koperator-docs"
+  # An optional link to a related project repo. For example, the sibling repository where your product code lives.
+  github_project_repo = "https://github.com/banzaicloud/koperator"
+
+  # Specify a value here if your content directory is not in your repo's root directory
+  # github_subdir = ""
+
+  # Uncomment this if your GitHub repo does not have "main" as the default branch,
+  # or specify a new value if you want to reference another branch in your GitHub links
+  github_branch= "main"
+
+
+  # Enable Lunr.js offline search
+  offlineSearch = true
+
+  # Add CTA partial to navbar
+  navbar_cta = true
+
+  #####
+  # Code highlighting
+  #####
+  # Highlighting config
+  pygmentsCodeFences = true
+  pygmentsUseClasses = false
+  # Use the new Chroma Go highlighter in Hugo.
+  pygmentsUseClassic = false
+  #pygmentsOptions = "linenos=table"
+  # See https://help.farbox.com/pygments.html
+  pygmentsStyle = "coy"
+  # Enable syntax highlighting and copy buttons on code blocks with Prism
+  prism_syntax_highlighting = true
+
+  # User interface configuration
+  [params.ui]
+  #  Set to true to disable breadcrumb navigation.
+  breadcrumb_disable = false
+  # Set to true to disable the About link in the site footer
+  footer_about_disable = false
+  # Set to false if you don't want to display a logo (/assets/icons/logo.svg) in the top navbar
+  navbar_logo = true
+  # Set to true if you don't want the top navbar to be translucent when over a `block/cover`, like on the homepage.
+  navbar_translucent_over_cover_disable = false
+  # Enable to show the side bar menu in its compact state.
+  #sidebar_menu_compact = false
+  # Enable to make the side bar menu foldable.
+  sidebar_menu_foldable = true
+  # Set to true to hide the sidebar search box (the top nav search box will still be displayed if search is enabled)
+  sidebar_search_disable = false
+
+  [params.jstoc]
+  enable = true
+
+  [params.links]
+  # End user relevant links. These will show up on left side of footer and in the community page if you have one.
+  #[[params.links.user]]
+  #  name = "Community forum"
+  #  url = "https://community.cisco.com/t5/application-networking-and/bd-p/dev-app-networking"
+  #  icon = "fa fa-envelope"
+  #  desc = "Discussion and help from your fellow users"
+  #[[params.links.user]]
+  #  name ="Twitter"
+  #  url = "https://twitter.com/ciscoemerge"
+  #  icon = "fab fa-twitter"
+  #  desc = "Follow us on Twitter to get the latest news!"
+  #[[params.links.user]]
+  #  name = "Linkedin"
+  #  url = "https://linkedin.com/cisco-emerging-technologies-and-incubation"
+  #  icon = "fab fa-linkedin"
+  #  desc = "Follow us on Twitter to get the latest news!"
+  # Developer relevant links. These will show up on right side of footer and in the community page if you have one.
+  [[params.links.developer]]
+    name = "GitHub"
+    url = "https://github.com/banzaicloud/koperator"
+    icon = "fab fa-github"
+    desc = "Get involved with Koperator development"
+  [[params.links.developer]]
+    name = "Slack"
+    url = "https://outshift.slack.com"
+    icon = "fab fa-slack"
+    desc = "Chat with the project developers"
+  #[[params.links.developer]]
+  #  name = "Developer mailing list"
+  #  url = "https://example.org/mail"
+  #  icon = "fa fa-envelope"
+  #  desc = "Discuss development issues around the project"
+
+###############################################################################
+# Hugo - Top-level navigation (horizontal)
+###############################################################################
+[menu]
+  [[menu.main]]
+    name = "Project page"
+    weight = -110
+    pre = "<i class='fab fa-github pr-2'></i>"
+    url = "https://github.com/banzaicloud/koperator"
+#  [[menu.main]]
+#    name = "Blog"
+#    weight = -120
+#    pre = "<i class='fas fa-blog pr-2'></i>"
+#    url = "https://github.com/bank-vaults/"
+  [[menu.main]]
+    name = "Documentation"
+    weight = -100
+    pre = "<i class='fas fa-book pr-2'></i>"
+    url = "/docs/"
+  [[menu.main]]
+    name = "Community"
+    url = "https://outshift.slack.com"
+    pre = "<i class='fab fa-slack pr-2'></i>"
+    weight = 150
+
+###############################################################################
+# Misc customizations
+###############################################################################
+
+enableRobotsTXT = true
+
+enableGitInfo = true
+
+# Image processing configuration.
+[imaging]
+resampleFilter = "CatmullRom"
+quality = 75
+anchor = "smart"
+
+[minify]
+  minifyOutput = true
+  disableJSON = true
+  [minify.tdewolff]
+    [minify.tdewolff.html]
+    keepQuotes = true
+    keepWhitespace = true
+
+[sitemap]
+  ChangeFreq = "daily"
+  Priority = "1"
+
+[security]
+  [security.funcs]
+    getenv = ['^HUGO_', 'PWD', '^DOC_', 'ENVIRONMENT']
+
+[privacy]
+  [privacy.googleAnalytics]
+    respectDoNotTrack = true
+
+[module]
+proxy = "direct"
+[[module.imports]]
+path = "github.com/google/docsy"
+[[module.imports]]
+path = "github.com/google/docsy/dependencies"

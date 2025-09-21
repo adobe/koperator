@@ -1,0 +1,20 @@
+kubectl create -n kafka -f - <<EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kafka-test
+spec:
+  containers:
+  - name: kafka-test
+    image: edenhill/kcat:1.7.0
+    # Just spin & wait forever
+    command: [ "/bin/sh", "-c", "--" ]
+    args: [ "while true; do sleep 3000; done;" ]
+    volumeMounts:
+    - name: sslcerts
+      mountPath: "/ssl/certs"
+  volumes:
+  - name: sslcerts
+    secret:
+      secretName: example-kafkauser-secret
+EOF

@@ -1,0 +1,68 @@
+{{- $file := .Get 0 -}}
+{{- $ext := (.Get 1 | default "bash" ) -}}
+{{- $opts := .Get 2 -}}
+{{- $text := "" -}}
+{{- $url := "" -}}
+{{- $found_file := false -}}
+{{- $is_url := false -}}
+{{- $is_eof := false -}}
+
+{{ if or (hasPrefix $file "https://") (hasPrefix $file "http://") }}
+  {{- warnf "URL found in include-code %s" $file -}}
+  {{ with resources.GetRemote $file }}
+    {{ with .Err }}
+      {{ warnf "%s" . }}
+    {{ else }}
+      {{ $text = .Content }}
+      {{ $url = $file }}
+      {{- $found_file = true -}}
+      {{- $is_url = true -}}
+    {{ end }}
+  {{ end }}
+
+{{ end }}
+
+{{ if (fileExists (print .Page.File.Dir $file)) -}}
+  <!-- First try as relative path -->
+  {{- $text = readFile (print .Page.File.Dir $file) -}}
+  {{- $url = (print .Page.Site.BaseURL .Page.File.Dir $file) -}}
+  {{- $found_file = true -}}
+{{ else }}
+  {{ if (fileExists $file) -}}
+    <!-- Then as project-relative path-->
+    {{- $text = readFile $file -}}
+    {{- $url = (print .Page.Site.BaseURL $file) -}}
+    {{- $found_file = true -}}
+  {{- end }}
+{{- end }}
+
+{{ if not $found_file -}}
+  {{ if in $opts "optional" }}
+    {{- warnf "Cannot find file to include %q %s" $file .Position -}}
+  {{ else if in $opts "suppress" }}
+    <!-- Silently fail without any error or warning -->
+  {{ else }}
+    {{- errorf "Cannot find file to include %q %s" $file .Position -}}
+  {{- end }}
+{{- end }}
+
+<!-- Add prefix/suffix to $text if $opts begins with "eof" -->
+{{ if in $opts "eof" }}
+  {{- $text = ( print "kubectl create -f - <<EOF\n" $text "\nEOF") -}}
+  {{ $opts = replace $opts "eof" "" }}
+  {{ $is_eof = true }}
+{{ end }}
+
+{{/*  DO NOT INDENT THE HTML CODE  */}}
+{{ if and $is_url (not $is_eof) }}
+<pre data-src="{{ $url }}" data-download-link="{{ $url }}" data-download-link-label="Download this file" class='{{ $opts }}'>
+<code class="language-{{ $ext }}">{{ $text }}</code>
+</pre>
+{{ else if $is_eof }}
+<pre class='{{ $opts }}'>
+<code class="language-{{ $ext }}">{{ $text }}</code>
+</pre>
+{{ else }}
+<pre data-src="{{ $url }}" data-download-link data-download-link-label="Download this file" class='{{ $opts }}'>
+</pre>
+{{ end }}

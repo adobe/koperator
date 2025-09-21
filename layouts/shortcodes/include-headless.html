@@ -1,0 +1,25 @@
+{{/* For details on using this shortcode, see /content/headless/README.md */}}
+{{ $file := .Get 0 }}
+
+{{ $path := .Site.GetPage "" }}
+
+{{ if .Get 1 }}
+    {{ $module := .Get 1 }}
+    {{ $modulepath := "" }}
+    {{ if .Site.GetPage (printf "%s%s%s" "/docs/" $module "/headless/index.md") }}
+        {{ $modulepath = (printf "%s%s%s" "/docs/" $module "/headless/index.md" ) }}
+    {{else}}
+        {{ $modulepath = (printf "%s%s%s" $module "/headless/index.md" ) }}
+    {{ end }}
+    {{ $path = .Site.GetPage $modulepath }}
+{{else}}
+    {{ $path = .Site.GetPage "/headless/index.md" }}
+{{ end }}
+
+{{ $reusablePages := $path.Resources.Match $file }}
+{{if lt (len $reusablePages) 1}}
+    {{ errorf "Headless file not found: %q %s" $file .Position}}
+{{ end }}
+{{ range $reusablePages }}
+    {{- .Content }}
+{{ end }}

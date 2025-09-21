@@ -1,0 +1,28 @@
+{{- $file := .Get 0 -}}
+{{- $fullref := (relref . $file) -}}
+{{- $pageref := (replaceRE "#.*$" "" $fullref) -}}
+{{- $scratch := newScratch -}}
+
+{{- if eq $pageref "" -}}
+  {{- errorf "xref cannot handle header refs on caller page; %s" .Position -}}
+{{- else -}}
+  {{- range .Site.Pages -}}
+    {{- if eq $pageref .RelPermalink -}}
+      {{- $scratch.Set "page" . -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+
+{{- if (findRE "#.*$" $file) -}}
+  {{- $anchor := (strings.TrimPrefix $pageref $fullref) -}}
+  {{- $page := ($scratch.Get "page") -}}
+  {{- $toc_line := (findRE (print "<li><a href=\"" $anchor "\">(.*)</a>") $page.TableOfContents) -}}
+  {{- if eq (len $toc_line) 0 -}}
+    {{- errorf "Failed to extract header title for anchor %q on page %s" $anchor .Position -}}
+  {{- end -}}
+  {{- $header := (replaceRE (print "<li><a href=\"" $anchor "\">(.*)</a>") "$1" (index $toc_line 0)) | safeHTML -}}
+  [{{- $header }}]({{ print $page.RelPermalink $anchor -}})
+{{- else -}}
+  {{- $page := ($scratch.Get "page") -}}
+  {{ print "[" $page.Title "](" $page.RelPermalink ")" | markdownify }}
+{{- end -}}

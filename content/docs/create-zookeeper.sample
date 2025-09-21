@@ -1,0 +1,11 @@
+kubectl create -f - <<EOF
+apiVersion: zookeeper.pravega.io/v1beta1
+kind: ZookeeperCluster
+metadata:
+    name: zookeeper-server
+    namespace: zookeeper
+spec:
+    replicas: 3
+    persistence:
+        reclaimPolicy: Delete
+EOF
