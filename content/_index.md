@@ -23,3 +23,5 @@ Read the Koperator documentation.
 We do a [Pull Request](https://github.com/adobe/koperator/pulls) contributions workflow on **GitHub**. New users and developers are always welcome!
 {{% /blocks/feature %}}
 
+{{< /blocks/section >}}
+
