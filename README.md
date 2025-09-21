@@ -3,7 +3,7 @@
 ![Koperator](https://img.shields.io/github/v/release/adobe/koperator?label=Koperator)
 ![Released](https://img.shields.io/github/release-date/adobe/koperator?label=Released)
 ![License](https://img.shields.io/github/license/adobe/koperator?label=License)
-![Go version (latest release)](https://img.shields.io/github/go-mod/go-version/adobe/koperator/0.28.0-adobe-20250911)
+![Go version (latest release)](https://img.shields.io/github/go-mod/go-version/adobe/koperator/0.28.0-adobe-20250923)
 
 </p>
 
@@ -114,28 +114,28 @@ kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/ma
 
 2. Install Koperator into the `kafka` namespace using the OCI Helm chart from GitHub Container Registry:
 
-> 📦 **View available versions**: [ghcr.io/adobe/koperator/chart](https://github.com/adobe/koperator/pkgs/container/koperator/chart)
+> 📦 **View available versions**: [ghcr.io/adobe/koperator/kafka-operator](https://github.com/adobe/koperator/pkgs/container/koperator%2Fkafka-operator/versions)
 
 ```sh
 # Install the latest release
-helm install kafka-operator oci://ghcr.io/adobe/koperator/chart --namespace=kafka --create-namespace
+helm install kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator --namespace=kafka --create-namespace
 
 # Or install a specific version (replace with desired version)
-helm install kafka-operator oci://ghcr.io/adobe/koperator/chart --version 0.28.0-adobe-20250911 --namespace=kafka --create-namespace
+helm install kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator --version 0.28.0-adobe-20250923 --namespace=kafka --create-namespace
 ```
 
 #### Pull and inspect the chart before installation
 
 ```sh
 # Pull the chart locally
-helm pull oci://ghcr.io/adobe/koperator/chart --version 0.28.0-adobe-20250911
+helm pull oci://ghcr.io/adobe/koperator/kafka-operator --version 0.28.0-adobe-20250923
 
 # Extract and inspect
-tar -xzf chart-0.28.0-adobe-20250911.tgz
-helm template kafka-operator ./chart/
+tar -xzf kafka-operator-0.28.0-adobe-20250923.tgz
+helm template kafka-operator ./kafka-operator/
 
 # Install from local chart
-helm install kafka-operator ./chart/ --namespace=kafka --create-namespace
+helm install kafka-operator ./kafka-operator/ --namespace=kafka --create-namespace
 ```
 
 1. Create the Kafka cluster using the `KafkaCluster` custom resource. The quick start uses a minimal custom resource, but there are other examples in the same directory.

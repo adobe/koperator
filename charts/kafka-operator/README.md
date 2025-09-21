@@ -21,19 +21,19 @@ kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/ma
 
 To install the chart from the OCI registry:
 
-> 📦 **View available versions**: [ghcr.io/adobe/koperator/chart](https://github.com/adobe/koperator/pkgs/container/koperator/chart)
+> 📦 **View available versions**: [ghcr.io/adobe/koperator/kafka-operator](https://github.com/adobe/koperator/pkgs/container/koperator%2Fkafka-operator/versions)
 
 ```bash
 # Install the latest release
-helm install kafka-operator oci://ghcr.io/adobe/koperator/chart --namespace=kafka --create-namespace
+helm install kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator --namespace=kafka --create-namespace
 
 # Or install a specific version
-helm install kafka-operator oci://ghcr.io/adobe/koperator/chart --version 0.28.0-adobe-20250911 --namespace=kafka --create-namespace
+helm install kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator --version 0.28.0-adobe-20250923 --namespace=kafka --create-namespace
 ```
 
 To install the operator using an already installed cert-manager:
 ```bash
-helm install kafka-operator oci://ghcr.io/adobe/koperator/chart --set certManager.namespace=<your cert manager namespace> --namespace=kafka --create-namespace
+helm install kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator --set certManager.namespace=<your cert manager namespace> --namespace=kafka --create-namespace
 ```
 
 ## Upgrading the chart
@@ -43,10 +43,10 @@ If this value is not set your CRDs might be deleted.
 
 ```bash
 # Upgrade to latest version
-helm upgrade kafka-operator oci://ghcr.io/adobe/koperator/chart --namespace=kafka
+helm upgrade kafka-operator oci://ghcr.io/adobe/koperator/kafka-operator --namespace=kafka
 
 # Upgrade to specific version
-helm upgrade kafka-operator oci://ghcr.io/adobe/koperator/chart --version 0.28.0-adobe-20250911 --namespace=kafka
+helm upgrade kafka-operator oci://ghcr.io/adobe/koperator/kafka-operator --version 0.28.0-adobe-20250923 --namespace=kafka
 ```
 
 ## Uninstalling the Chart
@@ -66,7 +66,7 @@ The following table lists the configurable parameters of the Banzaicloud Kafka O
 Parameter | Description | Default
 --------- | ----------- | -------
 `operator.image.repository` | Operator container image repository | `ghcr.io/adobe/koperator`
-`operator.image.tag` | Operator container image tag | `0.28.0-adobe-20250911`
+`operator.image.tag` | Operator container image tag | `0.28.0-adobe-20250923`
 `operator.image.pullPolicy` | Operator container image pull policy | `IfNotPresent`
 `operator.serviceAccount.name` | ServiceAccount used by the operator pod | `kafka-operator`
 `operator.serviceAccount.create` | If true, create the `operator.serviceAccount.name` service account | `true`
