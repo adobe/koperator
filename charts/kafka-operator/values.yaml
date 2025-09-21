@@ -11,7 +11,7 @@ replicaCount: 1
 operator:
   annotations: {}
   image:
-    repository: ghcr.io/banzaicloud/kafka-operator
+    repository: ghcr.io/adobe/koperator
     tag: ""
     pullPolicy: IfNotPresent
   # In constrained environments where operator cannot
@@ -31,8 +31,8 @@ operator:
       cpu: 200m
       memory: 256Mi
     requests:
-      cpu: 100m
-      memory: 128Mi
+      cpu: 200m
+      memory: 256Mi
   serviceAccount:
     create: true
     name: kafka-operator

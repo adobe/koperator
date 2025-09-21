@@ -101,7 +101,7 @@ zookeeper-operator-54444dbd9d-2tccj          1/1     Running   0          28m
 
 ### Install Koperator
 
-You can deploy Koperator using a Helm chart. Complete the following steps.
+You can deploy Koperator using a Helm chart from GitHub Container Registry (OCI). Complete the following steps.
 
 1. Install the Koperator `CustomResourceDefinition` resources (adjust the version number to the Koperator release you want to install). This is performed in a separate step to allow you to uninstall and reinstall Koperator without deleting your already installed custom resources.
 
@@ -112,10 +112,30 @@ kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/ma
 kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_kafkausers.yaml
 ```
 
-1. Install Koperator into the `kafka` namespace:
+2. Install Koperator into the `kafka` namespace using the OCI Helm chart from GitHub Container Registry:
+
+> 📦 **View available versions**: [ghcr.io/adobe/koperator/chart](https://github.com/adobe/koperator/pkgs/container/koperator/chart)
 
 ```sh
-helm install kafka-operator --repo https://kubernetes-charts.banzaicloud.com kafka-operator --namespace=kafka --create-namespace
+# Install the latest release
+helm install kafka-operator oci://ghcr.io/adobe/koperator/chart --namespace=kafka --create-namespace
+
+# Or install a specific version (replace with desired version)
+helm install kafka-operator oci://ghcr.io/adobe/koperator/chart --version 0.28.0-adobe-20250911 --namespace=kafka --create-namespace
+```
+
+#### Pull and inspect the chart before installation
+
+```sh
+# Pull the chart locally
+helm pull oci://ghcr.io/adobe/koperator/chart --version 0.28.0-adobe-20250911
+
+# Extract and inspect
+tar -xzf chart-0.28.0-adobe-20250911.tgz
+helm template kafka-operator ./chart/
+
+# Install from local chart
+helm install kafka-operator ./chart/ --namespace=kafka --create-namespace
 ```
 
 1. Create the Kafka cluster using the `KafkaCluster` custom resource. The quick start uses a minimal custom resource, but there are other examples in the same directory.

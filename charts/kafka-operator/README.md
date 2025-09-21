@@ -1,30 +1,39 @@
 # Koperator chart
 
-The [Koperator](https://github.com/banzaicloud/koperator) is a Kubernetes operator to deploy and manage [Apache Kafka](https://kafka.apache.org) resources for a Kubernetes cluster.
+The [Koperator](https://github.com/adobe/koperator) is a Kubernetes operator to deploy and manage [Apache Kafka](https://kafka.apache.org) resources for a Kubernetes cluster.
 
 ## Prerequisites
 
 - Kubernetes 1.15.0+
+- Helm 3.8+ (for OCI registry support)
 
 ## Installing the chart
 
 Before installing the chart, you must first install the Koperator CustomResourceDefinition resources.
 This is performed in a separate step to allow you to easily uninstall and reinstall Koperator without deleting your installed custom resources.
 
-```
-kubectl create --validate=false -f https://github.com/banzaicloud/koperator/releases/download/v0.25.1/kafka-operator.crds.yaml
-```
-
-To install the chart:
-
-```
-$ helm repo add banzaicloud-stable https://kubernetes-charts.banzaicloud.com
-$ helm install kafka-operator --create-namespace --namespace=kafka banzaicloud-stable/kafka-operator
-```
-
-To install the operator using an already installed cert-manager
 ```bash
-$ helm install kafka-operator --set certManager.namespace=<your cert manager namespace> --namespace=kafka  --create-namespace banzaicloud-stable/kafka-operator
+kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_cruisecontroloperations.yaml
+kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_kafkaclusters.yaml
+kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_kafkatopics.yaml
+kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_kafkausers.yaml
+```
+
+To install the chart from the OCI registry:
+
+> 📦 **View available versions**: [ghcr.io/adobe/koperator/chart](https://github.com/adobe/koperator/pkgs/container/koperator/chart)
+
+```bash
+# Install the latest release
+helm install kafka-operator oci://ghcr.io/adobe/koperator/chart --namespace=kafka --create-namespace
+
+# Or install a specific version
+helm install kafka-operator oci://ghcr.io/adobe/koperator/chart --version 0.28.0-adobe-20250911 --namespace=kafka --create-namespace
+```
+
+To install the operator using an already installed cert-manager:
+```bash
+helm install kafka-operator oci://ghcr.io/adobe/koperator/chart --set certManager.namespace=<your cert manager namespace> --namespace=kafka --create-namespace
 ```
 
 ## Upgrading the chart
@@ -33,7 +42,11 @@ To upgrade the chart since the helm 3 limitation you have to set a value as well
 If this value is not set your CRDs might be deleted.
 
 ```bash
-helm upgrade kafka-operator --set --namespace=kafka banzaicloud-stable/kafka-operator
+# Upgrade to latest version
+helm upgrade kafka-operator oci://ghcr.io/adobe/koperator/chart --namespace=kafka
+
+# Upgrade to specific version
+helm upgrade kafka-operator oci://ghcr.io/adobe/koperator/chart --version 0.28.0-adobe-20250911 --namespace=kafka
 ```
 
 ## Uninstalling the Chart
@@ -52,8 +65,8 @@ The following table lists the configurable parameters of the Banzaicloud Kafka O
 
 Parameter | Description | Default
 --------- | ----------- | -------
-`operator.image.repository` | Operator container image repository | `ghcr.io/banzaicloud/kafka-operator`
-`operator.image.tag` | Operator container image tag | `v0.26.0-dev.0`
+`operator.image.repository` | Operator container image repository | `ghcr.io/adobe/koperator`
+`operator.image.tag` | Operator container image tag | `0.28.0-adobe-20250911`
 `operator.image.pullPolicy` | Operator container image pull policy | `IfNotPresent`
 `operator.serviceAccount.name` | ServiceAccount used by the operator pod | `kafka-operator`
 `operator.serviceAccount.create` | If true, create the `operator.serviceAccount.name` service account | `true`

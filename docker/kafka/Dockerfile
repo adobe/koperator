@@ -27,6 +27,9 @@ FROM debian:bullseye-slim
 
 ARG scala_version=2.13
 ARG kafka_version=3.9.1
+ARG VERSION
+ARG BUILT_AT
+ARG COMMIT
 
 
 RUN set -eux; \
@@ -122,5 +125,16 @@ COPY opt/kafka/config/log4j.properties ${KAFKA_HOME}/config/log4j.properties
 
 RUN chmod a+x ${KAFKA_HOME}/bin/*.sh
 RUN chmod g+rwX ${KAFKA_HOME} && mkdir -p ${KAFKA_HOME}/libs/extensions && chmod g+rwX ${KAFKA_HOME}/libs/extensions
+
+# Add metadata labels
+LABEL org.opencontainers.image.title="Apache Kafka"
+LABEL org.opencontainers.image.description="Apache Kafka with OpenJDK 21"
+LABEL org.opencontainers.image.vendor="Adobe"
+LABEL org.opencontainers.image.licenses="Apache-2.0"
+LABEL org.opencontainers.image.source="https://github.com/adobe/koperator"
+LABEL org.opencontainers.image.documentation="https://github.com/adobe/koperator/blob/main/docker/kafka/README.md"
+LABEL org.opencontainers.image.version="${VERSION}"
+LABEL org.opencontainers.image.created="${BUILT_AT}"
+LABEL org.opencontainers.image.revision="${COMMIT}"
 
 CMD ["kafka-server-start.sh"]
