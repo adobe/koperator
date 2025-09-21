@@ -56,7 +56,7 @@ const (
 	DefaultCruiseControlImage = "ghcr.io/banzaicloud/cruise-control:2.5.123"
 
 	// DefaultKafkaImage is the default Kafka image used when users don't specify it in KafkaClusterSpec.ClusterImage
-	DefaultKafkaImage = "ghcr.io/banzaicloud/kafka:2.13-3.4.1"
+	DefaultKafkaImage = "ghcr.io/adobe/kafka:2.13-3.9.1"
 
 	// ControllerNodeProcessRole represents the node is a controller node
 	ControllerNodeProcessRole = "controller"
@@ -126,7 +126,7 @@ const (
 	defaultKafkaClusterK8sClusterDomain  = "cluster.local"
 
 	// KafkaBroker.spec.container["kafka"].image
-	defaultKafkaImage = "ghcr.io/banzaicloud/kafka:2.13-3.4.1"
+	defaultKafkaImage = "ghcr.io/adobe/kafka:2.13-3.9.1"
 
 	/* Istio Ingress Config */
 

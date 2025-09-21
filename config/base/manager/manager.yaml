@@ -20,7 +20,7 @@ spec:
         - /manager
         args:
         - --enable-leader-election
-        image: ghcr.io/banzaicloud/kafka-operator:latest
+        image: ghcr.io/adobe/koperator:latest
         name: manager
         livenessProbe:
           initialDelaySeconds: 15
