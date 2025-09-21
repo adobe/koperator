@@ -3,7 +3,7 @@
 ![Koperator](https://img.shields.io/github/v/release/adobe/koperator?label=Koperator)
 ![Released](https://img.shields.io/github/release-date/adobe/koperator?label=Released)
 ![License](https://img.shields.io/github/license/adobe/koperator?label=License)
-![Go version (latest release)](https://img.shields.io/github/go-mod/go-version/adobe/koperator/0.28.0-adobe-20250911)
+![Go version (latest release)](https://img.shields.io/github/go-mod/go-version/adobe/koperator/0.28.0-adobe-20250921)
 
 </p>
 
@@ -114,24 +114,24 @@ kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/ma
 
 2. Install Koperator into the `kafka` namespace using the OCI Helm chart from GitHub Container Registry:
 
-> 📦 **View available versions**: [ghcr.io/adobe/koperator/chart](https://github.com/adobe/koperator/pkgs/container/koperator/chart)
+> 📦 **View available versions**: [ghcr.io/adobe/koperator/kafka-operator](https://github.com/adobe/koperator/pkgs/container/koperator/kafka-operator)
 
 ```sh
 # Install the latest release
-helm install kafka-operator oci://ghcr.io/adobe/koperator/chart --namespace=kafka --create-namespace
+helm install kafka-operator oci://ghcr.io/adobe/koperator/kafka-operator --namespace=kafka --create-namespace
 
 # Or install a specific version (replace with desired version)
-helm install kafka-operator oci://ghcr.io/adobe/koperator/chart --version 0.28.0-adobe-20250911 --namespace=kafka --create-namespace
+helm install kafka-operator oci://ghcr.io/adobe/koperator/kafka-operator --version 0.28.0-adobe-20250921 --namespace=kafka --create-namespace
 ```
 
 #### Pull and inspect the chart before installation
 
 ```sh
 # Pull the chart locally
-helm pull oci://ghcr.io/adobe/koperator/chart --version 0.28.0-adobe-20250911
+helm pull oci://ghcr.io/adobe/koperator/kafka-operator --version 0.28.0-adobe-20250921
 
 # Extract and inspect
-tar -xzf chart-0.28.0-adobe-20250911.tgz
+tar -xzf chart-0.28.0-adobe-20250921.tgz
 helm template kafka-operator ./chart/
 
 # Install from local chart

@@ -45,6 +45,8 @@ jobs:
       - name: Set Release Date
         run: |
           echo "BUILT_AT=$(date --rfc-3339=date)" >> ${GITHUB_ENV}
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       # Extract metadata (tags, labels) for Docker
@@ -62,6 +64,7 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
           build-args: |
             VERSION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
             BUILT_AT=${{ env.BUILT_AT }}
@@ -78,8 +81,8 @@ jobs:
       - name: Push Helm Chart to GHCR
         uses: appany/helm-oci-chart-releaser@v0.5.0
         with:
-          name: chart
-          repository: ${{ github.repository_owner }}
+          name: kafka-operator
+          repository: ${{ github.repository_owner }}/koperator
           tag: ${{ steps.vars.outputs.tag }}
           path: charts/kafka-operator
           registry: ${{ env.GHCR_REGISTRY }}
