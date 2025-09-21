@@ -4,13 +4,13 @@ shorttitle: Install
 weight: 10
 ---
 
-The operator installs version 3.1.0 of Apache Kafka, and can run on:
+The operator installs version 3.9.1 of Apache Kafka, and can run on:
 
 - Minikube v0.33.1+,
-- Kubernetes 1.21-1.24, and
+- Kubernetes 1.21+, and
 - Red Hat OpenShift 4.10-4.11.
 
-> The operator supports Kafka 2.6.2-3.1.x.
+> The operator supports Kafka 2.6.2-3.9.x.
 
 {{< include-headless "warning-ebs-csi-driver.md" >}}
 
@@ -542,7 +542,7 @@ Koperator can be deployed using its [Helm chart](https://github.com/adobe/kopera
     ```bash
     helm install \
     kafka-operator \
-    --repo https://kubernetes-charts.banzaicloud.com kafka-operator \
+    oci://ghcr.io/adobe/koperator/kafka-operator \
     --version {{< param "latest_version" >}} \
     --namespace=kafka \
     --create-namespace \
@@ -591,7 +591,7 @@ Koperator can be deployed using its [Helm chart](https://github.com/adobe/kopera
         ```bash
         kubectl create \
         -n kafka \
-        -f https://raw.githubusercontent.com/banzaicloud/koperator/v{{< param "latest_version" >}}/config/samples/simplekafkacluster.yaml
+        -f https://raw.githubusercontent.com/adobe/koperator/v{{< param "latest_version" >}}/config/samples/simplekafkacluster.yaml
         ```
 
     - To create a sample Kafka cluster that allows TLS-encrypted client connections, run the following command. For details on the configuration parameters related to SSL, see {{% xref "/docs/ssl.md#enable-ssl" %}}.
@@ -599,7 +599,7 @@ Koperator can be deployed using its [Helm chart](https://github.com/adobe/kopera
         ```bash
         kubectl create \
         -n kafka \
-        -f https://raw.githubusercontent.com/banzaicloud/koperator/v{{< param "latest_version" >}}/config/samples/simplekafkacluster_ssl.yaml
+        -f https://raw.githubusercontent.com/adobe/koperator/v{{< param "latest_version" >}}/config/samples/simplekafkacluster_ssl.yaml
         ```
 
     Expected output:
@@ -660,7 +660,7 @@ Koperator can be deployed using its [Helm chart](https://github.com/adobe/kopera
     ```bash
     kubectl create \
     -n kafka \
-    -f https://raw.githubusercontent.com/banzaicloud/koperator/v{{< param "latest_version" >}}/config/samples/kafkacluster-prometheus.yaml
+    -f https://raw.githubusercontent.com/adobe/koperator/v{{< param "latest_version" >}}/config/samples/kafkacluster-prometheus.yaml
     ```
 
     Expected output:

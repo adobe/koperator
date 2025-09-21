@@ -65,9 +65,9 @@ To change this behavior, modify the following lines at the end of the CR.
 ```yaml
 monitoringConfig:
    jmxImage describes the used prometheus jmx exporter agent container
-    jmxImage: "banzaicloud/jmx-javaagent:0.15.0"
+    jmxImage: "ghcr.io/amuraru/jmx-javaagent:0.19.1"
    pathToJar describes the path to the jar file in the given image
-    pathToJar: "/opt/jmx_exporter/jmx_prometheus_javaagent-0.15.0.jar"
+    pathToJar: "/opt/jmx_exporter/jmx_prometheus_javaagent-0.19.1.jar"
    kafkaJMXExporterConfig describes jmx exporter config for Kafka
     kafkaJMXExporterConfig: |
      lowercaseOutputName: true

@@ -19,6 +19,7 @@ When upgrading your Koperator deployment to a new version, complete the followin
 1. Update your Koperator deployment by running:
 
     ```bash
-    helm repo update
-    helm upgrade kafka-operator --namespace=kafka banzaicloud-stable/kafka-operator
+    helm upgrade kafka-operator \
+    oci://ghcr.io/adobe/koperator/kafka-operator \
+    --namespace=kafka
     ```

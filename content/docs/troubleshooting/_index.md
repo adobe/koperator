@@ -87,7 +87,7 @@ spec:
     id: 0
   - brokerConfigGroup: default
     id: 1
-  clusterImage: ghcr.io/banzaicloud/kafka:2.13-3.1.0
+  clusterImage: ghcr.io/adobe/kafka:2.13-3.9.1
   cruiseControlConfig:
     clusterConfig: |
       {
@@ -141,7 +141,7 @@ status:
             cruiseControlOperationReference:
               name: kafka-rebalance-bhs7n
             cruiseControlVolumeState: GracefulDiskRebalanceSucceeded
-      image: ghcr.io/banzaicloud/kafka:2.13-3.1.0
+      image: ghcr.io/adobe/kafka:2.13-3.9.1
       perBrokerConfigurationState: PerBrokerConfigInSync
       rackAwarenessState: ""
       version: 3.1.0
@@ -155,7 +155,7 @@ status:
             cruiseControlOperationReference:
               name: kafka-rebalance-bhs7n
             cruiseControlVolumeState: GracefulDiskRebalanceSucceeded
-      image: ghcr.io/banzaicloud/kafka:2.13-3.1.0
+      image: ghcr.io/adobe/kafka:2.13-3.9.1
       perBrokerConfigurationState: PerBrokerConfigInSync
       rackAwarenessState: ""
       version: 3.1.0

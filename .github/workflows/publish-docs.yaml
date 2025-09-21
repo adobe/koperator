@@ -60,7 +60,7 @@ jobs:
       cancel-in-progress: false
 
     environment:
-      name: github-pages-deploy
+      name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:

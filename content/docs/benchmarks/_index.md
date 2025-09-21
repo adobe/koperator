@@ -56,8 +56,10 @@ How to setup the environment for the Kafka Performance Test.
 1. Create a ZooKeeper cluster with 3 replicas using Pravega's Zookeeper Operator.
 
     ```bash
-    helm repo add banzaicloud-stable https://kubernetes-charts.banzaicloud.com/
-    helm install zookeeper-operator --namespace=zookeeper --create-namespace pravega/zookeeper-operator
+    helm install zookeeper-operator \
+    --repo https://charts.pravega.io zookeeper-operator \
+    --namespace=zookeeper \
+    --create-namespace
     kubectl create -f - <<EOF
     apiVersion: zookeeper.pravega.io/v1beta1
     kind: ZookeeperCluster
@@ -76,10 +78,13 @@ How to setup the environment for the Kafka Performance Test.
     ```
 
     ```bash
-    helm install kafka-operator --namespace=kafka --create-namespace banzaicloud-stable/kafka-operator
+    helm install kafka-operator \
+    oci://ghcr.io/adobe/koperator/kafka-operator \
+    --namespace=kafka \
+    --create-namespace
     ```
 
-1. Create a 3-broker Kafka Cluster using [this YAML file](https://raw.githubusercontent.com/banzaicloud/koperator/master/docs/benchmarks/infrastructure/kafka.yaml).
+1. Create a 3-broker Kafka Cluster using [this YAML file](https://raw.githubusercontent.com/adobe/koperator/master/docs/benchmarks/infrastructure/kafka.yaml).
 
     This will install 3 brokers with fast SSD. If you would like the brokers in different zones, modify the following configurations to match your environment and use them in the broker configurations:
 
@@ -148,7 +153,7 @@ Monitoring environment is automatically installed. To monitor the infrastructure
 
 ## Run the tests
 
-1. Run performance test against the cluster, by building [this Docker image](https://raw.githubusercontent.com/banzaicloud/koperator/master/docs/benchmarks/loadgens/Dockerfile).
+1. Run performance test against the cluster, by building [this Docker image](https://raw.githubusercontent.com/adobe/koperator/master/docs/benchmarks/loadgens/Dockerfile).
 
     ```bash
     docker build -t <yourname>/perfload:0.1.0 /loadgens

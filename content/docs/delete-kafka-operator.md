@@ -16,7 +16,7 @@ In case you want to delete the Koperator from your cluster, note that because of
     ```
     kubectl delete \
         -n kafka \
-        -f https://raw.githubusercontent.com/banzaicloud/koperator/{{< param "latest_version" >}}/config/samples/kafkacluster-prometheus.yaml
+        -f https://raw.githubusercontent.com/adobe/koperator/{{< param "latest_version" >}}/config/samples/kafkacluster-prometheus.yaml
     ```
 
     Expected output:
