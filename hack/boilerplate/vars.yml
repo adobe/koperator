@@ -15,6 +15,8 @@ license:
 copyright:
   owner: Cisco Systems, Inc. and/or its affiliates
   contact: https://cisco.com
+  adobe:
+    notice: Adobe. All rights reserved.
 spdx:
   # enable/disable including SPDX fields in license header
   enabled: false
