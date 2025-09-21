@@ -46,7 +46,7 @@ Note that depending on your use case, you might need additional configuration on
 As mentioned earlier, `broker.rack` is a read-only broker config, so is set whenever the broker starts or restarts. The [Koperator](https://github.com/adobe/koperator) holds all its configs within a ConfigMap in each broker.
 Getting label values from nodes and using them to generate a ConfigMap is relatively easy, but to determine where the exact broker/pod is scheduled, the operator has to wait until the pod is *actually* scheduled to a node. Luckily, Kubernetes schedules pods even when a given ConfigMap is unavailable. However, the corresponding pod will remain in a pending state as long as the ConfigMap is not available to mount. The operator makes use of this pending state to gather all the necessary node labels and initialize a ConfigMap with the fetched data. To take advantage of this, we introduced a status field called `RackAwarenessState` in our CRD. The operator populates this status field with two values, `WaitingForRackAwareness` and `Configured`.
 
-![Rack Awareness](/img/blog/kafka-rack-awareness/kafkarack.gif)
+![Rack Awareness](kafkarack.gif)
 
 ## When a broker fails
 

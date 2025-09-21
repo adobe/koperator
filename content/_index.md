@@ -7,7 +7,7 @@ title: Koperator
 	<a class="btn btn-lg btn-primary mr-3 mb-4" href="{{< relref "/docs/" >}}" title="Read the documentation">
 		Documentation <i class="fa-solid fa-circle-right ml-2"></i>
 	</a>
-	<a class="btn btn-lg btn-secondary mr-3 mb-4" href="/docs/install-kafka-operator/" title="Install Koperator">
+	<a class="btn btn-lg btn-secondary mr-3 mb-4" href="{{< relref "/docs/install-kafka-operator/" >}}" title="Install Koperator">
 		Install <i class="fa-brands fa-github ml-2 "></i>
 	</a>
 	<p class="lead mt-5">The Koperator (formerly called Banzai Cloud Kafka Operator) is a Kubernetes operator to automate provisioning, management, autoscaling and operations of Apache Kafka clusters deployed to Kubernetes.</p>
@@ -15,7 +15,7 @@ title: Koperator
 {{< /blocks/cover >}}
 
 {{< blocks/section color="dark" type="row">}}
-{{% blocks/feature icon="fa-lightbulb" title="Learn more about Koperator!" url="/docs/" %}}
+{{% blocks/feature icon="fa-lightbulb" title="Learn more about Koperator!" url="{{< relref \"/docs/\" >}}" %}}
 Read the Koperator documentation.
 {{% /blocks/feature %}}
 

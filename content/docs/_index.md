@@ -20,7 +20,7 @@ The Koperator (formerly called Banzai Cloud Kafka Operator) is a Kubernetes oper
 - graceful rolling upgrade
 - advanced topic and user management via CRD
 
-![Koperator architecture](/img/kafka-operator-arch.png)
+![Koperator architecture](../img/kafka-operator-arch.png)
 
 {{% include-headless "kafka-operator-intro.md" %}}
 
@@ -80,14 +80,14 @@ We know how to operate Apache Kafka at scale (we are contributors and have been 
 
 The Koperator externalizes access to Apache Kafka using a dynamically (re)configured Envoy proxy. Using Envoy allows us to use **a single** LoadBalancer, so there's no need for a LoadBalancer for each Broker.
 
-![Kafka External Access](/img/kafka-external.png)
+![Kafka External Access](../img/kafka-external.png)
 
 ### Communication via SSL
 
 The operator fully automates Kafka's SSL support.
 The operator can provision the required secrets and certificates for you, or you can provide your own.
 
-![SSL support for Kafka](/img/kafka-ssl.png)
+![SSL support for Kafka](../img/kafka-ssl.png)
 
 ### Monitoring via Prometheus
 

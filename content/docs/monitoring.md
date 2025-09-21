@@ -6,7 +6,7 @@ weight: 600
 
 
 
-This documentation shows you how to enable custom monitoring on an Apache Kafka cluster installed using the [Koperator](/products/kafka-operator/).
+This documentation shows you how to enable custom monitoring on an Apache Kafka cluster installed using the [Koperator]({{< relref "/docs/" >}}).
 
 ## Using Helm for Prometheus
 
