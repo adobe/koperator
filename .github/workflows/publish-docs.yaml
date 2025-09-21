@@ -26,13 +26,13 @@ jobs:
       - name: Set up Hugo
         uses: peaceiris/actions-hugo@6e295a6a0c9087bf374299e9d67f9d2edab9f18f # v3.0.0
         with:
-          hugo-version: '0.110.0'
+          hugo-version: 'latest'
           extended: true
 
       - name: Set up Node
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
-          node-version: 16
+          node-version: 20
 
       - name: Set up PostCSS
         run: npm install --save-dev autoprefixer postcss-cli postcss

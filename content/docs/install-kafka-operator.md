@@ -484,14 +484,14 @@ Koperator uses [Prometheus](https://prometheus.io/) for exporting metrics of the
 
 ### Install Koperator with Helm {#install-kafka-operator-with-helm}
 
-Koperator can be deployed using its [Helm chart](https://github.com/banzaicloud/koperator/tree/{{< param "latest_version" >}}/charts).
+Koperator can be deployed using its [Helm chart](https://github.com/adobe/koperator/tree/{{< param "latest_version" >}}/charts).
 
 1. Install the Koperator CustomResourceDefinition resources (adjust the version number to the Koperator release you want to install). This is performed in a separate step to allow you to uninstall and reinstall Koperator without deleting your installed custom resources.
 
     ```bash
     kubectl create \
     --validate=false \
-    -f https://github.com/banzaicloud/koperator/releases/download/v{{< param "latest_version" >}}/kafka-operator.crds.yaml
+    -f https://github.com/adobe/koperator/releases/download/v{{< param "latest_version" >}}/kafka-operator.crds.yaml
     ```
 
     Expected output:
@@ -554,7 +554,7 @@ Koperator can be deployed using its [Helm chart](https://github.com/banzaicloud/
 
     ```bash
     install.go:194: [debug] Original chart version: ""
-    install.go:211: [debug] CHART PATH: /Users/pregnor/development/src/github.com/banzaicloud/koperator/kafka-operator-{{< param "latest_version" >}}.tgz
+    install.go:211: [debug] CHART PATH: /Users/pregnor/development/src/github.com/adobe/koperator/kafka-operator-{{< param "latest_version" >}}.tgz
 
     # ...
     NAME: kafka-operator
@@ -582,7 +582,7 @@ Koperator can be deployed using its [Helm chart](https://github.com/banzaicloud/
 
 ### Deploy a Kafka cluster {#deploy-a-kafka-cluster}
 
-1. Create the Kafka cluster using the KafkaCluster custom resource. You can find various examples for the custom resource in {{% xref "/docs/configurations/_index.md" %}} and in the [Koperator repository](https://github.com/banzaicloud/koperator/tree/{{< param "latest_version" >}}/config/samples).
+1. Create the Kafka cluster using the KafkaCluster custom resource. You can find various examples for the custom resource in {{% xref "/docs/configurations/_index.md" %}} and in the [Koperator repository](https://github.com/adobe/koperator/tree/{{< param "latest_version" >}}/config/samples).
 
     {{< include-headless "warning-listener-protocol.md" >}}
 

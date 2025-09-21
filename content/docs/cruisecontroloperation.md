@@ -163,7 +163,7 @@ status:
 - The `state` shows the progress of the request.  
 - The `summary` is Cruise Control's optimization proposal. It shows the scope of the changes that Cruise Control will apply through the operation.  
 - The `retryCount` field shows the number of retries when a task has failed and `cruiseControlOperation.spec.errorPolicy` is set to `retry`. In this case, the `status.failedTask` field shows the history of the failed tasks (including their error messages).  
-For further information on the fields, see the [source code](https://github.com/banzaicloud/koperator/blob/master/api/v1alpha1/cruisecontroloperation_types.go).
+For further information on the fields, see the [source code](https://github.com/adobe/koperator/blob/master/api/v1alpha1/cruisecontroloperation_types.go).
 
 ## Control the created CruiseControlOperation {#control-cruisecontroloperation}
 

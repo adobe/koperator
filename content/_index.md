@@ -19,11 +19,9 @@ title: Koperator
 Read the Koperator documentation.
 {{% /blocks/feature %}}
 
-{{% blocks/feature icon="fa-brands fa-github" title="Contributions welcome!" url="https://github.com/banzaicloud/koperator" %}}
-We do a [Pull Request](https://github.com/banzaicloud/koperator/pulls) contributions workflow on **GitHub**. New users and developers are always welcome!
+{{% blocks/feature icon="fa-brands fa-github" title="Contributions welcome!" url="https://github.com/adobe/koperator" %}}
+We do a [Pull Request](https://github.com/adobe/koperator/pulls) contributions workflow on **GitHub**. New users and developers are always welcome!
 {{% /blocks/feature %}}
 
-{{% blocks/feature icon="fa-brands fa-slack" title="Come chat with us!" url="https://outshift.slack.com/messages/koperator" url_text="Join Slack" %}}
-In case you need help, you can find us on <a href="https://outshift.slack.com/messages/koperator">Slack</a>.
-{{% /blocks/feature %}}
 {{< /blocks/section >}}
+

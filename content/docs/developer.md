@@ -11,7 +11,7 @@ If you find this project useful here's how you can help:
 
 - Send a pull request with your new features and bug fixes
 - Help new users with issues they may encounter
-- Support the development of this project and [star this repo](https://github.com/banzaicloud/koperator/)!
+- Support the development of this project and [star this repo](https://github.com/adobe/koperator/)!
 
 When you are opening a PR to Koperator the first time we will require you to sign a standard CLA.
 

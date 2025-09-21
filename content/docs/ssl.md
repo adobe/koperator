@@ -31,7 +31,7 @@ If `sslSecrets.create` is `false`, the operator will look for the secret at `ssl
 
 ### Listeners not used for internal broker and controller communication
 
-In [this **KafkaCluster** custom resource](https://github.com/banzaicloud/koperator/blob/master/config/samples/kafkacluster_with_ssl_hybrid_customcert.yaml), SSL is enabled for all listeners, and certificates are automatically generated for "inner" and "controller" listeners. The "external" and "internal" listeners will use the user-provided certificates. The **serverSSLCertSecret** key is a reference to the Kubernetes secret that contains the server certificate for the listener to be used for SSL communication.
+In [this **KafkaCluster** custom resource](https://github.com/adobe/koperator/blob/master/config/samples/kafkacluster_with_ssl_hybrid_customcert.yaml), SSL is enabled for all listeners, and certificates are automatically generated for "inner" and "controller" listeners. The "external" and "internal" listeners will use the user-provided certificates. The **serverSSLCertSecret** key is a reference to the Kubernetes secret that contains the server certificate for the listener to be used for SSL communication.
 
 In the server secret, the following keys must be set:
 
@@ -45,7 +45,7 @@ The certificates in the listener configuration must be in JKS format.
 
 ### Listeners used for internal broker or controller communication
 
-In [this **KafkaCluster** custom resource](https://github.com/banzaicloud/koperator/blob/master/config/samples/kafkacluster_with_ssl_groups_customcert.yaml), SSL is enabled for all listeners, and user-provided server certificates. In that case, when a custom certificate is used for a listener which is used for internal broker or controller communication, you must also specify the client certificate. The client certificate will be used by Koperator, Cruise Control, Cruise Control Metrics Reporter to communicate on SSL. The **clientSSLCertSecret** key is a reference to the Kubernetes secret where the custom client SSL certificate can be provided. The client certificate must be signed by the same CA authority as the server certificate for the corresponding listener. The **clientSSLCertSecret** has to be in the **KafkaCluster** custom resource spec field.
+In [this **KafkaCluster** custom resource](https://github.com/adobe/koperator/blob/master/config/samples/kafkacluster_with_ssl_groups_customcert.yaml), SSL is enabled for all listeners, and user-provided server certificates. In that case, when a custom certificate is used for a listener which is used for internal broker or controller communication, you must also specify the client certificate. The client certificate will be used by Koperator, Cruise Control, Cruise Control Metrics Reporter to communicate on SSL. The **clientSSLCertSecret** key is a reference to the Kubernetes secret where the custom client SSL certificate can be provided. The client certificate must be signed by the same CA authority as the server certificate for the corresponding listener. The **clientSSLCertSecret** has to be in the **KafkaCluster** custom resource spec field.
 The client secret must contain the keystore and truststore JKS files and the password for them in base64 encoded format.
 
 In the server secret the following keys must be set:
