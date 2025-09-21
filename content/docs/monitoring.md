@@ -58,7 +58,7 @@ Prometheus must be configured to recognize these annotations. The following exam
       target_label: __address__
 ```
 
-If you are using the provided [CR](https://github.com/banzaicloud/koperator/blob/master/config/samples/banzaicloud_v1beta1_kafkacluster.yaml), the operator installs the official [jmx exporter](https://github.com/prometheus/jmx_exporter) for Prometheus.
+If you are using the provided [CR](https://github.com/adobe/koperator/blob/master/config/samples/banzaicloud_v1beta1_kafkacluster.yaml), the operator installs the official [jmx exporter](https://github.com/prometheus/jmx_exporter) for Prometheus.
 
 To change this behavior, modify the following lines at the end of the CR.
 

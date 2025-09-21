@@ -84,7 +84,7 @@ To configure an external listener that uses the LoadBalancer access method, comp
 
     Configure the ingress controller you want to use:
 
-    - To use Envoy, set the `ingressController` field in the `KafkaCluster` custom resource to `envoy`. For an example, [see](https://github.com/banzaicloud/koperator/blob/672b19d49e5c0a22f9658181003beddb56f17d33/config/samples/banzaicloud_v1beta1_kafkacluster.yaml#L12).
+    - To use Envoy, set the `ingressController` field in the `KafkaCluster` custom resource to `envoy`. For an example, [see](https://github.com/adobe/koperator/blob/672b19d49e5c0a22f9658181003beddb56f17d33/config/samples/banzaicloud_v1beta1_kafkacluster.yaml#L12).
 
       For OpenShift:
 
@@ -107,7 +107,7 @@ To configure an external listener that uses the LoadBalancer access method, comp
         ingressController: "envoy"
       ```
 
-    - To use Istio ingress controller set the `ingressController` field to `istioingress`. [Istio operator](https://github.com/banzaicloud/istio-operator) v2 is supported from Koperator version 0.21.0+. Istio operator v2 supports multiple Istio control plane on the same cluster, that is why the corresponding control plane to the gateway must be specified. The `istioControlPlane` field in the `KafkaCluster` custom resource is a reference to that IstioControlPlane resource. For an example, [see](https://github.com/banzaicloud/koperator/blob/672b19d49e5c0a22f9658181003beddb56f17d33/config/samples/kafkacluster-with-istio.yaml#L10).
+    - To use Istio ingress controller set the `ingressController` field to `istioingress`. [Istio operator](https://github.com/banzaicloud/istio-operator) v2 is supported from Koperator version 0.21.0+. Istio operator v2 supports multiple Istio control plane on the same cluster, that is why the corresponding control plane to the gateway must be specified. The `istioControlPlane` field in the `KafkaCluster` custom resource is a reference to that IstioControlPlane resource. For an example, [see](https://github.com/adobe/koperator/blob/672b19d49e5c0a22f9658181003beddb56f17d33/config/samples/kafkacluster-with-istio.yaml#L10).
 
       ```yaml
       spec:

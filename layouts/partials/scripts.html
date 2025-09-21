@@ -62,9 +62,7 @@ window.markmap = {
 
 {{ $jsBs := resources.Get "vendor/bootstrap/dist/js/bootstrap.bundle.js" -}}
 {{ $jsBase := resources.Get "js/base.js" -}}
-{{ $jsAnchor := resources.Get "js/anchor.js" -}}
 {{ $jsSearch := resources.Get "js/search.js" | resources.ExecuteAsTemplate "js/search.js" .Site.Home -}}
-{{ $jsMermaid := resources.Get "js/mermaid.js" | resources.ExecuteAsTemplate "js/mermaid.js" . -}}
 {{ $jsMarkmap := resources.Get "js/markmap.js" | resources.ExecuteAsTemplate "js/markmap.js" . -}}
 {{ $jsPlantuml := resources.Get "js/plantuml.js" | resources.ExecuteAsTemplate "js/plantuml.js" . -}}
 {{ $jsDrawio := resources.Get "js/drawio.js" | resources.ExecuteAsTemplate "js/drawio.js" . -}}
@@ -72,11 +70,10 @@ window.markmap = {
   {{ $jsSearch = resources.Get "js/offline-search.js" -}}
 {{ end -}}
 
-{{ $jsArray := slice $jsBs $jsBase $jsAnchor $jsSearch $jsPlantuml $jsMarkmap $jsDrawio -}}
+{{ $jsArray := slice $jsBs $jsBase $jsSearch $jsPlantuml $jsMarkmap $jsDrawio -}}
 
 {{ if $needmermaid -}}
-{{ $jsArray = $jsArray | append $jsMermaid -}}
-<script src="https://cdn.jsdelivr.net/npm/mermaid@9.2.2/dist/mermaid.min.js" integrity="sha512-IX+bU+wShHqfqaMHLMrtwi4nK6W/Z+QdZoL4kPNtRxI2wCLyHPMAdl3a43Fv1Foqv4AP+aiW6hg1dcrTt3xc+Q==" crossorigin="anonymous"></script>
+{{- partial "scripts/mermaid.html" . -}}
 {{ end -}}
 
 {{ $js := $jsArray | resources.Concat "js/main.js" -}}

@@ -10,16 +10,16 @@ This page shows you the list of supported Koperator versions, and the versions o
 
 |Operator Version|Apache Kafka Version|JMX Exporter Version|Cruise Control Version|Istio Operator Version|Example cluster CR|Maintained|
 |-------|------|----------------|-------|----|---|-|
-|v0.18.3|2.6.2+|0.15.0|2.5.37|1.10|[link](https://github.com/banzaicloud/koperator/blob/v0.18.3/config/samples/simplekafkacluster.yaml)|-|
-|v0.19.0|2.6.2+|0.15.0|2.5.68|1.10|[link](https://github.com/banzaicloud/koperator/blob/v0.19.0/config/samples/simplekafkacluster.yaml)|-|
-|v0.20.0|2.6.2+|0.15.0|2.5.68|1.10|[link](https://github.com/banzaicloud/koperator/blob/v0.20.0/config/samples/simplekafkacluster.yaml)|-|
-|v0.20.2|2.6.2+|0.16.1|2.5.80|1.10|[link](https://github.com/banzaicloud/koperator/blob/v0.20.2/config/samples/simplekafkacluster.yaml)|-|
-|v0.21.0|2.6.2+|0.16.1|2.5.86|2.11|[link](https://github.com/banzaicloud/koperator/blob/v0.21.0/config/samples/simplekafkacluster.yaml)|-|
-|v0.21.1|2.6.2+|0.16.1|2.5.86|2.11|[link](https://github.com/banzaicloud/koperator/blob/v0.21.1/config/samples/simplekafkacluster.yaml)|-|
-|v0.21.2|2.6.2+|0.16.1|2.5.86|2.11|[link](https://github.com/banzaicloud/koperator/blob/v0.21.2/config/samples/simplekafkacluster.yaml)|-|
-|v0.22.0|2.6.2+|0.16.1|2.5.101|2.15.3|[link](https://github.com/banzaicloud/koperator/blob/v0.22.0/config/samples/simplekafkacluster.yaml)|+|
-|v0.23.0|2.6.2+|0.16.1|2.5.101|2.15.3|[link](https://github.com/banzaicloud/koperator/blob/v0.23.0/config/samples/simplekafkacluster.yaml)|+|
-|v0.24.0|2.6.2+|0.16.1|2.5.101|2.15.3|[link](https://github.com/banzaicloud/koperator/blob/v0.24.0/config/samples/simplekafkacluster.yaml)|+|
+|v0.18.3|2.6.2+|0.15.0|2.5.37|1.10|[link](https://github.com/adobe/koperator/blob/v0.18.3/config/samples/simplekafkacluster.yaml)|-|
+|v0.19.0|2.6.2+|0.15.0|2.5.68|1.10|[link](https://github.com/adobe/koperator/blob/v0.19.0/config/samples/simplekafkacluster.yaml)|-|
+|v0.20.0|2.6.2+|0.15.0|2.5.68|1.10|[link](https://github.com/adobe/koperator/blob/v0.20.0/config/samples/simplekafkacluster.yaml)|-|
+|v0.20.2|2.6.2+|0.16.1|2.5.80|1.10|[link](https://github.com/adobe/koperator/blob/v0.20.2/config/samples/simplekafkacluster.yaml)|-|
+|v0.21.0|2.6.2+|0.16.1|2.5.86|2.11|[link](https://github.com/adobe/koperator/blob/v0.21.0/config/samples/simplekafkacluster.yaml)|-|
+|v0.21.1|2.6.2+|0.16.1|2.5.86|2.11|[link](https://github.com/adobe/koperator/blob/v0.21.1/config/samples/simplekafkacluster.yaml)|-|
+|v0.21.2|2.6.2+|0.16.1|2.5.86|2.11|[link](https://github.com/adobe/koperator/blob/v0.21.2/config/samples/simplekafkacluster.yaml)|-|
+|v0.22.0|2.6.2+|0.16.1|2.5.101|2.15.3|[link](https://github.com/adobe/koperator/blob/v0.22.0/config/samples/simplekafkacluster.yaml)|+|
+|v0.23.0|2.6.2+|0.16.1|2.5.101|2.15.3|[link](https://github.com/adobe/koperator/blob/v0.23.0/config/samples/simplekafkacluster.yaml)|+|
+|v0.24.0|2.6.2+|0.16.1|2.5.101|2.15.3|[link](https://github.com/adobe/koperator/blob/v0.24.0/config/samples/simplekafkacluster.yaml)|+|
 
 ## Available Koperator images
 

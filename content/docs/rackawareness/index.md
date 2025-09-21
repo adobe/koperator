@@ -8,7 +8,7 @@ Kafka automatically replicates partitions across brokers, so if a broker fails, 
 
 > Note: All brokers deployed by Koperator must belong to the same Kubernetes cluster.
 
-Since rack awareness is so vitally important, especially in multi-region and hybrid-cloud environments, the [Koperator](https://github.com/banzaicloud/koperator) provides an automated solution for it, and allows fine-grained broker rack configuration based on pod affinities and anti-affinities.
+Since rack awareness is so vitally important, especially in multi-region and hybrid-cloud environments, the [Koperator](https://github.com/adobe/koperator) provides an automated solution for it, and allows fine-grained broker rack configuration based on pod affinities and anti-affinities.
 
 When [well-known Kubernetes labels](https://kubernetes.io/docs/reference/kubernetes-api/labels-annotations-taints/) are available (for example, AZ, node labels, and so on), the Koperator attempts to improve broker resilience by default.
 
@@ -43,7 +43,7 @@ Note that depending on your use case, you might need additional configuration on
 
 ## Under the hood
 
-As mentioned earlier, `broker.rack` is a read-only broker config, so is set whenever the broker starts or restarts. The [Koperator](https://github.com/banzaicloud/koperator) holds all its configs within a ConfigMap in each broker.
+As mentioned earlier, `broker.rack` is a read-only broker config, so is set whenever the broker starts or restarts. The [Koperator](https://github.com/adobe/koperator) holds all its configs within a ConfigMap in each broker.
 Getting label values from nodes and using them to generate a ConfigMap is relatively easy, but to determine where the exact broker/pod is scheduled, the operator has to wait until the pod is *actually* scheduled to a node. Luckily, Kubernetes schedules pods even when a given ConfigMap is unavailable. However, the corresponding pod will remain in a pending state as long as the ConfigMap is not available to mount. The operator makes use of this pending state to gather all the necessary node labels and initialize a ConfigMap with the fetched data. To take advantage of this, we introduced a status field called `RackAwarenessState` in our CRD. The operator populates this status field with two values, `WaitingForRackAwareness` and `Configured`.
 
 ![Rack Awareness](/img/blog/kafka-rack-awareness/kafkarack.gif)
