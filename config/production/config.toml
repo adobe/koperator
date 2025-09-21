@@ -1,4 +1,4 @@
-baseurl = "https://banzaicloud.github.io/koperator-docs/"
+baseurl = "https://opensource.adobe.com/koperator/"
 buildDrafts = false
 #googleAnalytics = "G-FIXME"
 
@@ -9,4 +9,4 @@ buildDrafts = false
 
 [params]
 
-url_latest_version = "https://banzaicloud.github.io/koperator-docs/"
+url_latest_version = "https://opensource.adobe.com/koperator/"

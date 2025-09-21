@@ -185,7 +185,7 @@ status:
 
 ## Getting Support
 
-If you encounter any problems that the documentation does not address, [file an issue](https://github.com/banzaicloud/koperator/issues) or talk to us on the Banzai Cloud Slack channel [#kafka-operator](https://slack.banzaicloud.io/).
+If you encounter any problems that the documentation does not address, [file an issue](https://github.com/adobe/koperator/issues).
 
 Various [support]({{< relref "/docs/support.md">}}) channels are also available for Koperator.
 

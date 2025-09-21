@@ -77,9 +77,9 @@ weight = 1
   url_latest_version = "/"
 
   # Repository configuration (URLs for in-page links to opening issues and suggesting changes)
-  github_repo = "https://github.com/banzaicloud/koperator-docs"
+  github_repo = "https://github.com/adobe/koperator/tree/gh-pages"
   # An optional link to a related project repo. For example, the sibling repository where your product code lives.
-  github_project_repo = "https://github.com/banzaicloud/koperator"
+  github_project_repo = "https://github.com/adobe/koperator"
 
   # Specify a value here if your content directory is not in your repo's root directory
   # github_subdir = ""
@@ -130,39 +130,12 @@ weight = 1
   enable = true
 
   [params.links]
-  # End user relevant links. These will show up on left side of footer and in the community page if you have one.
-  #[[params.links.user]]
-  #  name = "Community forum"
-  #  url = "https://community.cisco.com/t5/application-networking-and/bd-p/dev-app-networking"
-  #  icon = "fa fa-envelope"
-  #  desc = "Discussion and help from your fellow users"
-  #[[params.links.user]]
-  #  name ="Twitter"
-  #  url = "https://twitter.com/ciscoemerge"
-  #  icon = "fab fa-twitter"
-  #  desc = "Follow us on Twitter to get the latest news!"
-  #[[params.links.user]]
-  #  name = "Linkedin"
-  #  url = "https://linkedin.com/cisco-emerging-technologies-and-incubation"
-  #  icon = "fab fa-linkedin"
-  #  desc = "Follow us on Twitter to get the latest news!"
-  # Developer relevant links. These will show up on right side of footer and in the community page if you have one.
   [[params.links.developer]]
     name = "GitHub"
-    url = "https://github.com/banzaicloud/koperator"
+    url = "https://github.com/adobe/koperator"
     icon = "fab fa-github"
     desc = "Get involved with Koperator development"
-  [[params.links.developer]]
-    name = "Slack"
-    url = "https://outshift.slack.com"
-    icon = "fab fa-slack"
-    desc = "Chat with the project developers"
-  #[[params.links.developer]]
-  #  name = "Developer mailing list"
-  #  url = "https://example.org/mail"
-  #  icon = "fa fa-envelope"
-  #  desc = "Discuss development issues around the project"
-
+  
 ###############################################################################
 # Hugo - Top-level navigation (horizontal)
 ###############################################################################
@@ -171,22 +144,13 @@ weight = 1
     name = "Project page"
     weight = -110
     pre = "<i class='fab fa-github pr-2'></i>"
-    url = "https://github.com/banzaicloud/koperator"
-#  [[menu.main]]
-#    name = "Blog"
-#    weight = -120
-#    pre = "<i class='fas fa-blog pr-2'></i>"
-#    url = "https://github.com/bank-vaults/"
+    url = "https://github.com/adobe/koperator"
   [[menu.main]]
     name = "Documentation"
     weight = -100
     pre = "<i class='fas fa-book pr-2'></i>"
     url = "/docs/"
-  [[menu.main]]
-    name = "Community"
-    url = "https://outshift.slack.com"
-    pre = "<i class='fab fa-slack pr-2'></i>"
-    weight = 150
+
 
 ###############################################################################
 # Misc customizations
