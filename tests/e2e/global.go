@@ -31,7 +31,7 @@ var (
 		ReleaseName:  "cert-manager",
 		Namespace:    "cert-manager",
 		SetValues: map[string]string{
-			"installCRDs": "true",
+			"installCRDs": "false",
 		},
 		RemoteCRDPathVersionTemplate: "https://github.com/jetstack/cert-manager/releases/download/v%s/cert-manager.crds.yaml",
 	}
@@ -83,17 +83,6 @@ var (
 		return koperatorLocalHelmDescriptor
 	}()
 
-	// koperatorLocalHelmDescriptor describes the Koperator Helm component with
-	// a remote latest chart and version.
-	koperatorRemoteLatestHelmDescriptor = helmDescriptor{ //nolint:unused // Note: intentional possibly needed in the future for upgrade test.
-		Repository:                   "https://kubernetes-charts.banzaicloud.com",
-		ChartName:                    "kafka-operator",
-		ChartVersion:                 "", // Note: empty string translates to latest final version.
-		ReleaseName:                  "kafka-operator",
-		Namespace:                    "kafka",
-		RemoteCRDPathVersionTemplate: "https://github.com/banzaicloud/koperator/releases/download/%s/kafka-operator.crds.yaml",
-	}
-
 	// prometheusOperatorHelmDescriptor describes the prometheus-operator Helm
 	// component.
 	prometheusOperatorHelmDescriptor = helmDescriptor{
@@ -123,14 +112,15 @@ var (
 	// zookeeperOperatorHelmDescriptor describes the zookeeper-operator Helm
 	// component.
 	zookeeperOperatorHelmDescriptor = helmDescriptor{
-		Repository:   "https://charts.pravega.io",
-		ChartName:    "zookeeper-operator",
-		ChartVersion: "0.2.15",
+		Repository:   "",
+		ChartName:    "oci://ghcr.io/adobe/helm-charts/zookeeper-operator",
+		ChartVersion: "0.2.15-adobe-20250923",
 		ReleaseName:  "zookeeper-operator",
 		Namespace:    "zookeeper",
 		SetValues: map[string]string{
-			"crd.create": "true",
+			"crd.create": "false",
 		},
+		RemoteCRDPathVersionTemplate: "https://raw.githubusercontent.com/adobe/zookeeper-operator/%s/config/crd/bases/zookeeper.pravega.io_zookeeperclusters.yaml",
 	}
 
 	// dependencyCRDs storing the Koperator dependencies CRDs name

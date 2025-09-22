@@ -385,7 +385,7 @@ func expectKafkaBrokerPod(ctx context.Context, kafkaCluster *v1beta1.KafkaCluste
 	Expect(pod.Spec.Containers[1]).To(WithTransform(getContainerName, Equal("test-container")))
 	container := pod.Spec.Containers[0]
 	Expect(container.Name).To(Equal("kafka"))
-	Expect(container.Image).To(Equal("ghcr.io/adobe/kafka:2.13-3.9.1"))
+	Expect(container.Image).To(Equal("ghcr.io/adobe/koperator/kafka:2.13-3.9.1"))
 	Expect(container.Lifecycle).NotTo(BeNil())
 	Expect(container.Lifecycle.PreStop).NotTo(BeNil())
 	if kafkaCluster.Spec.KRaftMode && broker.BrokerConfig.IsControllerNode() {

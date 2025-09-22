@@ -53,10 +53,10 @@ const (
 	IsControllerNodeKey = "isControllerNode"
 
 	// DefaultCruiseControlImage is the default CC image used when users don't specify it in CruiseControlConfig.Image
-	DefaultCruiseControlImage = "ghcr.io/banzaicloud/cruise-control:2.5.123"
+	DefaultCruiseControlImage = "adobe/cruise-control:3.0.3-adbe-20250804"
 
 	// DefaultKafkaImage is the default Kafka image used when users don't specify it in KafkaClusterSpec.ClusterImage
-	DefaultKafkaImage = "ghcr.io/adobe/kafka:2.13-3.9.1"
+	DefaultKafkaImage = "ghcr.io/adobe/koperator/kafka:2.13-3.9.1"
 
 	// ControllerNodeProcessRole represents the node is a controller node
 	ControllerNodeProcessRole = "controller"
@@ -110,7 +110,7 @@ const (
 	/* Cruise Control Config */
 
 	// CruiseControlDeployment.spec.template.spec.container["%s-cruisecontrol"].image
-	defaultCruiseControlImage = "ghcr.io/banzaicloud/cruise-control:2.5.123"
+	defaultCruiseControlImage = "adobe/cruise-control:3.0.3-adbe-20250804"
 
 	// CruiseControlDeployment.spec.template.spec.container["%s-cruisecontrol"].resources
 	defaultCruiseControlRequestResourceCpu    = "200m"
@@ -126,7 +126,7 @@ const (
 	defaultKafkaClusterK8sClusterDomain  = "cluster.local"
 
 	// KafkaBroker.spec.container["kafka"].image
-	defaultKafkaImage = "ghcr.io/adobe/kafka:2.13-3.9.1"
+	defaultKafkaImage = "ghcr.io/adobe/koperator/kafka:2.13-3.9.1"
 
 	/* Istio Ingress Config */
 
@@ -145,7 +145,7 @@ const (
 
 	// KafkaBrokerPod.spec.initContainer[jmx-exporter].image
 	// kafkaClusterDeployment.spec.template.spec.initContainer["jmx-exporter"].image
-	defaultMonitorImage = "ghcr.io/banzaicloud/jmx-javaagent:0.16.1"
+	defaultMonitorImage = "ghcr.io/amuraru/jmx-javaagent:0.19.2"
 
 	// KafkaBrokerPod.spec.initContainer["jmx-exporter"].command
 	// kafkaClusterDeployment.spec.template.spec.initContainer["jmx-exporter"].command

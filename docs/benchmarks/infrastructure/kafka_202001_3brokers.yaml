@@ -7,8 +7,8 @@ metadata:
 spec:
   kRaft: false
   monitoringConfig:
-    jmxImage: "banzaicloud/jmx-javaagent:0.13.0"
-    pathToJar: "/opt/jmx_exporter/jmx_prometheus_javaagent-0.13.0.jar"
+    jmxImage: "ghcr.io/amuraru/jmx-javaagent:0.19.2"
+    pathToJar: "/jmx_prometheus_javaagent.jar"
     kafkaJMXExporterConfig: |2
       lowercaseOutputName: true
       lowercaseOutputLabelNames: true
@@ -66,7 +66,7 @@ spec:
   zkAddresses:
     - "zookeeper-server-client.zookeeper:2181"
   oneBrokerPerNode: true
-  clusterImage: "ghcr.io/adobe/kafka:2.13-3.9.1"
+  clusterImage: "ghcr.io/adobe/koperator/kafka:2.13-3.9.1"
   readOnlyConfig: |
     auto.create.topics.enable=false
     min.insync.replicas=3
