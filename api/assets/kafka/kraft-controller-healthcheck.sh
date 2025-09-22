@@ -25,16 +25,16 @@ if [ "$skip_check" = "true" ]; then
 fi
 
 JMX_ENDPOINT="http://localhost:9020/metrics"
-METRIC_PREFIX="kafka_server_raft_metrics_current_state_"
+METRIC_NAME="kafka_server_raft_metrics_current_state_info"
 
-# Fetch the matching current-state metric with value of 1.0 from the JMX endpoint
-MATCHING_METRIC=$(curl -s "$JMX_ENDPOINT" | grep "^${METRIC_PREFIX}" | awk '$2 == 1.0 {print $1}')
+# Fetch the current-state metric with value of 1.0 from the JMX endpoint
+MATCHING_METRIC=$(curl -s "$JMX_ENDPOINT" | grep "^${METRIC_NAME}" | awk '$2 == 1.0 {print $0}')
 
 # If it's not empty, it means we found a metric with a value of 1.0.
 if [ -n "$MATCHING_METRIC" ]; then
-    # Determine the state of the controller using the last field name of the metric 
-    # Possible values are leader, candidate, voted, follower, unattached, observer
-    STATE=$(echo "$MATCHING_METRIC" | rev | cut -d'_' -f1 | rev)
+    # Extract the state from the label state="value" in the metric line
+    # Possible values are leader, candidate, voted, follower, unattached, observer  
+    STATE=$(echo "$MATCHING_METRIC" | sed -n 's/.*state="\([^"]*\)".*/\1/p')
 
     # Check if the extracted state is 'leader' or 'follower'
     if [ "$STATE" == "leader" ] || [ "$STATE" == "follower" ]; then
@@ -46,6 +46,6 @@ if [ -n "$MATCHING_METRIC" ]; then
         exit 1
     fi
 else
-    echo "JMX Exporter endpoint is not avaiable or kafka_server_raft_metrics_current_state_ was not found."
+    echo "JMX Exporter endpoint is not avaiable or kafka_server_raft_metrics_current_state_info was not found."
     exit 0
 fi
