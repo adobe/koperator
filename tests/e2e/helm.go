@@ -24,6 +24,7 @@ import (
 	"path"
 	"regexp"
 	"strings"
+	"time"
 
 	"emperror.dev/errors"
 	"github.com/gruntwork-io/terratest/modules/helm"
@@ -93,10 +94,27 @@ func (helmDescriptor *helmDescriptor) downloadAndInstallRemoteCRDs(kubectlOption
 
 	ginkgo.By(fmt.Sprintf("Downloading CRD from %s", crdURL))
 
-	// Download the CRD content
-	resp, err := http.Get(crdURL)
+	// Download the CRD content with retry logic
+	var resp *http.Response
+	var err error
+	maxRetries := 3
+	for i := 0; i < maxRetries; i++ {
+		ginkgo.By(fmt.Sprintf("Downloading attempt %d/%d", i+1, maxRetries))
+		resp, err = http.Get(crdURL)
+		if err == nil && resp.StatusCode == http.StatusOK {
+			break
+		}
+		if resp != nil {
+			resp.Body.Close()
+		}
+		if i < maxRetries-1 {
+			ginkgo.By(fmt.Sprintf("Download failed, retrying in 2 seconds... Error: %v", err))
+			time.Sleep(2 * time.Second)
+		}
+	}
+
 	if err != nil {
-		return errors.WrapIfWithDetails(err, "downloading remote CRD failed", "url", crdURL)
+		return errors.WrapIfWithDetails(err, "downloading remote CRD failed after retries", "url", crdURL)
 	}
 	defer resp.Body.Close()
 

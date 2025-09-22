@@ -150,9 +150,12 @@ func getK8sCRD(kubectlOptions k8s.KubectlOptions, crdName string) ([]byte, error
 	}
 
 	ginkgo.By(fmt.Sprintf("Getting CRD %s", crdName))
+	// CRDs are cluster-scoped, so we need to remove the namespace from kubectlOptions
+	clusterScopedOptions := kubectlOptions
+	clusterScopedOptions.Namespace = ""
 	output, err := k8s.RunKubectlAndGetOutputE(
 		ginkgo.GinkgoT(),
-		&kubectlOptions,
+		&clusterScopedOptions,
 		[]string{"get", "crd", "--output", "json", crdName}...,
 	)
 	if err != nil {
@@ -399,10 +402,13 @@ func listK8sCRDs(kubectlOptions k8s.KubectlOptions, crdNames ...string) ([]strin
 		ginkgo.By(fmt.Sprintf("Listing CRDs filtered for CRD names %+v", crdNames))
 	}
 
+	// CRDs are cluster-scoped, so we need to remove the namespace from kubectlOptions
+	clusterScopedOptions := kubectlOptions
+	clusterScopedOptions.Namespace = ""
 	args := append([]string{"get", "crd", "--output", "name"}, crdNames...)
 	output, err := k8s.RunKubectlAndGetOutputE(
 		ginkgo.GinkgoT(),
-		&kubectlOptions,
+		&clusterScopedOptions,
 		args...,
 	)
 	if err != nil {

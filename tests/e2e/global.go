@@ -120,7 +120,7 @@ var (
 		SetValues: map[string]string{
 			"crd.create": "false",
 		},
-		RemoteCRDPathVersionTemplate: "https://github.com/adobe/zookeeper-operator/blob/master/charts/zookeeper-operator/templates/zookeeper.pravega.io_zookeeperclusters_crd.yaml",
+		RemoteCRDPathVersionTemplate: "https://raw.githubusercontent.com/adobe/zookeeper-operator/%s/config/crd/bases/zookeeper.pravega.io_zookeeperclusters.yaml",
 	}
 
 	// dependencyCRDs storing the Koperator dependencies CRDs name
