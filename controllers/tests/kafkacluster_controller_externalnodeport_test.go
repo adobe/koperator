@@ -197,8 +197,11 @@ var _ = Describe("KafkaClusterNodeportExternalAccess", Ordered, func() {
 	When("NodePortExternalIP is configured", func() {
 		BeforeEach(func() {
 			allocatedNodePorts = nil
-			safePort = GetNodePort(1)
-			allocatedNodePorts = append(allocatedNodePorts, safePort)
+			safePort = GetNodePort(3)
+			// Allocate all 3 ports for the 3 brokers to avoid conflicts
+			for i := int32(0); i < 3; i++ {
+				allocatedNodePorts = append(allocatedNodePorts, safePort+i)
+			}
 			// update the external listener config with a nodeport listener
 			kafkaCluster.Spec.ListenersConfig.ExternalListeners = []v1beta1.ExternalListenerConfig{
 				{
