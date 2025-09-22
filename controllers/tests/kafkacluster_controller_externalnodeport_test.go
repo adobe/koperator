@@ -104,6 +104,12 @@ var _ = Describe("KafkaClusterNodeportExternalAccess", Ordered, func() {
 	When("hostnameOverride is configured with externalStartingPort 0", func() {
 		BeforeEach(func() {
 			allocatedNodePorts = nil
+			// Pre-allocate ports even when using auto-assignment to prevent conflicts
+			// Allocate 3 consecutive ports for the 3 brokers to avoid race conditions
+			safePort = GetNodePort(3)
+			for i := int32(0); i < 3; i++ {
+				allocatedNodePorts = append(allocatedNodePorts, safePort+i)
+			}
 			kafkaCluster.Spec.ListenersConfig.ExternalListeners = []v1beta1.ExternalListenerConfig{
 				{
 					CommonListenerSpec: v1beta1.CommonListenerSpec{
@@ -139,9 +145,6 @@ var _ = Describe("KafkaClusterNodeportExternalAccess", Ordered, func() {
 
 				port := service.Spec.Ports[0].NodePort
 				assignedNodePortPerBroker[broker.Id] = port
-
-				nodePorts[port] = true
-				allocatedNodePorts = append(allocatedNodePorts, port)
 			}
 
 			Expect(kafkaCluster.Status.ListenerStatuses).To(Equal(v1beta1.ListenerStatuses{
@@ -194,8 +197,11 @@ var _ = Describe("KafkaClusterNodeportExternalAccess", Ordered, func() {
 	When("NodePortExternalIP is configured", func() {
 		BeforeEach(func() {
 			allocatedNodePorts = nil
-			safePort = GetNodePort(1)
-			allocatedNodePorts = append(allocatedNodePorts, safePort)
+			safePort = GetNodePort(3)
+			// Allocate all 3 ports for the 3 brokers to avoid conflicts
+			for i := int32(0); i < 3; i++ {
+				allocatedNodePorts = append(allocatedNodePorts, safePort+i)
+			}
 			// update the external listener config with a nodeport listener
 			kafkaCluster.Spec.ListenersConfig.ExternalListeners = []v1beta1.ExternalListenerConfig{
 				{

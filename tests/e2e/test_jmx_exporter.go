@@ -55,12 +55,12 @@ func requireJmxMetrics(kubectlOptions k8s.KubectlOptions) {
 		checkMetricExistsForBrokers(kubectlOptions, kafkaLabelSelectorAll, "kafka_server_", true)
 	})
 
-	ginkgo.It("When kraft mode is enabled, brokers/controllers should have kafka_server_raft_metrics_current_state_ metric available", func() {
+	ginkgo.It("When kraft mode is enabled, brokers/controllers should have kafka_server_raft_metrics_current_state_info metric available", func() {
 		if kRaftEnabled {
-			checkMetricExistsForBrokers(kubectlOptions, kafkaLabelSelectorBrokers, "kafka_server_raft_metrics_current_state_", true)
-			checkMetricExistsForBrokers(kubectlOptions, kafkaLabelSelectorControllers, "kafka_server_raft_metrics_current_state_", true)
+			checkMetricExistsForBrokers(kubectlOptions, kafkaLabelSelectorBrokers, "kafka_server_raft_metrics_current_state_info", true)
+			checkMetricExistsForBrokers(kubectlOptions, kafkaLabelSelectorControllers, "kafka_server_raft_metrics_current_state_info", true)
 		} else {
-			checkMetricExistsForBrokers(kubectlOptions, kafkaLabelSelectorBrokers, "kafka_server_raft_metrics_current_state_", false)
+			checkMetricExistsForBrokers(kubectlOptions, kafkaLabelSelectorBrokers, "kafka_server_raft_metrics_current_state_info", false)
 		}
 	})
 }
