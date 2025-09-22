@@ -18,6 +18,8 @@ package e2e
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path"
 	"regexp"
@@ -75,6 +77,42 @@ func (helmDescriptor *helmDescriptor) crdPath() (string, error) { //nolint:unuse
 	))
 
 	return createTempFileFromBytes(localCRDsBytes, "", "", 0)
+}
+
+// downloadAndInstallRemoteCRDs downloads CRDs from RemoteCRDPathVersionTemplate and installs them
+func (helmDescriptor *helmDescriptor) downloadAndInstallRemoteCRDs(kubectlOptions k8s.KubectlOptions) error {
+	if helmDescriptor.RemoteCRDPathVersionTemplate == "" {
+		return nil // No remote CRDs to install
+	}
+
+	// Generate the CRD URL using the version template
+	crdURL := fmt.Sprintf(
+		helmDescriptor.RemoteCRDPathVersionTemplate,
+		strings.TrimPrefix(helmDescriptor.ChartVersion, "v"),
+	)
+
+	ginkgo.By(fmt.Sprintf("Downloading CRD from %s", crdURL))
+
+	// Download the CRD content
+	resp, err := http.Get(crdURL)
+	if err != nil {
+		return errors.WrapIfWithDetails(err, "downloading remote CRD failed", "url", crdURL)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return errors.NewWithDetails("remote CRD download failed", "url", crdURL, "status", resp.StatusCode)
+	}
+
+	crdContent, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return errors.WrapIfWithDetails(err, "reading remote CRD content failed", "url", crdURL)
+	}
+
+	ginkgo.By("Installing downloaded CRD")
+
+	// Install the CRD
+	return installK8sCRD(kubectlOptions, crdContent, false)
 }
 
 // installHelmChart checks whether the specified named Helm release exists in
@@ -157,6 +195,19 @@ func (helmDescriptor *helmDescriptor) installHelmChart(kubectlOptions k8s.Kubect
 
 		return nil
 	case !isInstalled:
+		// Install remote CRDs if specified
+		if helmDescriptor.RemoteCRDPathVersionTemplate != "" {
+			ginkgo.By("Installing remote CRDs before Helm chart installation")
+			err := helmDescriptor.downloadAndInstallRemoteCRDs(kubectlOptions)
+			if err != nil {
+				return errors.WrapIfWithDetails(
+					err,
+					"installing remote CRDs failed",
+					"releaseName", helmDescriptor.ReleaseName,
+				)
+			}
+		}
+
 		ginkgo.By(
 			fmt.Sprintf(
 				"Installing Helm chart %s from %s with version %s by name %s",
@@ -264,7 +315,8 @@ func (helmDescriptor *helmDescriptor) uninstallHelmChart(kubectlOptions k8s.Kube
 // repository URL.
 func (helmDescriptor *helmDescriptor) IsRemote() bool {
 	return helmDescriptor.Repository == "" || // Note: default repository.
-		strings.HasPrefix(helmDescriptor.Repository, "https://") // Note: explicit repository.
+		strings.HasPrefix(helmDescriptor.Repository, "https://") || // Note: explicit repository.
+		strings.HasPrefix(helmDescriptor.Repository, "oci://") // Note: OCI registry.
 }
 
 // HelmReleaseStatus describes the possible states of a Helm release.

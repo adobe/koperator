@@ -173,6 +173,10 @@ func pruneUnnecessaryClusterResourceNames(resourceNameList []string) []string {
 		if strings.HasPrefix(name, "cilium") {
 			continue
 		}
+		// ComponentStatus is deprecated in Kubernetes v1.19+ and causes warnings
+		if name == "componentstatuses" {
+			continue
+		}
 		updatedList = append(updatedList, name)
 	}
 	return updatedList
