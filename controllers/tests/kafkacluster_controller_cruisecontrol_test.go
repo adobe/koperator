@@ -277,7 +277,7 @@ func expectCruiseControlDeployment(ctx context.Context, kafkaCluster *v1beta1.Ka
 	Expect(deployment.Spec.Template.Spec.InitContainers).To(HaveLen(1))
 	initContainer := deployment.Spec.Template.Spec.InitContainers[0]
 	Expect(initContainer.Name).To(Equal("jmx-exporter"))
-	Expect(initContainer.Image).To(Equal("ghcr.io/banzaicloud/jmx-javaagent:0.16.1"))
+	Expect(initContainer.Image).To(Equal("ghcr.io/amuraru/jmx-javaagent:0.19.2"))
 	Expect(initContainer.Command).To(Equal([]string{"cp", "/jmx_prometheus_javaagent.jar", "/opt/jmx-exporter/jmx_prometheus.jar"}))
 	Expect(initContainer.VolumeMounts).To(ConsistOf(corev1.VolumeMount{
 		Name:      "jmx-jar-data",

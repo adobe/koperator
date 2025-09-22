@@ -145,7 +145,7 @@ const (
 
 	// KafkaBrokerPod.spec.initContainer[jmx-exporter].image
 	// kafkaClusterDeployment.spec.template.spec.initContainer["jmx-exporter"].image
-	defaultMonitorImage = "ghcr.io/banzaicloud/jmx-javaagent:0.16.1"
+	defaultMonitorImage = "ghcr.io/amuraru/jmx-javaagent:0.19.2"
 
 	// KafkaBrokerPod.spec.initContainer["jmx-exporter"].command
 	// kafkaClusterDeployment.spec.template.spec.initContainer["jmx-exporter"].command
