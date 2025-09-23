@@ -8,7 +8,7 @@ require (
 	github.com/banzaicloud/koperator v0.25.1
 	github.com/banzaicloud/koperator/api v0.28.8
 	github.com/cisco-open/k8s-objectmatcher v1.10.0
-	github.com/gruntwork-io/terratest v0.50.0
+	github.com/gruntwork-io/terratest v0.51.0
 	github.com/onsi/ginkgo/v2 v2.25.3
 	github.com/onsi/gomega v1.38.2
 	github.com/twmb/franz-go v1.19.5
