@@ -18,6 +18,7 @@ package tests
 import (
 	"fmt"
 	"sync/atomic"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -98,6 +99,23 @@ var _ = Describe("KafkaClusterNodeportExternalAccess", Ordered, func() {
 		Expect(err).NotTo(HaveOccurred())
 		// deletes all nodeports in the test namespace, to ensure a clean sheet, as garbage collection does not work in envtest
 		Expect(deleteNodePorts(ctx, kafkaCluster)).Should(Succeed())
+
+		// Wait for services to be fully deleted to prevent port conflicts
+		Eventually(func() int {
+			var serviceList corev1.ServiceList
+			err := k8sClient.List(ctx, &serviceList, client.InNamespace(namespace))
+			if err != nil {
+				return -1
+			}
+			nodePortCount := 0
+			for _, service := range serviceList.Items {
+				if service.Spec.Type == corev1.ServiceTypeNodePort {
+					nodePortCount++
+				}
+			}
+			return nodePortCount
+		}, 30*time.Second, 100*time.Millisecond).Should(Equal(0), "NodePort services should be fully deleted")
+
 		kafkaCluster = nil
 	})
 
