@@ -11,8 +11,8 @@ replicaCount: 1
 operator:
   annotations: {}
   image:
-    repository: ghcr.io/adobe/koperator/kafka-operator
-    tag: "0.28.0-adobe-20250921"
+    repository: ghcr.io/adobe/koperator
+    tag: 0.28.0-adobe-20250923
     pullPolicy: IfNotPresent
   # In constrained environments where operator cannot
   # be granted cluster level roles, users can configure

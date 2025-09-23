@@ -303,6 +303,11 @@ func GetNodePort(portAmount int32) int32 {
 			continue
 		}
 
+		// Ensure the port range doesn't cross into the high conflict zone
+		if port+portAmount >= 32025 && port <= 32035 {
+			continue
+		}
+
 		allAvailable := true
 		for i := int32(0); i <= portAmount; i++ {
 			if nodePorts[port+i] {
