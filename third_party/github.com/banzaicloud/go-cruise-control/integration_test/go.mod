@@ -4,7 +4,7 @@ go 1.25
 
 require (
 	github.com/banzaicloud/go-cruise-control v0.0.0
-	github.com/docker/compose/v2 v2.39.3
+	github.com/docker/compose/v2 v2.39.4
 	github.com/go-logr/logr v1.4.3
 	github.com/go-logr/zapr v1.3.0
 	github.com/onsi/ginkgo/v2 v2.25.3
@@ -51,7 +51,7 @@ require (
 	github.com/buger/goterm v1.0.4 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/compose-spec/compose-go/v2 v2.8.2 // indirect
+	github.com/compose-spec/compose-go/v2 v2.9.0 // indirect
 	github.com/containerd/console v1.0.5 // indirect
 	github.com/containerd/containerd/v2 v2.1.4 // indirect
 	github.com/containerd/continuity v0.4.5 // indirect
