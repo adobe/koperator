@@ -756,4 +756,55 @@ func checkAndPrintKafkaPodStatus(kubectlOptions k8s.KubectlOptions, namespace st
 		return
 	}
 	ginkgo.By(fmt.Sprintf("Kafka pod status in namespace %s:\n%s", namespace, output))
+
+	// Get pod names to describe them individually
+	podNamesArgs := []string{
+		"get", "pods",
+		"-n", namespace,
+		"-l", fmt.Sprintf("%s=%s,app=kafka", v1beta1.KafkaCRLabelKey, kafkaClusterName),
+		"-o", "jsonpath={.items[*].metadata.name}",
+	}
+
+	podNamesOutput, err := k8s.RunKubectlAndGetOutputE(
+		ginkgo.GinkgoT(),
+		&kubectlOptions,
+		podNamesArgs...,
+	)
+
+	if err != nil {
+		ginkgo.By(fmt.Sprintf("Failed to get Kafka pod names: %v", err))
+		return
+	}
+
+	podNames := strings.Fields(podNamesOutput)
+	for _, podName := range podNames {
+		if podName == "" {
+			continue
+		}
+
+		// Get only the Events section for focused debugging
+		eventsArgs := []string{
+			"get", "events",
+			"-n", namespace,
+			"--field-selector", fmt.Sprintf("involvedObject.name=%s", podName),
+			"--sort-by", ".lastTimestamp",
+		}
+
+		eventsOutput, err := k8s.RunKubectlAndGetOutputE(
+			ginkgo.GinkgoT(),
+			&kubectlOptions,
+			eventsArgs...,
+		)
+
+		if err != nil {
+			ginkgo.By(fmt.Sprintf("Failed to get events for pod %s: %v", podName, err))
+			continue
+		}
+
+		if strings.TrimSpace(eventsOutput) != "" {
+			ginkgo.By(fmt.Sprintf("Events for Kafka pod %s:\n%s", podName, eventsOutput))
+		} else {
+			ginkgo.By(fmt.Sprintf("No events found for Kafka pod %s", podName))
+		}
+	}
 }
