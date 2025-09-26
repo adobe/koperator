@@ -2,17 +2,24 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+# -- Operator replica count can be set
 replicaCount: 1
 
 # Lists the secrets you need to use to pull kafka-operator image from a private registry.
+# -- Image pull secrets can be set
 # imagePullSecrets:
 #   - name: secret-with-private-registry-key
 
+# -- (operator docs)
 operator:
+  # -- Operator pod annotations can be set
   annotations: {}
   image:
+    # -- Operator container image repository
     repository: ghcr.io/adobe/koperator
+    # -- Operator container image tag
     tag: 0.28.0-adobe-20250923
+    # -- Operator container image pull policy
     pullPolicy: IfNotPresent
   # In constrained environments where operator cannot
   # be granted cluster level roles, users can configure
@@ -23,91 +30,122 @@ operator:
   # When this field is not empty and Cert-manager is used,
   # the Cert-manager's Custom Resource Namespace must be included in the comma separated list.
   # When it is empty, all namespaces will be watched.
+  # -- List of namespaces where Operator watches for custom resources.<br><br>**Note** that the operator still requires to read the cluster-scoped `Node` labels to configure `rack awareness`. Make sure the operator ServiceAccount is granted `get` permissions on this `Node` resource when using limited RBACs.
   namespaces: "kafka, cert-manager"
+  # -- Enable verbose logging
   verboseLogging: false
+  # -- Enable development logging
   developmentLogging: false
+  # -- (operator resources)
   resources:
+    # -- CPU/Memory limits
     limits:
       cpu: 200m
       memory: 256Mi
+    # -- CPU/Memory requests
     requests:
       cpu: 200m
       memory: 256Mi
   serviceAccount:
+    # -- If true, create the `operator.serviceAccount.name` service account
     create: true
+    # -- ServiceAccount used by the operator pod
     name: kafka-operator
 
 webhook:
+  # -- Operator will activate the admission webhooks for custom resources
   enabled: true
 #  serverPort:
 #  tls:
 #    certDir: ""
   certs:
+    # -- Helm chart will generate cert for the webhook
     generate: true
+    # -- Helm chart will use the secret name applied here for the cert
     secret: "kafka-operator-serving-cert"
 
 certManager:
+  # -- Operator will integrate with the cert manager
   enabled: false
+  # -- Operator will look for the cert manager in this namespace
   # namespace field specifies the Cert-manager's Cluster Resource Namespace.
   # https://cert-manager.io/docs/configuration/
   namespace: "cert-manager"
 
 certSigning:
+  # -- Enable native certificate signing integration
   enabled: true
 
 alertManager:
+  # -- AlertManager can be enabled
   enable: true
+  # -- AlertManager port
   port: 9001
   permissivePeerAuthentication:
+    # -- Permissive PeerAuthentication (Istio resource) for AlertManager can be created
     create: false
 
 prometheusMetrics:
+  # -- If true, use direct access for Prometheus metrics
   enabled: true
   authProxy:
+    # -- If true, use auth proxy for Prometheus metrics
     enabled: true
     image:
-      repository: gcr.io/kubebuilder/kube-rbac-proxy
-      tag: v0.15.0
+      # -- Auth proxy container image repository
+      repository: quay.io/brancz/kube-rbac-proxy
+      # -- Auth proxy container image tag
+      tag: v0.20.0
+      # -- Auth proxy container image pull policy
       pullPolicy: IfNotPresent
     serviceAccount:
+      # -- If true, create the service account (see `prometheusMetrics.authProxy.serviceAccount.name`) used by prometheus auth proxy
       create: true
+      # -- ServiceAccount used by prometheus auth proxy
       name: kafka-operator-authproxy
 
+# -- Health probes configuration
 healthProbes: {}
   # port:
 
 #metricEndpoint:
 #  port:
 
+# -- Release name can be overwritten
 nameOverride: ""
+# -- Release full name can be overwritten
 fullnameOverride: ""
 
 rbac:
+  # -- Create rbac service account and roles
   enabled: true
 
+# -- Operator pod node selector can be set
 nodeSelector: {}
 
-tolerations: []
+# -- Operator pod tolerations can be set
+tolerances: []
 
+# -- Operator pod affinity can be set
 affinity: {}
 
-## Additional Sidecars Configuration.
+# -- Additional Sidecars Configuration
 additionalSidecars: {}
 # - name: nginx
 #   image: nginx:latest
 
-## Additional Environment Variables.
+# -- Additional Environment Variables
 additionalEnv: {}
 
-## Additional volumes required for sidecar(s).
+# -- Additional volumes required for sidecars
 additionalVolumes: {}
 # - name: volume1
 #   emptyDir: {}
 # - name: volume2
 #   emptyDir: {}
 
-# Pod Security Context
+# -- Pod Security Context
 # See https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
 podSecurityContext: {}
-# Container Security Context
+# -- Container Security Context
 containerSecurityContext: {}
