@@ -19,7 +19,7 @@ REL_TAG = $(shell ./scripts/increment_version.sh -${RELEASE_TYPE} ${TAG})
 
 # Version constants
 GOLANGCI_VERSION = 2.4.0 # renovate: datasource=github-releases depName=golangci/golangci-lint
-LICENSEI_VERSION = 0.9.0 # renovate: datasource=github-releases depName/goph/licensei
+LICENSEI_VERSION = 0.9.0 # renovate: datasource=github-releases depName=goph/licensei
 CONTROLLER_GEN_VERSION = v0.19.0 # renovate: datasource=github-releases depName=kubernetes-sigs/controller-tools
 ENVTEST_K8S_VERSION = 1.34.0 # renovate: datasource=github-releases depName=kubernetes/kubernetes
 SETUP_ENVTEST_VERSION := latest

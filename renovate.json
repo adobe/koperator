@@ -8,7 +8,6 @@
     ":semanticPrefixFixDepsChoreOthers",
     ":updateNotScheduled",
     ":automergeDisabled",
-    ":ignoreModulesAndTests",
     "helpers:disableTypesNodeMajor",
     ":prHourlyLimitNone",
     ":prConcurrentLimitNone",
@@ -18,6 +17,13 @@
   "postUpdateOptions": [
     "gomodTidy",
     "gomodUpdateImportPaths"
+  ],
+  "fileMatch": [
+    "(^|/)go\\.mod$",
+    "(^|/)go\\.sum$",
+    "(^|/)Makefile$",
+    "(^|/)pom\\.xml$",
+    "(^|/)Dockerfile$"
   ],
   "packageRules": [
     {
@@ -34,6 +40,12 @@
       ],
       "matchPackageNames": [
         "*"
+      ],
+      "matchDepTypes": [
+        "require",
+        "action",
+        "maven",
+        "docker"
       ]
     },
     {
@@ -46,6 +58,12 @@
       ],
       "matchPackageNames": [
         "*"
+      ],
+      "matchDepTypes": [
+        "require",
+        "action",
+        "maven",
+        "docker"
       ]
     }
   ]
