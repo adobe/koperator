@@ -28,6 +28,7 @@ import (
 
 	"emperror.dev/errors"
 	"github.com/Masterminds/sprig/v3"
+	"github.com/banzaicloud/koperator/api/v1beta1"
 	"github.com/cisco-open/k8s-objectmatcher/patch"
 	"github.com/gruntwork-io/terratest/modules/k8s"
 	ginkgo "github.com/onsi/ginkgo/v2"
@@ -493,6 +494,11 @@ func applyK8sResourceFromTemplate(kubectlOptions k8s.KubectlOptions, templateFil
 // with the apiGroupSelector parameter the result can be narrowed by the resource group.
 // extraArgs can be any kubectl api-resources parameter.
 func listK8sResourceKinds(kubectlOptions k8s.KubectlOptions, apiGroupSelector string, extraArgs ...string) ([]string, error) {
+	// Only log if verbose logging is enabled
+	if os.Getenv("E2E_VERBOSE_LOGGING") == "true" {
+		ginkgo.By(fmt.Sprintf("Listing K8s resource kinds for apiGroup: '%s'", apiGroupSelector))
+	}
+
 	args := []string{"api-resources", "--verbs", "list", "--output", "name", "--sort-by", "name"}
 
 	if apiGroupSelector != "" {
@@ -626,4 +632,128 @@ func kubectlRemoveWarnings(outputSlice []string) []string {
 
 func isKubectlNotFoundError(err error) bool {
 	return err != nil && strings.Contains(err.Error(), kubectlNotFoundErrorMsg)
+}
+
+// setupReducedLogging configures reduced logging for terratest operations
+func setupReducedLogging() {
+	// Set environment variables to reduce terratest logging verbosity
+	if os.Getenv("E2E_VERBOSE_LOGGING") != "true" {
+		// Reduce terratest internal logging
+		os.Setenv("TEST_LOG_LEVEL", "-5")
+		// Reduce kubectl verbosity
+		os.Setenv("KUBECTL_VERBOSITY", "0")
+	}
+}
+
+// waitForKafkaClusterWithPodStatusCheck waits for KafkaCluster to be ready and checks pod status every 10 seconds
+func waitForKafkaClusterWithPodStatusCheck(kubectlOptions k8s.KubectlOptions, clusterName string, timeout time.Duration) error {
+	// Only log if verbose logging is enabled
+	if os.Getenv("E2E_VERBOSE_LOGGING") == "true" {
+		ginkgo.By(fmt.Sprintf("Waiting for KafkaCluster %s to be ready with pod status checks", clusterName))
+	}
+
+	startTime := time.Now()
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		// Check if timeout has been reached
+		if time.Since(startTime) > timeout {
+			return fmt.Errorf("timeout waiting for KafkaCluster %s to be ready after %v", clusterName, timeout)
+		}
+
+		// Check KafkaCluster status
+		args := []string{
+			"get", "kafkaclusters.kafka.banzaicloud.io", clusterName,
+			"-o", "jsonpath={.status.state}",
+			"-n", kubectlOptions.Namespace,
+		}
+
+		output, err := k8s.RunKubectlAndGetOutputE(
+			ginkgo.GinkgoT(),
+			&kubectlOptions,
+			args...,
+		)
+
+		if err != nil {
+			// If we can't get the status, continue waiting
+			<-ticker.C
+			continue
+		}
+
+		// Check if the cluster is running
+		if strings.TrimSpace(output) == "ClusterRunning" {
+			// Cluster is running, now check all Kafka pods in the namespace
+			if err := checkAllKafkaPodsInNamespace(kubectlOptions, kubectlOptions.Namespace); err == nil {
+				// All Kafka pods are ready
+				return nil
+			}
+			// If pods aren't ready yet, continue waiting
+		} else {
+			// Cluster is not running, check and print Kafka pod status for debugging
+			checkAndPrintKafkaPodStatus(kubectlOptions, kubectlOptions.Namespace)
+		}
+
+		// Wait for next check
+		<-ticker.C
+		continue
+	}
+}
+
+// checkAllKafkaPodsInNamespace checks that all Kafka pods in the namespace are ready
+func checkAllKafkaPodsInNamespace(kubectlOptions k8s.KubectlOptions, namespace string) error {
+	// Get Kafka pods with the same label selector as the original verification
+	args := []string{
+		"get", "pods",
+		"-n", namespace,
+		"-l", fmt.Sprintf("%s=%s,app=kafka", v1beta1.KafkaCRLabelKey, kafkaClusterName),
+		"-o", "jsonpath={range .items[*]}{.metadata.name}{.status.phase}{.status.containerStatuses[*].ready}{\"\\n\"}{end}",
+	}
+
+	output, err := k8s.RunKubectlAndGetOutputE(
+		ginkgo.GinkgoT(),
+		&kubectlOptions,
+		args...,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+
+		// Check if pod is running and ready
+		if !strings.Contains(line, "Running") || strings.Contains(line, "false") {
+			return fmt.Errorf("kafka pod not ready: %s", line)
+		}
+	}
+
+	return nil
+}
+
+// checkAndPrintKafkaPodStatus checks and prints the status of Kafka pods for debugging
+func checkAndPrintKafkaPodStatus(kubectlOptions k8s.KubectlOptions, namespace string) {
+	// Get Kafka pod status with the same label selector as the original verification
+	args := []string{
+		"get", "pods",
+		"-n", namespace,
+		"-l", fmt.Sprintf("%s=%s,app=kafka", v1beta1.KafkaCRLabelKey, kafkaClusterName),
+		"-o", "wide",
+	}
+
+	output, err := k8s.RunKubectlAndGetOutputE(
+		ginkgo.GinkgoT(),
+		&kubectlOptions,
+		args...,
+	)
+
+	if err != nil {
+		ginkgo.By(fmt.Sprintf("Failed to get Kafka pod status: %v", err))
+		return
+	}
+	ginkgo.By(fmt.Sprintf("Kafka pod status in namespace %s:\n%s", namespace, output))
 }

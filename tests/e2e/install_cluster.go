@@ -42,7 +42,7 @@ func requireCreatingKafkaCluster(kubectlOptions k8s.KubectlOptions, manifestPath
 		}
 
 		ginkgo.By("Verifying the KafkaCluster state")
-		err := waitK8sResourceCondition(kubectlOptions, kafkaKind, fmt.Sprintf("jsonpath={.status.state}=%s", string(v1beta1.KafkaClusterRunning)), kafkaClusterCreateTimeout, "", kafkaClusterName)
+		err := waitForKafkaClusterWithPodStatusCheck(kubectlOptions, kafkaClusterName, kafkaClusterCreateTimeout)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		ginkgo.By("Verifying the CruiseControl pod")
