@@ -36,21 +36,34 @@ jobs:
         with:
           version: '3.19.0'
           
+      - name: Clean Go module cache
+        run: |
+          # Clean any existing Go module cache to avoid conflicts
+          # Use sudo to handle permission issues and force removal
+          sudo rm -rf ~/go/pkg/mod || true
+          mkdir -p ~/go/pkg/mod
+          # Ensure proper permissions
+          chmod -R 755 ~/go/pkg/mod
+
       - name: Cache Go modules
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: ~/go/pkg/mod
           key: ${{ runner.os }}-gomod-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-gomod-
+          enableCrossOsArchive: false
+          fail-on-cache-miss: false
             
       - name: Cache Go build cache
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: ~/.cache/go-build
           key: ${{ runner.os }}-gobuild-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-gobuild-
+          enableCrossOsArchive: false
+          fail-on-cache-miss: false
           
       # Enable Tmate Session if you'd like to Debut the E2E Kind Cluster
       # - name: Setup tmate session
@@ -78,6 +91,18 @@ jobs:
           cd api && go mod download && cd ..
           cd properties && go mod download && cd ..
           cd tests/e2e && go mod download && cd ../..
+
+      - name: Save Go modules cache
+        uses: actions/cache/save@v4
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-gomod-${{ hashFiles('**/go.sum') }}
+
+      - name: Save Go build cache
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/go-build
+          key: ${{ runner.os }}-gobuild-${{ github.sha }}
           
       - name: Run E2E tests
         env:

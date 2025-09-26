@@ -6,7 +6,7 @@ BIN_DIR := $(PROJECT_DIR)/bin
 BOILERPLATE_DIR := $(PROJECT_DIR)/hack/boilerplate
 
 # Image URL to use all building/pushing image targets
-TAG ?= $(shell git describe --tags --abbrev=0 --match 'v[0-9].*[0-9].*[0-9]' 2>/dev/null )
+TAG ?= $(shell git describe --tags --abbrev=0 --match '[0-9].*[0-9].*[0-9]*' 2>/dev/null )
 IMG ?= ghcr.io/adobe/kafka-operator:$(TAG)
 
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
@@ -17,15 +17,20 @@ RELEASE_MSG ?= "koperator release"
 
 REL_TAG = $(shell ./scripts/increment_version.sh -${RELEASE_TYPE} ${TAG})
 
-GOLANGCI_VERSION = 2.4.0
-LICENSEI_VERSION = 0.9.0
+# Version constants
+GOLANGCI_VERSION = 2.4.0 # renovate: datasource=github-releases depName=golangci/golangci-lint
+LICENSEI_VERSION = 0.9.0 # renovate: datasource=github-releases depName/goph/licensei
+CONTROLLER_GEN_VERSION = v0.19.0 # renovate: datasource=github-releases depName=kubernetes-sigs/controller-tools
+ENVTEST_K8S_VERSION = 1.34.0 # renovate: datasource=github-releases depName=kubernetes/kubernetes
+SETUP_ENVTEST_VERSION := latest
+ADDLICENSE_VERSION := 1.2.0 # renovate: datasource=github-releases depName=google/addlicense
+GOTEMPLATE_VERSION := 3.12.0 # renovate: datasource=github-releases depName=cznic/gotemplate
+MOCKGEN_VERSION := 0.6.0 # renovate: datasource=github-releases depName=uber-go/mock
+
 GOPROXY=https://proxy.golang.org
 
-CONTROLLER_GEN_VERSION = v0.19.0
 # Use BIN_DIR to form an absolute, stable path regardless of `cd` usage
 CONTROLLER_GEN = $(BIN_DIR)/controller-gen
-
-ENVTEST_K8S_VERSION = 1.34.x!
 
 KUSTOMIZE_BASE = config/overlays/specific-manager-version
 
@@ -181,7 +186,6 @@ bin/controller-gen-$(CONTROLLER_GEN_VERSION): ## Download versioned controller-g
 # find or download setup-envtest
 
 # https://github.com/kubernetes-sigs/controller-runtime/commits/main/tools/setup-envtest
-SETUP_ENVTEST_VERSION := 42a14a36c13b95dd6bc8b4ba69c181b16d50e3c0
 
 bin/setup-envtest: $(BIN_DIR)/setup-envtest-$(SETUP_ENVTEST_VERSION) ## Symlink setup-envtest-<version> into versionless setup-envtest.
 	@ln -sf setup-envtest-$(SETUP_ENVTEST_VERSION) $(BIN_DIR)/setup-envtest
@@ -213,7 +217,16 @@ update-go-deps: ## Update Go modules dependencies.
 		) \
 	done
 
-ADDLICENSE_VERSION := 1.2.0
+tidy: ## Run go mod tidy in all Go modules.
+	@echo "Finding all directories with go.mod files..."
+	@for gomod in $$(find . -name "go.mod" | sort); do \
+		dir=$$(dirname $$gomod); \
+		( \
+		echo "Running go mod tidy in $$dir"; \
+		cd $$dir; \
+		go mod tidy \
+		) \
+	done
 
 bin/addlicense: $(BIN_DIR)/addlicense-$(ADDLICENSE_VERSION) ## Symlink addlicense-<version> into versionless addlicense.
 	@ln -sf addlicense-$(ADDLICENSE_VERSION) $(BIN_DIR)/addlicense
@@ -241,8 +254,6 @@ license-header-fix: gen-license-header bin/addlicense ## Fix missing license hea
 		$(ADDLICENSE_OPTS_IGNORE) \
 		$(ADDLICENSE_SOURCE_DIRS)
 
-GOTEMPLATE_VERSION := 3.12.0
-
 bin/gotemplate: $(BIN_DIR)/gotemplate-$(GOTEMPLATE_VERSION) ## Symlink gotemplate-<version> into versionless gotemplate.
 	@ln -sf gotemplate-$(GOTEMPLATE_VERSION) $(BIN_DIR)/gotemplate
 
@@ -259,8 +270,6 @@ gen-license-header: bin/gotemplate ## Generate license header used in source cod
 		--import="$(BOILERPLATE_DIR)/vars.yml" \
 		--source="$(BOILERPLATE_DIR)"
 
-
-MOCKGEN_VERSION := 0.6.0
 
 bin/mockgen: $(BIN_DIR)/mockgen-$(MOCKGEN_VERSION) ## Symlink mockgen-<version> into versionless mockgen.
 	@ln -sf mockgen-$(MOCKGEN_VERSION) $(BIN_DIR)/mockgen

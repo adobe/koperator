@@ -17,13 +17,23 @@ trap cleanup EXIT
 
 
 create_topic() {
-  kafka-topics \
+  # Create the main topic
+  /opt/kafka/bin/kafka-topics.sh \
     --bootstrap-server "${KAFKA_BROKERS}" \
     --create \
     --if-not-exists \
     --partitions 30 \
     --replication-factor 2 \
     --topic "${TOPIC}"
+  
+  # Create the Cruise Control metrics topic
+  /opt/kafka/bin/kafka-topics.sh \
+    --bootstrap-server "${KAFKA_BROKERS}" \
+    --create \
+    --if-not-exists \
+    --partitions 32 \
+    --replication-factor 3 \
+    --topic "__CruiseControlMetrics"
 }
 
 
@@ -37,7 +47,7 @@ produce_from_csv() {
   while :; do
     tail -n +2 "${DATA_FILE}" \
     | awk -F ',' '{print $1"::"$0}' \
-    | kafka-console-producer \
+    | /opt/kafka/bin/kafka-console-producer.sh \
       --bootstrap-server "${KAFKA_BROKERS}" \
       --producer.config "${PRODUCER_CONFIG}" \
       --property parse.key=true \

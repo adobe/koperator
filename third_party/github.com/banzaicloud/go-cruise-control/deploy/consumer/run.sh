@@ -13,7 +13,7 @@ cleanup() {
 trap cleanup EXIT
 
 consume() {
-  kafka-console-consumer \
+  /opt/kafka/bin/kafka-console-consumer.sh \
     --bootstrap-server "${KAFKA_BROKERS}" \
     --consumer.config "${CONSUMER_CONFIG}" \
     --topic "${TOPIC}"
