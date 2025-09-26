@@ -272,12 +272,13 @@ func GetNodePort(portAmount int32) int32 {
 
 	fmt.Println("GetNodePort: Looking for an available nodeport")
 
-	if k8sClient == nil {
-		fmt.Println("WARNING: k8sClient not initialized yet skipping Kubernetes service check")
-	} else {
+	// Always refresh the nodePorts map from actual Kubernetes services
+	if k8sClient != nil {
 		var serviceList corev1.ServiceList
 		if err := k8sClient.List(context.Background(), &serviceList); err == nil {
 			fmt.Printf("GetNodePort: Found %d services to check for nodeports\n", len(serviceList.Items))
+			// Clear the map first to get fresh state
+			nodePorts = make(map[int32]bool)
 			for _, service := range serviceList.Items {
 				if service.Spec.Type == corev1.ServiceTypeNodePort {
 					for _, port := range service.Spec.Ports {
@@ -292,10 +293,12 @@ func GetNodePort(portAmount int32) int32 {
 		} else {
 			fmt.Printf("ERROR: Failed to list services: %v\n", err)
 		}
+	} else {
+		fmt.Println("WARNING: k8sClient not initialized yet skipping Kubernetes service check")
 	}
 
 	attempts := 0
-	for attempts = 0; attempts < 100; attempts++ {
+	for attempts = 0; attempts < 200; attempts++ {
 		port := minPort + rand.Int32N(int32(portRange))
 
 		// Avoid the problematic range around 32030 that often causes conflicts

@@ -28,7 +28,6 @@ import (
 
 	"emperror.dev/errors"
 	"github.com/Masterminds/sprig/v3"
-	"github.com/banzaicloud/koperator/api/v1beta1"
 	"github.com/cisco-open/k8s-objectmatcher/patch"
 	"github.com/gruntwork-io/terratest/modules/k8s"
 	ginkgo "github.com/onsi/ginkgo/v2"
@@ -537,7 +536,7 @@ func getK8sResources(kubectlOptions k8s.KubectlOptions, resourceKind []string, s
 	if os.Getenv("E2E_VERBOSE_LOGGING") == verboseLoggingEnabled {
 		logMsg := fmt.Sprintf("Get K8S resources: '%s'", resourceKind)
 		args := []string{"get", strings.Join(resourceKind, ",")}
-		logMsg, args = kubectlArgExtender(args, logMsg, selector, names, kubectlOptions.Namespace, extraArgs)
+		logMsg, _ = kubectlArgExtender(args, logMsg, selector, names, kubectlOptions.Namespace, extraArgs)
 		ginkgo.By(logMsg)
 	}
 
@@ -580,7 +579,7 @@ func waitK8sResourceCondition(kubectlOptions k8s.KubectlOptions, resourceKind, w
 			fmt.Sprintf("--for=%s", waitFor),
 			fmt.Sprintf("--timeout=%s", timeout),
 		}
-		logMsg, args = kubectlArgExtender(args, logMsg, selector, names, kubectlOptions.Namespace, extraArgs)
+		logMsg, _ = kubectlArgExtender(args, logMsg, selector, names, kubectlOptions.Namespace, extraArgs)
 		ginkgo.By(logMsg)
 	}
 
@@ -687,14 +686,14 @@ func waitForKafkaClusterWithPodStatusCheck(kubectlOptions k8s.KubectlOptions, cl
 		// Check if the cluster is running
 		if strings.TrimSpace(output) == "ClusterRunning" {
 			// Cluster is running, now check all Kafka pods in the namespace
-			if err := checkAllKafkaPodsInNamespace(kubectlOptions, kubectlOptions.Namespace); err == nil {
+			if err := checkAllKafkaPodsInNamespace(kubectlOptions, kubectlOptions.Namespace, kafkaCRLabelKey, clusterName); err == nil {
 				// All Kafka pods are ready
 				return nil
 			}
 			// If pods aren't ready yet, continue waiting
 		} else {
 			// Cluster is not running, check and print Kafka pod status for debugging
-			checkAndPrintKafkaPodStatus(kubectlOptions, kubectlOptions.Namespace)
+			checkAndPrintKafkaPodStatus(kubectlOptions, kubectlOptions.Namespace, kafkaCRLabelKey, clusterName)
 		}
 
 		// Wait for next check
@@ -704,12 +703,12 @@ func waitForKafkaClusterWithPodStatusCheck(kubectlOptions k8s.KubectlOptions, cl
 }
 
 // checkAllKafkaPodsInNamespace checks that all Kafka pods in the namespace are ready
-func checkAllKafkaPodsInNamespace(kubectlOptions k8s.KubectlOptions, namespace string) error {
+func checkAllKafkaPodsInNamespace(kubectlOptions k8s.KubectlOptions, namespace string, labelKey string, clusterName string) error {
 	// Get Kafka pods with the same label selector as the original verification
 	args := []string{
 		"get", "pods",
 		"-n", namespace,
-		"-l", fmt.Sprintf("%s=%s,app=kafka", v1beta1.KafkaCRLabelKey, kafkaClusterName),
+		"-l", fmt.Sprintf("%s=%s,app=kafka", labelKey, clusterName),
 		"-o", "jsonpath={range .items[*]}{.metadata.name}{.status.phase}{.status.containerStatuses[*].ready}{\"\\n\"}{end}",
 	}
 
@@ -739,12 +738,12 @@ func checkAllKafkaPodsInNamespace(kubectlOptions k8s.KubectlOptions, namespace s
 }
 
 // checkAndPrintKafkaPodStatus checks and prints the status of Kafka pods for debugging
-func checkAndPrintKafkaPodStatus(kubectlOptions k8s.KubectlOptions, namespace string) {
+func checkAndPrintKafkaPodStatus(kubectlOptions k8s.KubectlOptions, namespace string, labelKey string, clusterName string) {
 	// Get Kafka pod status with the same label selector as the original verification
 	args := []string{
 		"get", "pods",
 		"-n", namespace,
-		"-l", fmt.Sprintf("%s=%s,app=kafka", v1beta1.KafkaCRLabelKey, kafkaClusterName),
+		"-l", fmt.Sprintf("%s=%s,app=kafka", labelKey, clusterName),
 		"-o", "wide",
 	}
 
@@ -764,7 +763,7 @@ func checkAndPrintKafkaPodStatus(kubectlOptions k8s.KubectlOptions, namespace st
 	podNamesArgs := []string{
 		"get", "pods",
 		"-n", namespace,
-		"-l", fmt.Sprintf("%s=%s,app=kafka", v1beta1.KafkaCRLabelKey, kafkaClusterName),
+		"-l", fmt.Sprintf("%s=%s,app=kafka", labelKey, clusterName),
 		"-o", "jsonpath={.items[*].metadata.name}",
 	}
 
