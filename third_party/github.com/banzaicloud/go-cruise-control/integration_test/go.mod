@@ -219,7 +219,7 @@ replace cloud.google.com/go => cloud.google.com/go v0.100.2
 // Docker
 replace (
 	// Override for e2e tests
-	github.com/cucumber/godog => github.com/laurazard/godog v0.0.0-20220922095256-4c4b17abdae7
+	github.com/cucumber/godog => github.com/laurazard/godog v0.0.0-20220831081700-c35ea0b236ed
 
 	golang.org/x/oauth2 => golang.org/x/oauth2 v0.0.0-20221014153046-6fdb5e3db783
 
