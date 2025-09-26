@@ -5,7 +5,7 @@ go 1.25
 require (
 	dario.cat/mergo v1.0.2
 	emperror.dev/errors v0.8.1
-	github.com/IBM/sarama v1.46.0
+	github.com/IBM/sarama v1.46.1
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/banzaicloud/go-cruise-control v0.6.0
 	github.com/banzaicloud/istio-client-go v0.0.17
@@ -16,7 +16,7 @@ require (
 	github.com/cert-manager/cert-manager v1.18.2
 	github.com/cisco-open/cluster-registry-controller/api v0.2.12
 	github.com/envoyproxy/go-control-plane v0.13.4
-	github.com/envoyproxy/go-control-plane/envoy v1.32.5-0.20250926061013-da3e293e0651
+	github.com/envoyproxy/go-control-plane/envoy v1.32.5-0.20250926155504-ac643a5856f9
 	github.com/ghodss/yaml v1.0.1-0.20220118164431-d8423dcdf344
 	github.com/go-logr/logr v1.4.3
 	github.com/onsi/ginkgo/v2 v2.25.3

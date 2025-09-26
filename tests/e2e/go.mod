@@ -8,7 +8,7 @@ require (
 	github.com/banzaicloud/koperator v0.25.1
 	github.com/banzaicloud/koperator/api v0.28.8
 	github.com/cisco-open/k8s-objectmatcher v1.10.0
-	github.com/gruntwork-io/terratest v0.50.0
+	github.com/gruntwork-io/terratest v0.51.0
 	github.com/onsi/ginkgo/v2 v2.25.3
 	github.com/onsi/gomega v1.38.2
 	github.com/twmb/franz-go v1.19.5
@@ -22,7 +22,7 @@ require (
 	dario.cat/mergo v1.0.2 // indirect
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/BurntSushi/toml v1.5.0 // indirect
-	github.com/IBM/sarama v1.46.0 // indirect
+	github.com/IBM/sarama v1.46.1 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.32.5 // indirect

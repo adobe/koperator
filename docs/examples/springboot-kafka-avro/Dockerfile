@@ -1,4 +1,4 @@
-FROM maven:3.6-jdk-11-slim as build
+FROM maven:3.8-jdk-11-slim@sha256:2cb7c73ba2fd0f7ae64cfabd99180030ec85841a1197b4ae821d21836cb0aa3b as build
 
 # Resolve all the dependencies and cache them to save a LOT of time
 COPY pom.xml /usr/src/myapp/
