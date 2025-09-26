@@ -8,7 +8,6 @@
     ":semanticPrefixFixDepsChoreOthers",
     ":updateNotScheduled",
     ":automergeDisabled",
-    ":ignoreModulesAndTests",
     "helpers:disableTypesNodeMajor",
     ":prHourlyLimitNone",
     ":prConcurrentLimitNone",
@@ -18,6 +17,10 @@
   "postUpdateOptions": [
     "gomodTidy",
     "gomodUpdateImportPaths"
+  ],
+  "fileMatch": [
+    "(^|/)go\\.mod$",
+    "(^|/)go\\.sum$"
   ],
   "packageRules": [
     {
@@ -34,6 +37,9 @@
       ],
       "matchPackageNames": [
         "*"
+      ],
+      "matchDepTypes": [
+        "require"
       ]
     },
     {
@@ -46,6 +52,9 @@
       ],
       "matchPackageNames": [
         "*"
+      ],
+      "matchDepTypes": [
+        "require"
       ]
     }
   ]
