@@ -9,7 +9,6 @@
     ":updateNotScheduled",
     ":automergeDisabled",
     ":ignoreModulesAndTests",
-    ":autodetectPinVersions",
     "helpers:disableTypesNodeMajor",
     ":prHourlyLimitNone",
     ":prConcurrentLimitNone",
@@ -17,28 +16,31 @@
   ],
   "packageRules": [
     {
+      "matchCategories": [
+        "docker"
+      ],
+      "pinDigests": true
+    },
+    {
       "groupName": "all major dependencies",
       "groupSlug": "all-major",
-      "matchPackagePatterns": [
-        "*"
-      ],
       "matchUpdateTypes": [
         "major"
+      ],
+      "matchPackageNames": [
+        "*"
       ]
     },
     {
       "groupName": "all non-major dependencies",
       "groupSlug": "all-minor-patch",
-      "matchPackagePatterns": [
-        "*"
-      ],
       "matchUpdateTypes": [
         "minor",
         "patch"
+      ],
+      "matchPackageNames": [
+        "*"
       ]
     }
-  ],
-  "docker": {
-    "pinDigests": true
-  }
+  ]
 }
