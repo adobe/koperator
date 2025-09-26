@@ -49,8 +49,9 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ~/go/pkg/mod
-          key: ${{ runner.os }}-gomod-${{ hashFiles('**/go.sum') }}
+          key: ${{ runner.os }}-e2e-gomod-${{ hashFiles('**/go.sum') }}
           restore-keys: |
+            ${{ runner.os }}-e2e-gomod-
             ${{ runner.os }}-gomod-
           enableCrossOsArchive: false
           fail-on-cache-miss: false
@@ -59,8 +60,9 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ~/.cache/go-build
-          key: ${{ runner.os }}-gobuild-${{ github.sha }}
+          key: ${{ runner.os }}-e2e-gobuild-${{ github.sha }}
           restore-keys: |
+            ${{ runner.os }}-e2e-gobuild-
             ${{ runner.os }}-gobuild-
           enableCrossOsArchive: false
           fail-on-cache-miss: false
@@ -96,13 +98,13 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: ~/go/pkg/mod
-          key: ${{ runner.os }}-gomod-${{ hashFiles('**/go.sum') }}
+          key: ${{ runner.os }}-e2e-gomod-${{ hashFiles('**/go.sum') }}
 
       - name: Save Go build cache
         uses: actions/cache/save@v4
         with:
           path: ~/.cache/go-build
-          key: ${{ runner.os }}-gobuild-${{ github.sha }}
+          key: ${{ runner.os }}-e2e-gobuild-${{ github.sha }}
           
       - name: Run E2E tests
         env:

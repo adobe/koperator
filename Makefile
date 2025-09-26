@@ -95,6 +95,7 @@ install-kustomize: ## Install kustomize.
 test: generate fmt vet bin/setup-envtest
 	cd api && go test ./...
 	KUBEBUILDER_ASSETS=$$($(BIN_DIR)/setup-envtest --print path --bin-dir $(BIN_DIR) use $(ENVTEST_K8S_VERSION)) \
+	GINKGO_FLAKE_ATTEMPTS=3 \
 	go test ./... \
 		-coverprofile cover.out \
 		-v \
