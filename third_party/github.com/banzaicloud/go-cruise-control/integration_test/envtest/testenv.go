@@ -23,10 +23,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/compose-spec/compose-go/cli"
-	"github.com/compose-spec/compose-go/types"
+	"github.com/compose-spec/compose-go/v2/cli"
+	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
-	cliflags "github.com/docker/cli/cli/flags"
+	"github.com/docker/cli/cli/flags"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/compose"
 	"github.com/pkg/errors"
@@ -133,18 +133,8 @@ func (e *Environment) Ready(ctx context.Context) (bool, error) {
 }
 
 func (e *Environment) CruiseControlURL() (*url.URL, error) {
-	var cruiseControl types.ServiceConfig
-	var ok bool
-
-	for _, srv := range e.project.Services {
-		if srv.Name == cruiseControlContainerName {
-			cruiseControl = srv
-			ok = true
-			break
-		}
-	}
-
-	if !ok {
+	cruiseControl, err := e.project.GetService(cruiseControlContainerName)
+	if err != nil {
 		return nil, errors.Errorf("container with name %s is not available", cruiseControlContainerName)
 	}
 
@@ -166,20 +156,17 @@ func (e *Environment) CruiseControlURL() (*url.URL, error) {
 }
 
 func (e *Environment) Services() []string {
-	services := make([]string, len(e.project.Services))
-	for i, srv := range e.project.Services {
-		services[i] = srv.Name
-	}
-	return services
+	return e.project.ServiceNames()
 }
 
 func New(o *cli.ProjectOptions, reuse bool) (*Environment, error) {
-	project, err := cli.ProjectFromOptions(o)
+	ctx := context.Background()
+	project, err := cli.ProjectFromOptions(ctx, o)
 	if err != nil {
 		return nil, err
 	}
 
-	for i, service := range project.Services {
+	project, err = project.WithServicesTransform(func(name string, service types.ServiceConfig) (types.ServiceConfig, error) {
 		service.CustomLabels = map[string]string{
 			api.ProjectLabel:     project.Name,
 			api.ServiceLabel:     service.Name,
@@ -187,7 +174,10 @@ func New(o *cli.ProjectOptions, reuse bool) (*Environment, error) {
 			api.ConfigFilesLabel: strings.Join(project.ComposeFiles, ","),
 			api.OneoffLabel:      "False",
 		}
-		project.Services[i] = service
+		return service, nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	cmd, err := command.NewDockerCli()
@@ -195,7 +185,7 @@ func New(o *cli.ProjectOptions, reuse bool) (*Environment, error) {
 		return nil, err
 	}
 
-	opts := cliflags.NewClientOptions()
+	opts := flags.NewClientOptions()
 
 	if err = cmd.Initialize(opts); err != nil {
 		return nil, err

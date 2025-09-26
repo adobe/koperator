@@ -1,8 +1,6 @@
-version: "3"
-
 services:
   zookeeper:
-    image: zookeeper:3.6
+    image: zookeeper:3.8.4
     restart: unless-stopped
     hostname: zookeeper
     container_name: zookeeper
@@ -37,15 +35,17 @@ services:
       interval: 10s
       timeout: 5s
       retries: 30
+      start_period: 30s
 
   cruisecontrolmetrics:
     image: "${CRUISE_CONTROL_IMAGE}"
+    platform: linux/amd64
     restart: "on-failure"
     hostname: cruisecontrolmetrics
     container_name: cruisecontrolmetrics
     environment:
       - METRICS_REPORTER_FILE=/opt/cruise-control/cruise-control/build/dependant-libs/cruise-control-metrics-reporter.jar
-    command: ["/run.sh"]
+    command: ["sh", "-c", "apt-get update && apt-get install -y netcat-openbsd && /run.sh"]
     networks:
       - kafka
     volumes:
@@ -65,14 +65,15 @@ services:
       interval: 10s
       timeout: 5s
       retries: 30
+      start_period: 30s
 
   kafka-0:
-    image: confluentinc/cp-kafka:6.2.2
+    image: ghcr.io/adobe/koperator/kafka:2.13-3.9.1
     restart: unless-stopped
     user: root
     hostname: kafka-0
     container_name: kafka-0
-    command: ["/run.sh"]
+    command: ["sh", "-c", "apt-get update && apt-get install -y netcat-openbsd && /run.sh"]
     environment:
       - KAFKA_BROKER_ID=0
       - KAFKA_ADVERTISED_LISTENERS=INTERNAL://kafka-0:9092,EXTERNAL://kafka-0:9093,CONTROLLER://kafka-0:9094
@@ -117,14 +118,15 @@ services:
       interval: 10s
       timeout: 5s
       retries: 30
+      start_period: 30s
 
   kafka-1:
-    image: confluentinc/cp-kafka:6.2.2
+    image: ghcr.io/adobe/koperator/kafka:2.13-3.9.1
     restart: unless-stopped
     user: root
     hostname: kafka-1
     container_name: kafka-1
-    command: ["/run.sh"]
+    command: ["sh", "-c", "apt-get update && apt-get install -y netcat-openbsd && /run.sh"]
     environment:
       - KAFKA_BROKER_ID=1
       - KAFKA_ADVERTISED_LISTENERS=INTERNAL://kafka-1:9092,EXTERNAL://kafka-1:9093,CONTROLLER://kafka-1:9094
@@ -169,14 +171,15 @@ services:
       interval: 10s
       timeout: 5s
       retries: 30
+      start_period: 30s
 
   kafka-2:
-    image: confluentinc/cp-kafka:6.2.2
+    image: ghcr.io/adobe/koperator/kafka:2.13-3.9.1
     restart: unless-stopped
     user: root
     hostname: kafka-2
     container_name: kafka-2
-    command: ["/run.sh"]
+    command: ["sh", "-c", "apt-get update && apt-get install -y netcat-openbsd && /run.sh"]
     environment:
       - KAFKA_BROKER_ID=2
       - KAFKA_ADVERTISED_LISTENERS=INTERNAL://kafka-2:9092,EXTERNAL://kafka-2:9093,CONTROLLER://kafka-2:9094
@@ -221,13 +224,15 @@ services:
       interval: 10s
       timeout: 5s
       retries: 30
+      start_period: 30s
 
   cruisecontrol:
     image: "${CRUISE_CONTROL_IMAGE}"
+    platform: linux/amd64
     restart: unless-stopped
     hostname: cruisecontrol
     container_name: cruisecontrol
-    command: "/opt/cruise-control/start.sh"
+    command: ["sh", "-c", "apt-get update && apt-get install -y bash procps && /opt/cruise-control/start.sh"]
     environment:
       - BOOTSTRAP_SERVERS=kafka-0:9092,kafka-1:9092,kafka-2:9092
     ports:
@@ -251,22 +256,23 @@ services:
         "CMD-SHELL",
         "bash -c 'echo > /dev/tcp/localhost/8090'",
       ]
-      interval: 10s
+      interval: 30s
       timeout: 5s
-      retries: 30
-      #start_period: 30s
+      retries: 300
+      start_period: 30s
 
   producer:
-    image: confluentinc/cp-kafka:6.2.2
+    image: ghcr.io/adobe/koperator/kafka:2.13-3.9.1
     restart: unless-stopped
     hostname: producer
     container_name: producer
+    user: root
     environment:
       - KAFKA_BROKERS=kafka-0:9092,kafka-1:9092,kafka-2:9092
       - TOPIC=airports
     env_file:
       - producer/producer.env
-    command: ["/wait-for-it", "-t", "120", "kafka-0:9092", "--", "/producer/run.sh"]
+    command: ["sh", "-c", "apt-get update && apt-get install -y netcat-openbsd && /wait-for-it -t 120 kafka-0:9092 -- /producer/run.sh"]
     networks:
       - kafka
     depends_on:
@@ -290,18 +296,20 @@ services:
       interval: 10s
       timeout: 5s
       retries: 30
+      start_period: 30s
 
   consumer:
-    image: confluentinc/cp-kafka:6.2.2
+    image: ghcr.io/adobe/koperator/kafka:2.13-3.9.1
     restart: unless-stopped
     hostname: consumer
     container_name: consumer
+    user: root
     environment:
       - KAFKA_BROKERS=kafka-0:9092,kafka-1:9092,kafka-2:9092
       - TOPIC=airports
     env_file:
       - consumer/consumer.env
-    command: ["/wait-for-it", "-t", "120", "kafka-0:9092", "--", "/consumer/run.sh"]
+    command: ["sh", "-c", "apt-get update && apt-get install -y netcat-openbsd && /wait-for-it -t 120 kafka-0:9092 -- /consumer/run.sh"]
     networks:
       - kafka
     depends_on:
@@ -325,6 +333,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 30
+      start_period: 30s
 
   kafka-ui:
     profiles:
@@ -355,6 +364,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 30
+      start_period: 30s
 
 volumes:
   zookeeper_data:

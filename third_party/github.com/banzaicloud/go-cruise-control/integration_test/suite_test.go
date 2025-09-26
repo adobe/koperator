@@ -26,14 +26,14 @@ import (
 	"github.com/banzaicloud/go-cruise-control/integration_test/envtest"
 	"github.com/banzaicloud/go-cruise-control/integration_test/helpers"
 	"github.com/banzaicloud/go-cruise-control/pkg/client"
-	"github.com/compose-spec/compose-go/cli"
+	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
 const (
-	CruiseControlReadyTimeout = 600
+	CruiseControlReadyTimeout = 6000
 
 	AirportsTopicNewPartitionSize     = 35
 	AirportsTopicOldPartitionSize     = 30

@@ -46,6 +46,13 @@ jobs:
         with:
           go-version: '1.25'
         id: go
+
+      - name: Clean Go module cache for reproducible builds
+        run: |
+          # Clean any existing Go module cache for clean, reproducible builds
+          sudo rm -rf ~/go/pkg/mod || true
+          sudo rm -rf ~/.cache/go-build || true
+
       - name: Set up Go for root
         run: |
           sudo ln -sf `which go` `sudo which go` || true

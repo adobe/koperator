@@ -15,6 +15,3 @@ require (
 	golang.org/x/net v0.44.0 // indirect
 	golang.org/x/text v0.29.0 // indirect
 )
-
-// remove once https://github.com/cert-manager/cert-manager/issues/5953 is fixed
-replace github.com/Venafi/vcert/v4 => github.com/jetstack/vcert/v4 v4.9.6-0.20230127103832-3aa3dfd6613d
