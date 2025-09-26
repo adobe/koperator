@@ -21,7 +21,9 @@
   "customManagers": [
     {
       "customType": "regex",
-      "fileMatch": ["Makefile"],
+      "managerFilePatterns": [
+        "/Makefile/"
+      ],
       "matchStrings": [
         "(?<depName>\\w+)_VERSION\\s*=\\s*(?<currentValue>[^\\s]+)\\s*#\\s*renovate:\\s*datasource=(?<datasource>[^\\s]+)\\s*depName=(?<packageName>[^\\s]+)"
       ],
@@ -48,7 +50,7 @@
         "maven",
         "dockerfile",
         "docker-compose",
-        "regex",
+        "custom.regex",
         "helm-values"
       ]
     },
@@ -66,7 +68,7 @@
         "maven",
         "dockerfile",
         "docker-compose",
-        "regex",
+        "custom.regex",
         "helm-values"
       ]
     }
