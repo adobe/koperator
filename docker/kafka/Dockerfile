@@ -1,7 +1,7 @@
 FROM alpine:latest AS kafka_dist
 
 ARG scala_version=2.13
-ARG kafka_version=3.9.1
+ARG kafka_version=3.9.10
 ARG kafka_distro_base_url=https://downloads.apache.org/kafka
 
 ENV kafka_distro=kafka_$scala_version-$kafka_version.tgz
