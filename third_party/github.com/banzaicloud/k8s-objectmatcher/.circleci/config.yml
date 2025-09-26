@@ -90,7 +90,7 @@ integration-test-base: &integration-test-base
 jobs:
   check:
     docker:
-      - image: circleci/golang:1.15
+      - image: circleci/golang:1.17
         environment:
           GOFLAG: -mod=readonly
 
