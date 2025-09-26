@@ -161,7 +161,7 @@ replace (
 	github.com/banzaicloud/koperator/api => ./api
 	github.com/banzaicloud/koperator/properties => ./properties
 	github.com/banzaicloud/operator-tools => ./third_party/github.com/banzaicloud/operator-tools
-	github.com/gogo/protobuf => github.com/waynz0r/protobuf v1.3.3-0.20210811122234-64636cae0910
+	github.com/gogo/protobuf => github.com/waynz0r/protobuf v1.3.2
 )
 
 // exclude github.com/imdario/mergo v0.3.6
