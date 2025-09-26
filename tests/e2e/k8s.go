@@ -44,6 +44,9 @@ const (
 
 	// crdNamePrefix is the prefix of the CRD names when listed through kubectl.
 	crdNamePrefix = "customresourcedefinition.apiextensions.k8s.io/" //nolint:unused // Note: this const is currently only used in helper functions which are not yet called on so this linter transitively fails for this const
+
+	// verboseLoggingEnabled is the string value for enabling verbose logging
+	verboseLoggingEnabled = "true"
 )
 
 // applyK8sResourceManifests applies the specified manifest to the provided
@@ -436,7 +439,7 @@ func deleteK8sResource(
 	args = append(args, fmt.Sprintf("--timeout=%s", timeout))
 
 	// Only log if verbose logging is enabled
-	if os.Getenv("E2E_VERBOSE_LOGGING") == "true" {
+	if os.Getenv("E2E_VERBOSE_LOGGING") == verboseLoggingEnabled {
 		logMsg := fmt.Sprintf("Deleting k8s resource: kind: '%s' ", kind)
 		logMsg, args = kubectlArgExtender(args, logMsg, selector, name, kubectlOptions.Namespace, extraArgs)
 		ginkgo.By(logMsg)
@@ -495,7 +498,7 @@ func applyK8sResourceFromTemplate(kubectlOptions k8s.KubectlOptions, templateFil
 // extraArgs can be any kubectl api-resources parameter.
 func listK8sResourceKinds(kubectlOptions k8s.KubectlOptions, apiGroupSelector string, extraArgs ...string) ([]string, error) {
 	// Only log if verbose logging is enabled
-	if os.Getenv("E2E_VERBOSE_LOGGING") == "true" {
+	if os.Getenv("E2E_VERBOSE_LOGGING") == verboseLoggingEnabled {
 		ginkgo.By(fmt.Sprintf("Listing K8s resource kinds for apiGroup: '%s'", apiGroupSelector))
 	}
 
@@ -531,7 +534,7 @@ func listK8sResourceKinds(kubectlOptions k8s.KubectlOptions, apiGroupSelector st
 // Returns a slice of the returned elements. Separator between elements must be newline.
 func getK8sResources(kubectlOptions k8s.KubectlOptions, resourceKind []string, selector string, names string, extraArgs ...string) ([]string, error) {
 	// Only log if verbose logging is enabled
-	if os.Getenv("E2E_VERBOSE_LOGGING") == "true" {
+	if os.Getenv("E2E_VERBOSE_LOGGING") == verboseLoggingEnabled {
 		logMsg := fmt.Sprintf("Get K8S resources: '%s'", resourceKind)
 		args := []string{"get", strings.Join(resourceKind, ",")}
 		logMsg, args = kubectlArgExtender(args, logMsg, selector, names, kubectlOptions.Namespace, extraArgs)
@@ -569,7 +572,7 @@ func getK8sResources(kubectlOptions k8s.KubectlOptions, resourceKind []string, s
 // extraArgs can be any of the kubectl arguments
 func waitK8sResourceCondition(kubectlOptions k8s.KubectlOptions, resourceKind, waitFor string, timeout time.Duration, selector string, names string, extraArgs ...string) error { //nolint:unparam // Note: library function with variadic argument currently always nil.
 	// Only log if verbose logging is enabled
-	if os.Getenv("E2E_VERBOSE_LOGGING") == "true" {
+	if os.Getenv("E2E_VERBOSE_LOGGING") == verboseLoggingEnabled {
 		logMsg := fmt.Sprintf("Waiting K8s resource(s)' condition: '%s' to fulfil", waitFor)
 		args := []string{
 			"wait",
@@ -637,7 +640,7 @@ func isKubectlNotFoundError(err error) bool {
 // setupReducedLogging configures reduced logging for terratest operations
 func setupReducedLogging() {
 	// Set environment variables to reduce terratest logging verbosity
-	if os.Getenv("E2E_VERBOSE_LOGGING") != "true" {
+	if os.Getenv("E2E_VERBOSE_LOGGING") != verboseLoggingEnabled {
 		// Reduce terratest internal logging
 		os.Setenv("TEST_LOG_LEVEL", "-5")
 		// Reduce kubectl verbosity
@@ -648,7 +651,7 @@ func setupReducedLogging() {
 // waitForKafkaClusterWithPodStatusCheck waits for KafkaCluster to be ready and checks pod status every 10 seconds
 func waitForKafkaClusterWithPodStatusCheck(kubectlOptions k8s.KubectlOptions, clusterName string, timeout time.Duration) error {
 	// Only log if verbose logging is enabled
-	if os.Getenv("E2E_VERBOSE_LOGGING") == "true" {
+	if os.Getenv("E2E_VERBOSE_LOGGING") == verboseLoggingEnabled {
 		ginkgo.By(fmt.Sprintf("Waiting for KafkaCluster %s to be ready with pod status checks", clusterName))
 	}
 

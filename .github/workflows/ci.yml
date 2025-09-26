@@ -60,34 +60,16 @@ jobs:
         with:
           go-version: '1.25'
 
-      - name: Clean Go module cache
+      - name: Clean Go module and build cache
         run: |
-          # Clean any existing Go module cache to avoid conflicts
+          # Clean any existing Go module and build cache to avoid conflicts
           sudo rm -rf ~/go/pkg/mod || true
+          sudo rm -rf ~/.cache/go-build || true
           mkdir -p ~/go/pkg/mod
+          mkdir -p ~/.cache/go-build
+          # Ensure proper permissions
           chmod -R 755 ~/go/pkg/mod
-
-      - name: Cache Go modules
-        uses: actions/cache/restore@v4
-        with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-ci-gomod-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-ci-gomod-
-            ${{ runner.os }}-gomod-
-          enableCrossOsArchive: false
-          fail-on-cache-miss: false
-
-      - name: Cache Go build cache
-        uses: actions/cache/restore@v4
-        with:
-          path: ~/.cache/go-build
-          key: ${{ runner.os }}-ci-gobuild-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-ci-gobuild-
-            ${{ runner.os }}-gobuild-
-          enableCrossOsArchive: false
-          fail-on-cache-miss: false
+          chmod -R 755 ~/.cache/go-build
 
       - name: License cache
         uses: actions/cache/restore@v4
@@ -134,20 +116,9 @@ jobs:
         run: |
           make test
 
-      - name: Save Go modules cache
-        uses: actions/cache/save@v4
-        with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-ci-gomod-${{ hashFiles('**/go.sum') }}
-
-      - name: Save Go build cache
-        uses: actions/cache/save@v4
-        with:
-          path: ~/.cache/go-build
-          key: ${{ runner.os }}-ci-gobuild-${{ github.sha }}
-
       - name: Save license cache
         uses: actions/cache/save@v4
         with:
           path: .licensei.cache
           key: ci-license-v1-${{ hashFiles('**/go.sum') }}
+
