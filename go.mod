@@ -16,7 +16,7 @@ require (
 	github.com/cert-manager/cert-manager v1.18.2
 	github.com/cisco-open/cluster-registry-controller/api v0.2.12
 	github.com/envoyproxy/go-control-plane v0.13.4
-	github.com/envoyproxy/go-control-plane/envoy v1.32.5-0.20250722125442-5321204dac14
+	github.com/envoyproxy/go-control-plane/envoy v1.32.5-0.20250926061013-da3e293e0651
 	github.com/ghodss/yaml v1.0.1-0.20220118164431-d8423dcdf344
 	github.com/go-logr/logr v1.4.3
 	github.com/onsi/ginkgo/v2 v2.25.3
