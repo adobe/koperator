@@ -17,6 +17,7 @@ package e2e
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/gruntwork-io/terratest/modules/k8s"
 	ginkgo "github.com/onsi/ginkgo/v2"
@@ -164,7 +165,7 @@ func requireRemovePrometheusOperatorCRDs(kubectlOptions k8s.KubectlOptions) {
 // requireUninstallingCertManager uninstall Cert-manager Helm chart and
 // remove CRDs.
 func requireUninstallingCertManager(kubectlOptions k8s.KubectlOptions) {
-	ginkgo.When("Uninstalling zookeeper-operator", func() {
+	ginkgo.When("Uninstalling cert-manager", func() {
 		requireUninstallingCertManagerHelmChart(kubectlOptions)
 		requireRemoveCertManagerCRDs(kubectlOptions)
 		requireRemoveNamespace(kubectlOptions, certManagerHelmDescriptor.Namespace)
@@ -198,12 +199,42 @@ func requireUninstallingCertManagerHelmChart(kubectlOptions k8s.KubectlOptions) 
 	})
 }
 
-// requireRemoveKoperatorCRDs deletes the cert-manager CRDs
+// requireRemoveCertManagerCRDs deletes the cert-manager CRDs
 func requireRemoveCertManagerCRDs(kubectlOptions k8s.KubectlOptions) {
 	ginkgo.It("Removing cert-manager CRDs", func() {
+		// First, try to remove CRDs detected by the dependencyCRDs system
 		for _, crd := range dependencyCRDs.CertManager() {
 			err := deleteK8sResourceNoErrNotFound(kubectlOptions, defaultDeletionTimeout, crdKind, crd)
 			gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
+		}
+
+		// Additionally, explicitly remove known cert-manager CRDs to ensure complete cleanup
+		knownCertManagerCRDs := []string{
+			"certificaterequests.cert-manager.io",
+			"certificates.cert-manager.io",
+			"challenges.acme.cert-manager.io",
+			"clusterissuers.cert-manager.io",
+			"issuers.cert-manager.io",
+			"orders.acme.cert-manager.io",
+		}
+
+		for _, crd := range knownCertManagerCRDs {
+			err := deleteK8sResourceNoErrNotFound(kubectlOptions, defaultDeletionTimeout, crdKind, crd)
+			if err != nil && !isKubectlNotFoundError(err) {
+				ginkgo.By(fmt.Sprintf("Warning: Failed to delete CRD %s: %v", crd, err))
+			}
+		}
+
+		// Verify that cert-manager CRDs are actually removed
+		ginkgo.By("Verifying cert-manager CRDs cleanup")
+		remainingCRDs, err := getK8sResources(kubectlOptions, []string{crdKind}, "", "", "--all-namespaces", kubectlArgGoTemplateKindNameNamespace)
+		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
+
+		// Check if any cert-manager CRDs are still present
+		for _, crd := range remainingCRDs {
+			if strings.Contains(crd, "cert-manager.io") {
+				ginkgo.By(fmt.Sprintf("Warning: cert-manager CRD still present: %s", crd))
+			}
 		}
 	})
 }

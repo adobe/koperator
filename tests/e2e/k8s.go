@@ -434,9 +434,14 @@ func deleteK8sResource(
 
 	args = append(args, fmt.Sprintf("--timeout=%s", timeout))
 
-	logMsg := fmt.Sprintf("Deleting k8s resource: kind: '%s' ", kind)
-	logMsg, args = kubectlArgExtender(args, logMsg, selector, name, kubectlOptions.Namespace, extraArgs)
-	ginkgo.By(logMsg)
+	// Only log if verbose logging is enabled
+	if os.Getenv("E2E_VERBOSE_LOGGING") == "true" {
+		logMsg := fmt.Sprintf("Deleting k8s resource: kind: '%s' ", kind)
+		logMsg, args = kubectlArgExtender(args, logMsg, selector, name, kubectlOptions.Namespace, extraArgs)
+		ginkgo.By(logMsg)
+	} else {
+		_, args = kubectlArgExtender(args, "", selector, name, kubectlOptions.Namespace, extraArgs)
+	}
 
 	_, err := k8s.RunKubectlAndGetOutputE(
 		ginkgo.GinkgoT(),
@@ -519,11 +524,16 @@ func listK8sResourceKinds(kubectlOptions k8s.KubectlOptions, apiGroupSelector st
 // namespace optionally. Extra arguments can be any of the kubectl get flag arguments.
 // Returns a slice of the returned elements. Separator between elements must be newline.
 func getK8sResources(kubectlOptions k8s.KubectlOptions, resourceKind []string, selector string, names string, extraArgs ...string) ([]string, error) {
-	logMsg := fmt.Sprintf("Get K8S resources: '%s'", resourceKind)
+	// Only log if verbose logging is enabled
+	if os.Getenv("E2E_VERBOSE_LOGGING") == "true" {
+		logMsg := fmt.Sprintf("Get K8S resources: '%s'", resourceKind)
+		args := []string{"get", strings.Join(resourceKind, ",")}
+		logMsg, args = kubectlArgExtender(args, logMsg, selector, names, kubectlOptions.Namespace, extraArgs)
+		ginkgo.By(logMsg)
+	}
 
 	args := []string{"get", strings.Join(resourceKind, ",")}
-	logMsg, args = kubectlArgExtender(args, logMsg, selector, names, kubectlOptions.Namespace, extraArgs)
-	ginkgo.By(logMsg)
+	_, args = kubectlArgExtender(args, "", selector, names, kubectlOptions.Namespace, extraArgs)
 
 	output, err := k8s.RunKubectlAndGetOutputE(
 		ginkgo.GinkgoT(),
@@ -552,7 +562,18 @@ func getK8sResources(kubectlOptions k8s.KubectlOptions, resourceKind []string, s
 // waitK8sResourceCondition waits until the condition is met or the timeout is elapsed for the selected K8s resource(s)
 // extraArgs can be any of the kubectl arguments
 func waitK8sResourceCondition(kubectlOptions k8s.KubectlOptions, resourceKind, waitFor string, timeout time.Duration, selector string, names string, extraArgs ...string) error { //nolint:unparam // Note: library function with variadic argument currently always nil.
-	logMsg := fmt.Sprintf("Waiting K8s resource(s)' condition: '%s' to fulfil", waitFor)
+	// Only log if verbose logging is enabled
+	if os.Getenv("E2E_VERBOSE_LOGGING") == "true" {
+		logMsg := fmt.Sprintf("Waiting K8s resource(s)' condition: '%s' to fulfil", waitFor)
+		args := []string{
+			"wait",
+			resourceKind,
+			fmt.Sprintf("--for=%s", waitFor),
+			fmt.Sprintf("--timeout=%s", timeout),
+		}
+		logMsg, args = kubectlArgExtender(args, logMsg, selector, names, kubectlOptions.Namespace, extraArgs)
+		ginkgo.By(logMsg)
+	}
 
 	args := []string{
 		"wait",
@@ -561,8 +582,7 @@ func waitK8sResourceCondition(kubectlOptions k8s.KubectlOptions, resourceKind, w
 		fmt.Sprintf("--timeout=%s", timeout),
 	}
 
-	logMsg, args = kubectlArgExtender(args, logMsg, selector, names, kubectlOptions.Namespace, extraArgs)
-	ginkgo.By(logMsg)
+	_, args = kubectlArgExtender(args, "", selector, names, kubectlOptions.Namespace, extraArgs)
 
 	_, err := k8s.RunKubectlAndGetOutputE(
 		ginkgo.GinkgoT(),

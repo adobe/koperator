@@ -51,7 +51,7 @@ func requireCreatingKafkaCluster(kubectlOptions k8s.KubectlOptions, manifestPath
 		}, kafkaClusterResourceReadinessTimeout, 3*time.Second).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Verifying all Kafka pods")
-		err = waitK8sResourceCondition(kubectlOptions, "pod", "condition=Ready", defaultPodReadinessWaitTime, v1beta1.KafkaCRLabelKey+"="+kafkaClusterName, "")
+		err = waitK8sResourceCondition(kubectlOptions, "pod", "condition=Ready", defaultPodReadinessWaitTime, v1beta1.KafkaCRLabelKey+"="+kafkaClusterName+",app=kafka", "")
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	})
 }
