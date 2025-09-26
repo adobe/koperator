@@ -18,12 +18,16 @@
     "gomodTidy",
     "gomodUpdateImportPaths"
   ],
-  "fileMatch": [
-    "(^|/)go\\.mod$",
-    "(^|/)go\\.sum$",
-    "(^|/)Makefile$",
-    "(^|/)pom\\.xml$",
-    "(^|/)Dockerfile$"
+  "customManagers": [
+    {
+      "customType": "regex",
+      "fileMatch": ["Makefile"],
+      "matchStrings": [
+        "(?<depName>\\w+)_VERSION\\s*=\\s*(?<currentValue>[^\\s]+)\\s*#\\s*renovate:\\s*datasource=(?<datasource>[^\\s]+)\\s*depName=(?<packageName>[^\\s]+)"
+      ],
+      "datasourceTemplate": "{{datasource}}",
+      "depNameTemplate": "{{packageName}}"
+    }
   ],
   "packageRules": [
     {
@@ -38,14 +42,14 @@
       "matchUpdateTypes": [
         "major"
       ],
-      "matchPackageNames": [
-        "*"
-      ],
-      "matchDepTypes": [
-        "require",
-        "action",
+      "matchManagers": [
+        "gomod",
+        "github-actions",
         "maven",
-        "docker"
+        "dockerfile",
+        "docker-compose",
+        "regex",
+        "helm-values"
       ]
     },
     {
@@ -56,14 +60,14 @@
         "patch",
         "digest"
       ],
-      "matchPackageNames": [
-        "*"
-      ],
-      "matchDepTypes": [
-        "require",
-        "action",
+      "matchManagers": [
+        "gomod",
+        "github-actions",
         "maven",
-        "docker"
+        "dockerfile",
+        "docker-compose",
+        "regex",
+        "helm-values"
       ]
     }
   ]
