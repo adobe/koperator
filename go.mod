@@ -9,7 +9,6 @@ require (
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/banzaicloud/go-cruise-control v0.6.0
 	github.com/banzaicloud/istio-client-go v0.0.17
-	github.com/banzaicloud/istio-operator/api/v2 v2.17.4
 	github.com/banzaicloud/k8s-objectmatcher v1.8.0
 	github.com/banzaicloud/koperator/api v0.28.8
 	github.com/banzaicloud/koperator/properties v0.4.1
@@ -95,7 +94,6 @@ require (
 	github.com/go-openapi/jsonreference v0.21.1 // indirect
 	github.com/go-openapi/swag v0.24.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
@@ -143,7 +141,6 @@ require (
 	gomodules.xyz/jsonpatch/v2 v2.5.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	istio.io/api v1.27.1 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20250910181357-589584f1c912 // indirect
 	k8s.io/utils v0.0.0-20250820121507-0af2bda4dd1d // indirect
@@ -155,7 +152,6 @@ require (
 replace (
 	github.com/banzaicloud/go-cruise-control => ./third_party/github.com/banzaicloud/go-cruise-control
 	github.com/banzaicloud/istio-client-go => ./third_party/github.com/banzaicloud/istio-client-go
-	github.com/banzaicloud/istio-operator/api/v2 => ./third_party/github.com/banzaicloud/istio-operator/api
 	github.com/banzaicloud/k8s-objectmatcher => ./third_party/github.com/banzaicloud/k8s-objectmatcher
 	github.com/banzaicloud/koperator/api => ./api
 	github.com/banzaicloud/koperator/properties => ./properties

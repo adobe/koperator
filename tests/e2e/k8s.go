@@ -644,6 +644,9 @@ func setupReducedLogging() {
 		os.Setenv("TEST_LOG_LEVEL", "-5")
 		// Reduce kubectl verbosity
 		os.Setenv("KUBECTL_VERBOSITY", "0")
+		// Additional environment variables to reduce terratest kubectl command logging
+		os.Setenv("TERRATEST_LOG_LEVEL", "INFO")
+		os.Setenv("KUBECTL_LOG_LEVEL", "0")
 	}
 }
 

@@ -54,8 +54,6 @@ updates:
   # - /third_party/github.com/banzaicloud/operator-tools
   # - /third_party/github.com/banzaicloud/k8s-objectmatcher
   # - /third_party/github.com/banzaicloud/k8s-objectmatcher/tests
-  # - /third_party/github.com/banzaicloud/istio-operator
-  # - /third_party/github.com/banzaicloud/istio-operator/api
   # - /third_party/github.com/banzaicloud/istio-client-go
   # - /third_party/github.com/banzaicloud/go-cruise-control
   # - /third_party/github.com/banzaicloud/go-cruise-control/integration_test
@@ -168,35 +166,6 @@ updates:
         patterns:
           - "*"
 
-  - package-ecosystem: "gomod"
-    directory: "/third_party/github.com/banzaicloud/istio-operator"
-    schedule:
-      interval: "weekly"
-      day: "tuesday"
-      time: "10:00"
-      timezone: "UTC"
-    commit-message:
-      prefix: "chore"
-      include: "scope"
-    groups:
-      third-party-go-dependencies:
-        patterns:
-          - "*"
-
-  - package-ecosystem: "gomod"
-    directory: "/third_party/github.com/banzaicloud/istio-operator/api"
-    schedule:
-      interval: "weekly"
-      day: "tuesday"
-      time: "10:00"
-      timezone: "UTC"
-    commit-message:
-      prefix: "chore"
-      include: "scope"
-    groups:
-      third-party-go-dependencies:
-        patterns:
-          - "*"
 
   - package-ecosystem: "gomod"
     directory: "/third_party/github.com/banzaicloud/istio-client-go"

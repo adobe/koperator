@@ -1,0 +1,868 @@
+f4a84e67", "component": "kafkacluster-2-cruisecontrol"}
+  2025-09-27T12:17:31+02:00     INFO    outgoing network throughput is not set falling back to default value    {"controller": "KafkaCluster", "controllerGroup": "kafka.banzaicloud.io", "controllerKind": "KafkaCluster", "KafkaCluster": {"name":"kafkacluster-2","namespace":"kafka-istioingress-2"}, "namespace": "kafka-istioingress-2", "name": "kafkacluster-2", "reconcileID": "ab8cd744-6973-4739-9c43-e949f4a84e67", "component": "kafkacluster-2-cruisecontrol"}
+  2025-09-27T12:17:31+02:00     DEBUG   capacity config successfully generated for broker       {"controller": "KafkaCluster", "controllerGroup": "kafka.banzaicloud.io", "controllerKind": "KafkaCluster", "KafkaCluster": {"name":"kafkacluster-2","namespace":"kafka-istioingress-2"}, "namespace": "kafka-istioingress-2", "name": "kafkacluster-2", "reconcileID": "ab8cd744-6973-4739-9c43-e949f4a84e67", "component": "kafkacluster-2-cruisecontrol", "capacity config": {"brokerId":"0","capacity":{"DISK":{"/ephemeral-dir1/kafka":"104","/kafka-logs/kafka":"10737"},"CPU":"150","NW_IN":"125000","NW_OUT":"125000"},"doc":"Capacity unit used for disk is in MB, cpu is in percentage, network throughput is in KB."}}
+  2025-09-27T12:17:31+02:00     DEBUG   broker log.dir /kafka-logs size in MB: 10737    {"controller": "KafkaCluster", "controllerGroup": "kafka.banzaicloud.io", "controllerKind": "KafkaCluster", "KafkaCluster": {"name":"kafkacluster-2","namespace":"kafka-istioingress-2"}, "namespace": "kafka-istioingress-2", "name": "kafkacluster-2", "reconcileID": "ab8cd744-6973-4739-9c43-e949f4a84e67", "component": "kafkacluster-2-cruisecontrol", "brokerId": 1}
+  2025-09-27T12:17:31+02:00     DEBUG   broker log.dir /ephemeral-dir1 size in MB: 104  {"controller": "KafkaCluster", "controllerGroup": "kafka.banzaicloud.io", "controllerKind": "KafkaCluster", "KafkaCluster": {"name":"kafkacluster-2","namespace":"kafka-istioingress-2"}, "namespace": "kafka-istioingress-2", "name": "kafkacluster-2", "reconcileID": "ab8cd744-6973-4739-9c43-e949f4a84e67", "component": "kafkacluster-2-cruisecontrol", "brokerId": 1}
+  2025-09-27T12:17:31+02:00     INFO    incoming network throughput is not set falling back to default value    {"controller": "KafkaCluster", "controllerGroup": "kafka.banzaicloud.io", "controllerKind": "KafkaCluster", "KafkaCluster": {"name":"kafkacluster-2","namespace":"kafka-istioingress-2"}, "namespace": "kafka-istioingress-2", "name": "kafkacluster-2", "reconcileID": "ab8cd744-6973-4739-9c43-e949f4a84e67", "component": "kafkacluster-2-cruisecontrol"}
+  2025-09-27T12:17:31+02:00     INFO    outgoing network throughput is not set falling back to default value    {"controller": "KafkaCluster", "controllerGroup": "kafka.banzaicloud.io", "controllerKind": "KafkaCluster", "KafkaCluster": {"name":"kafkacluster-2","namespace":"kafka-istioingress-2"}, "namespace": "kafka-istioingress-2", "name": "kafkacluster-2", "reconcileID": "ab8cd744-6973-4739-9c43-e949f4a84e67", "component": "kafkacluster-2-cruisecontrol"}
+  2025-09-27T12:17:31+02:00     DEBUG   capacity config successfully generated for broker       {"controller": "KafkaCluster", "controllerGroup": "kafka.banzaicloud.io", "controllerKind": "KafkaCluster", "KafkaCluster": {"name":"kafkacluster-2","namespace":"kafka-istioingress-2"}, "namespace": "kafka-istioingress-2", "name": "kafkacluster-2", "reconcileID": "ab8cd744-6973-4739-9c43-e949f4a84e67", "component": "kafkacluster-2-cruisecontrol", "capacity config": {"brokerId":"1","capacity":{"DISK":{"/ephemeral-dir1/kafka":"104","/kafka-logs/kafka":"10737"},"CPU":"150","NW_IN":"125000","NW_OUT":"125000"},"doc":"Capacity unit used for disk is in MB, cpu is in percentage, network throughput is in KB."}}
+  2025-09-27T12:17:31+02:00     DEBUG   broker log.dir /kafka-logs size in MB: 10737    {"controller": "KafkaCluster", "controllerGroup": "kafka.banzaicloud.io", "controllerKind": "KafkaCluster", "KafkaCluster": {"name":"kafkacluster-2","namespace":"kafka-istioingress-2"}, "namespace": "kafka-istioingress-2", "name": "kafkacluster-2", "reconcileID": "ab8cd744-6973-4739-9c43-e949f4a84e67", "component": "kafkacluster-2-cruisecontrol", "brokerId": 2}
+  2025-09-27T12:17:31+02:00     DEBUG   broker log.dir /ephemeral-dir1 size in MB: 104  {"controller": "KafkaCluster", "controllerGroup": "kafka.banzaicloud.io", "controllerKind": "KafkaCluster", "KafkaCluster": {"name":"kafkacluster-2","namespace":"kafka-istioingress-2"}, "namespace": "kafka-istioingress-2", "name": "kafkacluster-2", "reconcileID": "ab8cd744-6973-4739-9c43-e949f4a84e67", "component": "kafkacluster-2-cruisecontrol", "brokerId": 2}
+  2025-09-27T12:17:31+02:00     INFO    incoming network throughput is not set falling back to default value    {"controller": "KafkaCluster", "controllerGroup": "kafka.banzaicloud.io", "controllerKind": "KafkaCluster", "KafkaCluster": {"name":"kafkacluster-2","namespace":"kafka-istioingress-2"}, "namespace": "kafka-istioingress-2", "name": "kafkacluster-2", "reconcileID": "ab8cd744-6973-4739-9c43-e949f4a84e67", "component": "kafkacluster-2-cruisecontrol"}
+  2025-09-27T12:17:31+02:00     INFO    outgoing network throughput is not set falling back to default value    {"controller": "KafkaCluster", "controllerGroup": "kafka.banzaicloud.io", "controllerKind": "KafkaCluster", "KafkaCluster": {"name":"kafkacluster-2","namespace":"kafka-istioingress-2"}, "namespace": "kafka-istioingress-2", "name": "kafkacluster-2", "reconcileID": "ab8cd744-6973-4739-9c43-e949f4a84e67", "component": "kafkacluster-2-cruisecontrol"}
+  2025-09-27T12:17:31+02:00     DEBUG   capacity config successfully generated for broker       {"controller": "KafkaCluster", "controllerGroup": "kafka.banzaicloud.io", "controllerKind": "KafkaCluster", "KafkaCluster": {"name":"kafkacluster-2","namespace":"kafka-istioingress-2"}, "namespace": "kafka-istioingress-2", "name": "kafkacluster-2", "reconcileID": "ab8cd744-6973-4739-9c43-e949f4a84e67", "component": "kafkacluster-2-cruisecontrol", "capacity config": {"brokerId":"2","capacity":{"DISK":{"/ephemeral-dir1/kafka":"104","/kafka-logs/kafka":"10737"},"CPU":"150","NW_IN":"125000","NW_OUT":"125000"},"doc":"Capacity unit used for disk is in MB, cpu is in percentage, network throughput is in KB."}}
+  2025-09-27T12:17:31+02:00     INFO    broker capacity config generated successfully   {"controller": "KafkaCluster", "controllerGroup": "kafka.banzaicloud.io", "controllerKind": "KafkaCluster", "KafkaCluster": {"name":"kafkacluster-2","namespace":"kafka-istioingress-2"}, "namespace": "kafka-istioingress-2", "name": "kafkacluster-2", "reconcileID": "ab8cd744-6973-4739-9c43-e949f4a84e67", "component": "kafkacluster-2-cruisecontrol", "capacity config": "{\n    \"brokerCapacities\": [\n        {\n            \"brokerId\": \"0\",\n            \"capacity\": {\n                \"DISK\": {\n                    \"/ephemeral-dir1/kafka\": \"104\",\n                    \"/kafka-logs/kafka\": \"10737\"\n                },\n                \"CPU\": \"150\",\n                \"NW_IN\": \"125000\",\n                \"NW_OUT\": \"125000\"\n            },\n            \"doc\": \"Capacity unit used for disk is in MB, cpu is in percentage, network throughput is in KB.\"\n        },\n        {\n            \"brokerId\": \"1\",\n            \"capacity\": {\n                \"DISK\": {\n                    \"/ephemeral-dir1/kafka\": \"104\",\n                    \"/kafka-logs/kafka\": \"10737\"\n                },\n                \"CPU\": \"150\",\n                \"NW_IN\": \"125000\",\n                \"NW_OUT\": \"125000\"\n            },\n            \"doc\": \"Capacity unit used for disk is in MB, cpu is in percentage, network throughput is in KB.\"\n        },\n        {\n            \"brokerId\": \"2\",\n            \"capacity\": {\n                \"DISK\": {\n                    \"/ephemeral-dir1/kafka\": \"104\",\n                    \"/kafka-logs/kafka\": \"10737\"\n                },\n                \"CPU\": \"150\",\n                \"NW_IN\": \"125000\",\n                \"NW_OUT\": \"125000\"\n            },\n            \"doc\": \"Capacity unit used for disk is in MB, cpu is in percentage, network throughput is in KB.\"\n        }\n    ]\n}"}
+  2025-09-27T12:17:31+02:00     DEBUG   resource is in sync     {"controller": "KafkaCluster", "controllerGroup": "kafka.banzaicloud.io", "controllerKind": "KafkaCluster", "KafkaCluster": {"name":"kafkacluster-2","namespace":"kafka-istioingress-2"}, "namespace": "kafka-istioingress-2", "name": "kafkacluster-2", "reconcileID": "ab8cd744-6973-4739-9c43-e949f4a84e67", "component": "kafkacluster-2-cruisecontrol", "kind": "*v1.ConfigMap", "name": "kafkacluster-2-cruisecontrol-config"}
+  2025-09-27T12:17:31+02:00     DEBUG   resource is in sync     {"controller": "KafkaCluster", "controllerGroup": "kafka.banzaicloud.io", "controllerKind": "KafkaCluster", "KafkaCluster": {"name":"kafkacluster-2","namespace":"kafka-istioingress-2"}, "namespace": "kafka-istioingress-2", "name": "kafkacluster-2", "reconcileID": "ab8cd744-6973-4739-9c43-e949f4a84e67", "component": "kafkacluster-2-cruisecontrol", "kind": "*v1.Deployment", "name": "kafkacluster-2-cruisecontrol"}
+  2025-09-27T12:17:31+02:00     DEBUG   Reconciled      {"controller": "KafkaCluster", "controllerGroup": "kafka.banzaicloud.io", "controllerKind": "KafkaCluster", "KafkaCluster": {"name":"kafkacluster-2","namespace":"kafka-istioingress-2"}, "namespace": "kafka-istioingress-2", "name": "kafkacluster-2", "reconcileID": "ab8cd744-6973-4739-9c43-e949f4a84e67", "component": "kafkacluster-2-cruisecontrol"}
+  2025-09-27T12:17:31+02:00     INFO    ensuring finalizers on kafkacluster     {"controller": "KafkaCluster", "controllerGroup": "kafka.banzaicloud.io", "controllerKind": "KafkaCluster", "KafkaCluster": {"name":"kafkacluster-2","namespace":"kafka-istioingress-2"}, "namespace": "kafka-istioingress-2", "name": "kafkacluster-2", "reconcileID": "ab8cd744-6973-4739-9c43-e949f4a84e67"}
+  2025-09-27T12:17:31+02:00     INFO    CR status updated       {"controller": "KafkaCluster", "controllerGroup": "kafka.banzaicloud.io", "controllerKind": "KafkaCluster", "KafkaCluster": {"name":"kafkacluster-2","namespace":"kafka-istioingress-2"}, "namespace": "kafka-istioingress-2", "name": "kafkacluster-2", "reconcileID": "ab8cd744-6973-4739-9c43-e949f4a84e67", "status": "ClusterRunning"}
+  [FAILED] in [It] - /Users/amuraru/go/src/github.com/koperator/controllers/tests/kafkacluster_controller_istioingress_test.go:329 @ 09/27/25 12:17:31.734
+  STEP: deleting Kafka cluster object kafkacluster-2 in namespace kafka-istioingress-2 @ 09/27/25 12:17:31.734
+  << Timeline
+
+  [FAILED] Expected
+      <v1beta1.ListenerStatuses>: {
+          InternalListeners: {
+              "internal": [
+                  {
+                      Name: "headless",
+                      Address: "kafkacluster-2-headless.kafka-istioingress-2.svc.cluster.local:29092",
+                  },
+                  {
+                      Name: "broker-0",
+                      Address: "kafkacluster-2-0.kafkacluster-2-headless.kafka-istioingress-2.svc.cluster.local:29092",
+                  },
+                  {
+                      Name: "broker-1",
+                      Address: "kafkacluster-2-1.kafkacluster-2-headless.kafka-istioingress-2.svc.cluster.local:29092",
+                  },
+                  {
+                      Name: "broker-2",
+                      Address: "kafkacluster-2-2.kafkacluster-2-headless.kafka-istioingress-2.svc.cluster.local:29092",
+                  },
+              ],
+          },
+          ExternalListeners: nil,
+      }
+  to equal
+      <v1beta1.ListenerStatuses>: {
+          InternalListeners: {
+              "internal": [
+                  {
+                      Name: "headless",
+                      Address: "kafkacluster-2-headless.kafka-istioingress-2.svc.cluster.local:29092",
+                  },
+                  {
+                      Name: "broker-0",
+                      Address: "kafkacluster-2-0.kafkacluster-2-headless.kafka-istioingress-2.svc.cluster.local:29092",
+                  },
+                  {
+                      Name: "broker-1",
+                      Address: "kafkacluster-2-1.kafkacluster-2-headless.kafka-istioingress-2.svc.cluster.local:29092",
+                  },
+                  {
+                      Name: "broker-2",
+                      Address: "kafkacluster-2-2.kafkacluster-2-headless.kafka-istioingress-2.svc.cluster.local:29092",
+                  },
+              ],
+          },
+          ExternalListeners: {
+              "external": [
+                  {
+                      Name: "any-broker",
+                      Address: "ingress.test.host.com:29092",
+                  },
+                  {
+                      Name: "broker-0",
+                      Address: "ingress.test.host.com:19090",
+                  },
+                  {
+                      Name: "broker-1",
+                      Address: "ingress.test.host.com:19091",
+                  },
+                  {
+                      Name: "broker-2",
+                      Address: "ingress.test.host.com:19092",
+                  },
+              ],
+          },
+      }
+  In [It] at: /Users/amuraru/go/src/github.com/koperator/controllers/tests/kafkacluster_controller_istioingress_test.go:329 @ 09/27/25 12:17:31.734
+------------------------------
+••••••GetNodePort: Looking for an available nodeport
+GetNodePort: Found 175 services to check for nodeports
+GetNodePort: Successfully allocated NodePort range 30982-30984 after 1 attempts
+Released NodePort 30982
+Released NodePort 30983
+Released NodePort 30984
+•GetNodePort: Looking for an available nodeport
+GetNodePort: Found 180 services to check for nodeports
+GetNodePort: Successfully allocated NodePort range 30371-30373 after 1 attempts
+Released NodePort 30371
+Released NodePort 30372
+Released NodePort 30373
+•GetNodePort: Looking for an available nodeport
+GetNodePort: Found 185 services to check for nodeports
+GetNodePort: Successfully allocated NodePort range 31870-31872 after 1 attempts
+Released NodePort 31870
+Released NodePort 31871
+Released NodePort 31872
+••Broker-only mode line 171
+Controller-only mode line 187
+Combined-only mode line 206
+•Broker-only mode line 171
+Controller-only mode line 187
+Combined-only mode line 206
+••••
+
+Summarizing 3 Failures:
+  [FAIL] KafkaClusterIstioIngressControllerWithBrokerIdBindings when Istio ingress controller is configured [It] creates Istio ingress related objects
+  /Users/amuraru/go/src/github.com/koperator/controllers/tests/kafkacluster_controller_istioingress_test.go:680
+  [FAIL] KafkaClusterIstioIngressController when Istio ingress controller is configured [It] creates Istio ingress related objects
+  /Users/amuraru/go/src/github.com/koperator/controllers/tests/kafkacluster_controller_istioingress_test.go:272
+  [FAIL] KafkaClusterIstioIngressController when Headless mode is turned on [It] does not add the all-broker service to the listener status
+  /Users/amuraru/go/src/github.com/koperator/controllers/tests/kafkacluster_controller_istioingress_test.go:329
+
+Ran 36 of 36 Specs in 115.637 seconds
+FAIL! -- 33 Passed | 3 Failed | 0 Pending | 0 Skipped
+--- FAIL: TestControllers (115.64s)
+FAIL
+coverage: [no statements]
+FAIL    github.com/banzaicloud/koperator/controllers/tests      118.748s
+=== RUN   TestControllersWithClusterRegistry
+Running Suite: Controller Suite with Cluster Registry - /Users/amuraru/go/src/github.com/koperator/controllers/tests/clusterregistry
+====================================================================================================================================
+Random Seed: 1758968216
+
+Will run 8 of 8 specs
+••••••••
+
+Ran 8 of 8 Specs in 66.145 seconds
+SUCCESS! -- 8 Passed | 0 Failed | 0 Pending | 0 Skipped
+--- PASS: TestControllersWithClusterRegistry (66.15s)
+PASS
+coverage: [no statements]
+ok      github.com/banzaicloud/koperator/controllers/tests/clusterregistry      69.646s coverage: [no statements]
+        github.com/banzaicloud/koperator/controllers/tests/mocks                coverage: 0.0% of statements
+        github.com/banzaicloud/koperator/hack/kafka-test-pod            coverage: 0.0% of statements
+        github.com/banzaicloud/koperator/internal/alertmanager          coverage: 0.0% of statements
+=== RUN   TestAddPvcValidator_validateAlert
+=== PAUSE TestAddPvcValidator_validateAlert
+=== RUN   TestAlertValidators_ValidateAlert
+=== PAUSE TestAlertValidators_ValidateAlert
+=== RUN   TestGetCurrentAlerts
+    current_alerts_test.go:221: &{firing {alertname="PodAlert", kafka_cr="kafka", namespace="kafka", test="test"} {command="testing"} true}
+--- PASS: TestGetCurrentAlerts (2.14s)
+=== RUN   TestDownScaleValidator_validateAlert
+=== PAUSE TestDownScaleValidator_validateAlert
+=== RUN   Test_resizePvc
+=== RUN   Test_resizePvc/Resize_pvc_created_by_default_group
+[{0 default  0x14000027680}]
+=== RUN   Test_resizePvc/Resize_pvc_from_broker_specific_config
+[{0   0x14000df94a0}]
+--- PASS: Test_resizePvc (0.04s)
+    --- PASS: Test_resizePvc/Resize_pvc_created_by_default_group (0.00s)
+    --- PASS: Test_resizePvc/Resize_pvc_from_broker_specific_config (0.00s)
+=== RUN   Test_addPvc
+=== RUN   Test_addPvc/addPvc_alert_successfully_creates_pvc
+=== RUN   Test_addPvc/addPvc_skips_pvc_creation_because_of_an_existing_unbound_pvc
+--- PASS: Test_addPvc (0.01s)
+    --- PASS: Test_addPvc/addPvc_alert_successfully_creates_pvc (0.00s)
+    --- PASS: Test_addPvc/addPvc_skips_pvc_creation_because_of_an_existing_unbound_pvc (0.00s)
+=== RUN   Test_upScale
+=== RUN   Test_upScale/upScale_with_config_group
+=== RUN   Test_upScale/upScale_with_broker_config
+--- PASS: Test_upScale (0.00s)
+    --- PASS: Test_upScale/upScale_with_config_group (0.00s)
+    --- PASS: Test_upScale/upScale_with_broker_config (0.00s)
+=== RUN   Test_downScale
+=== RUN   Test_downScale/downscale_with_broker_id
+--- PASS: Test_downScale (0.00s)
+    --- PASS: Test_downScale/downscale_with_broker_id (0.00s)
+=== RUN   TestResizePvcValidator_validateAlert
+=== PAUSE TestResizePvcValidator_validateAlert
+=== RUN   TestUpScaleValidator_validateAlert
+=== PAUSE TestUpScaleValidator_validateAlert
+=== CONT  TestAddPvcValidator_validateAlert
+=== RUN   TestAddPvcValidator_validateAlert/addPvc_validate_success
+=== CONT  TestResizePvcValidator_validateAlert
+=== CONT  TestAlertValidators_ValidateAlert
+=== RUN   TestResizePvcValidator_validateAlert/resizePvc_validate_success
+=== RUN   TestAlertValidators_ValidateAlert/addPvc_validate_success
+=== CONT  TestDownScaleValidator_validateAlert
+=== RUN   TestDownScaleValidator_validateAlert/downScale_validate_success
+=== CONT  TestUpScaleValidator_validateAlert
+=== RUN   TestUpScaleValidator_validateAlert/upScale_validate_success
+=== RUN   TestResizePvcValidator_validateAlert/resizePvc_validate_failed_due_to_invalid_incrementBy_annotation
+=== RUN   TestAddPvcValidator_validateAlert/addPvc_validate_failed_due_to_missing_label
+=== RUN   TestAlertValidators_ValidateAlert/addPvc_validate_failed_due_to_missing_label
+=== RUN   TestDownScaleValidator_validateAlert/downScale_validate_failed_due_to_missing_label
+=== RUN   TestAddPvcValidator_validateAlert/addPvc_validate_failed_due_to_unsupported_command
+=== RUN   TestUpScaleValidator_validateAlert/upScale_validate_failed_due_to_missing_label
+=== RUN   TestResizePvcValidator_validateAlert/resizePvc_validate_failed_due_to_missing_incrementBy_annotation
+--- PASS: TestAddPvcValidator_validateAlert (0.00s)
+    --- PASS: TestAddPvcValidator_validateAlert/addPvc_validate_success (0.00s)
+    --- PASS: TestAddPvcValidator_validateAlert/addPvc_validate_failed_due_to_missing_label (0.00s)
+    --- PASS: TestAddPvcValidator_validateAlert/addPvc_validate_failed_due_to_unsupported_command (0.00s)
+=== RUN   TestAlertValidators_ValidateAlert/addPvc_validate_failed_due_to_unsupported_command
+=== RUN   TestDownScaleValidator_validateAlert/downScale_validate_failed_due_to_unsupported_command
+=== RUN   TestAlertValidators_ValidateAlert/downScale_validate_success
+--- PASS: TestDownScaleValidator_validateAlert (0.00s)
+    --- PASS: TestDownScaleValidator_validateAlert/downScale_validate_success (0.00s)
+    --- PASS: TestDownScaleValidator_validateAlert/downScale_validate_failed_due_to_missing_label (0.00s)
+    --- PASS: TestDownScaleValidator_validateAlert/downScale_validate_failed_due_to_unsupported_command (0.00s)
+=== RUN   TestUpScaleValidator_validateAlert/upScale_validate_failed_due_to_unsupported_command
+=== RUN   TestResizePvcValidator_validateAlert/resizePvc_validate_failed_due_to_missing_label
+--- PASS: TestUpScaleValidator_validateAlert (0.00s)
+    --- PASS: TestUpScaleValidator_validateAlert/upScale_validate_success (0.00s)
+    --- PASS: TestUpScaleValidator_validateAlert/upScale_validate_failed_due_to_missing_label (0.00s)
+    --- PASS: TestUpScaleValidator_validateAlert/upScale_validate_failed_due_to_unsupported_command (0.00s)
+=== RUN   TestAlertValidators_ValidateAlert/downScale_validate_failed_due_to_missing_label
+=== RUN   TestResizePvcValidator_validateAlert/resizePvc_validate_failed_due_to_unsupported_command
+=== RUN   TestAlertValidators_ValidateAlert/downScale_validate_failed_due_to_unsupported_command
+--- PASS: TestResizePvcValidator_validateAlert (0.00s)
+    --- PASS: TestResizePvcValidator_validateAlert/resizePvc_validate_success (0.00s)
+    --- PASS: TestResizePvcValidator_validateAlert/resizePvc_validate_failed_due_to_invalid_incrementBy_annotation (0.00s)
+    --- PASS: TestResizePvcValidator_validateAlert/resizePvc_validate_failed_due_to_missing_incrementBy_annotation (0.00s)
+    --- PASS: TestResizePvcValidator_validateAlert/resizePvc_validate_failed_due_to_missing_label (0.00s)
+    --- PASS: TestResizePvcValidator_validateAlert/resizePvc_validate_failed_due_to_unsupported_command (0.00s)
+=== RUN   TestAlertValidators_ValidateAlert/upScale_validate_success
+=== RUN   TestAlertValidators_ValidateAlert/upScale_validate_failed_due_to_missing_label
+=== RUN   TestAlertValidators_ValidateAlert/upScale_validate_failed_due_to_unsupported_command
+--- PASS: TestAlertValidators_ValidateAlert (0.00s)
+    --- PASS: TestAlertValidators_ValidateAlert/addPvc_validate_success (0.00s)
+    --- PASS: TestAlertValidators_ValidateAlert/addPvc_validate_failed_due_to_missing_label (0.00s)
+    --- PASS: TestAlertValidators_ValidateAlert/addPvc_validate_failed_due_to_unsupported_command (0.00s)
+    --- PASS: TestAlertValidators_ValidateAlert/downScale_validate_success (0.00s)
+    --- PASS: TestAlertValidators_ValidateAlert/downScale_validate_failed_due_to_missing_label (0.00s)
+    --- PASS: TestAlertValidators_ValidateAlert/downScale_validate_failed_due_to_unsupported_command (0.00s)
+    --- PASS: TestAlertValidators_ValidateAlert/upScale_validate_success (0.00s)
+    --- PASS: TestAlertValidators_ValidateAlert/upScale_validate_failed_due_to_missing_label (0.00s)
+    --- PASS: TestAlertValidators_ValidateAlert/upScale_validate_failed_due_to_unsupported_command (0.00s)
+PASS
+coverage: 61.0% of statements
+ok      github.com/banzaicloud/koperator/internal/alertmanager/currentalert     10.579s coverage: 61.0% of statements
+=== RUN   Test_alertFilter
+=== RUN   Test_alertFilter/alertFilter
+--- PASS: Test_alertFilter (0.00s)
+    --- PASS: Test_alertFilter/alertFilter (0.00s)
+PASS
+coverage: 38.1% of statements
+ok      github.com/banzaicloud/koperator/internal/alertmanager/dispatcher       3.830s  coverage: 38.1% of statements
+        github.com/banzaicloud/koperator/internal/alertmanager/receiver         coverage: 0.0% of statements
+=== RUN   TestNew
+--- PASS: TestNew (0.00s)
+=== RUN   TestUnwrapMethod
+--- PASS: TestUnwrapMethod (0.00s)
+PASS
+coverage: 73.2% of statements
+ok      github.com/banzaicloud/koperator/pkg/errorfactory       3.536s  coverage: 73.2% of statements
+        github.com/banzaicloud/koperator/pkg/jmxextractor               coverage: 0.0% of statements
+=== RUN   Test_rackAwarenessLabelsToReadonlyConfig
+=== PAUSE Test_rackAwarenessLabelsToReadonlyConfig
+=== CONT  Test_rackAwarenessLabelsToReadonlyConfig
+=== RUN   Test_rackAwarenessLabelsToReadonlyConfig/rack_awareness_state_not_set
+=== RUN   Test_rackAwarenessLabelsToReadonlyConfig/rack_awareness_state_not_set,_broker.rack_is_set_in_broker_read_only_config
+=== RUN   Test_rackAwarenessLabelsToReadonlyConfig/rack_awareness_state_is_set,_broker_radonly_config_not_set
+=== RUN   Test_rackAwarenessLabelsToReadonlyConfig/rack_awareness_state_is_set,_broker_readonly_config_is_set
+=== RUN   Test_rackAwarenessLabelsToReadonlyConfig/rack_awareness_state_is_set,_broker_readonly_config_is_set_but_broker.rack_is_missing
+--- PASS: Test_rackAwarenessLabelsToReadonlyConfig (0.00s)
+    --- PASS: Test_rackAwarenessLabelsToReadonlyConfig/rack_awareness_state_not_set (0.00s)
+    --- PASS: Test_rackAwarenessLabelsToReadonlyConfig/rack_awareness_state_not_set,_broker.rack_is_set_in_broker_read_only_config (0.00s)
+    --- PASS: Test_rackAwarenessLabelsToReadonlyConfig/rack_awareness_state_is_set,_broker_radonly_config_not_set (0.00s)
+    --- PASS: Test_rackAwarenessLabelsToReadonlyConfig/rack_awareness_state_is_set,_broker_readonly_config_is_set (0.00s)
+    --- PASS: Test_rackAwarenessLabelsToReadonlyConfig/rack_awareness_state_is_set,_broker_readonly_config_is_set_but_broker.rack_is_missing (0.00s)
+PASS
+coverage: 4.5% of statements
+ok      github.com/banzaicloud/koperator/pkg/k8sutil    4.102s  coverage: 4.5% of statements
+=== RUN   TestNew
+--- PASS: TestNew (0.00s)
+=== RUN   TestOpen
+--- PASS: TestOpen (0.00s)
+=== RUN   TestClose
+--- PASS: TestClose (0.00s)
+=== RUN   TestNumBrokers
+--- PASS: TestNumBrokers (0.00s)
+=== RUN   TestGetSaramaConfig
+--- PASS: TestGetSaramaConfig (0.00s)
+=== RUN   TestClusterConfig
+--- PASS: TestClusterConfig (0.00s)
+=== RUN   TestListTopics
+--- PASS: TestListTopics (0.00s)
+=== RUN   TestGetTopic
+--- PASS: TestGetTopic (0.00s)
+=== RUN   TestDescribeTopic
+--- PASS: TestDescribeTopic (0.00s)
+=== RUN   TestCreateTopic
+--- PASS: TestCreateTopic (0.00s)
+=== RUN   TestDeleteTopic
+--- PASS: TestDeleteTopic (0.00s)
+=== RUN   TestEnsureTopicConfig
+--- PASS: TestEnsureTopicConfig (0.00s)
+=== RUN   TestEnsurePartitionCount
+--- PASS: TestEnsurePartitionCount (0.00s)
+=== RUN   TestCreateUserACLs
+--- PASS: TestCreateUserACLs (0.00s)
+=== RUN   TestDeleteUserACLs
+--- PASS: TestDeleteUserACLs (0.00s)
+PASS
+coverage: 55.6% of statements
+ok      github.com/banzaicloud/koperator/pkg/kafkaclient        3.166s  coverage: 55.6% of statements
+=== RUN   TestGetPKIManager
+--- PASS: TestGetPKIManager (0.00s)
+PASS
+coverage: 86.7% of statements
+ok      github.com/banzaicloud/koperator/pkg/pki        3.417s  coverage: 86.7% of statements
+=== RUN   TestFinalizePKI
+--- PASS: TestFinalizePKI (0.04s)
+=== RUN   TestReconcilePKI
+--- PASS: TestReconcilePKI (0.34s)
+=== RUN   TestNew
+--- PASS: TestNew (0.00s)
+=== RUN   TestGetControllerTLSConfig
+--- PASS: TestGetControllerTLSConfig (0.17s)
+=== RUN   TestFinalizeUserCertificate
+--- PASS: TestFinalizeUserCertificate (0.00s)
+=== RUN   TestReconcileUserCertificate
+--- PASS: TestReconcileUserCertificate (0.45s)
+PASS
+coverage: 79.4% of statements
+ok      github.com/banzaicloud/koperator/pkg/pki/certmanagerpki 4.647s  coverage: 79.4% of statements
+=== RUN   TestNew
+--- PASS: TestNew (0.00s)
+=== RUN   TestReconcileUserCertificate
+--- PASS: TestReconcileUserCertificate (0.08s)
+PASS
+coverage: 36.8% of statements
+ok      github.com/banzaicloud/koperator/pkg/pki/k8scsrpki      3.772s  coverage: 36.8% of statements
+?       github.com/banzaicloud/koperator/pkg/resources  [no test files]
+        github.com/banzaicloud/koperator/pkg/resources/contouringress           coverage: 0.0% of statements
+=== RUN   TestGenerateCapacityConfig_JBOD
+=== PAUSE TestGenerateCapacityConfig_JBOD
+=== RUN   TestReturnErrorStorageConfigLessThan1MB
+--- PASS: TestReturnErrorStorageConfigLessThan1MB (0.00s)
+=== RUN   TestGenerateCapacityConfigWithUserProvidedInput
+=== PAUSE TestGenerateCapacityConfigWithUserProvidedInput
+=== CONT  TestGenerateCapacityConfig_JBOD
+=== RUN   TestGenerateCapacityConfig_JBOD/if_config_is_set_manually_then_use_that_one
+=== CONT  TestGenerateCapacityConfigWithUserProvidedInput
+=== RUN   TestGenerateCapacityConfigWithUserProvidedInput/JBOD_case,_without_default_broker
+=== RUN   TestGenerateCapacityConfig_JBOD/generate_correct_capacity_config_when_there_is_a_broker_config_group
+=== RUN   TestGenerateCapacityConfig_JBOD/generate_correct_capacity_config_when_there_is_a_broker_missing_from_spec_but_present_in_status
+=== RUN   TestGenerateCapacityConfigWithUserProvidedInput/JBOD_case,_with_default_broker
+=== RUN   TestGenerateCapacityConfig_JBOD/generate_correct_capacity_config_when_storage_config_is_specified_as_1Mi_
+=== RUN   TestGenerateCapacityConfig_JBOD/generate_correct_capacity_config_when_there_is_no_broker_config_group_on_last_broker
+=== RUN   TestGenerateCapacityConfigWithUserProvidedInput/without_JBOD_and_default_broker
+--- PASS: TestGenerateCapacityConfig_JBOD (0.00s)
+    --- PASS: TestGenerateCapacityConfig_JBOD/if_config_is_set_manually_then_use_that_one (0.00s)
+    --- PASS: TestGenerateCapacityConfig_JBOD/generate_correct_capacity_config_when_there_is_a_broker_config_group (0.00s)
+    --- PASS: TestGenerateCapacityConfig_JBOD/generate_correct_capacity_config_when_there_is_a_broker_missing_from_spec_but_present_in_status (0.00s)
+    --- PASS: TestGenerateCapacityConfig_JBOD/generate_correct_capacity_config_when_storage_config_is_specified_as_1Mi_ (0.00s)
+    --- PASS: TestGenerateCapacityConfig_JBOD/generate_correct_capacity_config_when_there_is_no_broker_config_group_on_last_broker (0.00s)
+=== RUN   TestGenerateCapacityConfigWithUserProvidedInput/without_JBOD_case,_but_with_default_broker
+--- PASS: TestGenerateCapacityConfigWithUserProvidedInput (0.00s)
+    --- PASS: TestGenerateCapacityConfigWithUserProvidedInput/JBOD_case,_without_default_broker (0.00s)
+    --- PASS: TestGenerateCapacityConfigWithUserProvidedInput/JBOD_case,_with_default_broker (0.00s)
+    --- PASS: TestGenerateCapacityConfigWithUserProvidedInput/without_JBOD_and_default_broker (0.00s)
+    --- PASS: TestGenerateCapacityConfigWithUserProvidedInput/without_JBOD_case,_but_with_default_broker (0.00s)
+PASS
+coverage: 33.3% of statements
+ok      github.com/banzaicloud/koperator/pkg/resources/cruisecontrol    2.839s  coverage: 33.3% of statements
+        github.com/banzaicloud/koperator/pkg/resources/cruisecontrolmonitoring          coverage: 0.0% of statements
+        github.com/banzaicloud/koperator/pkg/resources/envoy            coverage: 0.0% of statements
+        github.com/banzaicloud/koperator/pkg/resources/istioingress             coverage: 0.0% of statements
+=== RUN   TestGetMountPathsFromBrokerConfigMap
+--- PASS: TestGetMountPathsFromBrokerConfigMap (0.00s)
+=== RUN   TestMergeMountPaths
+--- PASS: TestMergeMountPaths (0.00s)
+=== RUN   TestGenerateBrokerConfig
+=== PAUSE TestGenerateBrokerConfig
+=== RUN   TestGenerateBrokerConfigKRaftMode
+=== PAUSE TestGenerateBrokerConfigKRaftMode
+=== RUN   TestGenerateBrokerConfigKRaftModeSSL
+=== PAUSE TestGenerateBrokerConfigKRaftModeSSL
+=== RUN   TestCollectNonIdenticalConfigsFromResponse
+--- PASS: TestCollectNonIdenticalConfigsFromResponse (0.00s)
+=== RUN   TestIsNodePortAccessMethodInUseAmongExternalListeners
+=== RUN   TestIsNodePortAccessMethodInUseAmongExternalListeners/All_external_listeners_use_NodePort_access_method
+=== RUN   TestIsNodePortAccessMethodInUseAmongExternalListeners/All_external_listeners_use_non-NodePort_access_method
+=== RUN   TestIsNodePortAccessMethodInUseAmongExternalListeners/External_listeners_with_mixed_usages_of_NodePort_and_non-NodePort_access_methods
+--- PASS: TestIsNodePortAccessMethodInUseAmongExternalListeners (0.00s)
+    --- PASS: TestIsNodePortAccessMethodInUseAmongExternalListeners/All_external_listeners_use_NodePort_access_method (0.00s)
+    --- PASS: TestIsNodePortAccessMethodInUseAmongExternalListeners/All_external_listeners_use_non-NodePort_access_method (0.00s)
+    --- PASS: TestIsNodePortAccessMethodInUseAmongExternalListeners/External_listeners_with_mixed_usages_of_NodePort_and_non-NodePort_access_methods (0.00s)
+=== RUN   TestNonNodePortServices
+=== RUN   TestNonNodePortServices/Services_with_mixed_NodePort_and_non-NodePort_services_that_are_evenly_distributed
+=== RUN   TestNonNodePortServices/Services_with_mixed_NodePort_and_non-NodePort_services_that_are_non-evenly_distributed
+=== RUN   TestNonNodePortServices/Services_with_only_NodePort_services
+=== RUN   TestNonNodePortServices/Services_with_only_non-NodePort_services
+--- PASS: TestNonNodePortServices (0.00s)
+    --- PASS: TestNonNodePortServices/Services_with_mixed_NodePort_and_non-NodePort_services_that_are_evenly_distributed (0.00s)
+    --- PASS: TestNonNodePortServices/Services_with_mixed_NodePort_and_non-NodePort_services_that_are_non-evenly_distributed (0.00s)
+    --- PASS: TestNonNodePortServices/Services_with_only_NodePort_services (0.00s)
+    --- PASS: TestNonNodePortServices/Services_with_only_non-NodePort_services (0.00s)
+=== RUN   TestGetBrokersWithPendingOrRunningCCTask
+=== RUN   TestGetBrokersWithPendingOrRunningCCTask/pending_and_running_CC_rebalance_tasks
+=== RUN   TestGetBrokersWithPendingOrRunningCCTask/no_pending_or_running_CC_upscale_tasks
+=== RUN   TestGetBrokersWithPendingOrRunningCCTask/pending_and_running_CC_upscale_tasks
+=== RUN   TestGetBrokersWithPendingOrRunningCCTask/no_pending_or_running_CC_downscale_tasks
+=== RUN   TestGetBrokersWithPendingOrRunningCCTask/pending_and_running_CC_downscale_tasks
+=== RUN   TestGetBrokersWithPendingOrRunningCCTask/no_pending_or_running_CC_rebalance_tasks
+--- PASS: TestGetBrokersWithPendingOrRunningCCTask (0.00s)
+    --- PASS: TestGetBrokersWithPendingOrRunningCCTask/pending_and_running_CC_rebalance_tasks (0.00s)
+    --- PASS: TestGetBrokersWithPendingOrRunningCCTask/no_pending_or_running_CC_upscale_tasks (0.00s)
+    --- PASS: TestGetBrokersWithPendingOrRunningCCTask/pending_and_running_CC_upscale_tasks (0.00s)
+    --- PASS: TestGetBrokersWithPendingOrRunningCCTask/no_pending_or_running_CC_downscale_tasks (0.00s)
+    --- PASS: TestGetBrokersWithPendingOrRunningCCTask/pending_and_running_CC_downscale_tasks (0.00s)
+    --- PASS: TestGetBrokersWithPendingOrRunningCCTask/no_pending_or_running_CC_rebalance_tasks (0.00s)
+=== RUN   TestReorderBrokers
+=== PAUSE TestReorderBrokers
+=== RUN   TestGetServerPasswordKeysAndUsers
+=== PAUSE TestGetServerPasswordKeysAndUsers
+=== RUN   TestReconcileKafkaPvcDiskRemoval
+=== PAUSE TestReconcileKafkaPvcDiskRemoval
+=== RUN   TestReconcileKafkaPvcDisk
+=== PAUSE TestReconcileKafkaPvcDisk
+=== RUN   TestReconcileConcurrentBrokerRestartsAllowed
+=== PAUSE TestReconcileConcurrentBrokerRestartsAllowed
+=== RUN   TestGetBrokerAzMap
+=== PAUSE TestGetBrokerAzMap
+=== RUN   TestGetAffinity
+--- PASS: TestGetAffinity (0.00s)
+=== RUN   Test_generateEnvConfig
+--- PASS: Test_generateEnvConfig (0.00s)
+=== RUN   TestReconciler_pvc
+=== PAUSE TestReconciler_pvc
+=== RUN   TestGenerateClusterID
+--- PASS: TestGenerateClusterID (0.06s)
+=== RUN   TestGenerateQuorumVoters
+=== RUN   TestGenerateQuorumVoters/brokers_with_ascending_order_by_IDs;_controller_listener_statuses_has_the_same_order_as_brokers
+=== RUN   TestGenerateQuorumVoters/brokers_with_descending_order_by_IDs;_controller_listener_statuses_has_the_same_order_as_brokers
+=== RUN   TestGenerateQuorumVoters/brokers_with_ascending_order_by_IDs;_controller_listener_statuses_has_the_opposite_order_as_brokers
+=== RUN   TestGenerateQuorumVoters/brokers_and_controller_listener_statuses_with_random_order
+--- PASS: TestGenerateQuorumVoters (0.00s)
+    --- PASS: TestGenerateQuorumVoters/brokers_with_ascending_order_by_IDs;_controller_listener_statuses_has_the_same_order_as_brokers (0.00s)
+    --- PASS: TestGenerateQuorumVoters/brokers_with_descending_order_by_IDs;_controller_listener_statuses_has_the_same_order_as_brokers (0.00s)
+    --- PASS: TestGenerateQuorumVoters/brokers_with_ascending_order_by_IDs;_controller_listener_statuses_has_the_opposite_order_as_brokers (0.00s)
+    --- PASS: TestGenerateQuorumVoters/brokers_and_controller_listener_statuses_with_random_order (0.00s)
+=== CONT  TestGenerateBrokerConfig
+=== RUN   TestGenerateBrokerConfig/basicConfig
+=== RUN   TestGenerateBrokerConfig/basicConfigWithZKPath
+=== RUN   TestGenerateBrokerConfig/basicConfigWithSimpleZkPath
+=== RUN   TestGenerateBrokerConfig/basicConfigWithMultipleZKAddressAndPath
+=== RUN   TestGenerateBrokerConfig/basicConfigWithCustomStorage
+=== RUN   TestGenerateBrokerConfig/basicConfigWithClusterDomain
+=== RUN   TestGenerateBrokerConfig/readOnlyRedefinedInOneBroker
+=== RUN   TestGenerateBrokerConfig/configWithSasl
+=== RUN   TestGenerateBrokerConfig/configWithSSL_SSLClientAuth_not_provided
+=== RUN   TestGenerateBrokerConfig/configWithSSL_SSLClientAuth_required
+=== RUN   TestGenerateBrokerConfig/configWithSSL_SSLClientAuth_requested
+=== CONT  TestReconcileKafkaPvcDiskRemoval
+=== CONT  TestGetBrokerAzMap
+=== RUN   TestGetBrokerAzMap/Brokers_have_different_AZs_if_no_broker_rack_value_is_set
+=== RUN   TestGetBrokerAzMap/Brokers_have_different_AZs_if_one_broker_has_no_broker_rack_value_set
+=== RUN   TestGetBrokerAzMap/Brokers_have_different_AZs_if_read_only_configs_is_a_corrupted_string_for_one_broker
+=== CONT  TestReconciler_pvc
+=== RUN   TestGetBrokerAzMap/Brokers_have_correct_AZs_if_read_only_configs_is_valid_for_all_brokers
+=== RUN   TestReconciler_pvc/storage_config_with_no_template
+--- PASS: TestGetBrokerAzMap (0.00s)
+    --- PASS: TestGetBrokerAzMap/Brokers_have_different_AZs_if_no_broker_rack_value_is_set (0.00s)
+    --- PASS: TestGetBrokerAzMap/Brokers_have_different_AZs_if_one_broker_has_no_broker_rack_value_set (0.00s)
+    --- PASS: TestGetBrokerAzMap/Brokers_have_different_AZs_if_read_only_configs_is_a_corrupted_string_for_one_broker (0.00s)
+    --- PASS: TestGetBrokerAzMap/Brokers_have_correct_AZs_if_read_only_configs_is_valid_for_all_brokers (0.00s)
+=== CONT  TestGenerateBrokerConfigKRaftModeSSL
+=== RUN   TestGenerateBrokerConfigKRaftModeSSL/a_Kafka_cluster_with_a_mix_of_broker-only_and_controller-only_nodes;_broker-only_nodes_with_multiple_mount_paths;_two_internal_ssl_listeners
+=== CONT  TestGetServerPasswordKeysAndUsers
+=== CONT  TestReconcileConcurrentBrokerRestartsAllowed
+=== RUN   TestGenerateBrokerConfigKRaftModeSSL/a_Kafka_cluster_with_a_mix_of_broker-only_and_controller-only_nodes;_broker-only_nodes_with_multiple_mount_paths;_two_external_ssl_listeners
+=== CONT  TestReconcileKafkaPvcDisk
+=== RUN   TestGetServerPasswordKeysAndUsers/secretmissingdatafield
+=== RUN   TestReconcileConcurrentBrokerRestartsAllowed/Pod_is_not_deleted_if_pod_list_count_different_from_spec
+=== RUN   TestReconcileKafkaPvcDisk/broker_with_multiple_disks_is_allowed
+--- PASS: TestGenerateBrokerConfigKRaftModeSSL (0.00s)
+    --- PASS: TestGenerateBrokerConfigKRaftModeSSL/a_Kafka_cluster_with_a_mix_of_broker-only_and_controller-only_nodes;_broker-only_nodes_with_multiple_mount_paths;_two_internal_ssl_listeners (0.00s)
+    --- PASS: TestGenerateBrokerConfigKRaftModeSSL/a_Kafka_cluster_with_a_mix_of_broker-only_and_controller-only_nodes;_broker-only_nodes_with_multiple_mount_paths;_two_external_ssl_listeners (0.00s)
+=== RUN   TestGetServerPasswordKeysAndUsers/autogenerated
+=== RUN   TestGetServerPasswordKeysAndUsers/autogenerated-and-custom
+=== RUN   TestGetServerPasswordKeysAndUsers/custom
+=== RUN   TestGetServerPasswordKeysAndUsers/missingsecret
+--- PASS: TestGetServerPasswordKeysAndUsers (0.00s)
+    --- PASS: TestGetServerPasswordKeysAndUsers/secretmissingdatafield (0.00s)
+    --- PASS: TestGetServerPasswordKeysAndUsers/autogenerated (0.00s)
+    --- PASS: TestGetServerPasswordKeysAndUsers/autogenerated-and-custom (0.00s)
+    --- PASS: TestGetServerPasswordKeysAndUsers/custom (0.00s)
+    --- PASS: TestGetServerPasswordKeysAndUsers/missingsecret (0.00s)
+=== CONT  TestGenerateBrokerConfigKRaftMode
+=== RUN   TestGenerateBrokerConfig/configWithSSL_SSLClientAuth_none
+=== RUN   TestGenerateBrokerConfigKRaftMode/a_Kafka_cluster_with_a_mix_of_broker-only_and_controller-only_nodes;_broker-only_nodes_with_multiple_mount_paths
+=== RUN   TestReconcileKafkaPvcDiskRemoval/If_no_disk_removed,_do_nothing
+=== RUN   TestGenerateBrokerConfig/configWithSSL_with_readOnly-superUsers1
+=== CONT  TestReorderBrokers
+=== RUN   TestReorderBrokers/all_broker_pods_are_up_an_running_with_no_controller_broker
+=== RUN   TestReorderBrokers/all_broker_pods_are_up_an_running_with_controller_broker
+=== RUN   TestReorderBrokers/some_missing_broker_pods
+=== RUN   TestReorderBrokers/some_missing_broker_pods_and_newly_added_brokers
+=== RUN   TestGenerateBrokerConfig/configWithSSL_with_readOnly-superUsers2
+=== RUN   TestReorderBrokers/some_missing_broker_pods,_newly_added_brokers,_and_missing_bokers_with_pvc_and_incomplete_downscale_operation
+=== RUN   TestReconciler_pvc/storage_config_with_template
+=== RUN   TestGenerateBrokerConfig/configWithSSL_with_readOnly-superUsers3
+=== RUN   TestReconciler_pvc/storage_config_with_template_and_very_long_mount_path
+=== RUN   TestReconciler_pvc/storage_config_with_volume_name_template
+--- PASS: TestReconciler_pvc (0.00s)
+    --- PASS: TestReconciler_pvc/storage_config_with_no_template (0.00s)
+    --- PASS: TestReconciler_pvc/storage_config_with_template (0.00s)
+    --- PASS: TestReconciler_pvc/storage_config_with_template_and_very_long_mount_path (0.00s)
+    --- PASS: TestReconciler_pvc/storage_config_with_volume_name_template (0.00s)
+=== RUN   TestGenerateBrokerConfig/configWithSSL_with_readOnly-superUsers4
+=== RUN   TestGenerateBrokerConfig/security_inter_broker_protocol_Set
+--- PASS: TestGenerateBrokerConfig (0.00s)
+    --- PASS: TestGenerateBrokerConfig/basicConfig (0.00s)
+    --- PASS: TestGenerateBrokerConfig/basicConfigWithZKPath (0.00s)
+    --- PASS: TestGenerateBrokerConfig/basicConfigWithSimpleZkPath (0.00s)
+    --- PASS: TestGenerateBrokerConfig/basicConfigWithMultipleZKAddressAndPath (0.00s)
+    --- PASS: TestGenerateBrokerConfig/basicConfigWithCustomStorage (0.00s)
+    --- PASS: TestGenerateBrokerConfig/basicConfigWithClusterDomain (0.00s)
+    --- PASS: TestGenerateBrokerConfig/readOnlyRedefinedInOneBroker (0.00s)
+    --- PASS: TestGenerateBrokerConfig/configWithSasl (0.00s)
+    --- PASS: TestGenerateBrokerConfig/configWithSSL_SSLClientAuth_not_provided (0.00s)
+    --- PASS: TestGenerateBrokerConfig/configWithSSL_SSLClientAuth_required (0.00s)
+    --- PASS: TestGenerateBrokerConfig/configWithSSL_SSLClientAuth_requested (0.00s)
+    --- PASS: TestGenerateBrokerConfig/configWithSSL_SSLClientAuth_none (0.00s)
+    --- PASS: TestGenerateBrokerConfig/configWithSSL_with_readOnly-superUsers1 (0.00s)
+    --- PASS: TestGenerateBrokerConfig/configWithSSL_with_readOnly-superUsers2 (0.00s)
+    --- PASS: TestGenerateBrokerConfig/configWithSSL_with_readOnly-superUsers3 (0.00s)
+    --- PASS: TestGenerateBrokerConfig/configWithSSL_with_readOnly-superUsers4 (0.00s)
+    --- PASS: TestGenerateBrokerConfig/security_inter_broker_protocol_Set (0.00s)
+=== RUN   TestReorderBrokers/some_missing_broker_pods,_newly_added_brokers,_and_missing_bokers_without_pvc_and_incomplete_downscale_operation
+--- PASS: TestReorderBrokers (0.00s)
+    --- PASS: TestReorderBrokers/all_broker_pods_are_up_an_running_with_no_controller_broker (0.00s)
+    --- PASS: TestReorderBrokers/all_broker_pods_are_up_an_running_with_controller_broker (0.00s)
+    --- PASS: TestReorderBrokers/some_missing_broker_pods (0.00s)
+    --- PASS: TestReorderBrokers/some_missing_broker_pods_and_newly_added_brokers (0.00s)
+    --- PASS: TestReorderBrokers/some_missing_broker_pods,_newly_added_brokers,_and_missing_bokers_with_pvc_and_incomplete_downscale_operation (0.00s)
+    --- PASS: TestReorderBrokers/some_missing_broker_pods,_newly_added_brokers,_and_missing_bokers_without_pvc_and_incomplete_downscale_operation (0.00s)
+=== RUN   TestReconcileKafkaPvcDisk/when_a_controller_has_more_than_1_disk,_it_should_fail
+=== RUN   TestReconcileKafkaPvcDisk/when_a_controller_changes_a_mount_path,_it_should_fail
+--- PASS: TestReconcileKafkaPvcDisk (0.00s)
+    --- PASS: TestReconcileKafkaPvcDisk/broker_with_multiple_disks_is_allowed (0.00s)
+    --- PASS: TestReconcileKafkaPvcDisk/when_a_controller_has_more_than_1_disk,_it_should_fail (0.00s)
+    --- PASS: TestReconcileKafkaPvcDisk/when_a_controller_changes_a_mount_path,_it_should_fail (0.00s)
+=== RUN   TestGenerateBrokerConfigKRaftMode/a_Kafka_cluster_with_a_mix_of_broker-only,_controller-only,_and_combined_roles;_controller_nodes_with_multiple_mount_paths
+=== RUN   TestGenerateBrokerConfigKRaftMode/a_Kafka_cluster_with_a_mix_of_broker-only,_controller-only,_and_combined_roles;_and_various_migration_configs_set_on_each_brokers
+--- PASS: TestGenerateBrokerConfigKRaftMode (0.00s)
+    --- PASS: TestGenerateBrokerConfigKRaftMode/a_Kafka_cluster_with_a_mix_of_broker-only_and_controller-only_nodes;_broker-only_nodes_with_multiple_mount_paths (0.00s)
+    --- PASS: TestGenerateBrokerConfigKRaftMode/a_Kafka_cluster_with_a_mix_of_broker-only,_controller-only,_and_combined_roles;_controller_nodes_with_multiple_mount_paths (0.00s)
+    --- PASS: TestGenerateBrokerConfigKRaftMode/a_Kafka_cluster_with_a_mix_of_broker-only,_controller-only,_and_combined_roles;_and_various_migration_configs_set_on_each_brokers (0.00s)
+=== RUN   TestReconcileKafkaPvcDiskRemoval/If_disk_removed,_mark_it_as_GracefulDiskRemovalRequired_and_return_error
+=== RUN   TestReconcileKafkaPvcDiskRemoval/If_disk_is_rebalancing,_wait_for_it_to_finish
+=== RUN   TestReconcileKafkaPvcDiskRemoval/Wait_for_disk_removal_to_finish
+=== RUN   TestReconcileKafkaPvcDiskRemoval/If_disk_removal_successful,_do_not_return_error_and_delete_pvc_and_volume_state
+=== RUN   TestReconcileKafkaPvcDiskRemoval/If_disk_removal_failed,_and_it_is_readded,_mark_the_disk_as_rebalancing
+--- PASS: TestReconcileKafkaPvcDiskRemoval (0.01s)
+    --- PASS: TestReconcileKafkaPvcDiskRemoval/If_no_disk_removed,_do_nothing (0.01s)
+    --- PASS: TestReconcileKafkaPvcDiskRemoval/If_disk_removed,_mark_it_as_GracefulDiskRemovalRequired_and_return_error (0.00s)
+    --- PASS: TestReconcileKafkaPvcDiskRemoval/If_disk_is_rebalancing,_wait_for_it_to_finish (0.00s)
+    --- PASS: TestReconcileKafkaPvcDiskRemoval/Wait_for_disk_removal_to_finish (0.00s)
+    --- PASS: TestReconcileKafkaPvcDiskRemoval/If_disk_removal_successful,_do_not_return_error_and_delete_pvc_and_volume_state (0.00s)
+    --- PASS: TestReconcileKafkaPvcDiskRemoval/If_disk_removal_failed,_and_it_is_readded,_mark_the_disk_as_rebalancing (0.00s)
+=== RUN   TestReconcileConcurrentBrokerRestartsAllowed/Pod_is_not_deleted_if_allowed_concurrent_restarts_not_specified_(default=1)_and_another_pod_is_restarting
+=== RUN   TestReconcileConcurrentBrokerRestartsAllowed/Pod_is_not_deleted_if_allowed_concurrent_restarts_equals_pods_restarting
+=== RUN   TestReconcileConcurrentBrokerRestartsAllowed/Pod_is_not_deleted_if_broker.rack_is_not_set_in_all_read-only_configs,_if_another_pod_is_restarting
+=== RUN   TestReconcileConcurrentBrokerRestartsAllowed/Pod_is_not_deleted_if_broker.rack_is_not_set_in_some_read-only_configs,_if_another_pod_is_restarting
+=== RUN   TestReconcileConcurrentBrokerRestartsAllowed/Pod_is_not_deleted_if_allowed_concurrent_restarts_is_not_specified_and_failure_threshold_is_reached
+=== RUN   TestReconcileConcurrentBrokerRestartsAllowed/Pod_is_deleted_if_allowed_concurrent_restarts_is_default_and_failure_threshold_is_not_reached
+=== RUN   TestReconcileConcurrentBrokerRestartsAllowed/Pod_is_not_deleted_if_pod_is_restarting_in_another_AZ,_even_if_allowed_concurrent_restarts_is_not_reached
+=== RUN   TestReconcileConcurrentBrokerRestartsAllowed/Pod_is_not_deleted_if_failure_is_in_another_AZ,_even_if_allowed_concurrent_restarts_is_not_reached
+=== RUN   TestReconcileConcurrentBrokerRestartsAllowed/Pod_is_deleted_if_all_pods_are_running_and_CC_RackAwareDistributionGoal_is_not_ready_and_allowed_concurrent_restarts_is_not_reached
+=== RUN   TestReconcileConcurrentBrokerRestartsAllowed/Pod_is_deleted_if_failure_is_in_same_AZ_and_allowed_concurrent_restarts_is_not_reached
+=== RUN   TestReconcileConcurrentBrokerRestartsAllowed/Pod_is_not_deleted_if_pod_is_restarting_in_another_AZ,_if_brokers_per_AZ_<_tolerated_failures
+=== RUN   TestReconcileConcurrentBrokerRestartsAllowed/Pod_is_not_deleted_if_there_are_out-of-sync_replicas_in_another_AZ,_if_brokers_per_AZ_<_tolerated_failures
+=== RUN   TestReconcileConcurrentBrokerRestartsAllowed/Pod_is_not_deleted_if_there_are_offline_replicas_in_another_AZ,_if_brokers_per_AZ_<_tolerated_failures
+=== RUN   TestReconcileConcurrentBrokerRestartsAllowed/Pod_is_not_deleted_if_pod_is_restarting_in_another_AZ,_if_broker_rack_value_contains_dashes
+--- PASS: TestReconcileConcurrentBrokerRestartsAllowed (0.01s)
+    --- PASS: TestReconcileConcurrentBrokerRestartsAllowed/Pod_is_not_deleted_if_pod_list_count_different_from_spec (0.01s)
+    --- PASS: TestReconcileConcurrentBrokerRestartsAllowed/Pod_is_not_deleted_if_allowed_concurrent_restarts_not_specified_(default=1)_and_another_pod_is_restarting (0.00s)
+    --- PASS: TestReconcileConcurrentBrokerRestartsAllowed/Pod_is_not_deleted_if_allowed_concurrent_restarts_equals_pods_restarting (0.00s)
+    --- PASS: TestReconcileConcurrentBrokerRestartsAllowed/Pod_is_not_deleted_if_broker.rack_is_not_set_in_all_read-only_configs,_if_another_pod_is_restarting (0.00s)
+    --- PASS: TestReconcileConcurrentBrokerRestartsAllowed/Pod_is_not_deleted_if_broker.rack_is_not_set_in_some_read-only_configs,_if_another_pod_is_restarting (0.00s)
+    --- PASS: TestReconcileConcurrentBrokerRestartsAllowed/Pod_is_not_deleted_if_allowed_concurrent_restarts_is_not_specified_and_failure_threshold_is_reached (0.00s)
+    --- PASS: TestReconcileConcurrentBrokerRestartsAllowed/Pod_is_deleted_if_allowed_concurrent_restarts_is_default_and_failure_threshold_is_not_reached (0.00s)
+    --- PASS: TestReconcileConcurrentBrokerRestartsAllowed/Pod_is_not_deleted_if_pod_is_restarting_in_another_AZ,_even_if_allowed_concurrent_restarts_is_not_reached (0.00s)
+    --- PASS: TestReconcileConcurrentBrokerRestartsAllowed/Pod_is_not_deleted_if_failure_is_in_another_AZ,_even_if_allowed_concurrent_restarts_is_not_reached (0.00s)
+    --- PASS: TestReconcileConcurrentBrokerRestartsAllowed/Pod_is_deleted_if_all_pods_are_running_and_CC_RackAwareDistributionGoal_is_not_ready_and_allowed_concurrent_restarts_is_not_reached (0.00s)
+    --- PASS: TestReconcileConcurrentBrokerRestartsAllowed/Pod_is_deleted_if_failure_is_in_same_AZ_and_allowed_concurrent_restarts_is_not_reached (0.00s)
+    --- PASS: TestReconcileConcurrentBrokerRestartsAllowed/Pod_is_not_deleted_if_pod_is_restarting_in_another_AZ,_if_brokers_per_AZ_<_tolerated_failures (0.00s)
+    --- PASS: TestReconcileConcurrentBrokerRestartsAllowed/Pod_is_not_deleted_if_there_are_out-of-sync_replicas_in_another_AZ,_if_brokers_per_AZ_<_tolerated_failures (0.00s)
+    --- PASS: TestReconcileConcurrentBrokerRestartsAllowed/Pod_is_not_deleted_if_there_are_offline_replicas_in_another_AZ,_if_brokers_per_AZ_<_tolerated_failures (0.00s)
+    --- PASS: TestReconcileConcurrentBrokerRestartsAllowed/Pod_is_not_deleted_if_pod_is_restarting_in_another_AZ,_if_broker_rack_value_contains_dashes (0.00s)
+PASS
+coverage: 37.2% of statements
+ok      github.com/banzaicloud/koperator/pkg/resources/kafka    1.338s  coverage: 37.2% of statements
+        github.com/banzaicloud/koperator/pkg/resources/kafka/mocks              coverage: 0.0% of statements
+        github.com/banzaicloud/koperator/pkg/resources/kafkamonitoring          coverage: 0.0% of statements
+        github.com/banzaicloud/koperator/pkg/resources/nodeportexternalaccess           coverage: 0.0% of statements
+        github.com/banzaicloud/koperator/pkg/resources/templates                coverage: 0.0% of statements
+=== RUN   TestParseBrokerIDsAndLogDirToMap
+=== RUN   TestParseBrokerIDsAndLogDirToMap/valid_input
+=== RUN   TestParseBrokerIDsAndLogDirToMap/empty_input
+=== RUN   TestParseBrokerIDsAndLogDirToMap/invalid_format
+=== RUN   TestParseBrokerIDsAndLogDirToMap/invalid_broker_ID
+--- PASS: TestParseBrokerIDsAndLogDirToMap (0.00s)
+    --- PASS: TestParseBrokerIDsAndLogDirToMap/valid_input (0.00s)
+    --- PASS: TestParseBrokerIDsAndLogDirToMap/empty_input (0.00s)
+    --- PASS: TestParseBrokerIDsAndLogDirToMap/invalid_format (0.00s)
+    --- PASS: TestParseBrokerIDsAndLogDirToMap/invalid_broker_ID (0.00s)
+PASS
+coverage: 4.2% of statements
+ok      github.com/banzaicloud/koperator/pkg/scale      1.327s  coverage: 4.2% of statements
+=== RUN   TestIntstrPointer
+--- PASS: TestIntstrPointer (0.00s)
+=== RUN   TestInt64Pointer
+--- PASS: TestInt64Pointer (0.00s)
+=== RUN   TestInt32Pointer
+--- PASS: TestInt32Pointer (0.00s)
+=== RUN   TestBoolPointer
+--- PASS: TestBoolPointer (0.00s)
+=== RUN   TestStringPointer
+--- PASS: TestStringPointer (0.00s)
+=== RUN   TestMapStringStringPointer
+--- PASS: TestMapStringStringPointer (0.00s)
+=== RUN   TestConvertStringToInt32
+--- PASS: TestConvertStringToInt32 (0.00s)
+=== RUN   TestIsSSLEnabledForInternalCommunication
+--- PASS: TestIsSSLEnabledForInternalCommunication (0.00s)
+=== RUN   TestStringSliceRemove
+--- PASS: TestStringSliceRemove (0.00s)
+=== RUN   TestMergeAnnotations
+--- PASS: TestMergeAnnotations (0.00s)
+=== RUN   TestCreateLogger
+--- PASS: TestCreateLogger (0.00s)
+=== RUN   TestGetBrokerIdsFromStatusAndSpec
+--- PASS: TestGetBrokerIdsFromStatusAndSpec (0.00s)
+=== RUN   TestGetIngressConfigs
+--- PASS: TestGetIngressConfigs (0.00s)
+=== RUN   TestIsIngressConfigInUse
+--- PASS: TestIsIngressConfigInUse (0.00s)
+=== RUN   TestConfigurationBackup
+--- PASS: TestConfigurationBackup (0.00s)
+=== RUN   TestFilterControllerOnlyNodes
+=== RUN   TestFilterControllerOnlyNodes/there_is_no_controller-only_node_in_the_Kafka_cluster
+=== RUN   TestFilterControllerOnlyNodes/there_is_one_controller-only_node_in_the_Kafka_cluster
+=== RUN   TestFilterControllerOnlyNodes/there_are_multiple_controller-only_nodes_in_the_Kafka_cluster
+=== RUN   TestFilterControllerOnlyNodes/all_nodes_are_controller-only_in_the_Kafka_cluster
+--- PASS: TestFilterControllerOnlyNodes (0.00s)
+    --- PASS: TestFilterControllerOnlyNodes/there_is_no_controller-only_node_in_the_Kafka_cluster (0.00s)
+    --- PASS: TestFilterControllerOnlyNodes/there_is_one_controller-only_node_in_the_Kafka_cluster (0.00s)
+    --- PASS: TestFilterControllerOnlyNodes/there_are_multiple_controller-only_nodes_in_the_Kafka_cluster (0.00s)
+    --- PASS: TestFilterControllerOnlyNodes/all_nodes_are_controller-only_in_the_Kafka_cluster (0.00s)
+=== RUN   TestConstructEListenerLabelName
+--- PASS: TestConstructEListenerLabelName (0.00s)
+=== RUN   TestGenerateEnvoyResourceName
+--- PASS: TestGenerateEnvoyResourceName (0.00s)
+=== RUN   TestGetMD5Hash
+--- PASS: TestGetMD5Hash (0.00s)
+PASS
+coverage: 54.3% of statements
+ok      github.com/banzaicloud/koperator/pkg/util       1.604s  coverage: 54.3% of statements
+=== RUN   TestDecodePrivateKeyBytes
+=== PAUSE TestDecodePrivateKeyBytes
+=== RUN   TestDecodeCertificate
+--- PASS: TestDecodeCertificate (0.06s)
+=== RUN   TestGeneratePass
+--- PASS: TestGeneratePass (0.00s)
+=== RUN   TestGenerateJKS
+--- PASS: TestGenerateJKS (0.07s)
+=== RUN   TestEnsureJKSPassoword
+--- PASS: TestEnsureJKSPassoword (0.10s)
+=== RUN   TestParseKeyStoreToTLSCertificate
+--- PASS: TestParseKeyStoreToTLSCertificate (0.00s)
+=== CONT  TestDecodePrivateKeyBytes
+=== RUN   TestDecodePrivateKeyBytes/RSA_PRIVATE_KEY
+=== RUN   TestDecodePrivateKeyBytes/PRIVATE_KEY
+=== RUN   TestDecodePrivateKeyBytes/EC_PRIVATE_KEY
+--- PASS: TestDecodePrivateKeyBytes (0.03s)
+    --- PASS: TestDecodePrivateKeyBytes/RSA_PRIVATE_KEY (0.00s)
+    --- PASS: TestDecodePrivateKeyBytes/PRIVATE_KEY (0.00s)
+    --- PASS: TestDecodePrivateKeyBytes/EC_PRIVATE_KEY (0.00s)
+PASS
+coverage: 60.1% of statements
+ok      github.com/banzaicloud/koperator/pkg/util/cert  1.835s  coverage: 60.1% of statements
+=== RUN   TestGenerateKafkaAddress
+--- PASS: TestGenerateKafkaAddress (0.00s)
+PASS
+coverage: 28.6% of statements
+ok      github.com/banzaicloud/koperator/pkg/util/client        1.623s  coverage: 28.6% of statements
+?       github.com/banzaicloud/koperator/pkg/util/contour       [no test files]
+        github.com/banzaicloud/koperator/pkg/util/cruisecontrol         coverage: 0.0% of statements
+?       github.com/banzaicloud/koperator/pkg/util/envoy [no test files]
+?       github.com/banzaicloud/koperator/pkg/util/istioingress  [no test files]
+=== RUN   TestShouldRefreshOnlyPerBrokerConfigs
+--- PASS: TestShouldRefreshOnlyPerBrokerConfigs (0.00s)
+=== RUN   TestGetClusterServiceDomainName
+=== RUN   TestGetClusterServiceDomainName/Without_cluster_domain_override
+=== RUN   TestGetClusterServiceDomainName/With_cluster_domain_override
+--- PASS: TestGetClusterServiceDomainName (0.00s)
+    --- PASS: TestGetClusterServiceDomainName/Without_cluster_domain_override (0.00s)
+    --- PASS: TestGetClusterServiceDomainName/With_cluster_domain_override (0.00s)
+=== RUN   TestGetBrokerServiceFqdn
+=== RUN   TestGetBrokerServiceFqdn/Without_cluster_domain_override
+=== RUN   TestGetBrokerServiceFqdn/With_cluster_domain_override
+--- PASS: TestGetBrokerServiceFqdn (0.00s)
+    --- PASS: TestGetBrokerServiceFqdn/Without_cluster_domain_override (0.00s)
+    --- PASS: TestGetBrokerServiceFqdn/With_cluster_domain_override (0.00s)
+=== RUN   TestGetBootstrapServersService
+=== RUN   TestGetBootstrapServersService/Without_headless_service_and_cluster_domain_override
+=== RUN   TestGetBootstrapServersService/With_headless_service_and_cluster_domain_override
+=== RUN   TestGetBootstrapServersService/With_headless_service_but_without_cluster_domain_override
+=== RUN   TestGetBootstrapServersService/With_cluster_domain_override_but_without_headless_service
+--- PASS: TestGetBootstrapServersService (0.00s)
+    --- PASS: TestGetBootstrapServersService/Without_headless_service_and_cluster_domain_override (0.00s)
+    --- PASS: TestGetBootstrapServersService/With_headless_service_and_cluster_domain_override (0.00s)
+    --- PASS: TestGetBootstrapServersService/With_headless_service_but_without_cluster_domain_override (0.00s)
+    --- PASS: TestGetBootstrapServersService/With_cluster_domain_override_but_without_headless_service (0.00s)
+=== RUN   TestGetBootstrapServers
+=== RUN   TestGetBootstrapServers/Without_cluster_domain_override
+=== RUN   TestGetBootstrapServers/With_cluster_domain_override
+--- PASS: TestGetBootstrapServers (0.00s)
+    --- PASS: TestGetBootstrapServers/Without_cluster_domain_override (0.00s)
+    --- PASS: TestGetBootstrapServers/With_cluster_domain_override (0.00s)
+PASS
+coverage: 60.4% of statements
+ok      github.com/banzaicloud/koperator/pkg/util/kafka 1.247s  coverage: 60.4% of statements
+=== RUN   TestDN
+--- PASS: TestDN (0.02s)
+=== RUN   TestGetCommonName
+--- PASS: TestGetCommonName (0.00s)
+=== RUN   TestLabelsForKafkaPKI
+--- PASS: TestLabelsForKafkaPKI (0.00s)
+=== RUN   TestGetInternalDNSNames
+--- PASS: TestGetInternalDNSNames (0.00s)
+=== RUN   TestBrokerUserForCluster
+--- PASS: TestBrokerUserForCluster (0.00s)
+=== RUN   TestControllerUserForCluster
+--- PASS: TestControllerUserForCluster (0.00s)
+=== RUN   TestTruncatedCommonName
+=== PAUSE TestTruncatedCommonName
+=== CONT  TestTruncatedCommonName
+=== RUN   TestTruncatedCommonName/Common_name_with_length_exceeded_limitation
+=== RUN   TestTruncatedCommonName/Common_name_with_length_within_limitation
+--- PASS: TestTruncatedCommonName (0.00s)
+    --- PASS: TestTruncatedCommonName/Common_name_with_length_exceeded_limitation (0.00s)
+    --- PASS: TestTruncatedCommonName/Common_name_with_length_within_limitation (0.00s)
+PASS
+coverage: 74.5% of statements
+ok      github.com/banzaicloud/koperator/pkg/util/pki   1.346s  coverage: 74.5% of statements
+        github.com/banzaicloud/koperator/pkg/util/zookeeper             coverage: 0.0% of statements
+=== RUN   TestIsAdmissionConnectionError
+=== RUN   TestIsAdmissionConnectionError/correct_error_type_and_message
+=== RUN   TestIsAdmissionConnectionError/incorrect_both_error_type_and_message
+=== RUN   TestIsAdmissionConnectionError/incorrect_error_type_with_correct_message_component
+--- PASS: TestIsAdmissionConnectionError (0.00s)
+    --- PASS: TestIsAdmissionConnectionError/correct_error_type_and_message (0.00s)
+    --- PASS: TestIsAdmissionConnectionError/incorrect_both_error_type_and_message (0.00s)
+    --- PASS: TestIsAdmissionConnectionError/incorrect_error_type_with_correct_message_component (0.00s)
+=== RUN   TestIsInvalidReplicationFactor
+--- PASS: TestIsInvalidReplicationFactor (0.00s)
+=== RUN   TestIsAdmissionCantConnectAPIServer
+=== RUN   TestIsAdmissionCantConnectAPIServer/cantConnectAPIServer
+=== RUN   TestIsAdmissionCantConnectAPIServer/wrong-error-message
+--- PASS: TestIsAdmissionCantConnectAPIServer (0.00s)
+    --- PASS: TestIsAdmissionCantConnectAPIServer/cantConnectAPIServer (0.00s)
+    --- PASS: TestIsAdmissionCantConnectAPIServer/wrong-error-message (0.00s)
+=== RUN   TestIsAdmissionOutOfRangeReplicationFactor
+--- PASS: TestIsAdmissionOutOfRangeReplicationFactor (0.00s)
+=== RUN   TestIsAdmissionOutOfRangePartitions
+--- PASS: TestIsAdmissionOutOfRangePartitions (0.00s)
+=== RUN   TestIsAdmissionInvalidRemovingStorage
+=== RUN   TestIsAdmissionInvalidRemovingStorage/field.Invalid_removingStorage
+=== RUN   TestIsAdmissionInvalidRemovingStorage/field.NotFound_removingStorage
+=== RUN   TestIsAdmissionInvalidRemovingStorage/field.Invalid_wrong-error-message
+=== RUN   TestIsAdmissionInvalidRemovingStorage/field.NotFound_wrong-error-message
+--- PASS: TestIsAdmissionInvalidRemovingStorage (0.00s)
+    --- PASS: TestIsAdmissionInvalidRemovingStorage/field.Invalid_removingStorage (0.00s)
+    --- PASS: TestIsAdmissionInvalidRemovingStorage/field.NotFound_removingStorage (0.00s)
+    --- PASS: TestIsAdmissionInvalidRemovingStorage/field.Invalid_wrong-error-message (0.00s)
+    --- PASS: TestIsAdmissionInvalidRemovingStorage/field.NotFound_wrong-error-message (0.00s)
+=== RUN   TestIsAdmissionInvalidExternalListenerPort
+=== RUN   TestIsAdmissionInvalidExternalListenerPort/field.Invalid_externalListeners.[0]_correct_error_message
+=== RUN   TestIsAdmissionInvalidExternalListenerPort/field.Invalid_externalListeners.[1]_wrong_error_message
+--- PASS: TestIsAdmissionInvalidExternalListenerPort (0.00s)
+    --- PASS: TestIsAdmissionInvalidExternalListenerPort/field.Invalid_externalListeners.[0]_correct_error_message (0.00s)
+    --- PASS: TestIsAdmissionInvalidExternalListenerPort/field.Invalid_externalListeners.[1]_wrong_error_message (0.00s)
+=== RUN   TestIsAdmissionErrorDuringValidation
+=== RUN   TestIsAdmissionErrorDuringValidation/errorDuringValidation
+=== RUN   TestIsAdmissionErrorDuringValidation/wrong-error-message
+--- PASS: TestIsAdmissionErrorDuringValidation (0.00s)
+    --- PASS: TestIsAdmissionErrorDuringValidation/errorDuringValidation (0.00s)
+    --- PASS: TestIsAdmissionErrorDuringValidation/wrong-error-message (0.00s)
+=== RUN   TestCheckUniqueListenerContainerPort
+=== RUN   TestCheckUniqueListenerContainerPort/unique_values
+=== RUN   TestCheckUniqueListenerContainerPort/non-unique_containerPorts_with_only_internalListeners
+=== RUN   TestCheckUniqueListenerContainerPort/non-unique_containerPorts_with_only_externalListeners
+=== RUN   TestCheckUniqueListenerContainerPort/non-unique_containerPorts_across_both_listener_types_single_error
+=== RUN   TestCheckUniqueListenerContainerPort/non-unique_containerPorts_across_both_listener_types_two_errors
+--- PASS: TestCheckUniqueListenerContainerPort (0.00s)
+    --- PASS: TestCheckUniqueListenerContainerPort/unique_values (0.00s)
+    --- PASS: TestCheckUniqueListenerContainerPort/non-unique_containerPorts_with_only_internalListeners (0.00s)
+    --- PASS: TestCheckUniqueListenerContainerPort/non-unique_containerPorts_with_only_externalListeners (0.00s)
+    --- PASS: TestCheckUniqueListenerContainerPort/non-unique_containerPorts_across_both_listener_types_single_error (0.00s)
+    --- PASS: TestCheckUniqueListenerContainerPort/non-unique_containerPorts_across_both_listener_types_two_errors (0.00s)
+=== RUN   TestCheckExternalListenerStartingPort
+=== RUN   TestCheckExternalListenerStartingPort/valid_config:_3_brokers_with_2_externalListeners
+=== RUN   TestCheckExternalListenerStartingPort/invalid_config:_3_brokers_with_2_out-of-range_externalListeners
+=== RUN   TestCheckExternalListenerStartingPort/invalid_config:_3_brokers_with_2_at-the-limit_externalListeners
+=== RUN   TestCheckExternalListenerStartingPort/invalid_config:_brokers_with_in-range_external_port_numbers,_but_they_collide_with_the_envoy_ports
+--- PASS: TestCheckExternalListenerStartingPort (0.00s)
+    --- PASS: TestCheckExternalListenerStartingPort/valid_config:_3_brokers_with_2_externalListeners (0.00s)
+    --- PASS: TestCheckExternalListenerStartingPort/invalid_config:_3_brokers_with_2_out-of-range_externalListeners (0.00s)
+    --- PASS: TestCheckExternalListenerStartingPort/invalid_config:_3_brokers_with_2_at-the-limit_externalListeners (0.00s)
+    --- PASS: TestCheckExternalListenerStartingPort/invalid_config:_brokers_with_in-range_external_port_numbers,_but_they_collide_with_the_envoy_ports (0.00s)
+=== RUN   TestCheckTargetPortsCollisionForEnvoy
+=== RUN   TestCheckTargetPortsCollisionForEnvoy/valid_config:_envoy_admin_port,_envoy_health-check_port,_and_ingress_controller_target_port_are_not_defined
+=== RUN   TestCheckTargetPortsCollisionForEnvoy/valid_config:_external_listeners_use_non-LoadBalancer_access_method
+=== RUN   TestCheckTargetPortsCollisionForEnvoy/invalid_config:_user-specified_envoy_admin_port_collides_with_default_envoy_health-check_port
+=== RUN   TestCheckTargetPortsCollisionForEnvoy/invalid_config:_default_envoy_admin_port_collides_with_user-specified_envoy_health-check_port
+=== RUN   TestCheckTargetPortsCollisionForEnvoy/invalid_config:_user-specified_ingress_controller_target_port_collided_with_user-specified_envoy_admin_port_and_default_health-check_port
+=== RUN   TestCheckTargetPortsCollisionForEnvoy/invalid_config:_user-specified_ingress_controller_target_port_collided_with_default_envoy_admin_port_and_user-specified_health-check_port
+--- PASS: TestCheckTargetPortsCollisionForEnvoy (0.00s)
+    --- PASS: TestCheckTargetPortsCollisionForEnvoy/valid_config:_envoy_admin_port,_envoy_health-check_port,_and_ingress_controller_target_port_are_not_defined (0.00s)
+    --- PASS: TestCheckTargetPortsCollisionForEnvoy/valid_config:_external_listeners_use_non-LoadBalancer_access_method (0.00s)
+    --- PASS: TestCheckTargetPortsCollisionForEnvoy/invalid_config:_user-specified_envoy_admin_port_collides_with_default_envoy_health-check_port (0.00s)
+    --- PASS: TestCheckTargetPortsCollisionForEnvoy/invalid_config:_default_envoy_admin_port_collides_with_user-specified_envoy_health-check_port (0.00s)
+    --- PASS: TestCheckTargetPortsCollisionForEnvoy/invalid_config:_user-specified_ingress_controller_target_port_collided_with_user-specified_envoy_admin_port_and_default_health-check_port (0.00s)
+    --- PASS: TestCheckTargetPortsCollisionForEnvoy/invalid_config:_user-specified_ingress_controller_target_port_collided_with_default_envoy_admin_port_and_user-specified_health-check_port (0.00s)
+=== RUN   TestCheckKafkaTopicExist
+=== RUN   TestCheckKafkaTopicExist/topic_configuration_is_same_and_managedBy_koperator
+=== PAUSE TestCheckKafkaTopicExist/topic_configuration_is_same_and_managedBy_koperator
+=== RUN   TestCheckKafkaTopicExist/topic_configuration_is_same_and_not_managedBy_koperator
+=== PAUSE TestCheckKafkaTopicExist/topic_configuration_is_same_and_not_managedBy_koperator
+=== RUN   TestCheckKafkaTopicExist/topic_replication_factor_is_different_and_managedBy_koperator
+=== PAUSE TestCheckKafkaTopicExist/topic_replication_factor_is_different_and_managedBy_koperator
+=== RUN   TestCheckKafkaTopicExist/topic_partition_is_different_and_managedBy_koperator
+=== PAUSE TestCheckKafkaTopicExist/topic_partition_is_different_and_managedBy_koperator
+=== RUN   TestCheckKafkaTopicExist/topic_partition_and_replication_is_different_and_not_managedBy_koperator
+=== PAUSE TestCheckKafkaTopicExist/topic_partition_and_replication_is_different_and_not_managedBy_koperator
+=== RUN   TestCheckKafkaTopicExist/topic_configuration_is_different_and_managedBy_koperator
+=== PAUSE TestCheckKafkaTopicExist/topic_configuration_is_different_and_managedBy_koperator
+=== CONT  TestCheckKafkaTopicExist/topic_configuration_is_same_and_managedBy_koperator
+=== CONT  TestCheckKafkaTopicExist/topic_partition_is_different_and_managedBy_koperator
+=== CONT  TestCheckKafkaTopicExist/topic_replication_factor_is_different_and_managedBy_koperator
+=== CONT  TestCheckKafkaTopicExist/topic_configuration_is_different_and_managedBy_koperator
+=== CONT  TestCheckKafkaTopicExist/topic_partition_and_replication_is_different_and_not_managedBy_koperator
+=== CONT  TestCheckKafkaTopicExist/topic_configuration_is_same_and_not_managedBy_koperator
+--- PASS: TestCheckKafkaTopicExist (0.04s)
+    --- PASS: TestCheckKafkaTopicExist/topic_configuration_is_same_and_managedBy_koperator (0.00s)
+    --- PASS: TestCheckKafkaTopicExist/topic_partition_is_different_and_managedBy_koperator (0.00s)
+    --- PASS: TestCheckKafkaTopicExist/topic_replication_factor_is_different_and_managedBy_koperator (0.00s)
+    --- PASS: TestCheckKafkaTopicExist/topic_configuration_is_same_and_not_managedBy_koperator (0.00s)
+    --- PASS: TestCheckKafkaTopicExist/topic_partition_and_replication_is_different_and_not_managedBy_koperator (0.00s)
+    --- PASS: TestCheckKafkaTopicExist/topic_configuration_is_different_and_managedBy_koperator (0.00s)
+=== RUN   TestValidateTopic
+--- PASS: TestValidateTopic (0.00s)
+PASS
+coverage: 64.0% of statements
+ok      github.com/banzaicloud/koperator/pkg/webhooks   1.502s  coverage: 64.0% of statements
+FAIL
+make: *** [Makefile:97: test] Error 1
+$ cd /Users/amuraru/go/src/github.com/koperator && make test 2>&1 | tail -50
