@@ -37,6 +37,12 @@ import (
 	"github.com/banzaicloud/koperator/pkg/util"
 )
 
+const (
+	// Additional test timeout constants for task controller tests
+	taskRetryTimeoutDuration    = time.Duration(v1alpha1.DefaultRetryBackOffDurationSec+10) * time.Second // timeout for retry operations
+	taskExtendedTimeoutDuration = 15 * time.Second                                                        // extended timeout for complex operations
+)
+
 var _ = Describe("CruiseControlTaskReconciler", func() {
 	var (
 		count              uint64 = 0
@@ -142,7 +148,7 @@ var _ = Describe("CruiseControlTaskReconciler", func() {
 					volumeState.CruiseControlVolumeState == v1beta1.GracefulDiskRebalanceScheduled &&
 					operation.CurrentTask() != nil && operation.CurrentTask().Parameters["rebalance_disk"] == trueStr
 
-			}, 15*time.Second, 500*time.Millisecond).Should(BeTrue())
+			}, taskExtendedTimeoutDuration, reconcilePollingPeriod).Should(BeTrue())
 		})
 	})
 	When("new storage is added but there is a not JBOD capacityConfig for that", Serial, func() {
@@ -222,7 +228,7 @@ var _ = Describe("CruiseControlTaskReconciler", func() {
 					volumeState.CruiseControlVolumeState == v1beta1.GracefulDiskRebalanceScheduled &&
 					operation.CurrentTask() != nil && operation.CurrentTask().Parameters["rebalance_disk"] != trueStr
 
-			}, 15*time.Second, 500*time.Millisecond).Should(BeTrue())
+			}, taskExtendedTimeoutDuration, reconcilePollingPeriod).Should(BeTrue())
 		})
 	})
 	When("new storage is added and one broker is JBOD and another is not JBOD", Serial, func() {
@@ -307,7 +313,7 @@ var _ = Describe("CruiseControlTaskReconciler", func() {
 					operation.CurrentTaskOperation() == v1alpha1.OperationRebalance &&
 					volumeState.CruiseControlVolumeState == v1beta1.GracefulDiskRebalanceScheduled &&
 					operation.CurrentTask() != nil && operation.CurrentTask().Parameters["rebalance_disk"] != trueStr
-			}, 15*time.Second, 500*time.Millisecond).Should(BeTrue())
+			}, taskExtendedTimeoutDuration, reconcilePollingPeriod).Should(BeTrue())
 		})
 	})
 	When("new broker is added", Serial, func() {
@@ -350,7 +356,7 @@ var _ = Describe("CruiseControlTaskReconciler", func() {
 
 				}
 				return false
-			}, 10*time.Second, 500*time.Millisecond).Should(BeTrue())
+			}, maxReconcileDuration, reconcilePollingPeriod).Should(BeTrue())
 		})
 		When("created CruiseControlOperation state is inExecution", Serial, func() {
 			It("kafkaCluster gracefulActionState should be GracefulUpscaleRunning", func(ctx SpecContext) {
@@ -393,7 +399,7 @@ var _ = Describe("CruiseControlTaskReconciler", func() {
 							operation.CurrentTaskOperation() == v1alpha1.OperationAddBroker && actionState.CruiseControlState == v1beta1.GracefulUpscaleRunning
 					}
 					return false
-				}, 10*time.Second, 500*time.Millisecond).Should(BeTrue())
+				}, maxReconcileDuration, reconcilePollingPeriod).Should(BeTrue())
 			})
 		})
 
@@ -442,7 +448,7 @@ var _ = Describe("CruiseControlTaskReconciler", func() {
 					return actionState.CruiseControlOperationReference.Name == operation.Name && operation.CurrentTaskOperation() == v1alpha1.OperationRemoveBroker && actionState.CruiseControlState == v1beta1.GracefulDownscaleScheduled
 				}
 				return false
-			}, 15*time.Second, 500*time.Millisecond).Should(BeTrue())
+			}, taskExtendedTimeoutDuration, reconcilePollingPeriod).Should(BeTrue())
 		})
 	})
 })
