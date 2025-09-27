@@ -126,9 +126,14 @@ a dynamic reconfiguration.
 
 ### Seamless Istio mesh support
 
-- Operator allows to use ClusterIP services instead of Headless, which still works better in case of Service meshes.
-- To avoid too early Kafka initialization, which might lead to unready sidecar container. The operator uses a small script to mitigate this behavior. Any Kafka image can be used with the only requirement of an available **curl** command.
-- To access a Kafka cluster which runs inside the mesh. Operator supports creating Istio ingress gateways.
+- **Standard Istio Integration**: Koperator now uses standard Istio resources (Gateway, VirtualService) instead of deprecated banzaicloud istio-operator
+- **Flexible Deployment**: Works with any Istio installation method (operator, Helm, or manual)
+- **Service Mesh Ready**: Operator allows to use ClusterIP services instead of Headless, which works better with Service meshes
+- **Sidecar Compatibility**: To avoid too early Kafka initialization, the operator uses a small script to mitigate sidecar container readiness issues
+- **Istio Ingress Gateways**: Operator supports creating Istio ingress gateways for external access to Kafka clusters running inside the mesh
+- **No Control Plane Dependency**: Works with any Istio installation without requiring specific control plane configuration
+
+For detailed Istio integration configuration, troubleshooting, and migration guides, see the [Istio Integration Guide]({{< relref "istio-integration.md" >}}).
 
 ---
 Apache Kafka, Kafka, and the Kafka logo are either registered trademarks or trademarks of The Apache Software Foundation in the United States and other countries.

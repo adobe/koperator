@@ -54,7 +54,7 @@ You can create a broker-ingress mapping to eliminate traffic across availability
 
 ## Kafka cluster with Istio
 
-You can use Istio as the ingress controller for your external listeners. It requires using our [Istio operator](https://github.com/banzaicloud/istio-operator) in the Kubernetes cluster.  
+You can use Istio as the ingress controller for your external listeners. Koperator now uses standard Istio resources (Gateway, VirtualService) instead of the deprecated banzaicloud istio-operator, providing better compatibility and working with any Istio installation.
 
 - [Kafka cluster with Istio as ingress controller](https://github.com/adobe/koperator/blob/master/config/samples/kafkacluster-with-istio.yaml)
 

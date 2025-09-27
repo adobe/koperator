@@ -45,6 +45,35 @@ Create CR and let the operator set up Kafka in your cluster (you can change the 
 
 `kubectl create -n kafka -f config/samples/simplekafkacluster.yaml`
 
+## Istio Integration
+
+Koperator now supports Istio integration using standard Istio resources instead of the deprecated banzaicloud istio-operator. This provides better compatibility and works with any Istio installation.
+
+### Prerequisites for Istio Integration
+
+1. Install Istio in your cluster (any method - operator, Helm, or manual)
+2. Ensure Istio CRDs are available
+3. Configure the `istioIngressConfig` section in your KafkaCluster spec
+
+### Example Istio Configuration
+
+```yaml
+apiVersion: kafka.banzaicloud.io/v1beta1
+kind: KafkaCluster
+metadata:
+  name: kafka
+spec:
+  ingressController: "istioingress"
+  istioIngressConfig:
+    gatewayConfig:
+      mode: ISTIO_MUTUAL
+  # ... rest of your configuration
+```
+
+**Note**: The `istioControlPlane` configuration is no longer required. Koperator creates standard Kubernetes Deployment and Service resources along with Istio Gateway and VirtualService resources.
+
+For comprehensive Istio integration documentation including advanced configuration, troubleshooting, and migration guides, see the [Istio Integration Guide]({{< relref "istio-integration.md" >}}).
+
 ## Limitations on minikube
 
 Minikube does not have a load balancer implementation, thus our envoy service will not get an external IP and the operator will get stuck at this point.
