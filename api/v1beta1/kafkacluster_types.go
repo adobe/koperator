@@ -187,10 +187,8 @@ type KafkaClusterSpec struct {
 	// Selector for broker pods that need to be recycled/reconciled
 	TaintedBrokersSelector *metav1.LabelSelector `json:"taintedBrokersSelector,omitempty"`
 	// +kubebuilder:validation:Enum=envoy;contour;istioingress
-	// IngressController specifies the type of the ingress controller to be used for external listeners. The `istioingress` ingress controller type requires the `spec.istioControlPlane` field to be populated as well.
+	// IngressController specifies the type of the ingress controller to be used for external listeners.
 	IngressController string `json:"ingressController,omitempty"`
-	// IstioControlPlane is a reference to the IstioControlPlane resource for envoy configuration. It must be specified if istio ingress is used.
-	IstioControlPlane *IstioControlPlaneReference `json:"istioControlPlane,omitempty"`
 	// If true OneBrokerPerNode ensures that each kafka broker will be placed on a different node unless a custom
 	// Affinity definition overrides this behavior
 	OneBrokerPerNode bool `json:"oneBrokerPerNode"`

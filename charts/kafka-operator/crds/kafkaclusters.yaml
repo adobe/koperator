@@ -20944,27 +20944,12 @@ spec:
                 type: boolean
               ingressController:
                 description: IngressController specifies the type of the ingress controller
-                  to be used for external listeners. The `istioingress` ingress controller
-                  type requires the `spec.istioControlPlane` field to be populated
-                  as well.
+                  to be used for external listeners.
                 enum:
                 - envoy
                 - contour
                 - istioingress
                 type: string
-              istioControlPlane:
-                description: IstioControlPlane is a reference to the IstioControlPlane
-                  resource for envoy configuration. It must be specified if istio
-                  ingress is used.
-                properties:
-                  name:
-                    type: string
-                  namespace:
-                    type: string
-                required:
-                - name
-                - namespace
-                type: object
               istioIngressConfig:
                 description: IstioIngressConfig defines the config for the Istio Ingress
                   Controller

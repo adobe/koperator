@@ -85,8 +85,10 @@ var (
 		ReleaseName:  "istio-ingressgateway",
 		Namespace:    "istio-system",
 		SetValues: map[string]string{
-			"service.type": "LoadBalancer",
-			"revision":     "",
+			"service.type":        "LoadBalancer",
+			"revision":            "",
+			"autoscaling.enabled": "false",
+			"replicaCount":        "1",
 		},
 	}
 
