@@ -33,6 +33,13 @@
   ],
   "packageRules": [
     {
+      "matchManagers": [
+        "gomod"
+      ],
+      "allowedVersions": ">=current",
+      "description": "Prevent downgrades for all Go modules - only allow upgrades"
+    },
+    {
       "matchCategories": [
         "docker"
       ],
