@@ -40,8 +40,9 @@ func testInstallKafkaClusterWithIstio(configPath string) bool {
 		})
 
 		ginkgo.It("Waiting for Kafka cluster to be ready", func() {
-			// Wait for Kafka cluster to be ready
-			time.Sleep(30 * time.Second)
+			// Wait for Kafka cluster to be ready using the same method as other tests
+			err := waitForKafkaClusterWithPodStatusCheck(kubectlOptions, kafkaClusterName, kafkaClusterCreateTimeout)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 	})
 }
