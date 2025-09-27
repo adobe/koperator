@@ -148,6 +148,8 @@ var _ = Describe("CruiseControlTaskReconciler", func() {
 		JustBeforeEach(func(ctx SpecContext) {
 			cruiseControlOperationReconciler.ScaleFactory = mocks.NewMockScaleFactory(getScaleMock5())
 			operation := generateCruiseControlOperation(opName1, namespace, kafkaCluster.GetName())
+			// Explicitly set error policy to retry to ensure retry behavior
+			operation.Spec.ErrorPolicy = v1alpha1.ErrorPolicyRetry
 			err := k8sClient.Create(ctx, &operation)
 			Expect(err).NotTo(HaveOccurred())
 			operation.Status.CurrentTask = &v1alpha1.CruiseControlTask{
@@ -167,10 +169,17 @@ var _ = Describe("CruiseControlTaskReconciler", func() {
 					Name:      opName1,
 				}, &operation)
 				if err != nil {
+					fmt.Printf("Error getting operation: %v\n", err)
 					return false
 				}
+
+				// Debug logging
+				fmt.Printf("Operation state: %s, FailedTasks: %d, IsWaitingForRetryExecution: %v, IsReadyForRetryExecution: %v\n",
+					operation.CurrentTaskState(), len(operation.Status.FailedTasks),
+					operation.IsWaitingForRetryExecution(), operation.IsReadyForRetryExecution())
+
 				return operation.CurrentTaskState() == v1beta1.CruiseControlTaskCompleted && len(operation.Status.FailedTasks) == 1
-			}, 10*time.Second, 500*time.Millisecond).Should(BeTrue())
+			}, time.Duration(v1alpha1.DefaultRetryBackOffDurationSec+10)*time.Second, 500*time.Millisecond).Should(BeTrue())
 		})
 	})
 	When("there is an errored remove_broker and an add_broker operation", Serial, func() {
