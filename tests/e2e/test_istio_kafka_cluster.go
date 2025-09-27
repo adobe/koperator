@@ -112,15 +112,48 @@ func testValidateIstioResources() bool {
 			gomega.Expect(pods).To(gomega.ContainSubstring("Running"))
 			ginkgo.By(fmt.Sprintf("Standard Istio ingress gateway pods status: %s", pods))
 		})
+
+		ginkgo.It("Validating external listener statuses are populated", func() {
+			// Check that external listener statuses are populated in the KafkaCluster
+			externalAddresses, err := getExternalListenerAddresses(kubectlOptions, "", kafkaClusterName)
+			gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
+			gomega.Expect(externalAddresses).ShouldNot(gomega.BeEmpty())
+			ginkgo.By(fmt.Sprintf("Found external listener addresses: %v", externalAddresses))
+
+			// Verify we have the expected number of external addresses (any-broker + individual brokers)
+			// For a 3-broker cluster, we should have 4 addresses: any-broker + broker-0, broker-1, broker-2
+			gomega.Expect(len(externalAddresses)).Should(gomega.BeNumerically(">=", 4))
+		})
 	})
 }
 
 func testProduceConsumeWithIstio() bool {
 	return ginkgo.When("Testing produce/consume with Istio ingress", ginkgo.Ordered, func() {
-		ginkgo.It("Testing external access through Istio ingress", func() {
-			// This would test external access through Istio ingress
-			// For now, we'll just verify the setup is working
-			ginkgo.By("Istio ingress setup validated - external access testing would go here")
+		var kubectlOptions k8s.KubectlOptions
+		var err error
+
+		ginkgo.It("Acquiring K8s config and context", func() {
+			kubectlOptions, err = kubectlOptionsForCurrentContext()
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		})
+
+		kubectlOptions.Namespace = koperatorLocalHelmDescriptor.Namespace
+
+		ginkgo.It("Deploying kcat pod for external testing", func() {
+			requireDeployingKcatPod(kubectlOptions, kcatName, "")
+		})
+
+		ginkgo.It("Deploying Kafka topic for external testing", func() {
+			requireDeployingKafkaTopic(kubectlOptions, testExternalTopicName)
+		})
+
+		ginkgo.It("Testing external produce/consume through Istio ingress", func() {
+			requireExternalProducingConsumingMessageViaKcat(kubectlOptions, kcatName, testExternalTopicName, "")
+		})
+
+		ginkgo.It("Cleaning up external test resources", func() {
+			requireDeleteKafkaTopic(kubectlOptions, testExternalTopicName)
+			requireDeleteKcatPod(kubectlOptions, kcatName)
 		})
 	})
 }
