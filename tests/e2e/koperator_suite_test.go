@@ -74,7 +74,7 @@ var _ = ginkgo.When("Testing e2e test altogether", ginkgo.Ordered, func() {
 	testProduceConsumeInternal()
 	testJmxExporter()
 	testUninstallKafkaCluster()
-	testInstallKafkaClusterWithIstio("../../config/samples/kafkacluster-with-istio.yaml")
+	testInstallKafkaClusterWithIstio("../../config/samples/kraft/kafkacluster-kraft-with-istio.yaml")
 	testValidateIstioResources()
 	testProduceConsumeWithIstio()
 	testUninstallKafkaClusterWithIstio()

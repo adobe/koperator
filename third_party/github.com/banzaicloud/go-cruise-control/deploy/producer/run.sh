@@ -25,7 +25,7 @@ create_topic() {
     --partitions 30 \
     --replication-factor 2 \
     --topic "${TOPIC}"
-  
+
   # Create the Cruise Control metrics topic
   /opt/kafka/bin/kafka-topics.sh \
     --bootstrap-server "${KAFKA_BROKERS}" \
