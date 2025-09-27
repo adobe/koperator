@@ -86,7 +86,8 @@ type KafkaClusterReconciler struct {
 // +kubebuilder:rbac:groups=kafka.banzaicloud.io,resources=kafkaclusters,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=kafka.banzaicloud.io,resources=kafkaclusters/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=kafka.banzaicloud.io,resources=kafkaclusters/finalizers,verbs=create;update;patch;delete
-// +kubebuilder:rbac:groups=servicemesh.cisco.com,resources=istiomeshgateways,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=networking.istio.io,resources=*,verbs=*
 
 func (r *KafkaClusterReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {

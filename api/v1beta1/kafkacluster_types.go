@@ -130,15 +130,13 @@ const (
 
 	/* Istio Ingress Config */
 
-	// IstioMeshGateway.spec.deployment.resources
+	// Kubernetes Deployment resources for Istio ingress gateway
 	defaultIstioIngressRequestResourceCpu    = "100m"
 	defaultIstioIngressRequestResourceMemory = "128Mi"
 	defaultIstioIngressLimitResourceCpu      = "2000m"
 	defaultIstioIngressLimitResourceMemory   = "1024Mi"
 
-	// IstioMeshGateway.spec.deployment.replicas.count
-	// IstioMeshGateway.spec.deployment.replicas.min
-	// IstioMeshGateway.spec.deployment.replicas.max
+	// Kubernetes Deployment replicas for Istio ingress gateway
 	defaultReplicas = 1
 
 	/* Monitor Config */
@@ -521,7 +519,7 @@ type IstioIngressConfig struct {
 	Annotations               map[string]string   `json:"annotations,omitempty"`
 	TLSOptions                *v1beta1.TLSOptions `json:"gatewayConfig,omitempty"`
 	VirtualServiceAnnotations map[string]string   `json:"virtualServiceAnnotations,omitempty"`
-	// Envs allows to add additional env vars to the istio meshgateway resource
+	// Envs allows to add additional env vars to the istio ingress gateway deployment
 	Envs []*corev1.EnvVar `json:"envs,omitempty"`
 	// If specified and supported by the platform, traffic through the
 	// cloud-provider load-balancer will be restricted to the specified client
