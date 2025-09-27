@@ -4,7 +4,7 @@ go 1.25
 
 require (
 	emperror.dev/errors v0.8.1
-	github.com/banzaicloud/k8s-objectmatcher v0.1.1
+	github.com/banzaicloud/k8s-objectmatcher v1.8.0
 	k8s.io/api v0.34.1
 	k8s.io/apiextensions-apiserver v0.34.1
 	k8s.io/apimachinery v0.34.1
