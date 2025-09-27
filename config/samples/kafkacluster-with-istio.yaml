@@ -7,9 +7,6 @@ metadata:
 spec:
   headlessServiceEnabled: false
   ingressController: "istioingress"
-  istioControlPlane:
-    name: istiod # Standard Istio control plane name when installed via Helm
-    namespace: istio-system
   istioIngressConfig:
     gatewayConfig:
       mode: ISTIO_MUTUAL

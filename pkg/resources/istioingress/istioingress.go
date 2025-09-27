@@ -84,12 +84,8 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 
 	for _, eListener := range r.KafkaCluster.Spec.ListenersConfig.ExternalListeners {
 		if r.KafkaCluster.Spec.GetIngressController() == istioingress.IngressControllerName && eListener.GetAccessMethod() == corev1.ServiceTypeLoadBalancer {
-			if r.KafkaCluster.Spec.IstioControlPlane == nil {
-				log.Error(errors.NewPlain("reference to Istio Control Plane is missing"), "skip external listener reconciliation", "external listener", eListener.Name)
-				continue
-			}
-
-			istioRevision := strings.ReplaceAll(r.KafkaCluster.Spec.IstioControlPlane.Name, ".", "-")
+			// Use vanilla Istio Gateway - no IstioControlPlane dependency
+			istioRevision := "" // Use default Istio revision for vanilla Istio
 			ingressConfigs, defaultControllerName, err := util.GetIngressConfigs(r.KafkaCluster.Spec, eListener)
 			if err != nil {
 				return err

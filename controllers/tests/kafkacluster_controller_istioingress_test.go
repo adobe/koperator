@@ -64,7 +64,7 @@ var _ = Describe("KafkaClusterIstioIngressController", func() {
 		kafkaCluster = createMinimalKafkaClusterCR(kafkaClusterCRName, namespace)
 
 		kafkaCluster.Spec.IngressController = istioingress.IngressControllerName
-		kafkaCluster.Spec.IstioControlPlane = &v1beta1.IstioControlPlaneReference{Name: "istiod", Namespace: "istio-system"}
+		// Use vanilla Istio Gateway - no IstioControlPlane dependency
 		kafkaCluster.Spec.ListenersConfig.ExternalListeners = []v1beta1.ExternalListenerConfig{
 			{
 				CommonListenerSpec: v1beta1.CommonListenerSpec{
@@ -178,7 +178,8 @@ var _ = Describe("KafkaClusterIstioIngressController", func() {
 			}).Should(Succeed())
 
 			ExpectIstioIngressLabels(gateway.Labels, "external", kafkaClusterCRName)
-			ExpectIstioIngressLabels(gateway.Spec.Selector, "external", kafkaClusterCRName)
+			// Check that the Gateway uses vanilla Istio Gateway selector
+			Expect(gateway.Spec.Selector).To(Equal(map[string]string{"istio": "ingressgateway"}))
 			Expect(gateway.Spec.Servers).To(ConsistOf(
 				istioclientv1beta1.Server{
 					Port: &istioclientv1beta1.Port{
@@ -400,7 +401,7 @@ var _ = Describe("KafkaClusterIstioIngressControllerWithBrokerIdBindings", func(
 		kafkaCluster = createMinimalKafkaClusterCR(kafkaClusterCRName, namespace)
 
 		kafkaCluster.Spec.IngressController = istioingress.IngressControllerName
-		kafkaCluster.Spec.IstioControlPlane = &v1beta1.IstioControlPlaneReference{Name: "istiod", Namespace: "istio-system"}
+		// Use vanilla Istio Gateway - no IstioControlPlane dependency
 		kafkaCluster.Spec.ListenersConfig.ExternalListeners = []v1beta1.ExternalListenerConfig{
 			{
 				CommonListenerSpec: v1beta1.CommonListenerSpec{
@@ -504,7 +505,8 @@ var _ = Describe("KafkaClusterIstioIngressControllerWithBrokerIdBindings", func(
 			}).Should(Succeed())
 
 			ExpectIstioIngressLabels(gateway.Labels, "external-az1", kafkaClusterCRName)
-			ExpectIstioIngressLabels(gateway.Spec.Selector, "external-az1", kafkaClusterCRName)
+			// Check that the Gateway uses vanilla Istio Gateway selector
+			Expect(gateway.Spec.Selector).To(Equal(map[string]string{"istio": "ingressgateway"}))
 			Expect(gateway.Spec.Servers).To(ConsistOf(
 				istioclientv1beta1.Server{
 					Port: &istioclientv1beta1.Port{
@@ -609,7 +611,8 @@ var _ = Describe("KafkaClusterIstioIngressControllerWithBrokerIdBindings", func(
 			}).Should(Succeed())
 
 			ExpectIstioIngressLabels(gateway.Labels, "external-az2", kafkaClusterCRName)
-			ExpectIstioIngressLabels(gateway.Spec.Selector, "external-az2", kafkaClusterCRName)
+			// Check that the Gateway uses vanilla Istio Gateway selector
+			Expect(gateway.Spec.Selector).To(Equal(map[string]string{"istio": "ingressgateway"}))
 			Expect(gateway.Spec.Servers).To(ConsistOf(
 				istioclientv1beta1.Server{
 					TLS: &istioclientv1beta1.TLSOptions{

@@ -72,28 +72,45 @@ func testValidateIstioResources() bool {
 			ginkgo.By(fmt.Sprintf("Found Istio VirtualServices: %s", virtualServices))
 		})
 
-		ginkgo.It("Validating Istio ingress gateway Deployment", func() {
-			// Check for istio ingress gateway deployments
+		ginkgo.It("Validating Istio Gateway selector", func() {
+			// Check that the Gateway resources use the correct selector for vanilla Istio
+			gatewayYaml, err := k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &kubectlOptions, "get", "gateways.networking.istio.io", "--all-namespaces", "-o", "yaml")
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(gatewayYaml).To(gomega.ContainSubstring("istio: ingressgateway"))
+			ginkgo.By("Verified Gateway resources use vanilla Istio selector")
+		})
+
+		ginkgo.It("Validating Gateway selector format", func() {
+			// More specific check for the exact selector format
+			gatewayJson, err := k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &kubectlOptions, "get", "gateways.networking.istio.io", "--all-namespaces", "-o", "jsonpath={.items[*].spec.selector}")
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(gatewayJson).To(gomega.ContainSubstring("istio"))
+			gomega.Expect(gatewayJson).To(gomega.ContainSubstring("ingressgateway"))
+			ginkgo.By("Verified Gateway selector format is correct")
+		})
+
+		ginkgo.It("Validating standard Istio ingress gateway is available", func() {
+			// Check for standard istio ingress gateway deployments (not custom ones)
 			deployments, err := k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &kubectlOptions, "get", "deployments", "--all-namespaces", "-l", "app=istio-ingressgateway", "-o", "name")
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(deployments).NotTo(gomega.BeEmpty())
-			ginkgo.By(fmt.Sprintf("Found istio ingress gateway deployments: %s", deployments))
+			ginkgo.By(fmt.Sprintf("Found standard istio ingress gateway deployments: %s", deployments))
 		})
 
-		ginkgo.It("Validating Istio ingress gateway Service", func() {
-			// Check for istio ingress gateway services
+		ginkgo.It("Validating standard Istio ingress gateway service", func() {
+			// Check for standard istio ingress gateway services
 			services, err := k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &kubectlOptions, "get", "services", "--all-namespaces", "-l", "app=istio-ingressgateway", "-o", "name")
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(services).NotTo(gomega.BeEmpty())
-			ginkgo.By(fmt.Sprintf("Found istio ingress gateway services: %s", services))
+			ginkgo.By(fmt.Sprintf("Found standard istio ingress gateway services: %s", services))
 		})
 
-		ginkgo.It("Validating Istio ingress gateway pods are running", func() {
-			// Check that istio ingress gateway pods are running
+		ginkgo.It("Validating standard Istio ingress gateway pods are running", func() {
+			// Check that standard istio ingress gateway pods are running
 			pods, err := k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &kubectlOptions, "get", "pods", "--all-namespaces", "-l", "app=istio-ingressgateway", "-o", "jsonpath={.items[*].status.phase}")
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(pods).To(gomega.ContainSubstring("Running"))
-			ginkgo.By(fmt.Sprintf("Istio ingress gateway pods status: %s", pods))
+			ginkgo.By(fmt.Sprintf("Standard Istio ingress gateway pods status: %s", pods))
 		})
 	})
 }
@@ -124,20 +141,25 @@ func testUninstallKafkaClusterWithIstio() bool {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 
-		ginkgo.It("Verifying Istio resources are cleaned up", func() {
+		ginkgo.It("Verifying Kafka-specific Istio resources are cleaned up", func() {
 			// Wait a bit for cleanup
 			time.Sleep(10 * time.Second)
 
-			// Check that istio ingress gateway resources are removed
-			deployments, err := k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &kubectlOptions, "get", "deployments", "--all-namespaces", "-l", "app=istio-ingressgateway", "-o", "name")
+			// Check that Kafka-specific Gateway resources are removed
+			gateways, err := k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &kubectlOptions, "get", "gateways.networking.istio.io", "--all-namespaces", "-l", "app=istioingress", "-o", "name")
 			if err == nil {
-				gomega.Expect(deployments).To(gomega.BeEmpty())
+				gomega.Expect(gateways).To(gomega.BeEmpty())
 			}
 
-			services, err := k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &kubectlOptions, "get", "services", "--all-namespaces", "-l", "app=istio-ingressgateway", "-o", "name")
+			// Check that Kafka-specific VirtualService resources are removed
+			virtualServices, err := k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &kubectlOptions, "get", "virtualservices.networking.istio.io", "--all-namespaces", "-l", "app=istioingress", "-o", "name")
 			if err == nil {
-				gomega.Expect(services).To(gomega.BeEmpty())
+				gomega.Expect(virtualServices).To(gomega.BeEmpty())
 			}
+
+			// Note: Standard Istio ingress gateway should still be running
+			// as it's not managed by the Kafka operator
+			ginkgo.By("Kafka-specific Istio resources cleaned up successfully")
 		})
 	})
 }

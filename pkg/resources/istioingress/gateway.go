@@ -44,7 +44,10 @@ func (r *Reconciler) gateway(log logr.Logger, externalListenerConfig v1beta1.Ext
 		ObjectMeta: templates.ObjectMeta(gatewayName,
 			labelsForIstioIngress(r.KafkaCluster.Name, eListenerLabelName, istioRevision), r.KafkaCluster),
 		Spec: istioclientv1beta1.GatewaySpec{
-			Selector: labelsForIstioIngress(r.KafkaCluster.Name, eListenerLabelName, istioRevision),
+			// Use vanilla Istio Gateway - selector targets the default Istio ingress gateway
+			Selector: map[string]string{
+				"istio": "ingressgateway", // Standard Istio ingress gateway selector
+			},
 			Servers: generateServers(r.KafkaCluster, externalListenerConfig, log, ingressConf,
 				ingressConfigName, defaultIngressConfigName),
 		},

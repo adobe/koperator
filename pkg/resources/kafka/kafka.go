@@ -1426,8 +1426,123 @@ func (r *Reconciler) getBrokerHost(log logr.Logger, defaultHost string, broker b
 func (r *Reconciler) createExternalListenerStatuses(log logr.Logger) (map[string]banzaiv1beta1.ListenerStatusList, error) {
 	extListenerStatuses := make(map[string]banzaiv1beta1.ListenerStatusList, len(r.KafkaCluster.Spec.ListenersConfig.ExternalListeners))
 	for _, eListener := range r.KafkaCluster.Spec.ListenersConfig.ExternalListeners {
-		// in case if external listener uses loadbalancer type of service and istioControlPlane is not specified than we skip this listener from status update. In this way this external listener will not be in the configmap.
-		if eListener.GetAccessMethod() == corev1.ServiceTypeLoadBalancer && r.KafkaCluster.Spec.GetIngressController() == istioingressutils.IngressControllerName && r.KafkaCluster.Spec.IstioControlPlane == nil {
+		// For istioingress controller with LoadBalancer, get host from Mesh Gateway Service
+		if eListener.GetAccessMethod() == corev1.ServiceTypeLoadBalancer && r.KafkaCluster.Spec.GetIngressController() == istioingressutils.IngressControllerName {
+			ingressConfigs, defaultControllerName, err := util.GetIngressConfigs(r.KafkaCluster.Spec, eListener)
+			if err != nil {
+				return nil, err
+			}
+
+			// Generate external listener statuses for istioingress
+			listenerStatusList := make(banzaiv1beta1.ListenerStatusList, 0, len(r.KafkaCluster.Spec.Brokers)+1)
+
+			// Phase 1: Add all any-broker services first
+			// Sort config names to ensure consistent ordering
+			var configNames []string
+			for iConfigName := range ingressConfigs {
+				configNames = append(configNames, iConfigName)
+			}
+			sort.Strings(configNames)
+
+			for _, iConfigName := range configNames {
+				if !util.IsIngressConfigInUse(iConfigName, defaultControllerName, r.KafkaCluster, log) {
+					continue
+				}
+
+				// Get the Mesh Gateway Service for this config
+				foundLBService, err := getServiceFromExternalListener(r.Client, r.KafkaCluster, eListener.Name, iConfigName)
+				if err != nil {
+					log.Error(err, "could not get mesh gateway service for istioingress", "configName", iConfigName)
+					continue
+				}
+
+				// Get host from LoadBalancer service
+				host := ""
+				if len(foundLBService.Status.LoadBalancer.Ingress) > 0 {
+					host = foundLBService.Status.LoadBalancer.Ingress[0].Hostname
+					if host == "" {
+						host = foundLBService.Status.LoadBalancer.Ingress[0].IP
+					}
+				}
+
+				// Add all brokers service for this config
+				if foundLBService != nil && host != "" {
+					anyBrokerName := "any-broker"
+					if iConfigName != util.IngressConfigGlobalName {
+						anyBrokerName = fmt.Sprintf("any-broker-%s", iConfigName)
+					}
+
+					// For Istio ingress, use the tcp-all-broker port from the service
+					var anyBrokerPort int32 = 0
+					for _, port := range foundLBService.Spec.Ports {
+						if port.Name == "tcp-all-broker" {
+							anyBrokerPort = port.Port
+							break
+						}
+					}
+					if anyBrokerPort == 0 {
+						// Fallback to ExternalStartingPort if tcp-all-broker port not found
+						anyBrokerPort = eListener.ExternalStartingPort
+					}
+
+					listenerStatusList = append(listenerStatusList, banzaiv1beta1.ListenerStatus{
+						Name:    anyBrokerName,
+						Address: fmt.Sprintf("%s:%d", host, anyBrokerPort),
+					})
+				}
+			}
+
+			// Phase 2: Add individual broker services
+			brokerIds := util.GetBrokerIdsFromStatusAndSpec(r.KafkaCluster.Status.BrokersState, r.KafkaCluster.Spec.Brokers, log)
+			for _, brokerId := range brokerIds {
+				brokerConfig, err := kafka.GatherBrokerConfigIfAvailable(r.KafkaCluster.Spec, brokerId)
+				if err != nil {
+					log.Error(err, "could not determine brokerConfig")
+					continue
+				}
+
+				// Find the appropriate config for this broker
+				var targetConfigName string
+				for _, iConfigName := range configNames {
+					if !util.IsIngressConfigInUse(iConfigName, defaultControllerName, r.KafkaCluster, log) {
+						continue
+					}
+					if util.ShouldIncludeBroker(brokerConfig, r.KafkaCluster.Status, brokerId, defaultControllerName, iConfigName) {
+						targetConfigName = iConfigName
+						break
+					}
+				}
+
+				if targetConfigName == "" {
+					continue
+				}
+
+				// Get the Mesh Gateway Service for this config
+				foundLBService, err := getServiceFromExternalListener(r.Client, r.KafkaCluster, eListener.Name, targetConfigName)
+				if err != nil {
+					log.Error(err, "could not get mesh gateway service for istioingress", "configName", targetConfigName)
+					continue
+				}
+
+				// Get host from LoadBalancer service
+				host := ""
+				if len(foundLBService.Status.LoadBalancer.Ingress) > 0 {
+					host = foundLBService.Status.LoadBalancer.Ingress[0].Hostname
+					if host == "" {
+						host = foundLBService.Status.LoadBalancer.Ingress[0].IP
+					}
+				}
+
+				// Add individual broker service
+				if foundLBService != nil && host != "" {
+					listenerStatusList = append(listenerStatusList, banzaiv1beta1.ListenerStatus{
+						Name:    fmt.Sprintf("broker-%d", brokerId),
+						Address: fmt.Sprintf("%s:%d", host, eListener.GetBrokerPort(int32(brokerId))),
+					})
+				}
+			}
+
+			extListenerStatuses[eListener.Name] = listenerStatusList
 			continue
 		}
 		var host string
