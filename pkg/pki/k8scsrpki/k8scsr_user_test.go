@@ -31,7 +31,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	istioclientv1beta1 "github.com/banzaicloud/istio-client-go/pkg/networking/v1beta1"
-	banzaiistiov1alpha1 "github.com/banzaicloud/istio-operator/api/v2/v1alpha1"
 
 	"github.com/banzaicloud/koperator/api/v1alpha1"
 	"github.com/banzaicloud/koperator/api/v1beta1"
@@ -76,10 +75,6 @@ func setupSchemeForTests() (*runtime.Scheme, error) {
 		return nil, err
 	}
 	err = v1beta1.AddToScheme(sch)
-	if err != nil {
-		return nil, err
-	}
-	err = banzaiistiov1alpha1.AddToScheme(sch)
 	if err != nil {
 		return nil, err
 	}

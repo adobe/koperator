@@ -45,6 +45,23 @@ func testInstall() bool {
 			})
 		})
 
+		ginkgo.When("Installing Istio", func() {
+			ginkgo.It("Installing Istio base Helm chart", func() {
+				err = istioBaseHelmDescriptor.installHelmChart(kubectlOptions)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			})
+
+			ginkgo.It("Installing Istio istiod Helm chart", func() {
+				err = istiodHelmDescriptor.installHelmChart(kubectlOptions)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			})
+
+			ginkgo.It("Installing Istio ingress gateway Helm chart", func() {
+				err = istioIngressGatewayHelmDescriptor.installHelmChart(kubectlOptions)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			})
+		})
+
 		ginkgo.When("Installing zookeeper-operator", func() {
 			ginkgo.It("Installing zookeeper-operator Helm chart", func() {
 				err = zookeeperOperatorHelmDescriptor.installHelmChart(kubectlOptions)
