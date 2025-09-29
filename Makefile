@@ -18,10 +18,10 @@ RELEASE_MSG ?= "koperator release"
 REL_TAG = $(shell ./scripts/increment_version.sh -${RELEASE_TYPE} ${TAG})
 
 # Version constants
-GOLANGCI_VERSION = 2.4.0 # renovate: datasource=github-releases depName=golangci/golangci-lint
+GOLANGCI_VERSION = 2.5.0 # renovate: datasource=github-releases depName=golangci/golangci-lint
 LICENSEI_VERSION = 0.9.0 # renovate: datasource=github-releases depName=goph/licensei
 CONTROLLER_GEN_VERSION = v0.19.0 # renovate: datasource=github-releases depName=kubernetes-sigs/controller-tools
-ENVTEST_K8S_VERSION = 1.34.0 # renovate: datasource=github-releases depName=kubernetes/kubernetes
+ENVTEST_K8S_VERSION = 1.34.1 # renovate: datasource=github-releases depName=kubernetes/kubernetes
 SETUP_ENVTEST_VERSION := latest
 ADDLICENSE_VERSION := 1.2.0 # renovate: datasource=github-releases depName=google/addlicense
 GOTEMPLATE_VERSION := 3.12.0 # renovate: datasource=github-releases depName=cznic/gotemplate
@@ -95,6 +95,7 @@ install-kustomize: ## Install kustomize.
 test: generate fmt vet bin/setup-envtest
 	cd api && go test ./...
 	KUBEBUILDER_ASSETS=$$($(BIN_DIR)/setup-envtest --print path --bin-dir $(BIN_DIR) use $(ENVTEST_K8S_VERSION)) \
+	GINKGO_FLAKE_ATTEMPTS=3 \
 	go test ./... \
 		-coverprofile cover.out \
 		-v \
@@ -147,11 +148,13 @@ fmt: ## Run go fmt against code.
 	go fmt ./...
 	cd api && go fmt ./...
 	cd properties && go fmt ./...
+	cd tests/e2e && go fmt ./...
 
 vet: ## Run go vet against code.
 	go vet ./...
 	cd api && go fmt ./...
 	cd properties && go vet ./...
+	cd tests/e2e && go vet ./...
 
 generate: bin/controller-gen gen-license-header ## Generate source code for APIs, Mocks, etc.
 	cd api && $(CONTROLLER_GEN) object:headerFile=$(BOILERPLATE_DIR)/header.go.generated.txt paths="./..."

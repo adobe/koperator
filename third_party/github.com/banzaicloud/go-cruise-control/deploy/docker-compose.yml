@@ -1,6 +1,6 @@
 services:
   zookeeper:
-    image: zookeeper:3.8.4
+    image: zookeeper:3.9.4@sha256:9283f601b66c373bb4caa653f59bf71f4b018b714693c4669defce3120328076
     restart: unless-stopped
     hostname: zookeeper
     container_name: zookeeper

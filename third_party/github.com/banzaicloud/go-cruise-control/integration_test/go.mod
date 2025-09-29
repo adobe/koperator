@@ -3,7 +3,7 @@ module github.com/banzaicloud/go-cruise-control/integration_test
 go 1.25
 
 require (
-	github.com/banzaicloud/go-cruise-control v0.0.0
+	github.com/banzaicloud/go-cruise-control v0.6.0
 	github.com/compose-spec/compose-go/v2 v2.9.0
 	github.com/docker/cli v28.4.0+incompatible
 	github.com/docker/compose/v2 v2.39.4

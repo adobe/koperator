@@ -15,7 +15,11 @@
 
 package e2e
 
-import "time"
+import (
+	"time"
+
+	"github.com/banzaicloud/koperator/api/v1beta1"
+)
 
 // Versions.
 type Version = string
@@ -38,6 +42,7 @@ const (
 	kafkaUserKind         = "kafkausers.kafka.banzaicloud.io"
 	kafkaClusterName      = "kafka"
 	kafkaUserName         = "test-user"
+	kafkaCRLabelKey       = v1beta1.KafkaCRLabelKey
 	testExternalTopicName = "topic-test-external"
 	testInternalTopicName = "topic-test-internal"
 
