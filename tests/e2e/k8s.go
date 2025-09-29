@@ -21,6 +21,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path"
 	"strings"
 	"text/template"
@@ -567,6 +568,60 @@ func getK8sResources(kubectlOptions k8s.KubectlOptions, resourceKind []string, s
 	return kubectlRemoveWarnings(outputSlice), nil
 }
 
+// getK8sResourcesQuiet gets the specified K8S resources without verbose logging
+// This is similar to getK8sResources but suppresses terratest's internal logging
+// to avoid printing large JSON outputs during snapshotting operations.
+func getK8sResourcesQuiet(kubectlOptions k8s.KubectlOptions, resourceKind []string, selector string, names string, extraArgs ...string) ([]string, error) {
+	args := []string{"get", strings.Join(resourceKind, ",")}
+	_, args = kubectlArgExtender(args, "", selector, names, kubectlOptions.Namespace, extraArgs)
+
+	// Execute kubectl directly without terratest's logging to avoid JSON output pollution
+	output, err := runKubectlSilent(kubectlOptions, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	output = strings.Trim(output, "'")
+	// Empty output
+	if output == "" {
+		return nil, nil
+	}
+
+	output = strings.TrimRight(output, "\n")
+	outputSlice := strings.Split(output, "\n")
+
+	// Remove warning message pollution from the output
+	return kubectlRemoveWarnings(outputSlice), nil
+}
+
+// runKubectlSilent executes kubectl command silently without any logging
+// This is used to avoid JSON output pollution in logs during snapshotting operations
+func runKubectlSilent(kubectlOptions k8s.KubectlOptions, args ...string) (string, error) {
+	cmd := exec.Command("kubectl", args...)
+
+	// Set kubeconfig and context if provided
+	if kubectlOptions.ConfigPath != "" {
+		cmd.Env = append(os.Environ(), fmt.Sprintf("KUBECONFIG=%s", kubectlOptions.ConfigPath))
+	}
+	if kubectlOptions.ContextName != "" {
+		cmd.Args = append(cmd.Args, "--context", kubectlOptions.ContextName)
+	}
+	if kubectlOptions.Namespace != "" {
+		cmd.Args = append(cmd.Args, "--namespace", kubectlOptions.Namespace)
+	}
+
+	// Capture output without logging
+	output, err := cmd.Output()
+	if err != nil {
+		if exitError, ok := err.(*exec.ExitError); ok {
+			return "", fmt.Errorf("kubectl command failed with exit code %d: %s", exitError.ExitCode(), string(exitError.Stderr))
+		}
+		return "", err
+	}
+
+	return string(output), nil
+}
+
 // waitK8sResourceCondition waits until the condition is met or the timeout is elapsed for the selected K8s resource(s)
 // extraArgs can be any of the kubectl arguments
 func waitK8sResourceCondition(kubectlOptions k8s.KubectlOptions, resourceKind, waitFor string, timeout time.Duration, selector string, names string, extraArgs ...string) error { //nolint:unparam // Note: library function with variadic argument currently always nil.
@@ -644,6 +699,9 @@ func setupReducedLogging() {
 		os.Setenv("TEST_LOG_LEVEL", "-5")
 		// Reduce kubectl verbosity
 		os.Setenv("KUBECTL_VERBOSITY", "0")
+		// Additional environment variables to reduce terratest kubectl command logging
+		os.Setenv("TERRATEST_LOG_LEVEL", "INFO")
+		os.Setenv("KUBECTL_LOG_LEVEL", "0")
 	}
 }
 

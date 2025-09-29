@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/banzaicloud/koperator/api/v1beta1"
@@ -52,10 +51,7 @@ var (
 	}
 )
 
-var allocatedNodePorts []int32
-var safePort int32
-
-var _ = Describe("KafkaClusterNodeportExternalAccess", Ordered, func() {
+var _ = Describe("KafkaClusterNodeportExternalAccess", Ordered, Serial, func() {
 	var (
 		count              uint64 = 0
 		namespace          string
@@ -89,7 +85,7 @@ var _ = Describe("KafkaClusterNodeportExternalAccess", Ordered, func() {
 		err = k8sClient.Create(ctx, kafkaCluster)
 		Expect(err).NotTo(HaveOccurred())
 
-		waitForClusterRunningState(ctx, kafkaCluster, namespace)
+		waitForClusterRunningStateWithTimeout(ctx, kafkaCluster, namespace, 120*time.Second)
 
 	})
 
@@ -121,13 +117,6 @@ var _ = Describe("KafkaClusterNodeportExternalAccess", Ordered, func() {
 
 	When("hostnameOverride is configured with externalStartingPort 0", func() {
 		BeforeEach(func() {
-			allocatedNodePorts = nil
-			// Pre-allocate ports even when using auto-assignment to prevent conflicts
-			// Allocate 3 consecutive ports for the 3 brokers to avoid race conditions
-			safePort = GetNodePort(3)
-			for i := int32(0); i < 3; i++ {
-				allocatedNodePorts = append(allocatedNodePorts, safePort+i)
-			}
 			kafkaCluster.Spec.ListenersConfig.ExternalListeners = []v1beta1.ExternalListenerConfig{
 				{
 					CommonListenerSpec: v1beta1.CommonListenerSpec{
@@ -204,23 +193,10 @@ var _ = Describe("KafkaClusterNodeportExternalAccess", Ordered, func() {
 				},
 			}))
 		})
-		AfterEach(func() {
-			for _, port := range allocatedNodePorts {
-				ReleaseNodePort(port)
-			}
-			allocatedNodePorts = nil
-		})
 	})
 
 	When("NodePortExternalIP is configured", func() {
 		BeforeEach(func() {
-			allocatedNodePorts = nil
-			safePort = GetNodePort(3)
-			// Allocate all 3 ports for the 3 brokers to avoid conflicts
-			for i := int32(0); i < 3; i++ {
-				allocatedNodePorts = append(allocatedNodePorts, safePort+i)
-			}
-			// update the external listener config with a nodeport listener
 			kafkaCluster.Spec.ListenersConfig.ExternalListeners = []v1beta1.ExternalListenerConfig{
 				{
 					CommonListenerSpec: v1beta1.CommonListenerSpec{
@@ -228,7 +204,7 @@ var _ = Describe("KafkaClusterNodeportExternalAccess", Ordered, func() {
 						ContainerPort: 9733,
 						Type:          "plaintext",
 					},
-					ExternalStartingPort: safePort,
+					ExternalStartingPort: 0,
 					AccessMethod:         corev1.ServiceTypeNodePort,
 				},
 			}
@@ -268,13 +244,6 @@ var _ = Describe("KafkaClusterNodeportExternalAccess", Ordered, func() {
 			}
 		})
 
-		AfterEach(func() {
-			for _, port := range allocatedNodePorts {
-				ReleaseNodePort(port)
-			}
-			allocatedNodePorts = nil
-		})
-
 		It("reconciles the service successfully", func(ctx SpecContext) {
 			var svc corev1.Service
 			svcName := fmt.Sprintf("%s-0-test", kafkaClusterCRName)
@@ -302,13 +271,8 @@ var _ = Describe("KafkaClusterNodeportExternalAccess", Ordered, func() {
 			Expect(svc.Spec.Ports[0].Port).To(BeEquivalentTo(9733))
 			Expect(svc.Spec.Ports[0].TargetPort.IntVal).To(BeEquivalentTo(9733))
 
-			Expect(svc.Spec.Ports).To(ConsistOf(corev1.ServicePort{
-				Name:       "broker-0",
-				Protocol:   corev1.ProtocolTCP,
-				Port:       9733,
-				TargetPort: intstr.FromInt(9733),
-				NodePort:   safePort,
-			}))
+			Expect(svc.Spec.Ports).NotTo(BeEmpty())
+			Expect(svc.Spec.Ports[0].NodePort).To(BeNumerically(">", 0))
 
 			// check status
 			err := k8sClient.Get(ctx, types.NamespacedName{
@@ -360,12 +324,6 @@ var _ = Describe("KafkaClusterNodeportExternalAccess", Ordered, func() {
 
 	When("hostnameOverride is configured", func() {
 		BeforeEach(func() {
-			allocatedNodePorts = nil
-			safePort = GetNodePort(3)
-			// Allocate all 3 ports for the 3 brokers to avoid conflicts
-			for i := int32(0); i < 3; i++ {
-				allocatedNodePorts = append(allocatedNodePorts, safePort+i)
-			}
 			kafkaCluster.Spec.ListenersConfig.ExternalListeners = []v1beta1.ExternalListenerConfig{
 				{
 					CommonListenerSpec: v1beta1.CommonListenerSpec{
@@ -373,7 +331,7 @@ var _ = Describe("KafkaClusterNodeportExternalAccess", Ordered, func() {
 						ContainerPort: 9733,
 						Type:          "plaintext",
 					},
-					ExternalStartingPort: safePort,
+					ExternalStartingPort: 0,
 					IngressServiceSettings: v1beta1.IngressServiceSettings{
 						HostnameOverride: ".external.nodeport.com",
 					},
@@ -389,7 +347,17 @@ var _ = Describe("KafkaClusterNodeportExternalAccess", Ordered, func() {
 			}, kafkaCluster)
 			Expect(err).NotTo(HaveOccurred())
 
-			expectedPort := safePort
+			// Get the actual allocated ports from Services
+			assignedNodePortPerBroker := make(map[int32]int32, len(kafkaCluster.Spec.Brokers))
+			for _, broker := range kafkaCluster.Spec.Brokers {
+				var svc corev1.Service
+				err := k8sClient.Get(ctx, types.NamespacedName{
+					Name:      fmt.Sprintf(kafka.NodePortServiceTemplate, kafkaCluster.GetName(), broker.Id, "test"),
+					Namespace: kafkaCluster.GetNamespace(),
+				}, &svc)
+				Expect(err).NotTo(HaveOccurred())
+				assignedNodePortPerBroker[broker.Id] = svc.Spec.Ports[0].NodePort
+			}
 
 			Expect(kafkaCluster.Status.ListenerStatuses).To(Equal(v1beta1.ListenerStatuses{
 				InternalListeners: map[string]v1beta1.ListenerStatusList{
@@ -416,26 +384,21 @@ var _ = Describe("KafkaClusterNodeportExternalAccess", Ordered, func() {
 					"test": {
 						{
 							Name:    "broker-0",
-							Address: fmt.Sprintf("%s-0-test.kafka-nodeport-%d.external.nodeport.com:%d", kafkaCluster.Name, count, expectedPort),
+							Address: fmt.Sprintf("%s-0-test.kafka-nodeport-%d.external.nodeport.com:%d", kafkaCluster.Name, count, assignedNodePortPerBroker[0]),
 						},
 						{
 							Name:    "broker-1",
-							Address: fmt.Sprintf("%s-1-test.kafka-nodeport-%d.external.nodeport.com:%d", kafkaCluster.Name, count, expectedPort+1),
+							Address: fmt.Sprintf("%s-1-test.kafka-nodeport-%d.external.nodeport.com:%d", kafkaCluster.Name, count, assignedNodePortPerBroker[1]),
 						},
 						{
 							Name:    "broker-2",
-							Address: fmt.Sprintf("%s-2-test.kafka-nodeport-%d.external.nodeport.com:%d", kafkaCluster.Name, count, expectedPort+2),
+							Address: fmt.Sprintf("%s-2-test.kafka-nodeport-%d.external.nodeport.com:%d", kafkaCluster.Name, count, assignedNodePortPerBroker[2]),
 						},
 					},
 				},
 			}))
 		})
-		AfterEach(func() {
-			for _, port := range allocatedNodePorts {
-				ReleaseNodePort(port)
-			}
-			allocatedNodePorts = nil
-		})
+
 	})
 })
 

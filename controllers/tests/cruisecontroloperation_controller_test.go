@@ -37,6 +37,12 @@ import (
 	"github.com/banzaicloud/koperator/pkg/scale"
 )
 
+const (
+	// Additional test timeout constants for operation controller tests
+	operationRetryTimeoutDuration    = time.Duration(v1alpha1.DefaultRetryBackOffDurationSec+10) * time.Second // timeout for retry operations
+	operationExtendedTimeoutDuration = 15 * time.Second                                                        // extended timeout for complex operations
+)
+
 var _ = Describe("CruiseControlTaskReconciler", func() {
 	var (
 		count              uint64 = 0
@@ -114,7 +120,7 @@ var _ = Describe("CruiseControlTaskReconciler", func() {
 					return ""
 				}
 				return operation.CurrentTaskState()
-			}, 10*time.Second, 500*time.Millisecond).Should(Equal(v1beta1.CruiseControlTaskCompleted))
+			}, maxReconcileDuration, reconcilePollingPeriod).Should(Equal(v1beta1.CruiseControlTaskCompleted))
 		})
 	})
 	When("add_broker operation is finished with completedWithError and 30s has not elapsed", Serial, func() {
@@ -141,13 +147,15 @@ var _ = Describe("CruiseControlTaskReconciler", func() {
 					return false
 				}
 				return operation.CurrentTaskState() == v1beta1.CruiseControlTaskCompletedWithError && len(operation.Status.FailedTasks) == 0
-			}, 10*time.Second, 500*time.Millisecond).Should(BeTrue())
+			}, maxReconcileDuration, reconcilePollingPeriod).Should(BeTrue())
 		})
 	})
 	When("add_broker operation is finished with completedWithError and 30s has elapsed", Serial, func() {
 		JustBeforeEach(func(ctx SpecContext) {
 			cruiseControlOperationReconciler.ScaleFactory = mocks.NewMockScaleFactory(getScaleMock5())
 			operation := generateCruiseControlOperation(opName1, namespace, kafkaCluster.GetName())
+			// Explicitly set error policy to retry to ensure retry behavior
+			operation.Spec.ErrorPolicy = v1alpha1.ErrorPolicyRetry
 			err := k8sClient.Create(ctx, &operation)
 			Expect(err).NotTo(HaveOccurred())
 			operation.Status.CurrentTask = &v1alpha1.CruiseControlTask{
@@ -167,10 +175,17 @@ var _ = Describe("CruiseControlTaskReconciler", func() {
 					Name:      opName1,
 				}, &operation)
 				if err != nil {
+					fmt.Printf("Error getting operation: %v\n", err)
 					return false
 				}
+
+				// Debug logging
+				fmt.Printf("Operation state: %s, FailedTasks: %d, IsWaitingForRetryExecution: %v, IsReadyForRetryExecution: %v\n",
+					operation.CurrentTaskState(), len(operation.Status.FailedTasks),
+					operation.IsWaitingForRetryExecution(), operation.IsReadyForRetryExecution())
+
 				return operation.CurrentTaskState() == v1beta1.CruiseControlTaskCompleted && len(operation.Status.FailedTasks) == 1
-			}, 10*time.Second, 500*time.Millisecond).Should(BeTrue())
+			}, operationRetryTimeoutDuration, reconcilePollingPeriod).Should(BeTrue())
 		})
 	})
 	When("there is an errored remove_broker and an add_broker operation", Serial, func() {
@@ -217,7 +232,7 @@ var _ = Describe("CruiseControlTaskReconciler", func() {
 				}
 
 				return operation2.CurrentTaskState() == v1beta1.CruiseControlTaskCompleted
-			}, 10*time.Second, 500*time.Millisecond).Should(BeTrue())
+			}, maxReconcileDuration, reconcilePollingPeriod).Should(BeTrue())
 		})
 	})
 	When("there is a new remove_broker and an errored remove_broker operation with pause annotation", Serial, func() {
@@ -266,7 +281,7 @@ var _ = Describe("CruiseControlTaskReconciler", func() {
 				}
 
 				return operation1.Status.RetryCount == 0 && operation2.CurrentTaskState() == v1beta1.CruiseControlTaskCompleted
-			}, 10*time.Second, 500*time.Millisecond).Should(BeTrue())
+			}, maxReconcileDuration, reconcilePollingPeriod).Should(BeTrue())
 		})
 	})
 	When("there is a new remove_broker and an errored remove_broker operation with ignore ErrorPolicy", Serial, func() {
@@ -316,7 +331,7 @@ var _ = Describe("CruiseControlTaskReconciler", func() {
 				}
 
 				return operation1.Status.RetryCount == 0 && operation2.CurrentTaskState() == v1beta1.CruiseControlTaskCompleted
-			}, 10*time.Second, 500*time.Millisecond).Should(BeTrue())
+			}, maxReconcileDuration, reconcilePollingPeriod).Should(BeTrue())
 		})
 	})
 	When("there is an errored remove_disks and a rebalance disks operation for the same broker", Serial, func() {
@@ -370,7 +385,7 @@ var _ = Describe("CruiseControlTaskReconciler", func() {
 
 				return rebalanceOp.CurrentTaskState() == v1beta1.CruiseControlTaskCompleted &&
 					removeDisksOp.GetLabels()[v1alpha1.PauseLabel] == v1alpha1.True
-			}, 10*time.Second, 500*time.Millisecond).Should(BeTrue())
+			}, maxReconcileDuration, reconcilePollingPeriod).Should(BeTrue())
 		})
 	})
 	When("Cruise Control makes the Status operation async", Serial, func() {
@@ -398,7 +413,7 @@ var _ = Describe("CruiseControlTaskReconciler", func() {
 					return ""
 				}
 				return operation.CurrentTaskState()
-			}, 15*time.Second, 500*time.Millisecond).Should(Equal(v1beta1.CruiseControlTaskCompleted))
+			}, operationExtendedTimeoutDuration, reconcilePollingPeriod).Should(Equal(v1beta1.CruiseControlTaskCompleted))
 		})
 	})
 })

@@ -53,6 +53,16 @@ all: test manager ## Run 'test' and 'manager' targets.
 .PHONY: check
 check: test lint ## Run tests and linters
 
+.PHONY: clean
+clean: ## Clean build artifacts and test binaries
+	@echo "Cleaning build artifacts..."
+	@if [ -d "bin" ]; then \
+		chmod -R u+w bin/ 2>/dev/null || true; \
+		rm -rf bin/; \
+	fi
+	@rm -f cover.out
+	@rm -f manager_image_patch.yaml
+
 bin/golangci-lint: bin/golangci-lint-${GOLANGCI_VERSION} ## Symlink golangi-lint-<version> into versionless golangci-lint.
 	@ln -sf golangci-lint-${GOLANGCI_VERSION} bin/golangci-lint
 bin/golangci-lint-${GOLANGCI_VERSION}: ## Download versioned golangci-lint.
@@ -95,7 +105,6 @@ install-kustomize: ## Install kustomize.
 test: generate fmt vet bin/setup-envtest
 	cd api && go test ./...
 	KUBEBUILDER_ASSETS=$$($(BIN_DIR)/setup-envtest --print path --bin-dir $(BIN_DIR) use $(ENVTEST_K8S_VERSION)) \
-	GINKGO_FLAKE_ATTEMPTS=3 \
 	go test ./... \
 		-coverprofile cover.out \
 		-v \

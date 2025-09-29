@@ -51,7 +51,7 @@ func requireDeleteKafkaCluster(kubectlOptions k8s.KubectlOptions, name string) {
 			gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 
 			return resources
-		}, kafkaClusterResourceCleanupTimeout, 1*time.Second).Should(gomega.BeEmpty())
+		}, kafkaClusterResourceCleanupTimeout, 15*time.Second).Should(gomega.BeEmpty())
 	})
 }
 
@@ -74,6 +74,6 @@ func requireDeleteZookeeperCluster(kubectlOptions k8s.KubectlOptions, name strin
 				"--all-namespaces", kubectlArgGoTemplateKindNameNamespace)
 			gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 			return resources
-		}, zookeeperClusterResourceCleanupTimeout, 1*time.Second).Should(gomega.BeEmpty())
+		}, zookeeperClusterResourceCleanupTimeout, 15*time.Second).Should(gomega.BeEmpty())
 	})
 }

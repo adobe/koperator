@@ -31,18 +31,13 @@ limitations under the License.
 package tests
 
 import (
-	"context"
-	"fmt"
-	"math/rand/v2"
 	"path/filepath"
-	"sync"
 	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	corev1 "k8s.io/api/core/v1"
 	apiv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -107,6 +102,8 @@ var _ = BeforeSuite(func(ctx SpecContext) {
 	}
 	apiServer := testEnv.ControlPlane.GetAPIServer()
 	apiServer.Configure().Set("service-cluster-ip-range", "10.0.0.0/16")
+	// Give kube-apiserver more room for automatic NodePort allocation and avoid the small static band.
+	apiServer.Configure().Set("service-node-port-range", "30128-65000")
 
 	var cfg *rest.Config
 	var err error
@@ -256,83 +253,3 @@ var _ = AfterSuite(func() {
 	err := testEnv.Stop()
 	Expect(err).ToNot(HaveOccurred())
 })
-
-var (
-	nodePortMutex sync.Mutex
-	nodePorts     = make(map[int32]bool)
-)
-
-func GetNodePort(portAmount int32) int32 {
-	portAmount--
-	nodePortMutex.Lock()
-	defer nodePortMutex.Unlock()
-
-	const minPort, maxPort = 30000, 32767
-	portRange := maxPort - minPort + 1
-
-	fmt.Println("GetNodePort: Looking for an available nodeport")
-
-	if k8sClient == nil {
-		fmt.Println("WARNING: k8sClient not initialized yet skipping Kubernetes service check")
-	} else {
-		var serviceList corev1.ServiceList
-		if err := k8sClient.List(context.Background(), &serviceList); err == nil {
-			fmt.Printf("GetNodePort: Found %d services to check for nodeports\n", len(serviceList.Items))
-			for _, service := range serviceList.Items {
-				if service.Spec.Type == corev1.ServiceTypeNodePort {
-					for _, port := range service.Spec.Ports {
-						if port.NodePort > 0 {
-							nodePorts[port.NodePort] = true
-							fmt.Printf("GetNodePort: Found existing nodeport %d in service %s/%s\n",
-								port.NodePort, service.Namespace, service.Name)
-						}
-					}
-				}
-			}
-		} else {
-			fmt.Printf("ERROR: Failed to list services: %v\n", err)
-		}
-	}
-
-	attempts := 0
-	for attempts = 0; attempts < 100; attempts++ {
-		port := minPort + rand.Int32N(int32(portRange))
-
-		// Avoid the problematic range around 32030 that often causes conflicts
-		if port >= 32025 && port <= 32035 {
-			continue
-		}
-
-		// Ensure the port range doesn't cross into the high conflict zone
-		if port+portAmount >= 32025 && port <= 32035 {
-			continue
-		}
-
-		allAvailable := true
-		for i := int32(0); i <= portAmount; i++ {
-			if nodePorts[port+i] {
-				allAvailable = false
-				break
-			}
-		}
-
-		if allAvailable {
-			for i := int32(0); i <= portAmount; i++ {
-				nodePorts[port+i] = true
-			}
-			fmt.Printf("GetNodePort: Successfully allocated NodePort range %d-%d after %d attempts\n",
-				port, port+portAmount, attempts+1)
-			return port
-		}
-	}
-
-	fmt.Printf("WARNING: No free NodePorts found after %d attempts, returning 0 for auto-assignment\n", attempts)
-	return 0
-}
-
-func ReleaseNodePort(port int32) {
-	nodePortMutex.Lock()
-	defer nodePortMutex.Unlock()
-	delete(nodePorts, port)
-	fmt.Printf("Released NodePort %d\n", port)
-}

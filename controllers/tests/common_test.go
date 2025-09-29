@@ -132,6 +132,10 @@ func createMinimalKafkaClusterCR(name, namespace string) *banzaicloudv1beta1.Kaf
 }
 
 func waitForClusterRunningState(ctx context.Context, kafkaCluster *banzaicloudv1beta1.KafkaCluster, namespace string) {
+	waitForClusterRunningStateWithTimeout(ctx, kafkaCluster, namespace, 240*time.Second)
+}
+
+func waitForClusterRunningStateWithTimeout(ctx context.Context, kafkaCluster *banzaicloudv1beta1.KafkaCluster, namespace string, timeout time.Duration) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -161,7 +165,7 @@ func waitForClusterRunningState(ctx context.Context, kafkaCluster *banzaicloudv1
 			}
 		}
 	}()
-	Eventually(ch, 240*time.Second, 50*time.Millisecond).Should(Receive())
+	Eventually(ch, timeout, 50*time.Millisecond).Should(Receive())
 }
 
 func getMockedKafkaClientForCluster(kafkaCluster *banzaicloudv1beta1.KafkaCluster) (kafkaclient.KafkaClient, func()) {

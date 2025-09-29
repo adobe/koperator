@@ -103,13 +103,20 @@ func snapshotCluster(snapshottedInfo *clusterSnapshot) bool { //nolint:unparam /
 		ginkgo.When("Snapshotting objects", func() {
 			ginkgo.It("Recording cluster-scoped resource objects", func() {
 				ginkgo.By(fmt.Sprintf("Getting cluster-scoped resources %v as json", clusterResourceNames))
-				output, err := getK8sResources(kubectlOptions, clusterResourceNames, "", "", "--output=json")
+				output, err := getK8sResourcesQuiet(kubectlOptions, clusterResourceNames, "", "", "--output=json")
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 				ginkgo.By(fmt.Sprintf("Unmarshalling cluster-scoped resources %v from json", clusterResourceNames))
 				var resourceList metav1.PartialObjectMetadataList
 				err = json.Unmarshal([]byte(strings.Join(output, "\n")), &resourceList)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+				// Log only the resource names instead of full content
+				resourceNames := make([]string, len(resourceList.Items))
+				for i, resource := range resourceList.Items {
+					resourceNames[i] = fmt.Sprintf("%s/%s", resource.GroupVersionKind().Kind, resource.GetName())
+				}
+				ginkgo.By(fmt.Sprintf("Recorded %d cluster-scoped resources: %v", len(resourceList.Items), resourceNames))
 
 				resources = append(resources, resourceList.Items...)
 			})
@@ -119,13 +126,20 @@ func snapshotCluster(snapshottedInfo *clusterSnapshot) bool { //nolint:unparam /
 					kubectlOptions.Namespace = ns
 
 					ginkgo.By(fmt.Sprintf("Getting namespaced resources %v as json for namespace %s", namespacedResourceNames, ns))
-					output, err := getK8sResources(kubectlOptions, namespacedResourceNames, "", "", "--output=json")
+					output, err := getK8sResourcesQuiet(kubectlOptions, namespacedResourceNames, "", "", "--output=json")
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 					ginkgo.By(fmt.Sprintf("Unmarshalling namespaced resources %v from json for namespace %s", namespacedResourceNames, ns))
 					var resourceList metav1.PartialObjectMetadataList
 					err = json.Unmarshal([]byte(strings.Join(output, "\n")), &resourceList)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+					// Log only the resource names instead of full content
+					resourceNames := make([]string, len(resourceList.Items))
+					for i, resource := range resourceList.Items {
+						resourceNames[i] = fmt.Sprintf("%s/%s", resource.GroupVersionKind().Kind, resource.GetName())
+					}
+					ginkgo.By(fmt.Sprintf("Recorded %d namespaced resources in %s: %v", len(resourceList.Items), ns, resourceNames))
 
 					resources = append(resources, resourceList.Items...)
 				}

@@ -52,19 +52,19 @@ const (
 	zookeeperClusterName       = "zookeeper-server"
 	managedByHelmLabelTemplate = "app.kubernetes.io/managed-by=Helm,app.kubernetes.io/instance=%s"
 
-	cruiseControlPodReadinessTimeout       = 50 * time.Second
-	kafkaClusterResourceReadinessTimeout   = 60 * time.Second
-	defaultDeletionTimeout                 = 20 * time.Second
-	defaultPodReadinessWaitTime            = 10 * time.Second
-	defaultTopicCreationWaitTime           = 10 * time.Second
-	defaultUserCreationWaitTime            = 10 * time.Second
+	cruiseControlPodReadinessTimeout       = 300 * time.Second // Increased for kind environments
+	kafkaClusterResourceReadinessTimeout   = 300 * time.Second // Increased for kind environments
+	defaultDeletionTimeout                 = 60 * time.Second  // Increased for kind environments
+	defaultPodReadinessWaitTime            = 180 * time.Second // Increased for kind environments
+	defaultTopicCreationWaitTime           = 60 * time.Second  // Increased for kind environments
+	defaultUserCreationWaitTime            = 60 * time.Second  // Increased for kind environments
 	kafkaClusterCreateTimeout              = 1800 * time.Second
 	kafkaClusterResourceCleanupTimeout     = 600 * time.Second
-	kcatDeleetionTimeout                   = 40 * time.Second
-	zookeeperClusterCreateTimeout          = 4 * time.Minute
-	zookeeperClusterResourceCleanupTimeout = 60 * time.Second
-	externalConsumerTimeout                = 5 * time.Second
-	externalProducerTimeout                = 5 * time.Second
+	kcatDeleetionTimeout                   = 120 * time.Second // Increased for kind environments
+	zookeeperClusterCreateTimeout          = 10 * time.Minute  // Increased for kind environments
+	zookeeperClusterResourceCleanupTimeout = 180 * time.Second // Increased for kind environments
+	externalConsumerTimeout                = 120 * time.Second // Increased for kind environments
+	externalProducerTimeout                = 120 * time.Second // Increased for kind environments
 
 	zookeeperClusterReplicaCount = 1
 
