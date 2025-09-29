@@ -192,3 +192,30 @@ func requireAvailableExternalKafkaAddress(kubectlOptions k8s.KubectlOptions, ext
 		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 	})
 }
+
+// requireExternalProducingConsumingMessageViaKcat gets the Kafka cluster external addresses from the kafkaCluster CR status
+// and produces/consumes messages using kcat (similar to internal tests but for external access via Istio).
+func requireExternalProducingConsumingMessageViaKcat(kubectlOptions k8s.KubectlOptions, kcatPodName, topicName, tlsSecretName string) {
+	ginkgo.It("Producing and consuming messages externally via Istio ingress", func() {
+		// Get external listener addresses from KafkaCluster status
+		externalAddresses, err := getExternalListenerAddresses(kubectlOptions, "", kafkaClusterName)
+		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
+		gomega.Expect(externalAddresses).ShouldNot(gomega.BeEmpty())
+
+		ginkgo.By(fmt.Sprintf("Using external addresses: %v", externalAddresses))
+
+		tlsMode := tlsSecretName != ""
+		message := time.Now().String()
+
+		// Produce message externally
+		err = producingMessagesExternallyViaKcat(kubectlOptions, kcatPodName, externalAddresses, topicName, message, tlsMode)
+		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
+
+		// Consume messages externally
+		consumedMessages, err := consumingMessagesExternallyViaKcat(kubectlOptions, kcatPodName, externalAddresses, topicName, tlsMode)
+		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
+
+		ginkgo.By(fmt.Sprintf("Comparing produced: '%s' and consumed message: '%s'", message, consumedMessages))
+		gomega.Expect(consumedMessages).Should(gomega.ContainSubstring(message))
+	})
+}

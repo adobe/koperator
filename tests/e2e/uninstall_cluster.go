@@ -36,7 +36,7 @@ func requireDeleteKafkaCluster(kubectlOptions k8s.KubectlOptions, name string) {
 		gomega.Eventually(context.Background(), func() []string {
 			ginkgo.By("Verifying the Kafka cluster resource cleanup")
 
-			// Check only those Koperator related resource types we have in K8s (istio usecase)
+			// Check only those Koperator related resource types we have in K8s
 			k8sResourceKinds, err := listK8sResourceKinds(kubectlOptions, "")
 			gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 

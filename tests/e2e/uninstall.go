@@ -239,7 +239,7 @@ func requireRemoveCertManagerCRDs(kubectlOptions k8s.KubectlOptions) {
 	})
 }
 func requireUninstallingContour(kubectlOptions k8s.KubectlOptions) {
-	ginkgo.When("Uninstalling zookeeper-operator", func() {
+	ginkgo.When("Uninstalling contour", func() {
 		requireUninstallingContourHelmChart(kubectlOptions)
 		requireRemoveContourCRDs(kubectlOptions)
 		requireRemoveNamespace(kubectlOptions, contourIngressControllerHelmDescriptor.Namespace)
