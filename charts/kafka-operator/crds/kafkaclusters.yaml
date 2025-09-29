@@ -20977,7 +20977,7 @@ spec:
                     type: object
                   envs:
                     description: Envs allows to add additional env vars to the istio
-                      meshgateway resource
+                      ingress gateway deployment
                     items:
                       description: EnvVar represents an environment variable present
                         in a Container.
@@ -23035,7 +23035,7 @@ spec:
                                         type: object
                                       envs:
                                         description: Envs allows to add additional
-                                          env vars to the istio meshgateway resource
+                                          env vars to the istio ingress gateway deployment
                                         items:
                                           description: EnvVar represents an environment
                                             variable present in a Container.

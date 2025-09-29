@@ -239,10 +239,66 @@ func requireRemoveCertManagerCRDs(kubectlOptions k8s.KubectlOptions) {
 	})
 }
 func requireUninstallingContour(kubectlOptions k8s.KubectlOptions) {
-	ginkgo.When("Uninstalling zookeeper-operator", func() {
+	ginkgo.When("Uninstalling contour", func() {
 		requireUninstallingContourHelmChart(kubectlOptions)
 		requireRemoveContourCRDs(kubectlOptions)
 		requireRemoveNamespace(kubectlOptions, contourIngressControllerHelmDescriptor.Namespace)
+	})
+}
+
+func requireUninstallingIstio(kubectlOptions k8s.KubectlOptions) {
+	ginkgo.When("Uninstalling Istio", func() {
+		requireUninstallingIstioHelmCharts(kubectlOptions)
+		requireRemoveIstioCRDs(kubectlOptions)
+		requireRemoveNamespace(kubectlOptions, istioBaseHelmDescriptor.Namespace)
+	})
+}
+
+// requireUninstallingIstioHelmCharts uninstalls Istio helm charts
+// and checks the success of that operation.
+func requireUninstallingIstioHelmCharts(kubectlOptions k8s.KubectlOptions) {
+	ginkgo.It("Uninstalling Istio ingress gateway Helm chart", func() {
+		err := istioIngressGatewayHelmDescriptor.uninstallHelmChart(kubectlOptions, true)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	})
+
+	ginkgo.It("Uninstalling Istio istiod Helm chart", func() {
+		err := istiodHelmDescriptor.uninstallHelmChart(kubectlOptions, true)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	})
+
+	ginkgo.It("Uninstalling Istio base Helm chart", func() {
+		err := istioBaseHelmDescriptor.uninstallHelmChart(kubectlOptions, true)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	})
+}
+
+// requireRemoveIstioCRDs removes Istio CRDs
+func requireRemoveIstioCRDs(kubectlOptions k8s.KubectlOptions) {
+	ginkgo.It("Removing Istio CRDs", func() {
+		istioCRDs := []string{
+			"gateways.networking.istio.io",
+			"virtualservices.networking.istio.io",
+			"destinationrules.networking.istio.io",
+			"serviceentries.networking.istio.io",
+			"workloadentries.networking.istio.io",
+			"workloadgroups.networking.istio.io",
+			"envoyfilters.networking.istio.io",
+			"sidecars.networking.istio.io",
+			"authorizationpolicies.security.istio.io",
+			"peerauthentications.security.istio.io",
+			"requestauthentications.security.istio.io",
+			"telemetries.telemetry.istio.io",
+			"wasmplugins.extensions.istio.io",
+			"istiocontrolplanes.install.istio.io",
+		}
+
+		for _, crd := range istioCRDs {
+			err := k8s.RunKubectlE(ginkgo.GinkgoT(), &kubectlOptions, "delete", "crd", crd, "--ignore-not-found=true")
+			if err != nil {
+				ginkgo.By(fmt.Sprintf("Warning: Istio CRD still present: %s", crd))
+			}
+		}
 	})
 }
 
