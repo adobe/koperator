@@ -30,16 +30,27 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version: '1.25'
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: '3.19.0'
           
       - name: Cache Go modules
         uses: actions/cache@v4
         with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('go.sum', 'api/go.sum', 'properties/go.sum', 'tests/e2e/go.sum') }}
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-gomod-${{ hashFiles('**/go.sum') }}
           restore-keys: |
-            ${{ runner.os }}-go-
+            ${{ runner.os }}-gomod-
+            
+      - name: Cache Go build cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/go-build
+          key: ${{ runner.os }}-gobuild-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-gobuild-
           
       # Enable Tmate Session if you'd like to Debut the E2E Kind Cluster
       # - name: Setup tmate session

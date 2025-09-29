@@ -41,6 +41,13 @@ func (s *clusterSnapshot) Resources() []metav1.PartialObjectMetadata {
 func (s *clusterSnapshot) ResourcesAsComparisonType() []localComparisonPartialObjectMetadataType {
 	var localList []localComparisonPartialObjectMetadataType
 	for _, r := range s.resources {
+		// Filter out cert-manager related resources to avoid comparison failures
+		// when cert-manager is not fully cleaned up during uninstall
+		resourceName := r.GetName()
+		if strings.Contains(resourceName, "cert-manager") || strings.Contains(resourceName, "acme.cert-manager") {
+			continue
+		}
+
 		localList = append(localList, localComparisonPartialObjectMetadataType{
 			GVK:       r.GroupVersionKind(),
 			Namespace: r.GetNamespace(),
@@ -173,6 +180,15 @@ func pruneUnnecessaryClusterResourceNames(resourceNameList []string) []string {
 		if strings.HasPrefix(name, "cilium") {
 			continue
 		}
+		// We never need to snapshot cert-manager-related resources (namespaced or not).
+		// These resources may not be fully cleaned up during uninstall and can cause snapshot comparison failures.
+		if strings.Contains(name, "cert-manager") || strings.Contains(name, "acme.cert-manager") {
+			continue
+		}
+		// ComponentStatus is deprecated in Kubernetes v1.19+ and causes warnings
+		if name == "componentstatuses" {
+			continue
+		}
 		updatedList = append(updatedList, name)
 	}
 	return updatedList
@@ -188,6 +204,11 @@ func pruneUnnecessaryNamespacedResourceNames(resourceNameList []string) []string
 		}
 		// We never need to snapshot Cilium-related resources (namespaced or not).
 		if strings.HasPrefix(name, "cilium") {
+			continue
+		}
+		// We never need to snapshot cert-manager-related resources (namespaced or not).
+		// These resources may not be fully cleaned up during uninstall and can cause snapshot comparison failures.
+		if strings.Contains(name, "cert-manager") || strings.Contains(name, "acme.cert-manager") {
 			continue
 		}
 		updatedList = append(updatedList, name)

@@ -39,7 +39,7 @@ spec:
 
   # Specify the Kafka Broker related settings
   # clusterImage can specify the whole kafkacluster image in one place
-  #clusterImage: "ghcr.io/adobe/kafka:2.13-3.9.1
+  #clusterImage: "ghcr.io/adobe/koperator/kafka:2.13-3.9.1
 
   #clusterWideConfig specifies the cluster-wide kafka config cluster wide, all these can be overridden per-broker
   #clusterWideConfig: |
@@ -181,7 +181,7 @@ spec:
         cruise.control.metrics.topic.replication.factor=2
       brokerConfig:
         # Docker image used by the operator to create the Broker with id 0
-        #image: "ghcr.io/adobe/kafka:2.13-3.9.1
+        #image: "ghcr.io/adobe/koperator/kafka:2.13-3.9.1
         # resourceRequirements works exactly like Container resources, the user can specify the limit and the requests
         # through this property
         #resourceRequirements:
@@ -252,7 +252,7 @@ spec:
         #volumeMounts:
         #  - mountPath: "/opt/kafka/libs/extra-jars"
         #    name: "jars"
-    - image: "ghcr.io/adobe/kafka:2.13-3.9.1"
+    - image: "ghcr.io/adobe/koperator/kafka:2.13-3.9.1"
       id: 1
       config: |
         auto.create.topics.enable=false
@@ -274,7 +274,7 @@ spec:
       readOnlyConfig: |
         auto.create.topics.enable=false
       brokerConfig:
-        image: "ghcr.io/adobe/kafka:2.13-3.9.1"
+        image: "ghcr.io/adobe/koperator/kafka:2.13-3.9.1"
         storageConfigs:
           - mountPath: "/kafka-logs"
             pvcSpec:
@@ -708,9 +708,9 @@ spec:
   # monitoringConfig describes the monitoring related configs
   #monitoringConfig:
   # jmxImage describes the used prometheus jmx exporter agent container
-  #  jmxImage: "ghcr.io/banzaicloud/jmx-javaagent:0.16.1"
+  #  jmxImage: "ghcr.io/amuraru/jmx-javaagent:0.19.2"
   # pathToJar describes the path to the jar file in the given image
-  #  pathToJar: "/opt/jmx_exporter/jmx_prometheus_javaagent-0.16.1.jar"
+  #  pathToJar: "/jmx_prometheus_javaagent.jar"
   # kafkaJMXExporterConfig describes jmx exporter config for Kafka
   #  kafkaJMXExporterConfig: |
   #   lowercaseOutputName: true
