@@ -1,4 +1,4 @@
-FROM alpine:latest AS kafka_dist
+FROM alpine:latest@sha256:4bcff63911fcb4448bd4fdacec207030997caf25e9bea4045fa6c8c44de311d1 AS kafka_dist
 
 ARG scala_version=2.13
 ARG kafka_version=3.9.1
@@ -23,7 +23,7 @@ RUN rm -r kafka_$scala_version-$kafka_version/bin/windows
 
 
 # backported from https://github.com/docker-library/openjdk/blob/master/18/jdk/slim-bullseye/Dockerfile
-FROM debian:bullseye-slim
+FROM debian:bullseye-slim@sha256:6d3c63184632046054ae709964befc943ecffa140adc697ca955a10002a79c08
 
 ARG scala_version=2.13
 ARG kafka_version=3.9.1
