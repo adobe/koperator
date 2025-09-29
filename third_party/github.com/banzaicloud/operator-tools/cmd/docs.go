@@ -19,7 +19,7 @@ import (
 	"path/filepath"
 
 	"emperror.dev/errors"
-	"github.com/MakeNowJust/heredoc"
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/banzaicloud/operator-tools/pkg/docgen"
 	"github.com/banzaicloud/operator-tools/pkg/utils"
 )

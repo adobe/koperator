@@ -37,8 +37,8 @@ import (
 	envoytypesmatcher "github.com/envoyproxy/go-control-plane/envoy/type/matcher/v3"
 	envoytypes "github.com/envoyproxy/go-control-plane/envoy/type/v3"
 	"github.com/envoyproxy/go-control-plane/pkg/wellknown"
-	"github.com/ghodss/yaml"
 	"github.com/go-logr/logr"
+	"sigs.k8s.io/yaml"
 
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/anypb"

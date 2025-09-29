@@ -17,7 +17,7 @@ package resources
 import (
 	"emperror.dev/errors"
 	ypatch "github.com/cppforlife/go-patch/patch"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"

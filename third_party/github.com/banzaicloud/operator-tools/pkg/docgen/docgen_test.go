@@ -20,7 +20,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/MakeNowJust/heredoc"
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/andreyvit/diff"
 	"github.com/banzaicloud/operator-tools/pkg/docgen"
 	"github.com/banzaicloud/operator-tools/pkg/utils"
