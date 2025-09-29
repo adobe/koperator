@@ -24,8 +24,6 @@ import (
 
 	"dario.cat/mergo"
 
-	"github.com/banzaicloud/istio-client-go/pkg/networking/v1beta1"
-
 	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -131,19 +129,6 @@ const (
 	// KafkaBroker.spec.container["kafka"].image
 	defaultKafkaImage = "ghcr.io/adobe/koperator/kafka:2.13-3.9.1" // renovate: datasource=docker depName=ghcr.io/adobe/koperator/kafka
 
-	/* Istio Ingress Config */
-
-	// IstioMeshGateway.spec.deployment.resources
-	defaultIstioIngressRequestResourceCpu    = "100m"
-	defaultIstioIngressRequestResourceMemory = "128Mi"
-	defaultIstioIngressLimitResourceCpu      = "2000m"
-	defaultIstioIngressLimitResourceMemory   = "1024Mi"
-
-	// IstioMeshGateway.spec.deployment.replicas.count
-	// IstioMeshGateway.spec.deployment.replicas.min
-	// IstioMeshGateway.spec.deployment.replicas.max
-	defaultReplicas = 1
-
 	/* Monitor Config */
 
 	// KafkaBrokerPod.spec.initContainer["jmx-exporter"].command
@@ -184,11 +169,9 @@ type KafkaClusterSpec struct {
 	RollingUpgradeConfig        RollingUpgradeConfig    `json:"rollingUpgradeConfig"`
 	// Selector for broker pods that need to be recycled/reconciled
 	TaintedBrokersSelector *metav1.LabelSelector `json:"taintedBrokersSelector,omitempty"`
-	// +kubebuilder:validation:Enum=envoy;contour;istioingress
-	// IngressController specifies the type of the ingress controller to be used for external listeners. The `istioingress` ingress controller type requires the `spec.istioControlPlane` field to be populated as well.
+	// +kubebuilder:validation:Enum=envoy;contour
+	// IngressController specifies the type of the ingress controller to be used for external listeners.
 	IngressController string `json:"ingressController,omitempty"`
-	// IstioControlPlane is a reference to the IstioControlPlane resource for envoy configuration. It must be specified if istio ingress is used.
-	IstioControlPlane *IstioControlPlaneReference `json:"istioControlPlane,omitempty"`
 	// If true OneBrokerPerNode ensures that each kafka broker will be placed on a different node unless a custom
 	// Affinity definition overrides this behavior
 	OneBrokerPerNode bool `json:"oneBrokerPerNode"`
@@ -203,7 +186,6 @@ type KafkaClusterSpec struct {
 	ContourIngressConfig         ContourIngressConfig `json:"contourIngressConfig,omitempty"`
 	MonitoringConfig             MonitoringConfig     `json:"monitoringConfig,omitempty"`
 	AlertManagerConfig           *AlertManagerConfig  `json:"alertManagerConfig,omitempty"`
-	IstioIngressConfig           IstioIngressConfig   `json:"istioIngressConfig,omitempty"`
 	// Envs defines environment variables for Kafka broker Pods.
 	// Adding the "+" prefix to the name prepends the value to that environment variable instead of overwriting it.
 	// Add the "+" suffix to append.
@@ -509,42 +491,6 @@ type EnvoyCommandLineArgs struct {
 	Concurrency int32 `json:"concurrency,omitempty"`
 }
 
-// IstioIngressConfig defines the config for the Istio Ingress Controller
-type IstioIngressConfig struct {
-	Resources *corev1.ResourceRequirements `json:"resourceRequirements,omitempty"`
-	// +kubebuilder:validation:Minimum=1
-	Replicas     int32                `json:"replicas,omitempty"`
-	NodeSelector map[string]string    `json:"nodeSelector,omitempty"`
-	Tolerations  []*corev1.Toleration `json:"tolerations,omitempty"`
-	// Annotations defines the annotations placed on the istio ingress controller deployment
-	Annotations               map[string]string   `json:"annotations,omitempty"`
-	TLSOptions                *v1beta1.TLSOptions `json:"gatewayConfig,omitempty"`
-	VirtualServiceAnnotations map[string]string   `json:"virtualServiceAnnotations,omitempty"`
-	// Envs allows to add additional env vars to the istio meshgateway resource
-	Envs []*corev1.EnvVar `json:"envs,omitempty"`
-	// If specified and supported by the platform, traffic through the
-	// cloud-provider load-balancer will be restricted to the specified client
-	// IPs. This field will be ignored if the
-	// cloud-provider does not support the feature."
-	// More info: https://kubernetes.io/docs/tasks/access-application-cluster/configure-cloud-provider-firewall/
-	// +optional
-	LoadBalancerSourceRanges []string `json:"loadBalancerSourceRanges,omitempty"`
-}
-
-func (iIConfig *IstioIngressConfig) GetAnnotations() map[string]string {
-	return util.CloneMap(iIConfig.Annotations)
-}
-
-// GetVirtualServiceAnnotations returns a copy of the VirtualServiceAnnotations field
-func (iIConfig *IstioIngressConfig) GetVirtualServiceAnnotations() map[string]string {
-	return util.CloneMap(iIConfig.VirtualServiceAnnotations)
-}
-
-// GetLoadBalancerSourceRanges returns LoadBalancerSourceRanges to use for Istio Meshagetway generated LoadBalancer
-func (iIConfig *IstioIngressConfig) GetLoadBalancerSourceRanges() []string {
-	return iIConfig.LoadBalancerSourceRanges
-}
-
 // MonitoringConfig defines the config for monitoring Kafka and Cruise Control
 type MonitoringConfig struct {
 	JmxImage               string `json:"jmxImage,omitempty"`
@@ -725,7 +671,7 @@ type ExternalListenerConfig struct {
 	// +optional
 	AccessMethod corev1.ServiceType `json:"accessMethod,omitempty"`
 	// Config allows to specify ingress controller configuration per external listener
-	// if set, it overrides the default `KafkaClusterSpec.IstioIngressConfig` or `KafkaClusterSpec.EnvoyConfig` for this external listener.
+	// if set, it overrides the default `KafkaClusterSpec.EnvoyConfig` for this external listener.
 	// +optional
 	Config *Config `json:"config,omitempty"`
 	// TLS secret
@@ -740,7 +686,6 @@ type Config struct {
 
 type IngressConfig struct {
 	IngressServiceSettings `json:",inline"`
-	IstioIngressConfig     *IstioIngressConfig   `json:"istioIngressConfig,omitempty"`
 	EnvoyConfig            *EnvoyConfig          `json:"envoyConfig,omitempty"`
 	ContourIngressConfig   *ContourIngressConfig `json:"contourIngressConfig,omitempty"`
 }
@@ -858,37 +803,12 @@ func init() {
 	SchemeBuilder.Register(&KafkaCluster{}, &KafkaClusterList{})
 }
 
-// GetResources returns the IstioIngress specific Kubernetes resources
-func (iIConfig *IstioIngressConfig) GetResources() *corev1.ResourceRequirements {
-	if iIConfig.Resources != nil {
-		return iIConfig.Resources
-	}
-	return &corev1.ResourceRequirements{
-		Requests: corev1.ResourceList{
-			"cpu":    resource.MustParse(defaultIstioIngressRequestResourceCpu),
-			"memory": resource.MustParse(defaultIstioIngressRequestResourceMemory),
-		},
-		Limits: corev1.ResourceList{
-			"cpu":    resource.MustParse(defaultIstioIngressLimitResourceCpu),
-			"memory": resource.MustParse(defaultIstioIngressLimitResourceMemory),
-		},
-	}
-}
-
 // GetListenerName returns the prepared listener name
 func (lP *CommonListenerSpec) GetListenerServiceName() string {
 	if !strings.HasPrefix(lP.Name, "tcp-") {
 		return "tcp-" + lP.Name
 	}
 	return lP.Name
-}
-
-// GetReplicas returns replicas used by the Istio Ingress deployment
-func (iIConfig *IstioIngressConfig) GetReplicas() int32 {
-	if iIConfig.Replicas == 0 {
-		return defaultReplicas
-	}
-	return iIConfig.Replicas
 }
 
 // GetClientSSLCertSecretName returns the ClientSSLCertSecretName. It returns empty string if It's not specified

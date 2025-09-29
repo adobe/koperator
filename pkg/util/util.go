@@ -59,7 +59,6 @@ import (
 	"github.com/banzaicloud/koperator/pkg/util/cert"
 	"github.com/banzaicloud/koperator/pkg/util/contour"
 	envoyutils "github.com/banzaicloud/koperator/pkg/util/envoy"
-	"github.com/banzaicloud/koperator/pkg/util/istioingress"
 	properties "github.com/banzaicloud/koperator/properties/pkg"
 )
 
@@ -316,34 +315,6 @@ func GetIngressConfigs(kafkaClusterSpec v1beta1.KafkaClusterSpec,
 				IngressConfigGlobalName: {
 					IngressServiceSettings: eListenerConfig.IngressServiceSettings,
 					EnvoyConfig:            &kafkaClusterSpec.EnvoyConfig,
-				},
-			}
-		}
-	case istioingress.IngressControllerName:
-		if eListenerConfig.Config != nil {
-			defaultIngressConfigName = eListenerConfig.Config.DefaultIngressConfig
-			ingressConfigs = make(map[string]v1beta1.IngressConfig, len(eListenerConfig.Config.IngressConfig))
-			for k, iConf := range eListenerConfig.Config.IngressConfig {
-				if iConf.IstioIngressConfig != nil {
-					err := mergo.Merge(iConf.IstioIngressConfig, kafkaClusterSpec.IstioIngressConfig)
-					if err != nil {
-						return nil, "", errors.WrapWithDetails(err,
-							"could not merge global istio config with local one", "istioConfig", k)
-					}
-					err = mergo.Merge(&iConf.IngressServiceSettings, eListenerConfig.IngressServiceSettings)
-					if err != nil {
-						return nil, "", errors.WrapWithDetails(err,
-							"could not merge global loadbalancer config with local one",
-							"externalListenerName", eListenerConfig.Name)
-					}
-					ingressConfigs[k] = iConf
-				}
-			}
-		} else {
-			ingressConfigs = map[string]v1beta1.IngressConfig{
-				IngressConfigGlobalName: {
-					IngressServiceSettings: eListenerConfig.IngressServiceSettings,
-					IstioIngressConfig:     &kafkaClusterSpec.IstioIngressConfig,
 				},
 			}
 		}

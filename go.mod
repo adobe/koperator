@@ -9,7 +9,6 @@ require (
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/banzaicloud/go-cruise-control v0.6.0
 	github.com/banzaicloud/istio-client-go v0.0.17
-	github.com/banzaicloud/istio-operator/api/v2 v2.17.4
 	github.com/banzaicloud/k8s-objectmatcher v1.8.0
 	github.com/banzaicloud/koperator/api v0.28.8
 	github.com/banzaicloud/koperator/properties v0.4.1
@@ -74,7 +73,7 @@ require (
 require (
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
-	github.com/banzaicloud/operator-tools v0.28.10
+	github.com/banzaicloud/operator-tools v0.28.10 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/briandowns/spinner v1.23.2 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -93,7 +92,6 @@ require (
 	github.com/go-openapi/jsonreference v0.21.4 // indirect
 	github.com/go-openapi/swag v0.25.4 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
@@ -138,7 +136,6 @@ require (
 	golang.org/x/time v0.14.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.5.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	istio.io/api v1.28.1 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20251125145642-4e65d59e963e // indirect
 	k8s.io/utils v0.0.0-20251002143259-bc988d571ff4 // indirect
@@ -149,8 +146,6 @@ require (
 
 replace (
 	github.com/banzaicloud/go-cruise-control => ./third_party/github.com/banzaicloud/go-cruise-control
-	github.com/banzaicloud/istio-client-go => ./third_party/github.com/banzaicloud/istio-client-go
-	github.com/banzaicloud/istio-operator/api/v2 => ./third_party/github.com/banzaicloud/istio-operator/api
 	github.com/banzaicloud/k8s-objectmatcher => ./third_party/github.com/banzaicloud/k8s-objectmatcher
 	github.com/banzaicloud/koperator/api => ./api
 	github.com/banzaicloud/koperator/properties => ./properties
