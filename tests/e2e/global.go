@@ -27,7 +27,7 @@ var (
 	certManagerHelmDescriptor = helmDescriptor{
 		Repository:   "https://charts.jetstack.io",
 		ChartName:    "cert-manager",
-		ChartVersion: "v1.11.0",
+		ChartVersion: "v1.18.2",
 		ReleaseName:  "cert-manager",
 		Namespace:    "cert-manager",
 		SetValues: map[string]string{
@@ -40,13 +40,13 @@ var (
 	}
 	// contour ingress controller
 	contourIngressControllerHelmDescriptor = helmDescriptor{
-		Repository:   "https://charts.bitnami.com/bitnami",
+		Repository:   "https://projectcontour.github.io/helm-charts",
 		ChartName:    "contour",
-		ChartVersion: "15.4.0",
+		ChartVersion: "0.1.0",
 		ReleaseName:  "contour",
 		Namespace:    "projectcontour",
 		SetValues: map[string]string{
-			"installCRDs": "true",
+			"contour.manageCRDs": "true",
 		},
 		HelmExtraArguments: map[string][]string{
 			"install": {"--timeout", "10m"},
@@ -94,24 +94,24 @@ var (
 	prometheusOperatorHelmDescriptor = helmDescriptor{
 		Repository:   "https://prometheus-community.github.io/helm-charts",
 		ChartName:    "kube-prometheus-stack",
-		ChartVersion: "54.1.0",
+		ChartVersion: "77.12.0",
 		ReleaseName:  "prometheus-operator",
 		Namespace:    "prometheus",
 		SetValues: map[string]string{
-			"prometheusOperator.createCustomResource": "true",
-			"defaultRules.enabled":                    "false",
-			"alertmanager.enabled":                    "false",
-			"grafana.enabled":                         "false",
-			"kubeApiServer.enabled":                   "false",
-			"kubelet.enabled":                         "false",
-			"kubeControllerManager.enabled":           "false",
-			"coreDNS.enabled":                         "false",
-			"kubeEtcd.enabled":                        "false",
-			"kubeScheduler.enabled":                   "false",
-			"kubeProxy.enabled":                       "false",
-			"kubeStateMetrics.enabled":                "false",
-			"nodeExporter.enabled":                    "false",
-			"prometheus.enabled":                      "false",
+			"crds.enabled":                  "true",
+			"defaultRules.enabled":          "false",
+			"alertmanager.enabled":          "false",
+			"grafana.enabled":               "false",
+			"kubeApiServer.enabled":         "false",
+			"kubelet.enabled":               "false",
+			"kubeControllerManager.enabled": "false",
+			"coreDNS.enabled":               "false",
+			"kubeEtcd.enabled":              "false",
+			"kubeScheduler.enabled":         "false",
+			"kubeProxy.enabled":             "false",
+			"kubeStateMetrics.enabled":      "false",
+			"nodeExporter.enabled":          "false",
+			"prometheus.enabled":            "false",
 		},
 		HelmExtraArguments: map[string][]string{
 			"install": {"--timeout", "10m"},
