@@ -2,10 +2,10 @@
 package options
 
 import (
-	jsonpb "github.com/golang/protobuf/jsonpb"
+	protojson "google.golang.org/protobuf/encoding/protojson"
 )
 
 var (
-	OptionsMarshaler   = &jsonpb.Marshaler{}
-	OptionsUnmarshaler = &jsonpb.Unmarshaler{AllowUnknownFields: true}
+	OptionsMarshaler   = protojson.MarshalOptions{}
+	OptionsUnmarshaler = protojson.UnmarshalOptions{DiscardUnknown: true}
 )

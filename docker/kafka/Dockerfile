@@ -23,7 +23,7 @@ RUN rm -r kafka_$scala_version-$kafka_version/bin/windows
 
 
 # backported from https://github.com/docker-library/openjdk/blob/master/18/jdk/slim-bullseye/Dockerfile
-FROM debian:bullseye-slim@sha256:6d3c63184632046054ae709964befc943ecffa140adc697ca955a10002a79c08
+FROM debian:bullseye-slim@sha256:f807f4b16002c623115b0247dca6a55711c6b1ae821dc64fb8a2339e4ce2115d
 
 ARG scala_version=2.13
 ARG kafka_version=3.9.1

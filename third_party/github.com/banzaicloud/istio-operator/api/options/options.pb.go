@@ -21,9 +21,9 @@
 package options
 
 import (
-	descriptor "github.com/golang/protobuf/protoc-gen-go/descriptor"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	descriptorpb "google.golang.org/protobuf/types/descriptorpb"
 	reflect "reflect"
 )
 
@@ -36,7 +36,7 @@ const (
 
 var file_api_options_options_proto_extTypes = []protoimpl.ExtensionInfo{
 	{
-		ExtendedType:  (*descriptor.FieldOptions)(nil),
+		ExtendedType:  (*descriptorpb.FieldOptions)(nil),
 		ExtensionType: (*string)(nil),
 		Field:         800815,
 		Name:          "istio_operator.v2.api.options.intorstring",
@@ -72,7 +72,7 @@ var file_api_options_options_proto_rawDesc = []byte{
 }
 
 var file_api_options_options_proto_goTypes = []interface{}{
-	(*descriptor.FieldOptions)(nil), // 0: google.protobuf.FieldOptions
+	(*descriptorpb.FieldOptions)(nil), // 0: google.protobuf.FieldOptions
 }
 var file_api_options_options_proto_depIdxs = []int32{
 	0, // 0: istio_operator.v2.api.options.intorstring:extendee -> google.protobuf.FieldOptions
