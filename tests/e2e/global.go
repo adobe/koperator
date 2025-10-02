@@ -34,6 +34,9 @@ var (
 			"installCRDs": "false",
 		},
 		RemoteCRDPathVersionTemplate: "https://github.com/jetstack/cert-manager/releases/download/v%s/cert-manager.crds.yaml",
+		HelmExtraArguments: map[string][]string{
+			"install": {"--timeout", "10m"},
+		},
 	}
 	// contour ingress controller
 	contourIngressControllerHelmDescriptor = helmDescriptor{
@@ -44,6 +47,9 @@ var (
 		Namespace:    "projectcontour",
 		SetValues: map[string]string{
 			"installCRDs": "true",
+		},
+		HelmExtraArguments: map[string][]string{
+			"install": {"--timeout", "10m"},
 		},
 	}
 
@@ -107,6 +113,9 @@ var (
 			"nodeExporter.enabled":                    "false",
 			"prometheus.enabled":                      "false",
 		},
+		HelmExtraArguments: map[string][]string{
+			"install": {"--timeout", "10m"},
+		},
 	}
 
 	// zookeeperOperatorHelmDescriptor describes the zookeeper-operator Helm
@@ -121,6 +130,9 @@ var (
 			"crd.create": "false",
 		},
 		RemoteCRDPathVersionTemplate: "https://raw.githubusercontent.com/adobe/zookeeper-operator/%s/config/crd/bases/zookeeper.pravega.io_zookeeperclusters.yaml",
+		HelmExtraArguments: map[string][]string{
+			"install": {"--timeout", "10m"},
+		},
 	}
 
 	// dependencyCRDs storing the Koperator dependencies CRDs name
