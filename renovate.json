@@ -19,7 +19,8 @@
     {
       "customType": "regex",
       "managerFilePatterns": [
-        "/Makefile/"
+        "/Makefile/",
+        "/Dockerfile$/"
       ],
       "matchStrings": [
         "(?<depName>\\w+)_VERSION\\s*=\\s*(?<currentValue>[^\\s]+)\\s*#\\s*renovate:\\s*datasource=(?<datasource>[^\\s]+)\\s*depName=(?<packageName>[^\\s]+)"
@@ -43,6 +44,35 @@
       "pinDigests": true
     },
     {
+      "groupName": "kafka docker images (major)",
+      "groupSlug": "kafka-docker-major",
+      "matchFilePatterns": [
+        "docker/**"
+      ],
+      "matchManagers": [
+        "dockerfile",
+        "custom.regex"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ]
+    },
+    {
+      "groupName": "kafka docker images (minor/patch)",
+      "groupSlug": "kafka-docker-minor-patch",
+      "matchFilePatterns": [
+        "docker/**"
+      ],
+      "matchManagers": [
+        "dockerfile",
+        "custom.regex"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ]
+    },
+    {
       "groupName": "all major dependencies",
       "groupSlug": "all-major",
       "matchUpdateTypes": [
@@ -55,6 +85,9 @@
         "docker-compose",
         "custom.regex",
         "helm-values"
+      ],
+      "excludeFilePatterns": [
+        "docker/**"
       ]
     },
     {
@@ -73,6 +106,9 @@
         "custom.regex",
         "helm-values",
         "docker"
+      ],
+      "excludeFilePatterns": [
+        "docker/**"
       ]
     }
   ]

@@ -1,11 +1,34 @@
+httpServer:
+  threads:
+    minimum: 5
+    maximum: 10
+    keepAliveTime: 120
 lowercaseOutputName: true
 rules:
-  # Special cases and very specific rules
-    # Export kraft current state metrics
+  # Export Kraft metrics
+  ## Export Kraft current-state count metrics
   - pattern: 'kafka.server<type=raft-metrics><>current-state: (.+)'
     name: kafka_server_raft_metrics_current_state_$1
     type: GAUGE
     value: 1
+  ## MetadataLoader count metrics as COUNTERs
+  - pattern: kafka.server<type=MetadataLoader><>([A-Za-z]+Count)
+    name: kafka_server_metadataloader_$1_total
+    type: COUNTER
+  ## Broker metadata error count metrics as COUNTERs
+  - pattern: kafka.server<type=broker-metadata-metrics><>(metadata-(load|apply)-error-count)
+    name: kafka_server_broker_metadata_metrics_$1_total
+    type: COUNTER
+  ## KafkaController ActiveBrokerCount as GAUGE (current state, not cumulative)
+  - pattern: kafka.controller<type=KafkaController><>ActiveBrokerCount
+    name: kafka_controller_kafkacontroller_ActiveBrokerCount
+    type: GAUGE
+  ## KafkaController count metrics as COUNTERs
+  - pattern: kafka.controller<type=KafkaController><>([A-Za-z]+Count)
+    name: kafka_controller_kafkacontroller_$1_total
+    type: COUNTER
+  # END: Export Kraft metrics
+
   - pattern: 'kafka.server<type=(app-info), id=(\d+)><>(Version): ([-.~+\w\d]+)'
     name: kafka_server_$1_$3
     type: COUNTER
