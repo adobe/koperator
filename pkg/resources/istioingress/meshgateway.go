@@ -63,12 +63,33 @@ func (r *Reconciler) meshgateway(log logr.Logger, externalListenerConfig v1beta1
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:      "istio-proxy",
-							Image:     v1beta1.DefaultIstioProxyImage, // Use a standard Istio proxy image
-							Env:       convertEnvVars(ingressConfig.IstioIngressConfig.Envs),
+							Name:    "istio-proxy",
+							Image:   v1beta1.DefaultIstioProxyImage, // Use a standard Istio proxy image
+							Command: []string{"/usr/local/bin/pilot-agent"},
+							Args: []string{
+								"proxy",
+								"router",
+								"--domain", fmt.Sprintf("%s.svc.cluster.local", r.KafkaCluster.Namespace),
+								"--proxyLogLevel=warning",
+								"--proxyComponentLogLevel=misc:error",
+								"--log_output_level=default:info",
+							},
+							Env:       append(convertEnvVars(ingressConfig.IstioIngressConfig.Envs), getIstioProxyEnvVars(meshgatewayName, r.KafkaCluster.Namespace)...),
 							Resources: *ingressConfig.IstioIngressConfig.GetResources(),
 							SecurityContext: &corev1.SecurityContext{
 								RunAsNonRoot: util.BoolPointer(false),
+							},
+							Ports: []corev1.ContainerPort{
+								{
+									ContainerPort: 15090,
+									Protocol:      corev1.ProtocolTCP,
+									Name:          "http-envoy-prom",
+								},
+								{
+									ContainerPort: 15021,
+									Protocol:      corev1.ProtocolTCP,
+									Name:          "status-port",
+								},
 							},
 						},
 					},
@@ -189,4 +210,99 @@ func convertTolerations(tolerations []*corev1.Toleration) []corev1.Toleration {
 		}
 	}
 	return result
+}
+
+// getIstioProxyEnvVars returns the required environment variables for Istio proxy
+func getIstioProxyEnvVars(gatewayName, namespace string) []corev1.EnvVar {
+	return []corev1.EnvVar{
+		{
+			Name:  "PILOT_CERT_PROVIDER",
+			Value: "istiod",
+		},
+		{
+			Name:  "CA_ADDR",
+			Value: "istiod.istio-system.svc:15012",
+		},
+		{
+			Name: "POD_NAME",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					APIVersion: "v1",
+					FieldPath:  "metadata.name",
+				},
+			},
+		},
+		{
+			Name: "POD_NAMESPACE",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					APIVersion: "v1",
+					FieldPath:  "metadata.namespace",
+				},
+			},
+		},
+		{
+			Name: "INSTANCE_IP",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					APIVersion: "v1",
+					FieldPath:  "status.podIP",
+				},
+			},
+		},
+		{
+			Name: "SERVICE_ACCOUNT",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					APIVersion: "v1",
+					FieldPath:  "spec.serviceAccountName",
+				},
+			},
+		},
+		{
+			Name: "HOST_IP",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					APIVersion: "v1",
+					FieldPath:  "status.hostIP",
+				},
+			},
+		},
+		{
+			Name:  "PROXY_CONFIG",
+			Value: "{}",
+		},
+		{
+			Name:  "ISTIO_META_POD_PORTS",
+			Value: `[{"containerPort":15090,"protocol":"TCP","name":"http-envoy-prom"},{"containerPort":15021,"protocol":"TCP","name":"status-port"}]`,
+		},
+		{
+			Name:  "ISTIO_META_APP_CONTAINERS",
+			Value: "istio-proxy",
+		},
+		{
+			Name:  "ISTIO_META_CLUSTER_ID",
+			Value: "Kubernetes",
+		},
+		{
+			Name:  "ISTIO_META_INTERCEPTION_MODE",
+			Value: "REDIRECT",
+		},
+		{
+			Name:  "ISTIO_META_WORKLOAD_NAME",
+			Value: gatewayName,
+		},
+		{
+			Name:  "ISTIO_META_OWNER",
+			Value: fmt.Sprintf("kubernetes://apis/apps/v1/namespaces/%s/deployments/%s", namespace, gatewayName),
+		},
+		{
+			Name:  "ISTIO_META_MESH_ID",
+			Value: "cluster.local",
+		},
+		{
+			Name:  "TRUST_DOMAIN",
+			Value: "cluster.local",
+		},
+	}
 }
