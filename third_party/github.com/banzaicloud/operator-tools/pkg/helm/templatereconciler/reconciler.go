@@ -184,7 +184,6 @@ func (rec *HelmReconciler) Reconcile(object runtime.Object, component Component)
 			return &reconcile.Result{
 				RequeueAfter: time.Second * 5,
 			}, nil
-
 		}
 	}
 
@@ -204,22 +203,22 @@ func (rec *HelmReconciler) Reconcile(object runtime.Object, component Component)
 			rec.logger.Error(uerr, "status update failed")
 		}
 		return result, err
-	} else {
-		if component.Skipped(object) {
-			err = component.UpdateStatus(object, types.ReconcileStatusUnmanaged, "")
-			if err != nil {
-				return result, err
-			}
-		} else if component.Enabled(object) {
-			err = component.UpdateStatus(object, types.ReconcileStatusAvailable, "")
-			if err != nil {
-				return result, err
-			}
-		} else {
-			err = component.UpdateStatus(object, types.ReconcileStatusRemoved, "")
-			if err != nil {
-				return result, err
-			}
+	}
+	switch {
+	case component.Skipped(object):
+		err = component.UpdateStatus(object, types.ReconcileStatusUnmanaged, "")
+		if err != nil {
+			return result, err
+		}
+	case component.Enabled(object):
+		err = component.UpdateStatus(object, types.ReconcileStatusAvailable, "")
+		if err != nil {
+			return result, err
+		}
+	default:
+		err = component.UpdateStatus(object, types.ReconcileStatusRemoved, "")
+		if err != nil {
+			return result, err
 		}
 	}
 

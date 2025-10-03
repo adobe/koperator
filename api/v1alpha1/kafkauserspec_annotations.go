@@ -16,10 +16,10 @@ package v1alpha1
 
 import (
 	"fmt"
+	"maps"
 	"time"
 
 	"emperror.dev/errors"
-	"golang.org/x/exp/maps"
 )
 
 // annotationsWithValidations is a map whose keys are KafkaUserSpec annotation keys, and values are validators

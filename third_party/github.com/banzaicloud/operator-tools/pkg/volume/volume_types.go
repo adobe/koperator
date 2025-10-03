@@ -21,22 +21,24 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-//nolint:unused,deadcode
 // +docName:"Kubernetes volume abstraction"
 // Refers to different types of volumes to be mounted to pods: emptyDir, hostPath, pvc
 //
 // Leverages core types from kubernetes/api/core/v1
+//
+//nolint:unused
 type _docKubernetesVolume interface{}
 
-//nolint:unused,deadcode
 // +name:"KubernetesVolume"
 // +description:"Kubernetes volume abstraction"
+//
+//nolint:unused
 type _metaKubernetesVolume interface{}
 
 // +kubebuilder:object:generate=true
 
 type KubernetesVolume struct {
-	// Deprecated, use hostPath
+	// Deprecated: use hostPath
 	HostPathLegacy *corev1.HostPathVolumeSource `json:"host_path,omitempty"`
 	HostPath       *corev1.HostPathVolumeSource `json:"hostPath,omitempty"`
 	EmptyDir       *corev1.EmptyDirVolumeSource `json:"emptyDir,omitempty"`
@@ -71,25 +73,27 @@ func (v *KubernetesVolume) GetVolume(name string) (corev1.Volume, error) {
 	if v.HostPathLegacy != nil {
 		return volume, errors.New("legacy host_path field is not supported anymore, please migrate to hostPath")
 	}
-	if v.HostPath != nil {
+	switch {
+	case v.HostPath != nil:
 		volume.VolumeSource = corev1.VolumeSource{
 			HostPath: v.HostPath,
 		}
 		return volume, nil
-	} else if v.EmptyDir != nil {
+	case v.EmptyDir != nil:
 		volume.VolumeSource = corev1.VolumeSource{
 			EmptyDir: v.EmptyDir,
 		}
 		return volume, nil
-	} else if v.PersistentVolumeClaim != nil {
+	case v.PersistentVolumeClaim != nil:
 		volume.VolumeSource = corev1.VolumeSource{
 			PersistentVolumeClaim: &v.PersistentVolumeClaim.PersistentVolumeSource,
 		}
 		return volume, nil
-	}
-	// return a default emptydir volume if none configured
-	volume.VolumeSource = corev1.VolumeSource{
-		EmptyDir: &corev1.EmptyDirVolumeSource{},
+	default:
+		// return a default emptydir volume if none configured
+		volume.VolumeSource = corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{},
+		}
 	}
 	return volume, nil
 }

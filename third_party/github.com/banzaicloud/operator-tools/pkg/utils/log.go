@@ -44,10 +44,8 @@ func joinAndSeparatePairs(values []interface{}) string {
 		joined += cast.ToString(v)
 		if i%2 == 0 {
 			joined += ": "
-		} else {
-			if i < len(values)-1 {
-				joined += ", "
-			}
+		} else if i < len(values)-1 {
+			joined += ", "
 		}
 	}
 	return joined

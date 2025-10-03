@@ -253,6 +253,7 @@ func deleteVolumeClaimTemplateFields(obj []byte) ([]byte, error) {
 }
 
 func isZero(v reflect.Value) bool {
+	//nolint:exhaustive
 	switch v.Kind() {
 	default:
 		z := reflect.Zero(v.Type())

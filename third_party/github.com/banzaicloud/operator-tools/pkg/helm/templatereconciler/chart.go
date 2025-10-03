@@ -48,11 +48,11 @@ func chartObjects(releaseData *ReleaseData, scheme *runtime.Scheme, caps chartut
 	}
 
 	objects, err := helm.Render(releaseData.Chart, helm.MergeMaps(chartDefaultValuesYaml, releaseData.Values), helm.ReleaseOptions{
-		Name:      releaseData.ReleaseName,
-		IsInstall: true,
-		IsUpgrade: false,
-		Namespace: releaseData.Namespace,
-		Scheme: scheme,
+		Name:         releaseData.ReleaseName,
+		IsInstall:    true,
+		IsUpgrade:    false,
+		Namespace:    releaseData.Namespace,
+		Scheme:       scheme,
 		Capabilities: caps,
 	}, releaseData.ChartName)
 	if err != nil {

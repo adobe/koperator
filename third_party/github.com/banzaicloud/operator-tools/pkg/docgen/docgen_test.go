@@ -15,22 +15,32 @@
 package docgen_test
 
 import (
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc/v2"
-	"github.com/andreyvit/diff"
 	"github.com/banzaicloud/operator-tools/pkg/docgen"
 	"github.com/banzaicloud/operator-tools/pkg/utils"
 	"github.com/go-logr/logr"
+	"github.com/google/go-cmp/cmp"
 )
 
 var logger logr.Logger
 
 func init() {
 	logger = utils.Log
+}
+
+// normalizeString trims trailing whitespace from each line and the overall string
+func normalizeString(s string) string {
+	lines := strings.Split(s, "\n")
+	for i, line := range lines {
+		lines[i] = strings.TrimRight(line, " \t")
+	}
+	return strings.TrimSpace(strings.Join(lines, "\n"))
 }
 
 func TestGenParse(t *testing.T) {
@@ -51,7 +61,7 @@ func TestGenParse(t *testing.T) {
 					## Sample
 
 					### field1 (string, optional) {#sample-field1}
-					
+
 					Default: -
 			`),
 		},
@@ -68,7 +78,7 @@ func TestGenParse(t *testing.T) {
 				## SampleDefault
 
 				### field1 (string, optional) {#sampledefault-field1}
-				
+
 				Default: testval
 			`),
 		},
@@ -90,7 +100,7 @@ func TestGenParse(t *testing.T) {
 				{{< highlight yaml >}}
 				test: code block
 				some: more lines
-					indented: line
+				    indented: line
 				{{< /highlight >}}
 
 
@@ -106,13 +116,15 @@ func TestGenParse(t *testing.T) {
 			t.Fatalf("%+v", err)
 		}
 
-		bytes, err := ioutil.ReadFile(filepath.Join(item.docItem.DestPath, item.docItem.Name+".md"))
+		bytes, err := os.ReadFile(filepath.Join(item.docItem.DestPath, item.docItem.Name+".md"))
 		if err != nil {
 			t.Fatalf("%+v", err)
 		}
 
-		if a, e := diff.TrimLinesInString(string(bytes)), diff.TrimLinesInString(item.expected); a != e {
-			t.Errorf("Result does not match (-actual vs +expected):\n%v\nActual: %s", diff.LineDiff(a, e), string(bytes))
+		actual := normalizeString(string(bytes))
+		expected := normalizeString(item.expected)
+		if diff := cmp.Diff(expected, actual); diff != "" {
+			t.Errorf("Result mismatch (-want +got):\n%s", diff)
 		}
 	}
 }

@@ -192,7 +192,7 @@ func MatchImmutableErrorMessages(errorMessage string) bool {
 }
 
 // NewGenericReconciler returns GenericResourceReconciler
-// Deprecated, use NewReconcilerWith
+// Deprecated: use NewReconcilerWith
 func NewGenericReconciler(c client.Client, log logr.Logger, opts ReconcilerOpts) *GenericResourceReconciler {
 	if opts.Scheme == nil {
 		opts.Scheme = runtime.NewScheme()
@@ -355,6 +355,8 @@ func (r *GenericResourceReconciler) shouldRecreate(sErr *apierrors.StatusError) 
 }
 
 // ReconcileResource reconciles various kubernetes types
+//
+//nolint:gocyclo,funlen
 func (r *GenericResourceReconciler) ReconcileResource(desired runtime.Object, desiredState DesiredState) (*reconcile.Result, error) {
 	resourceDetails, gvk, err := r.resourceDetails(desired)
 	if err != nil {
@@ -369,17 +371,25 @@ func (r *GenericResourceReconciler) ReconcileResource(desired runtime.Object, de
 	} else if ds, ok := desiredState.(DesiredStateWithGetter); ok {
 		state = ds.GetDesiredState()
 	}
+	var created bool
+	var current runtime.Object
 	switch state {
 	case StateCreated:
-		created, _, err := r.CreateIfNotExist(desired, desiredState)
+		created, _, err = r.CreateIfNotExist(desired, desiredState)
 		if err == nil && created {
 			return nil, nil
 		}
 		if err != nil {
 			return nil, errors.WrapIfWithDetails(err, "failed to create resource", resourceDetails...)
 		}
+	case StateAbsent:
+		_, err := r.delete(desired, desiredState)
+		if err != nil {
+			return nil, errors.WrapIfWithDetails(err, "failed to delete resource", resourceDetails...)
+		}
+		return nil, nil
 	default:
-		created, current, err := r.CreateIfNotExist(desired, desiredState)
+		created, current, err = r.CreateIfNotExist(desired, desiredState)
 		if err == nil && created {
 			return nil, nil
 		}
@@ -435,12 +445,13 @@ func (r *GenericResourceReconciler) ReconcileResource(desired runtime.Object, de
 		}
 
 		patchResult, err := r.Options.PatchMaker.Calculate(current, desired, r.Options.PatchCalculateOptions...)
-		if err != nil {
+		switch {
+		case err != nil:
 			debugLog.Info("could not match objects", "error", err)
-		} else if patchResult.IsEmpty() {
+		case patchResult.IsEmpty():
 			debugLog.Info("resource is in sync")
 			return nil, nil
-		} else {
+		default:
 			if gvk.Kind == "Secret" {
 				debugLog.Info("resource diff")
 			} else {
@@ -518,22 +529,16 @@ func (r *GenericResourceReconciler) ReconcileResource(desired runtime.Object, de
 			return nil, errors.WrapIfWithDetails(err, "updating resource failed", resourceDetails...)
 		}
 		debugLog.Info("resource updated")
-
-	case StateAbsent:
-		_, err := r.delete(desired, desiredState)
-		if err != nil {
-			return nil, errors.WrapIfWithDetails(err, "failed to delete resource", resourceDetails...)
-		}
 	}
 	return nil, nil
 }
 
-func (r *GenericResourceReconciler) fromDesired(desired runtime.Object) (runtime.Object, error) {
+func (r *GenericResourceReconciler) fromDesired(desired runtime.Object) runtime.Object {
 	if _, ok := desired.(*unstructured.Unstructured); ok {
 		if r.Options.Scheme != nil {
 			object, err := r.Options.Scheme.New(desired.GetObjectKind().GroupVersionKind())
 			if err == nil {
-				return object, nil
+				return object
 			}
 			r.Log.V(2).Info("unable to detect correct type for the resource, falling back to unstructured")
 		}
@@ -541,16 +546,13 @@ func (r *GenericResourceReconciler) fromDesired(desired runtime.Object) (runtime
 		desiredGVK := desired.GetObjectKind()
 		current.SetKind(desiredGVK.GroupVersionKind().Kind)
 		current.SetAPIVersion(desiredGVK.GroupVersionKind().GroupVersion().String())
-		return current, nil
+		return current
 	}
-	return reflect.New(reflect.Indirect(reflect.ValueOf(desired)).Type()).Interface().(runtime.Object), nil
+	return reflect.New(reflect.Indirect(reflect.ValueOf(desired)).Type()).Interface().(runtime.Object)
 }
 
 func (r *GenericResourceReconciler) CreateIfNotExist(desired runtime.Object, desiredState DesiredState) (bool, runtime.Object, error) {
-	current, err := r.fromDesired(desired)
-	if err != nil {
-		return false, nil, errors.WrapIf(err, "failed to create new object based on desired")
-	}
+	current := r.fromDesired(desired)
 	m, err := meta.Accessor(desired)
 	if err != nil {
 		return false, nil, errors.WrapIf(err, "failed to get object key")
@@ -595,8 +597,8 @@ func (r *GenericResourceReconciler) CreateIfNotExist(desired runtime.Object, des
 		}
 		switch t := desired.DeepCopyObject().(type) {
 		case *v1beta1.CustomResourceDefinition:
-			err = wait.Poll(time.Second*1, time.Second*10, func() (done bool, err error) {
-				err = r.Client.Get(context.TODO(), client.ObjectKey{Namespace: t.Namespace, Name: t.Name}, t)
+			err = wait.PollUntilContextTimeout(context.TODO(), time.Second*1, time.Second*10, true, func(ctx context.Context) (done bool, err error) {
+				err = r.Client.Get(ctx, client.ObjectKey{Namespace: t.Namespace, Name: t.Name}, t)
 				if err != nil {
 					return false, err
 				}
@@ -606,8 +608,8 @@ func (r *GenericResourceReconciler) CreateIfNotExist(desired runtime.Object, des
 				return false, nil, errors.WrapIfWithDetails(err, "failed to wait for the crd to get ready", resourceDetails...)
 			}
 		case *v1.CustomResourceDefinition:
-			err = wait.Poll(time.Second*1, time.Second*10, func() (done bool, err error) {
-				err = r.Client.Get(context.TODO(), client.ObjectKey{Namespace: t.Namespace, Name: t.Name}, t)
+			err = wait.PollUntilContextTimeout(context.TODO(), time.Second*1, time.Second*10, true, func(ctx context.Context) (done bool, err error) {
+				err = r.Client.Get(ctx, client.ObjectKey{Namespace: t.Namespace, Name: t.Name}, t)
 				if err != nil {
 					return false, err
 				}
@@ -625,10 +627,7 @@ func (r *GenericResourceReconciler) CreateIfNotExist(desired runtime.Object, des
 }
 
 func (r *GenericResourceReconciler) delete(desired runtime.Object, desiredState DesiredState) (bool, error) {
-	current, err := r.fromDesired(desired)
-	if err != nil {
-		return false, errors.WrapIf(err, "failed to create new object based on desired")
-	}
+	current := r.fromDesired(desired)
 	m, err := meta.Accessor(desired)
 	if err != nil {
 		return false, errors.WrapIf(err, "failed to get object key")
@@ -688,6 +687,8 @@ func crdReady(crd *v1beta1.CustomResourceDefinition) bool {
 			if cond.Status == v1beta1.ConditionTrue {
 				return true
 			}
+		case v1beta1.NamesAccepted, v1beta1.NonStructuralSchema, v1beta1.Terminating, v1beta1.KubernetesAPIApprovalPolicyConformant:
+			// These conditions are not relevant for readiness check
 		}
 	}
 	return false
@@ -700,6 +701,8 @@ func crdReadyV1(crd *v1.CustomResourceDefinition) bool {
 			if cond.Status == v1.ConditionTrue {
 				return true
 			}
+		case v1.NamesAccepted, v1.NonStructuralSchema, v1.Terminating, v1.KubernetesAPIApprovalPolicyConformant:
+			// These conditions are not relevant for readiness check
 		}
 	}
 	return false
@@ -716,7 +719,9 @@ func (r *GenericResourceReconciler) resourceDetails(desired runtime.Object) ([]i
 	if key.Namespace != "" {
 		values = append(values, "namespace", key.Namespace)
 	}
-	defaultValues := append(values, "type", reflect.TypeOf(desired).String())
+	defaultValues := make([]interface{}, len(values), len(values)+2)
+	copy(defaultValues, values)
+	defaultValues = append(defaultValues, "type", reflect.TypeOf(desired).String())
 	if r.Options.Scheme == nil {
 		return defaultValues, gvk, nil
 	}
@@ -731,7 +736,7 @@ func (r *GenericResourceReconciler) resourceDetails(desired runtime.Object) ([]i
 	return values, gvk, nil
 }
 
-func (r *GenericResourceReconciler) resourceLog(desired runtime.Object, details ...interface{}) logr.Logger {
+func (r *GenericResourceReconciler) resourceLog(_ runtime.Object, details ...interface{}) logr.Logger {
 	if len(details) > 0 {
 		return r.Log.WithValues(details...)
 	}

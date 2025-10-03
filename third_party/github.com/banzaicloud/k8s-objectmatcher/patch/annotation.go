@@ -18,7 +18,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/base64"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	json "github.com/json-iterator/go"
@@ -122,7 +122,9 @@ func (a *Annotator) GetModifiedConfiguration(obj runtime.Object, annotate bool) 
 
 	// Do not include an empty annotation map
 	if len(annots) == 0 {
-		a.metadataAccessor.SetAnnotations(obj, nil)
+		if err := a.metadataAccessor.SetAnnotations(obj, nil); err != nil {
+			return nil, err
+		}
 	}
 
 	modified, err = json.ConfigCompatibleWithStandardLibrary.Marshal(obj)
@@ -195,7 +197,7 @@ func zipAndBase64EncodeAnnotation(original []byte) (string, error) {
 }
 
 func unZipAnnotation(original []byte) ([]byte, error) {
-	annotation, err := ioutil.ReadAll(bytes.NewReader(original))
+	annotation, err := io.ReadAll(bytes.NewReader(original))
 	if err != nil {
 		return nil, err
 	}
@@ -221,5 +223,5 @@ func readZipFile(zf *zip.File) ([]byte, error) {
 		return nil, err
 	}
 	defer f.Close()
-	return ioutil.ReadAll(f)
+	return io.ReadAll(f)
 }
