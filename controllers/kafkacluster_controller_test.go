@@ -313,8 +313,8 @@ func TestUpdateAndFetchLatestReturnsLatestVersion(t *testing.T) {
 	}
 
 	// TypeMeta should be preserved
-	if updated.TypeMeta.Kind != cluster.TypeMeta.Kind {
-		t.Errorf("TypeMeta.Kind not preserved: expected %s, got %s", cluster.TypeMeta.Kind, updated.TypeMeta.Kind)
+	if updated.Kind != cluster.Kind {
+		t.Errorf("TypeMeta.Kind not preserved: expected %s, got %s", cluster.Kind, updated.Kind)
 	}
 }
 
