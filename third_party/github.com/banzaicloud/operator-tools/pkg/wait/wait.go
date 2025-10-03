@@ -41,7 +41,7 @@ type ResourceConditionChecks struct {
 func NewResourceConditionChecks(client client.Client, backoff Backoff, log logr.Logger, scheme *runtime.Scheme) *ResourceConditionChecks {
 	return &ResourceConditionChecks{
 		client:  client,
-		backoff: wait.Backoff(backoff),
+		backoff: backoff,
 		log:     log,
 		scheme:  scheme,
 	}

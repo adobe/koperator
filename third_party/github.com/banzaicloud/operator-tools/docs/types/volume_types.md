@@ -4,12 +4,13 @@
 
  Leverages core types from kubernetes/api/core/v1
 
+
 ## Configuration
 ## KubernetesVolume
 
 ### host_path (*corev1.HostPathVolumeSource, optional) {#kubernetesvolume-host_path}
 
-Deprecated, use hostPath 
+Deprecated: use hostPath 
 
 Default: -
 

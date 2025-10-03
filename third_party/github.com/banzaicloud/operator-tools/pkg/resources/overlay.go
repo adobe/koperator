@@ -15,13 +15,14 @@
 package resources
 
 import (
+	"encoding/json"
+
 	"emperror.dev/errors"
-	ypatch "github.com/cppforlife/go-patch/patch"
-	"gopkg.in/yaml.v3"
+	jsonpatch "github.com/evanphx/json-patch/v5"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	k8syaml "sigs.k8s.io/yaml"
+	"sigs.k8s.io/yaml"
 
 	"github.com/banzaicloud/operator-tools/pkg/types"
 	"github.com/banzaicloud/operator-tools/pkg/utils"
@@ -63,26 +64,40 @@ func PatchYAMLModifier(overlay K8SResourceOverlay, parser *ObjectParser) (Object
 		}, nil
 	}
 
-	var opsDefinitions []ypatch.OpDefinition
+	// Build JSON Patch operations
+	var patchOps []map[string]interface{}
 	for _, patch := range overlay.Patches {
-		var value interface{}
-		if patch.ParseValue {
-			err := yaml.Unmarshal([]byte(utils.PointerToString(patch.Value)), &value)
-			if err != nil {
-				return nil, errors.WrapIf(err, "could not unmarshal value")
-			}
-		} else {
-			value = interface{}(patch.Value)
+		op := map[string]interface{}{
+			"op":   string(patch.Type),
+			"path": utils.PointerToString(patch.Path),
 		}
 
-		op := ypatch.OpDefinition{
-			Type: string(patch.Type),
-			Path: patch.Path,
-		}
 		if patch.Type == ReplaceOverlayPatchType {
-			op.Value = &value
+			var value interface{}
+			if patch.ParseValue {
+				// Parse the value as YAML/JSON
+				err := yaml.Unmarshal([]byte(utils.PointerToString(patch.Value)), &value)
+				if err != nil {
+					return nil, errors.WrapIf(err, "could not unmarshal value")
+				}
+			} else {
+				value = utils.PointerToString(patch.Value)
+			}
+			op["value"] = value
 		}
-		opsDefinitions = append(opsDefinitions, op)
+
+		patchOps = append(patchOps, op)
+	}
+
+	// Convert patch operations to JSON
+	patchJSON, err := json.Marshal(patchOps)
+	if err != nil {
+		return nil, errors.WrapIf(err, "could not marshal patch operations")
+	}
+
+	patch, err := jsonpatch.DecodePatch(patchJSON)
+	if err != nil {
+		return nil, errors.WrapIf(err, "could not decode patch")
 	}
 
 	return func(o runtime.Object) (runtime.Object, error) {
@@ -110,33 +125,32 @@ func PatchYAMLModifier(overlay K8SResourceOverlay, parser *ObjectParser) (Object
 			return o, nil
 		}
 
-		y, err := k8syaml.Marshal(o)
+		// Marshal object to YAML
+		yamlBytes, err := yaml.Marshal(o)
 		if err != nil {
 			return o, errors.WrapIf(err, "could not marshal runtime object")
 		}
 
-		ops, err := ypatch.NewOpsFromDefinitions(opsDefinitions)
+		// Convert YAML to JSON (json-patch works on JSON)
+		jsonBytes, err := yaml.YAMLToJSON(yamlBytes)
 		if err != nil {
-			return o, errors.WrapIf(err, "could not init patch ops from definitions")
+			return o, errors.WrapIf(err, "could not convert YAML to JSON")
 		}
 
-		var in interface{}
-		err = yaml.Unmarshal(y, &in)
+		// Apply the patch
+		patchedJSON, err := patch.Apply(jsonBytes)
 		if err != nil {
-			return o, errors.WrapIf(err, "could not unmarshal resource yaml")
+			return o, errors.WrapIf(err, "could not apply patch")
 		}
 
-		res, err := ops.Apply(in)
+		// Convert JSON back to YAML
+		patchedYAML, err := yaml.JSONToYAML(patchedJSON)
 		if err != nil {
-			return o, errors.WrapIf(err, "could not apply patch ops")
+			return o, errors.WrapIf(err, "could not convert JSON to YAML")
 		}
 
-		y, err = yaml.Marshal(res)
-		if err != nil {
-			return o, errors.WrapIf(err, "could not marshal patched object to yaml")
-		}
-
-		o, err = parser.ParseYAMLToK8sObject(y)
+		// Parse back to K8s object
+		o, err = parser.ParseYAMLToK8sObject(patchedYAML)
 		if err != nil {
 			return o, errors.WrapIf(err, "could not parse runtime object from yaml")
 		}

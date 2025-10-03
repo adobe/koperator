@@ -87,13 +87,14 @@ func (log *SpinnerLogSink) Init(_ logr.RuntimeInfo) {}
 
 // Info implements logr.LogSink interface
 func (log *SpinnerLogSink) Info(level int, msg string, keysAndValues ...interface{}) {
-
 	colorPrinter := log.getColorPrinter(log.colors.Info)
 
 	if !log.Enabled(level) {
 		return
 	}
-	allVal := append(keysAndValues, log.values...)
+	allVal := make([]interface{}, 0, len(keysAndValues)+len(log.values))
+	allVal = append(allVal, keysAndValues...)
+	allVal = append(allVal, log.values...)
 	if len(allVal) > 0 {
 		msg = fmt.Sprintf("%s %s", msg, log.joinAndSeparatePairs(allVal))
 	}
@@ -116,6 +117,15 @@ func (log *SpinnerLogSink) Info(level int, msg string, keysAndValues ...interfac
 		}
 	}
 
+	// If not grouped, write directly without spinner animation
+	if !log.grouped {
+		// Include the same escape codes that spinner would use: \r (carriage return) and \x1b[K (clear line)
+		finalMsg := "\r\x1b[K" + colorPrinter.Sprintf("%c", log.checkMark) + " " + msg + "\n"
+		fmt.Fprint(log.out, finalMsg)
+		return
+	}
+
+	// For grouped mode, use spinner
 	if log.spinner == nil {
 		log.initSpinner()
 	}
@@ -127,10 +137,6 @@ func (log *SpinnerLogSink) Info(level int, msg string, keysAndValues ...interfac
 		log.spinner.FinalMSG = colorPrinter.Sprintf("%c", log.checkMark) + log.spinner.Suffix + "\n"
 	}
 	log.mux.Unlock()
-
-	if log.spinner != nil && !log.grouped {
-		log.stopSpinner()
-	}
 }
 
 // Enabled implements logr.LogSink interface
@@ -140,7 +146,9 @@ func (log *SpinnerLogSink) Enabled(level int) bool {
 
 // Error implements logr.LogSink interface
 func (log *SpinnerLogSink) Error(e error, msg string, keysAndValues ...interface{}) {
-	allVal := append(keysAndValues, log.values...)
+	allVal := make([]interface{}, 0, len(keysAndValues)+len(log.values))
+	allVal = append(allVal, keysAndValues...)
+	allVal = append(allVal, log.values...)
 
 	colorPrinter := log.getColorPrinter(log.colors.Error)
 

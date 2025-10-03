@@ -257,7 +257,7 @@ func newSliceEncoder(t reflect.Type) encoderFunc {
 	stringerType := reflect.TypeOf((*fmt.Stringer)(nil)).Elem()
 
 	if t.Elem().Kind() == reflect.Uint8 {
-		p := reflect.PtrTo(t.Elem())
+		p := reflect.PointerTo(t.Elem())
 		if !p.Implements(paramsMarshalerType) && !p.Implements(stringerType) {
 			return byteSliceEncoder
 		}

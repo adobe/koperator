@@ -51,14 +51,14 @@ type ResourceCondition struct {
 type ConditionChecker struct {
 	client client.Client
 	scheme *runtime.Scheme
-	log logr.Logger
+	log    logr.Logger
 }
 
 func NewConditionChecker(client client.Client, scheme *runtime.Scheme, log logr.Logger) *ConditionChecker {
 	return &ConditionChecker{
 		client: client,
 		scheme: scheme,
-		log: log,
+		log:    log,
 	}
 }
 

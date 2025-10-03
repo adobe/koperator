@@ -154,7 +154,7 @@ func TestRecreateObjectFailIfNotAllowed(t *testing.T) {
 			},
 			wantResult: func(result *reconcile.Result) {
 				require.NotNil(t, result)
-				require.True(t, result.Requeue)
+				require.Greater(t, result.RequeueAfter, int64(0))
 			},
 		},
 		{

@@ -114,8 +114,8 @@ func TestMerge(t *testing.T) {
 
 	// container c is not modified (note that it's index will change)
 	assert.Equal(t, corev1.Container{
-		Name:  "container-c",
-		Image: "image-c",
+		Name:    "container-c",
+		Image:   "image-c",
 		Command: []string{"fake"},
 	}, base.Spec.Template.Spec.Containers[3])
 }
@@ -166,7 +166,7 @@ func TestVolume(t *testing.T) {
 	err := Merge(base, overrides)
 	require.NoError(t, err)
 
-	require.Equal(t,  &v1.DaemonSet{
+	require.Equal(t, &v1.DaemonSet{
 		Spec: v1.DaemonSetSpec{
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
@@ -346,7 +346,7 @@ func TestMergeMap(t *testing.T) {
 		"a": "1",
 		"b": "3",
 		"c": "4",
-	}, base.ObjectMeta.Labels)
+	}, base.Labels)
 }
 
 func TestMergeMapWithEmbeddedType(t *testing.T) {
@@ -374,7 +374,7 @@ func TestMergeMapWithEmbeddedType(t *testing.T) {
 		"a": "1",
 		"b": "3",
 		"c": "4",
-	}, base.ObjectMeta.Labels)
+	}, base.Labels)
 }
 
 func TestMergeService(t *testing.T) {
@@ -420,7 +420,7 @@ func TestMergeService(t *testing.T) {
 					TargetPort: intstr.FromInt(8082),
 				},
 			},
-			Selector:map[string]string{
+			Selector: map[string]string{
 				"b": "3",
 				"c": "4",
 			},
@@ -434,7 +434,7 @@ func TestMergeService(t *testing.T) {
 		"a": "1",
 		"b": "3",
 		"c": "4",
-	}, base.ObjectMeta.Labels)
+	}, base.Labels)
 
 	require.Equal(t, base.Spec, corev1.ServiceSpec{
 		Ports: []corev1.ServicePort{

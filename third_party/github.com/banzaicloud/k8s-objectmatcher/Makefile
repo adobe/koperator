@@ -1,50 +1,18 @@
-LICENSEI_VERSION = 0.5.0
-GOLANGCI_VERSION = 1.44.0
+# k8s-objectmatcher Makefile
+# Most common targets (test, lint, fmt, vet, clean, license, license-check, etc.)
+# are now handled by the parent Makefile at the repository root.
+# This Makefile contains only unique targets specific to k8s-objectmatcher.
 
-all: license fmt vet test
+SHELL = /bin/bash
+.SHELLFLAGS := -eu -o pipefail -c
 
-.PHONY: license
-license: bin/licensei
-	bin/licensei header
+PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 
-# Run go fmt against code
-fmt:
-	go fmt ./...
+help: ## Display this help.
+	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^([a-zA-Z_0-9-]|\/)+:.*?##/ { printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
-# Run go vet against code
-vet:
-	go vet ./...
+# Unique targets for k8s-objectmatcher
 
-test:
-	go test ./...
-
-test-integration:
+.PHONY: test-integration
+test-integration: ## Run integration tests.
 	cd tests && go test -integration -v ./...
-
-bin/licensei: bin/licensei-${LICENSEI_VERSION}
-	@ln -sf licensei-${LICENSEI_VERSION} bin/licensei
-
-bin/licensei-${LICENSEI_VERSION}:
-	@mkdir -p bin
-	curl -sfL https://raw.githubusercontent.com/goph/licensei/master/install.sh | bash -s v${LICENSEI_VERSION}
-	@mv bin/licensei $@
-
-.PHONY: license-check
-license-check: bin/licensei ## Run license check
-	bin/licensei check
-	bin/licensei header
-
-.PHONY: license-cache
-license-cache: bin/licensei ## Generate license cache
-	bin/licensei cache
-
-bin/golangci-lint: bin/golangci-lint-${GOLANGCI_VERSION}
-	@ln -sf golangci-lint-${GOLANGCI_VERSION} bin/golangci-lint
-bin/golangci-lint-${GOLANGCI_VERSION}:
-	@mkdir -p bin
-	curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/v${GOLANGCI_VERSION}/install.sh | bash -s -- -b ./bin/ v${GOLANGCI_VERSION}
-	@mv bin/golangci-lint $@
-
-.PHONY: lint
-lint: bin/golangci-lint ## Run linter
-	bin/golangci-lint run

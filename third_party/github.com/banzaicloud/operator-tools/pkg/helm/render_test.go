@@ -54,7 +54,6 @@ func TestRenderChartWithCrdsAndTemplates(t *testing.T) {
 	assert.Equal(t, "loggings.logging.banzaicloud.io", o.GetName())
 }
 
-
 func TestRenderChartWithCrdsOnly(t *testing.T) {
 	chart := http.Dir("testdata/crds-only/logging-operator")
 
@@ -95,7 +94,7 @@ func TestRenderWithScheme(t *testing.T) {
 	objects, err := Render(chart, valuesMap, ReleaseOptions{
 		Name:      "release-name",
 		Namespace: "release-namespace",
-		Scheme: scheme,
+		Scheme:    scheme,
 	}, "logging-operator")
 	require.NoError(t, err)
 

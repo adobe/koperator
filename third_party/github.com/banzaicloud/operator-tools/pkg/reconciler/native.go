@@ -24,7 +24,6 @@ import (
 	crdv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	crdv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -149,7 +148,7 @@ type NativeReconciler struct {
 	*GenericResourceReconciler
 	client.Client
 	scheme                 *runtime.Scheme
-	restMapper             meta.RESTMapper
+	restMapper             apimeta.RESTMapper
 	reconciledComponent    NativeReconciledComponent
 	configTranslate        ResourceTranslate
 	componentName          string
@@ -175,7 +174,7 @@ func NativeReconcilerSetControllerRef() NativeReconcilerOpt {
 	}
 }
 
-func NativeReconcilerSetRESTMapper(mapper meta.RESTMapper) NativeReconcilerOpt {
+func NativeReconcilerSetRESTMapper(mapper apimeta.RESTMapper) NativeReconcilerOpt {
 	return func(r *NativeReconciler) {
 		r.restMapper = mapper
 	}
@@ -286,12 +285,13 @@ func (rec *NativeReconciler) Reconcile(owner runtime.Object) (*reconcile.Result,
 LOOP:
 	for _, r := range rec.reconciledComponent.ResourceBuilders(rec.configTranslate(owner)) {
 		o, state, err := r()
-		if err != nil {
+		switch {
+		case err != nil:
 			combinedResult.CombineErr(err)
-		} else if o == nil || state == nil {
+		case o == nil || state == nil:
 			rec.Log.Info("skipping resource builder reconciliation due to object or desired state was nil")
 			continue
-		} else {
+		default:
 			var objectMeta metav1.Object
 			objectMeta, err = rec.addComponentIDAnnotation(o, componentID)
 			if err != nil {
@@ -330,7 +330,7 @@ LOOP:
 				}
 			}
 
-			// desired state can be overriden to create-only by an annotation
+			// desired state can be overridden to create-only by an annotation
 			if _, ok := objectMeta.GetAnnotations()[types.BanzaiCloudDesiredStateCreated]; ok {
 				if ds, ok := state.(DynamicDesiredState); ok && ds.DesiredState == StatePresent || state == StatePresent {
 					state = StateCreated
@@ -376,7 +376,7 @@ LOOP:
 }
 
 func (rec *NativeReconciler) generateComponentID(owner runtime.Object) (string, metav1.Object, error) {
-	ownerMeta, err := meta.Accessor(owner)
+	ownerMeta, err := apimeta.Accessor(owner)
 	if err != nil {
 		return "", nil, errors.WrapIf(err, "failed to access owner object meta")
 	}
@@ -408,7 +408,7 @@ func (rec *NativeReconciler) generateComponentID(owner runtime.Object) (string, 
 }
 
 func (rec *NativeReconciler) generateResourceIDForPurge(resource runtime.Object) (string, error) {
-	resourceMeta, err := meta.Accessor(resource)
+	resourceMeta, err := apimeta.Accessor(resource)
 	if err != nil {
 		return "", errors.WrapIf(err, "failed to access owner object meta")
 	}
@@ -477,7 +477,7 @@ func (rec *NativeReconciler) purge(excluded map[string]bool, componentId string)
 			continue
 		}
 		for _, o := range objects.Items {
-			objectMeta, err := meta.Accessor(&o)
+			objectMeta, err := apimeta.Accessor(&o)
 			if err != nil {
 				allErr = errors.Combine(allErr, errors.WrapIf(err, "failed to get object metadata"))
 				continue
@@ -504,7 +504,7 @@ func (rec *NativeReconciler) purge(excluded map[string]bool, componentId string)
 
 	utils.RuntimeObjects(purgeObjects).Sort(utils.UninstallResourceOrder)
 	for _, o := range purgeObjects {
-		if err := rec.Client.Delete(context.TODO(), o.(client.Object)); err != nil && !k8serrors.IsNotFound(err) {
+		if err := rec.Delete(context.TODO(), o.(client.Object)); err != nil && !k8serrors.IsNotFound(err) {
 			allErr = errors.Combine(allErr, err)
 		} else {
 			rec.addReconciledObjectState(ReconciledObjectStatePurged, o.DeepCopyObject())
@@ -543,7 +543,7 @@ func (rec *NativeReconciler) addRelatedToAnnotation(objectMeta, ownerMeta metav1
 }
 
 func (rec *NativeReconciler) addComponentIDAnnotation(o runtime.Object, componentId string) (metav1.Object, error) {
-	objectMeta, err := meta.Accessor(o)
+	objectMeta, err := apimeta.Accessor(o)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to access object metadata")
 	}

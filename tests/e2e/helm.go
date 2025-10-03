@@ -239,7 +239,11 @@ func (helmDescriptor *helmDescriptor) installHelmChart(kubectlOptions k8s.Kubect
 		fixedArguments := []string{
 			"--create-namespace",
 			"--atomic",
-			"--debug",
+		}
+
+		// Only add --debug flag if verbose logging is enabled
+		if os.Getenv("E2E_VERBOSE_LOGGING") == verboseLoggingEnabled {
+			fixedArguments = append(fixedArguments, "--debug")
 		}
 
 		helmChartNameOrLocalPath := helmDescriptor.ChartName
@@ -309,10 +313,15 @@ func (helmDescriptor *helmDescriptor) uninstallHelmChart(kubectlOptions k8s.Kube
 	)
 
 	fixedArguments := []string{
-		"--debug",
 		"--wait",
 		"--cascade=foreground",
 	}
+
+	// Only add --debug flag if verbose logging is enabled
+	if os.Getenv("E2E_VERBOSE_LOGGING") == verboseLoggingEnabled {
+		fixedArguments = append(fixedArguments, "--debug")
+	}
+
 	purge := true
 
 	return helm.DeleteE(
@@ -380,14 +389,26 @@ func (helmRelease *HelmRelease) chartNameAndVersion() (string, string) {
 // listHelmReleases returns a slice of Helm releases retrieved from the cluster
 // using the specified kubectl context and namespace.
 func listHelmReleases(kubectlOptions k8s.KubectlOptions) ([]*HelmRelease, error) {
-	ginkgo.By("Listing Helm releases")
+	// Only log if verbose logging is enabled
+	if os.Getenv("E2E_VERBOSE_LOGGING") == verboseLoggingEnabled {
+		ginkgo.By("Listing Helm releases")
+	}
+
+	// Build command arguments
+	args := []string{"--output", "json"}
+
+	// Add --debug flag if verbose logging is enabled
+	if os.Getenv("E2E_VERBOSE_LOGGING") == verboseLoggingEnabled {
+		args = append(args, "--debug")
+	}
+
 	output, err := helm.RunHelmCommandAndGetOutputE(
 		ginkgo.GinkgoT(),
 		&helm.Options{
 			KubectlOptions: &kubectlOptions,
 		},
 		"list",
-		"--output", "json",
+		args...,
 	)
 
 	if err != nil {

@@ -29,6 +29,23 @@ MOCKGEN_VERSION := 0.6.0 # renovate: datasource=github-releases depName=uber-go/
 
 GOPROXY=https://proxy.golang.org
 
+# Directories to run golangci-lint in
+LINT_DIRS := . api properties tests/e2e \
+	third_party/github.com/banzaicloud/operator-tools \
+	third_party/github.com/banzaicloud/k8s-objectmatcher \
+	third_party/github.com/banzaicloud/go-cruise-control
+
+# Directories to run licensei check/cache in
+LICENSE_CHECK_DIRS := . \
+	third_party/github.com/banzaicloud/operator-tools \
+	third_party/github.com/banzaicloud/k8s-objectmatcher \
+	third_party/github.com/banzaicloud/go-cruise-control
+
+# Directories to run licensei header in
+LICENSE_HEADER_DIRS := \
+	third_party/github.com/banzaicloud/k8s-objectmatcher \
+	third_party/github.com/banzaicloud/go-cruise-control
+
 # Use BIN_DIR to form an absolute, stable path regardless of `cd` usage
 CONTROLLER_GEN = $(BIN_DIR)/controller-gen
 
@@ -62,6 +79,16 @@ clean: ## Clean build artifacts and test binaries
 	fi
 	@rm -f cover.out
 	@rm -f manager_image_patch.yaml
+	@echo "Cleaning third_party/github.com/banzaicloud/operator-tools..."
+	@if [ -d "third_party/github.com/banzaicloud/operator-tools/bin" ]; then \
+		chmod -R u+w third_party/github.com/banzaicloud/operator-tools/bin/ 2>/dev/null || true; \
+		rm -rf third_party/github.com/banzaicloud/operator-tools/bin/; \
+	fi
+	@echo "Cleaning third_party/github.com/banzaicloud/k8s-objectmatcher..."
+	@if [ -d "third_party/github.com/banzaicloud/k8s-objectmatcher/bin" ]; then \
+		chmod -R u+w third_party/github.com/banzaicloud/k8s-objectmatcher/bin/ 2>/dev/null || true; \
+		rm -rf third_party/github.com/banzaicloud/k8s-objectmatcher/bin/; \
+	fi
 
 bin/golangci-lint: bin/golangci-lint-${GOLANGCI_VERSION} ## Symlink golangi-lint-<version> into versionless golangci-lint.
 	@ln -sf golangci-lint-${GOLANGCI_VERSION} bin/golangci-lint
@@ -72,14 +99,22 @@ bin/golangci-lint-${GOLANGCI_VERSION}: ## Download versioned golangci-lint.
 
 .PHONY: lint
 lint: bin/golangci-lint ## Run linter analysis.
-	bin/golangci-lint run -c ./.golangci.yml --timeout=5m
-	cd api && ../bin/golangci-lint run -c ../.golangci.yml --timeout=5m
-	cd properties && ../bin/golangci-lint run -c ../.golangci.yml --timeout=5m
-	cd tests/e2e && ../../bin/golangci-lint run -c .golangci.yml --timeout=5m
+	@for dir in $(LINT_DIRS); do \
+		echo "Running lint in $$dir"; \
+		(cd $$dir && $(CURDIR)/bin/golangci-lint run -c $(CURDIR)/.golangci.yml --timeout=5m) || exit 1; \
+	done
 
-.PHONY: lint-fix ## Run linter with automatic fixes.
-lint-fix: bin/golangci-lint ## Run linter
-	@bin/golangci-lint run -v --fix
+.PHONY: lint-fix
+lint-fix: bin/golangci-lint ## Run linter with automatic fixes.
+	@for dir in $(LINT_DIRS); do \
+		echo "Running lint-fix in $$dir"; \
+		(cd $$dir && $(CURDIR)/bin/golangci-lint run -c $(CURDIR)/.golangci.yml --fix --timeout=5m) || exit 1; \
+	done
+
+.PHONY: lint-clean
+lint-clean: bin/golangci-lint ## Clean linter cache.
+	@echo "Cleaning golangci-lint cache..."
+	bin/golangci-lint cache clean
 
 bin/licensei: bin/licensei-${LICENSEI_VERSION} ## Symlink licensei-<version> into versionless licensei.
 	@ln -sf licensei-${LICENSEI_VERSION} bin/licensei
@@ -90,11 +125,24 @@ bin/licensei-${LICENSEI_VERSION}: ## Download versioned licensei.
 
 .PHONY: license-check
 license-check: bin/licensei ## Run license check.
-	bin/licensei check
+	@for dir in $(LICENSE_CHECK_DIRS); do \
+		echo "Running license check in $$dir..."; \
+		(cd $$dir && $(CURDIR)/bin/licensei check) || exit 1; \
+	done
 
 .PHONY: license-cache
 license-cache: bin/licensei ## Generate license cache.
-	bin/licensei cache
+	@for dir in $(LICENSE_CHECK_DIRS); do \
+		echo "Generating license cache in $$dir..."; \
+		(cd $$dir && $(CURDIR)/bin/licensei cache) || exit 1; \
+	done
+
+.PHONY: license
+license: bin/licensei ## Add license headers to source files.
+	@for dir in $(LICENSE_HEADER_DIRS); do \
+		echo "Adding license headers in $$dir..."; \
+		(cd $$dir && $(CURDIR)/bin/licensei header) || exit 1; \
+	done
 
 install-kustomize: ## Install kustomize.
 	@ if ! which bin/kustomize &>/dev/null; then\
@@ -113,6 +161,15 @@ test: generate fmt vet bin/setup-envtest
 		-test.paniconexit0 \
 		-timeout 1h
 	cd properties && go test -coverprofile cover.out -cover -failfast -v -covermode=count ./pkg/... ./internal/...
+	@echo "Running tests in third_party/github.com/banzaicloud/operator-tools..."
+	cd third_party/github.com/banzaicloud/operator-tools && \
+	KUBEBUILDER_ASSETS=$$($(BIN_DIR)/setup-envtest --print path --bin-dir $(BIN_DIR) use $(ENVTEST_K8S_VERSION)) \
+	go test ./... -v -failfast
+	@echo "Running tests in third_party/github.com/banzaicloud/k8s-objectmatcher..."
+	cd third_party/github.com/banzaicloud/k8s-objectmatcher && go test ./...
+	@echo "Running tests in third_party/github.com/banzaicloud/go-cruise-control..."
+	cd third_party/github.com/banzaicloud/go-cruise-control && \
+	go test -v -parallel 2 -failfast ./... -cover -covermode=count -coverprofile cover.out -test.v -test.paniconexit0
 
 # Run e2e tests
 test-e2e:
@@ -158,15 +215,38 @@ fmt: ## Run go fmt against code.
 	cd api && go fmt ./...
 	cd properties && go fmt ./...
 	cd tests/e2e && go fmt ./...
+	@echo "Running fmt in third_party/github.com/banzaicloud/k8s-objectmatcher..."
+	cd third_party/github.com/banzaicloud/k8s-objectmatcher && go fmt ./...
+	@echo "Running fmt in third_party/github.com/banzaicloud/go-cruise-control..."
+	cd third_party/github.com/banzaicloud/go-cruise-control && go fmt ./...
 
 vet: ## Run go vet against code.
 	go vet ./...
 	cd api && go fmt ./...
 	cd properties && go vet ./...
 	cd tests/e2e && go vet ./...
+	@echo "Running vet in third_party/github.com/banzaicloud/k8s-objectmatcher..."
+	cd third_party/github.com/banzaicloud/k8s-objectmatcher && go vet ./...
+	@echo "Running vet in third_party/github.com/banzaicloud/go-cruise-control..."
+	cd third_party/github.com/banzaicloud/go-cruise-control && go vet ./...
 
 generate: bin/controller-gen gen-license-header ## Generate source code for APIs, Mocks, etc.
 	cd api && $(CONTROLLER_GEN) object:headerFile=$(BOILERPLATE_DIR)/header.go.generated.txt paths="./..."
+	@echo "Running generate in third_party/github.com/banzaicloud/operator-tools..."
+	cd third_party/github.com/banzaicloud/operator-tools && \
+	$(CONTROLLER_GEN) object:headerFile=./hack/boilerplate.go.txt paths=./pkg/secret/... && \
+	$(CONTROLLER_GEN) object:headerFile=./hack/boilerplate.go.txt paths=./pkg/volume/... && \
+	$(CONTROLLER_GEN) object:headerFile=./hack/boilerplate.go.txt paths=./pkg/prometheus/... && \
+	$(CONTROLLER_GEN) object:headerFile=./hack/boilerplate.go.txt paths=./pkg/types/... && \
+	$(CONTROLLER_GEN) object:headerFile=./hack/boilerplate.go.txt paths=./pkg/typeoverride/... && \
+	$(CONTROLLER_GEN) object:headerFile=./hack/boilerplate.go.txt paths=./pkg/helm/...
+	@echo "Generating type documentation for operator-tools..."
+	cd third_party/github.com/banzaicloud/operator-tools && go run cmd/docs.go
+
+.PHONY: check-diff
+check-diff: generate ## Check for uncommitted changes
+	@echo "Checking for uncommitted changes ..."
+	git diff --exit-code
 
 docker-build: ## Build the operator docker image.
 	docker build . -t ${IMG}

@@ -29,7 +29,7 @@ func TestAnnotationRemovedWhenEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if "{\"metadata\":{}}" != string(modified) {
+	if string(modified) != "{\"metadata\":{}}" {
 		t.Fatalf("Expected {\"metadata\":{} got %s", string(modified))
 	}
 }

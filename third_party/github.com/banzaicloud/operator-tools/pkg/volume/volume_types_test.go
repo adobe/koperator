@@ -25,8 +25,7 @@ import (
 
 func TestKubernetesVolume_ApplyVolumeForPodSpec_FailNonExistingContainer(t *testing.T) {
 	vol := KubernetesVolume{
-		HostPath: &v1.HostPathVolumeSource{
-		},
+		HostPath: &v1.HostPathVolumeSource{},
 	}
 
 	spec := &v1.PodSpec{
@@ -47,8 +46,7 @@ func TestKubernetesVolume_ApplyVolumeForPodSpec_FailNonExistingContainer(t *test
 
 func TestKubernetesVolume_ApplyVolumeForPodSpec(t *testing.T) {
 	vol := KubernetesVolume{
-		HostPath: &v1.HostPathVolumeSource{
-		},
+		HostPath: &v1.HostPathVolumeSource{},
 	}
 
 	spec := &v1.PodSpec{
@@ -70,8 +68,7 @@ func TestKubernetesVolume_ApplyVolumeForPodSpec(t *testing.T) {
 func TestKubernetesVolume_ApplyPVCForStatefulSet(t *testing.T) {
 	vol := KubernetesVolume{
 		PersistentVolumeClaim: &PersistentVolumeClaim{
-			PersistentVolumeClaimSpec: v1.PersistentVolumeClaimSpec{
-			},
+			PersistentVolumeClaimSpec: v1.PersistentVolumeClaimSpec{},
 			PersistentVolumeSource: v1.PersistentVolumeClaimVolumeSource{
 				ClaimName: "my-claim",
 			},

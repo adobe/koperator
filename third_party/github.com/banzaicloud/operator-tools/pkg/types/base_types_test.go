@@ -24,11 +24,10 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v12 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestMetaBaseEmptyOverrideOnEmptyObject(t *testing.T) {
-	original := v1.ObjectMeta{}
+	original := metav1.ObjectMeta{}
 	overrides := types.MetaBase{}
 
 	result := overrides.Merge(original)
@@ -43,7 +42,7 @@ func TestMetaBaseEmptyOverrideOnEmptyObject(t *testing.T) {
 }
 
 func TestMetaBaseOverrideOnEmptyObject(t *testing.T) {
-	original := v1.ObjectMeta{}
+	original := metav1.ObjectMeta{}
 	overrides := types.MetaBase{
 		Annotations: map[string]string{
 			"annotation": "a",
@@ -65,7 +64,7 @@ func TestMetaBaseOverrideOnEmptyObject(t *testing.T) {
 }
 
 func TestMetaBaseOverrideOnExistingObject(t *testing.T) {
-	original := v1.ObjectMeta{
+	original := metav1.ObjectMeta{
 		Annotations: map[string]string{
 			"annotation": "a",
 		},
@@ -324,7 +323,6 @@ func TestDeploymentBaseOverride(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func TestStatefulsetBaseOverride(t *testing.T) {
@@ -546,13 +544,13 @@ func TestStatefulSetOverride(t *testing.T) {
 					"old":      "old-value",
 				},
 			}},
-			spec: appsv1.StatefulSet{ObjectMeta: v1.ObjectMeta{
+			spec: appsv1.StatefulSet{ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
 					"override": "ooo",
 					"new":      "new-value",
 				},
 			}},
-			want: appsv1.StatefulSet{ObjectMeta: v1.ObjectMeta{
+			want: appsv1.StatefulSet{ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
 					"override": "winning",
 					"old":      "old-value",
@@ -613,7 +611,7 @@ func TestPodSpecOverride(t *testing.T) {
 			spec: v12.PodSpec{
 				Containers: []v12.Container{
 					{
-						Name: "override", // this one will be overridden
+						Name:  "override", // this one will be overridden
 						Image: "original",
 					},
 					{
@@ -625,7 +623,7 @@ func TestPodSpecOverride(t *testing.T) {
 			want: v12.PodSpec{
 				Containers: []v12.Container{
 					{
-						Name: "override",
+						Name:  "override",
 						Image: "override-image",
 					},
 					{
@@ -652,7 +650,7 @@ func TestPodSpecOverride(t *testing.T) {
 			spec: v12.PodSpec{
 				InitContainers: []v12.Container{
 					{
-						Name: "override", // this one will be overridden
+						Name:  "override", // this one will be overridden
 						Image: "original",
 					},
 					{
@@ -664,7 +662,7 @@ func TestPodSpecOverride(t *testing.T) {
 			want: v12.PodSpec{
 				InitContainers: []v12.Container{
 					{
-						Name: "override",
+						Name:  "override",
 						Image: "override-image",
 					},
 					{
@@ -684,7 +682,6 @@ func TestPodSpecOverride(t *testing.T) {
 		})
 	}
 }
-
 
 func TestPodTemplateOverride(t *testing.T) {
 	tests := []struct {
@@ -724,4 +721,3 @@ func TestPodTemplateOverride(t *testing.T) {
 		})
 	}
 }
-
