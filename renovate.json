@@ -79,6 +79,11 @@
         "helm-values",
         "docker"
       ]
+    },
+    {
+      "matchManagers": ["gomod"],
+      "matchDepTypes": ["indirect"],
+      "enabled": true
     }
   ]
 }
