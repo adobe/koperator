@@ -20,8 +20,15 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
+	"go.uber.org/mock/gomock"
+
+	apiutil "github.com/banzaicloud/koperator/api/util"
 	"github.com/banzaicloud/koperator/api/v1beta1"
+	"github.com/banzaicloud/koperator/pkg/resources"
+	mocks "github.com/banzaicloud/koperator/pkg/resources/kafka/mocks"
+	"github.com/banzaicloud/koperator/pkg/util"
 )
 
 func TestIsNodePortAccessMethodInUseAmongExternalListeners(t *testing.T) {
@@ -293,6 +300,148 @@ func TestNonNodePortServices(t *testing.T) {
 			actualNonNodePortServices := nonNodePortServices(test.services)
 
 			require.Equal(t, test.expectedNonNodePortServices, actualNonNodePortServices)
+		})
+	}
+}
+
+func TestHeadlessServiceKraft(t *testing.T) {
+	testCases := []struct {
+		testName        string
+		expectedService *corev1.Service
+	}{
+		{
+			testName: "Services with mixed NodePort and non-NodePort services that are evenly distributed",
+			expectedService: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "kafka-headless",
+					Namespace:   "kafka",
+					Labels:      map[string]string{"isBrokerNode": "true", "app": "kafka", "kafka_cr": "kafka"},
+					Annotations: map[string]string{},
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							APIVersion:         "",
+							Kind:               "",
+							Name:               "kafka",
+							UID:                "",
+							Controller:         util.BoolPointer(true),
+							BlockOwnerDeletion: util.BoolPointer(true),
+						},
+					},
+				},
+				Spec: corev1.ServiceSpec{
+					Type:            corev1.ServiceTypeClusterIP,
+					SessionAffinity: corev1.ServiceAffinityNone,
+					Selector:        apiutil.LabelsForBroker("kafka"),
+					Ports: []corev1.ServicePort{
+						{
+							Name:       "metrics",
+							Protocol:   "TCP",
+							Port:       9020,
+							TargetPort: intstr.FromInt(9020),
+							NodePort:   0,
+						},
+					},
+					ClusterIP:                corev1.ClusterIPNone,
+					PublishNotReadyAddresses: true,
+				},
+			},
+		},
+	}
+	mockCtrl := gomock.NewController(t)
+
+	for _, test := range testCases {
+		t.Run(test.testName, func(t *testing.T) {
+			mockClient := mocks.NewMockClient(mockCtrl)
+			mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+			r := Reconciler{
+				Reconciler: resources.Reconciler{
+					Client: mockClient,
+					KafkaCluster: &v1beta1.KafkaCluster{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "kafka",
+							Namespace: "kafka",
+						},
+						Spec: v1beta1.KafkaClusterSpec{
+							KRaftMode: true,
+						},
+					},
+				},
+			}
+
+			actualService := r.headlessService()
+
+			require.Equal(t, test.expectedService, actualService)
+		})
+	}
+}
+
+func TestHeadlessControllerServiceKraft(t *testing.T) {
+	testCases := []struct {
+		testName        string
+		expectedService *corev1.Service
+	}{
+		{
+			testName: "Headless Controller Service for Kraft",
+			expectedService: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "kafka-controller-headless",
+					Namespace:   "kafka",
+					Labels:      map[string]string{"isControllerNode": "true", "app": "kafka", "kafka_cr": "kafka"},
+					Annotations: map[string]string{},
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							APIVersion:         "",
+							Kind:               "",
+							Name:               "kafka",
+							UID:                "",
+							Controller:         util.BoolPointer(true),
+							BlockOwnerDeletion: util.BoolPointer(true),
+						},
+					},
+				},
+				Spec: corev1.ServiceSpec{
+					Type:            corev1.ServiceTypeClusterIP,
+					SessionAffinity: corev1.ServiceAffinityNone,
+					Selector:        apiutil.LabelsForController("kafka"),
+					Ports: []corev1.ServicePort{
+						{
+							Name:       "metrics",
+							Protocol:   "TCP",
+							Port:       9020,
+							TargetPort: intstr.FromInt(9020),
+							NodePort:   0,
+						},
+					},
+					ClusterIP:                corev1.ClusterIPNone,
+					PublishNotReadyAddresses: true,
+				},
+			},
+		},
+	}
+	mockCtrl := gomock.NewController(t)
+
+	for _, test := range testCases {
+		t.Run(test.testName, func(t *testing.T) {
+			mockClient := mocks.NewMockClient(mockCtrl)
+			mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+			r := Reconciler{
+				Reconciler: resources.Reconciler{
+					Client: mockClient,
+					KafkaCluster: &v1beta1.KafkaCluster{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "kafka",
+							Namespace: "kafka",
+						},
+						Spec: v1beta1.KafkaClusterSpec{
+							KRaftMode: true,
+						},
+					},
+				},
+			}
+
+			actualService := r.headlessControllerService()
+
+			require.Equal(t, test.expectedService, actualService)
 		})
 	}
 }
