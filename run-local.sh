@@ -43,12 +43,12 @@ helm install prometheus prometheus/kube-prometheus-stack --version 54.1.0 --name
   --set kubeProxy.enabled=false \
   --set kubeStateMetrics.enabled=false \
   --set nodeExporter.enabled=false \
-  --set prometheus.enabled=false 
+  --set prometheus.enabled=false
 
 #### koperator
 helm install kafka-operator charts/kafka-operator --set operator.image.repository=koperator_e2e_test --set operator.image.tag=latest --namespace kafka --create-namespace
-kubectl apply -f charts/kafka-operator/crds/  
+kubectl apply -f charts/kafka-operator/crds/
 
 ### Initialize Kafka Cluster
 kubectl apply -f config/samples/kraft/simplekafkacluster_kraft.yaml -n kafka
-kubectl config set-context --current --namespace kafka 
+kubectl config set-context --current --namespace kafka
