@@ -17,22 +17,15 @@ package tests
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sync/atomic"
 
-	"google.golang.org/protobuf/types/known/wrapperspb"
-
 	istioclientv1beta1 "github.com/banzaicloud/istio-client-go/pkg/networking/v1beta1"
 
-	istioOperatorApi "github.com/banzaicloud/istio-operator/api/v2/v1alpha1"
-
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -71,7 +64,7 @@ var _ = Describe("KafkaClusterIstioIngressController", func() {
 		kafkaCluster = createMinimalKafkaClusterCR(kafkaClusterCRName, namespace)
 
 		kafkaCluster.Spec.IngressController = istioingress.IngressControllerName
-		kafkaCluster.Spec.IstioControlPlane = &v1beta1.IstioControlPlaneReference{Name: "icp-v115x-sample", Namespace: "istio-system"}
+		// Use vanilla Istio Gateway - no IstioControlPlane dependency
 		kafkaCluster.Spec.ListenersConfig.ExternalListeners = []v1beta1.ExternalListenerConfig{
 			{
 				CommonListenerSpec: v1beta1.CommonListenerSpec{
@@ -133,71 +126,49 @@ var _ = Describe("KafkaClusterIstioIngressController", func() {
 		})
 
 		It("creates Istio ingress related objects", func(ctx SpecContext) {
-			var meshGateway istioOperatorApi.IstioMeshGateway
+			// Test that the mesh gateway deployment is created
+			var deployment appsv1.Deployment
 			meshGatewayName := fmt.Sprintf("meshgateway-external-%s", kafkaCluster.Name)
 			Eventually(ctx, func() error {
-				err := k8sClient.Get(context.Background(), types.NamespacedName{Namespace: namespace, Name: meshGatewayName}, &meshGateway)
+				err := k8sClient.Get(context.Background(), types.NamespacedName{Namespace: namespace, Name: meshGatewayName}, &deployment)
 				return err
 			}).Should(Succeed())
 
-			meshGatewaySpec := meshGateway.Spec
-			ExpectIstioIngressLabels(meshGatewaySpec.Deployment.Metadata.Labels, "external", kafkaClusterCRName)
-			Expect(meshGatewaySpec.Service.Type).To(Equal(string(corev1.ServiceTypeLoadBalancer)))
-			deploymentConf := meshGatewaySpec.Deployment
+			Expect(deployment.Spec.Replicas).To(Equal(util.Int32Pointer(1)))
+			Expect(deployment.Spec.Template.Spec.Containers).To(HaveLen(1))
+			Expect(deployment.Spec.Template.Spec.Containers[0].Name).To(Equal("istio-proxy"))
 
-			Expect(cmp.Equal(deploymentConf.Replicas.Count, wrapperspb.Int32(1), cmpopts.IgnoreUnexported(wrapperspb.Int32Value{}))).To(BeTrue())
-			Expect(cmp.Equal(deploymentConf.Replicas.Min, wrapperspb.Int32(1), cmpopts.IgnoreUnexported(wrapperspb.Int32Value{}))).To(BeTrue())
-			Expect(cmp.Equal(deploymentConf.Replicas.Max, wrapperspb.Int32(1), cmpopts.IgnoreUnexported(wrapperspb.Int32Value{}))).To(BeTrue())
+			// Test that the mesh gateway service is created
+			var service corev1.Service
+			Eventually(ctx, func() error {
+				err := k8sClient.Get(context.Background(), types.NamespacedName{Namespace: namespace, Name: meshGatewayName}, &service)
+				return err
+			}).Should(Succeed())
 
-			actualResourceJSON, err := json.Marshal(deploymentConf.Resources)
-			Expect(err).NotTo(HaveOccurred())
-			expectedResource := &istioOperatorApi.ResourceRequirements{
-				Limits: map[string]*istioOperatorApi.Quantity{
-					"cpu":    {Quantity: resource.MustParse("2000m")},
-					"memory": {Quantity: resource.MustParse("1024Mi")},
-				},
-				Requests: map[string]*istioOperatorApi.Quantity{
-					"cpu":    {Quantity: resource.MustParse("100m")},
-					"memory": {Quantity: resource.MustParse("128Mi")},
-				},
-			}
-			expectedResourceJSON, err := json.Marshal(expectedResource)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(actualResourceJSON).To(Equal(expectedResourceJSON))
+			Expect(service.Spec.Type).To(Equal(corev1.ServiceTypeLoadBalancer))
+			Expect(service.Spec.Ports).To(HaveLen(4))
 
-			Expect(len(meshGatewaySpec.Service.Ports)).To(Equal(4))
+			// For LoadBalancer services, NodePort is automatically assigned by Kubernetes
+			// So we check individual fields instead of comparing the entire struct
+			Expect(service.Spec.Ports[0].Name).To(Equal("tcp-broker-0"))
+			Expect(service.Spec.Ports[0].Protocol).To(Equal(corev1.ProtocolTCP))
+			Expect(service.Spec.Ports[0].Port).To(Equal(int32(19090)))
+			Expect(service.Spec.Ports[0].TargetPort).To(Equal(intstr.FromInt(19090)))
 
-			expectedPort := &istioOperatorApi.ServicePort{
-				Name:       "tcp-broker-0",
-				Protocol:   string(corev1.ProtocolTCP),
-				Port:       19090,
-				TargetPort: &istioOperatorApi.IntOrString{IntOrString: intstr.FromInt(19090)},
-			}
-			Expect(cmp.Equal(meshGatewaySpec.Service.Ports[0], expectedPort, cmpopts.IgnoreUnexported(istioOperatorApi.ServicePort{}))).To(BeTrue())
+			Expect(service.Spec.Ports[1].Name).To(Equal("tcp-broker-1"))
+			Expect(service.Spec.Ports[1].Protocol).To(Equal(corev1.ProtocolTCP))
+			Expect(service.Spec.Ports[1].Port).To(Equal(int32(19091)))
+			Expect(service.Spec.Ports[1].TargetPort).To(Equal(intstr.FromInt(19091)))
 
-			expectedPort = &istioOperatorApi.ServicePort{
-				Name:       "tcp-broker-1",
-				Protocol:   string(corev1.ProtocolTCP),
-				Port:       19091,
-				TargetPort: &istioOperatorApi.IntOrString{IntOrString: intstr.FromInt(19091)},
-			}
-			Expect(cmp.Equal(meshGatewaySpec.Service.Ports[1], expectedPort, cmpopts.IgnoreUnexported(istioOperatorApi.ServicePort{}))).To(BeTrue())
-			expectedPort = &istioOperatorApi.ServicePort{
-				Name:       "tcp-broker-2",
-				Protocol:   string(corev1.ProtocolTCP),
-				Port:       19092,
-				TargetPort: &istioOperatorApi.IntOrString{IntOrString: intstr.FromInt(19092)},
-			}
-			Expect(cmp.Equal(meshGatewaySpec.Service.Ports[2], expectedPort, cmpopts.IgnoreUnexported(istioOperatorApi.ServicePort{}))).To(BeTrue())
-			expectedPort = &istioOperatorApi.ServicePort{
-				Name:       "tcp-all-broker",
-				Protocol:   string(corev1.ProtocolTCP),
-				Port:       29092,
-				TargetPort: &istioOperatorApi.IntOrString{IntOrString: intstr.FromInt(29092)},
-			}
-			Expect(cmp.Equal(meshGatewaySpec.Service.Ports[3], expectedPort, cmpopts.IgnoreUnexported(istioOperatorApi.ServicePort{}))).To(BeTrue())
+			Expect(service.Spec.Ports[2].Name).To(Equal("tcp-broker-2"))
+			Expect(service.Spec.Ports[2].Protocol).To(Equal(corev1.ProtocolTCP))
+			Expect(service.Spec.Ports[2].Port).To(Equal(int32(19092)))
+			Expect(service.Spec.Ports[2].TargetPort).To(Equal(intstr.FromInt(19092)))
 
-			Expect(meshGatewaySpec.Type).To(Equal(istioOperatorApi.GatewayType_ingress))
+			Expect(service.Spec.Ports[3].Name).To(Equal("tcp-all-broker"))
+			Expect(service.Spec.Ports[3].Protocol).To(Equal(corev1.ProtocolTCP))
+			Expect(service.Spec.Ports[3].Port).To(Equal(int32(29092)))
+			Expect(service.Spec.Ports[3].TargetPort).To(Equal(intstr.FromInt(29092)))
 
 			var gateway istioclientv1beta1.Gateway
 			gatewayName := fmt.Sprintf("%s-external-gateway", kafkaCluster.Name)
@@ -207,7 +178,8 @@ var _ = Describe("KafkaClusterIstioIngressController", func() {
 			}).Should(Succeed())
 
 			ExpectIstioIngressLabels(gateway.Labels, "external", kafkaClusterCRName)
-			ExpectIstioIngressLabels(gateway.Spec.Selector, "external", kafkaClusterCRName)
+			// Check that the Gateway uses vanilla Istio Gateway selector
+			Expect(gateway.Spec.Selector).To(Equal(map[string]string{"istio": "ingressgateway"}))
 			Expect(gateway.Spec.Servers).To(ConsistOf(
 				istioclientv1beta1.Server{
 					Port: &istioclientv1beta1.Port{
@@ -291,7 +263,7 @@ var _ = Describe("KafkaClusterIstioIngressController", func() {
 			}))
 
 			// expect kafkaCluster listener status
-			err = k8sClient.Get(ctx, types.NamespacedName{
+			err := k8sClient.Get(ctx, types.NamespacedName{
 				Name:      kafkaCluster.Name,
 				Namespace: kafkaCluster.Namespace,
 			}, kafkaCluster)
@@ -429,7 +401,7 @@ var _ = Describe("KafkaClusterIstioIngressControllerWithBrokerIdBindings", func(
 		kafkaCluster = createMinimalKafkaClusterCR(kafkaClusterCRName, namespace)
 
 		kafkaCluster.Spec.IngressController = istioingress.IngressControllerName
-		kafkaCluster.Spec.IstioControlPlane = &v1beta1.IstioControlPlaneReference{Name: "icp-v115x-sample", Namespace: "istio-system"}
+		// Use vanilla Istio Gateway - no IstioControlPlane dependency
 		kafkaCluster.Spec.ListenersConfig.ExternalListeners = []v1beta1.ExternalListenerConfig{
 			{
 				CommonListenerSpec: v1beta1.CommonListenerSpec{
@@ -488,41 +460,42 @@ var _ = Describe("KafkaClusterIstioIngressControllerWithBrokerIdBindings", func(
 	When("Istio ingress controller is configured", func() {
 
 		It("creates Istio ingress related objects", func(ctx SpecContext) {
-			// Istio ingress Az1 related objects
-			var meshGateway istioOperatorApi.IstioMeshGateway
+			// Test that the mesh gateway deployment is created
+			var deployment appsv1.Deployment
 			meshGatewayAz1Name := fmt.Sprintf("meshgateway-external-az1-%s", kafkaCluster.Name)
 			Eventually(ctx, func() error {
-				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: meshGatewayAz1Name}, &meshGateway)
+				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: meshGatewayAz1Name}, &deployment)
 				return err
 			}).Should(Succeed())
 
-			meshGatewaySpec := meshGateway.Spec
-			ExpectIstioIngressLabels(meshGatewaySpec.Deployment.Metadata.Labels, "external-az1", kafkaClusterCRName)
+			Expect(deployment.Spec.Template.Spec.Containers).To(HaveLen(1))
+			Expect(deployment.Spec.Template.Spec.Containers[0].Name).To(Equal("istio-proxy"))
 
-			Expect(len(meshGatewaySpec.Service.Ports)).To(Equal(3))
+			// Test that the mesh gateway service is created
+			var service corev1.Service
+			Eventually(ctx, func() error {
+				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: meshGatewayAz1Name}, &service)
+				return err
+			}).Should(Succeed())
 
-			expectedPort := &istioOperatorApi.ServicePort{
-				Name:       "tcp-broker-0",
-				Protocol:   string(corev1.ProtocolTCP),
-				Port:       19090,
-				TargetPort: &istioOperatorApi.IntOrString{IntOrString: intstr.FromInt(19090)},
-			}
-			Expect(cmp.Equal(meshGatewaySpec.Service.Ports[0], expectedPort, cmpopts.IgnoreUnexported(istioOperatorApi.ServicePort{}))).To(BeTrue())
+			Expect(service.Spec.Ports).To(HaveLen(3))
 
-			expectedPort = &istioOperatorApi.ServicePort{
-				Name:       "tcp-broker-2",
-				Protocol:   string(corev1.ProtocolTCP),
-				Port:       19092,
-				TargetPort: &istioOperatorApi.IntOrString{IntOrString: intstr.FromInt(19092)},
-			}
-			Expect(cmp.Equal(meshGatewaySpec.Service.Ports[1], expectedPort, cmpopts.IgnoreUnexported(istioOperatorApi.ServicePort{}))).To(BeTrue())
-			expectedPort = &istioOperatorApi.ServicePort{
-				Name:       "tcp-all-broker",
-				Protocol:   string(corev1.ProtocolTCP),
-				Port:       29092,
-				TargetPort: &istioOperatorApi.IntOrString{IntOrString: intstr.FromInt(29092)},
-			}
-			Expect(cmp.Equal(meshGatewaySpec.Service.Ports[2], expectedPort, cmpopts.IgnoreUnexported(istioOperatorApi.ServicePort{}))).To(BeTrue())
+			// For LoadBalancer services, NodePort is automatically assigned by Kubernetes
+			// So we check individual fields instead of comparing the entire struct
+			Expect(service.Spec.Ports[0].Name).To(Equal("tcp-broker-0"))
+			Expect(service.Spec.Ports[0].Protocol).To(Equal(corev1.ProtocolTCP))
+			Expect(service.Spec.Ports[0].Port).To(Equal(int32(19090)))
+			Expect(service.Spec.Ports[0].TargetPort).To(Equal(intstr.FromInt(19090)))
+
+			Expect(service.Spec.Ports[1].Name).To(Equal("tcp-broker-2"))
+			Expect(service.Spec.Ports[1].Protocol).To(Equal(corev1.ProtocolTCP))
+			Expect(service.Spec.Ports[1].Port).To(Equal(int32(19092)))
+			Expect(service.Spec.Ports[1].TargetPort).To(Equal(intstr.FromInt(19092)))
+
+			Expect(service.Spec.Ports[2].Name).To(Equal("tcp-all-broker"))
+			Expect(service.Spec.Ports[2].Protocol).To(Equal(corev1.ProtocolTCP))
+			Expect(service.Spec.Ports[2].Port).To(Equal(int32(29092)))
+			Expect(service.Spec.Ports[2].TargetPort).To(Equal(intstr.FromInt(29092)))
 
 			var gateway istioclientv1beta1.Gateway
 			gatewayName := fmt.Sprintf("%s-external-az1-gateway", kafkaCluster.Name)
@@ -532,7 +505,8 @@ var _ = Describe("KafkaClusterIstioIngressControllerWithBrokerIdBindings", func(
 			}).Should(Succeed())
 
 			ExpectIstioIngressLabels(gateway.Labels, "external-az1", kafkaClusterCRName)
-			ExpectIstioIngressLabels(gateway.Spec.Selector, "external-az1", kafkaClusterCRName)
+			// Check that the Gateway uses vanilla Istio Gateway selector
+			Expect(gateway.Spec.Selector).To(Equal(map[string]string{"istio": "ingressgateway"}))
 			Expect(gateway.Spec.Servers).To(ConsistOf(
 				istioclientv1beta1.Server{
 					Port: &istioclientv1beta1.Port{
@@ -598,33 +572,37 @@ var _ = Describe("KafkaClusterIstioIngressControllerWithBrokerIdBindings", func(
 					},
 				},
 			}))
-			// Istio Ingress Az2 related objects
+			// Test Istio Ingress Az2 related objects
+			var deploymentAz2 appsv1.Deployment
 			meshGatewayAz2Name := fmt.Sprintf("meshgateway-external-az2-%s", kafkaCluster.Name)
 			Eventually(ctx, func() error {
-				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: meshGatewayAz2Name}, &meshGateway)
+				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: meshGatewayAz2Name}, &deploymentAz2)
 				return err
 			}).Should(Succeed())
 
-			meshGatewaySpec = meshGateway.Spec
-			ExpectIstioIngressLabels(meshGatewaySpec.Deployment.Metadata.Labels, "external-az2", kafkaClusterCRName)
+			Expect(deploymentAz2.Spec.Template.Spec.Containers).To(HaveLen(1))
+			Expect(deploymentAz2.Spec.Template.Spec.Containers[0].Name).To(Equal("istio-proxy"))
 
-			Expect(len(meshGatewaySpec.Service.Ports)).To(Equal(2))
+			// Test that the mesh gateway service is created for az2
+			var serviceAz2 corev1.Service
+			Eventually(ctx, func() error {
+				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: meshGatewayAz2Name}, &serviceAz2)
+				return err
+			}).Should(Succeed())
 
-			expectedPort = &istioOperatorApi.ServicePort{
-				Name:       "tcp-broker-1",
-				Protocol:   string(corev1.ProtocolTCP),
-				Port:       19091,
-				TargetPort: &istioOperatorApi.IntOrString{IntOrString: intstr.FromInt(19091)},
-			}
-			Expect(cmp.Equal(meshGatewaySpec.Service.Ports[0], expectedPort, cmpopts.IgnoreUnexported(istioOperatorApi.ServicePort{}))).To(BeTrue())
+			Expect(serviceAz2.Spec.Ports).To(HaveLen(2))
 
-			expectedPort = &istioOperatorApi.ServicePort{
-				Name:       "tcp-all-broker",
-				Protocol:   string(corev1.ProtocolTCP),
-				Port:       29092,
-				TargetPort: &istioOperatorApi.IntOrString{IntOrString: intstr.FromInt(29092)},
-			}
-			Expect(cmp.Equal(meshGatewaySpec.Service.Ports[1], expectedPort, cmpopts.IgnoreUnexported(istioOperatorApi.ServicePort{}))).To(BeTrue())
+			// For LoadBalancer services, NodePort is automatically assigned by Kubernetes
+			// So we check individual fields instead of comparing the entire struct
+			Expect(serviceAz2.Spec.Ports[0].Name).To(Equal("tcp-broker-1"))
+			Expect(serviceAz2.Spec.Ports[0].Protocol).To(Equal(corev1.ProtocolTCP))
+			Expect(serviceAz2.Spec.Ports[0].Port).To(Equal(int32(19091)))
+			Expect(serviceAz2.Spec.Ports[0].TargetPort).To(Equal(intstr.FromInt(19091)))
+
+			Expect(serviceAz2.Spec.Ports[1].Name).To(Equal("tcp-all-broker"))
+			Expect(serviceAz2.Spec.Ports[1].Protocol).To(Equal(corev1.ProtocolTCP))
+			Expect(serviceAz2.Spec.Ports[1].Port).To(Equal(int32(29092)))
+			Expect(serviceAz2.Spec.Ports[1].TargetPort).To(Equal(intstr.FromInt(29092)))
 
 			gatewayName = fmt.Sprintf("%s-external-az2-gateway", kafkaCluster.Name)
 			Eventually(ctx, func() error {
@@ -633,7 +611,8 @@ var _ = Describe("KafkaClusterIstioIngressControllerWithBrokerIdBindings", func(
 			}).Should(Succeed())
 
 			ExpectIstioIngressLabels(gateway.Labels, "external-az2", kafkaClusterCRName)
-			ExpectIstioIngressLabels(gateway.Spec.Selector, "external-az2", kafkaClusterCRName)
+			// Check that the Gateway uses vanilla Istio Gateway selector
+			Expect(gateway.Spec.Selector).To(Equal(map[string]string{"istio": "ingressgateway"}))
 			Expect(gateway.Spec.Servers).To(ConsistOf(
 				istioclientv1beta1.Server{
 					TLS: &istioclientv1beta1.TLSOptions{

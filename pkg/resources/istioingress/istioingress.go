@@ -23,7 +23,6 @@ import (
 	"emperror.dev/errors"
 
 	istioclientv1beta1 "github.com/banzaicloud/istio-client-go/pkg/networking/v1beta1"
-	istioOperatorApi "github.com/banzaicloud/istio-operator/api/v2/v1alpha1"
 	"github.com/banzaicloud/operator-tools/pkg/utils"
 
 	"github.com/banzaicloud/koperator/api/v1beta1"
@@ -85,14 +84,8 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 
 	for _, eListener := range r.KafkaCluster.Spec.ListenersConfig.ExternalListeners {
 		if r.KafkaCluster.Spec.GetIngressController() == istioingress.IngressControllerName && eListener.GetAccessMethod() == corev1.ServiceTypeLoadBalancer {
-			if r.KafkaCluster.Spec.IstioControlPlane == nil {
-				log.Error(errors.NewPlain("reference to Istio Control Plane is missing"), "skip external listener reconciliation", "external listener", eListener.Name)
-				continue
-			}
-
-			istioRevision := istioOperatorApi.NamespacedRevision(
-				strings.ReplaceAll(r.KafkaCluster.Spec.IstioControlPlane.Name, ".", "-"),
-				r.KafkaCluster.Spec.IstioControlPlane.Namespace)
+			// Use vanilla Istio Gateway - no IstioControlPlane dependency
+			istioRevision := "" // Use default Istio revision for vanilla Istio
 			ingressConfigs, defaultControllerName, err := util.GetIngressConfigs(r.KafkaCluster.Spec, eListener)
 			if err != nil {
 				return err
@@ -103,6 +96,7 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 				}
 				for _, res := range []resources.ResourceWithLogAndExternalListenerSpecificInfosAndIstioRevision{
 					r.meshgateway,
+					r.meshgatewayService,
 					r.gateway,
 					r.virtualService,
 				} {
@@ -118,11 +112,6 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 			deletionCounter := 0
 			ctx := context.Background()
 			istioResourcesGVK := []schema.GroupVersionKind{
-				{
-					Version: istioOperatorApi.GroupVersion.Version,
-					Group:   istioOperatorApi.GroupVersion.Group,
-					Kind:    reflect.TypeOf(istioOperatorApi.IstioMeshGateway{}).Name(),
-				},
 				{
 					Version: istioclientv1beta1.SchemeGroupVersion.Version,
 					Group:   istioclientv1beta1.SchemeGroupVersion.Group,

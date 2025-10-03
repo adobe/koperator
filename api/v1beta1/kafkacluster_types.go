@@ -130,16 +130,17 @@ const (
 
 	/* Istio Ingress Config */
 
-	// IstioMeshGateway.spec.deployment.resources
+	// Kubernetes Deployment resources for Istio ingress gateway
 	defaultIstioIngressRequestResourceCpu    = "100m"
 	defaultIstioIngressRequestResourceMemory = "128Mi"
 	defaultIstioIngressLimitResourceCpu      = "2000m"
 	defaultIstioIngressLimitResourceMemory   = "1024Mi"
 
-	// IstioMeshGateway.spec.deployment.replicas.count
-	// IstioMeshGateway.spec.deployment.replicas.min
-	// IstioMeshGateway.spec.deployment.replicas.max
+	// Kubernetes Deployment replicas for Istio ingress gateway
 	defaultReplicas = 1
+
+	// DefaultIstioProxyImage is the default Istio proxy image for mesh gateway
+	DefaultIstioProxyImage = "docker.io/istio/proxyv2:1.27.1"
 
 	/* Monitor Config */
 
@@ -186,10 +187,8 @@ type KafkaClusterSpec struct {
 	// Selector for broker pods that need to be recycled/reconciled
 	TaintedBrokersSelector *metav1.LabelSelector `json:"taintedBrokersSelector,omitempty"`
 	// +kubebuilder:validation:Enum=envoy;contour;istioingress
-	// IngressController specifies the type of the ingress controller to be used for external listeners. The `istioingress` ingress controller type requires the `spec.istioControlPlane` field to be populated as well.
+	// IngressController specifies the type of the ingress controller to be used for external listeners.
 	IngressController string `json:"ingressController,omitempty"`
-	// IstioControlPlane is a reference to the IstioControlPlane resource for envoy configuration. It must be specified if istio ingress is used.
-	IstioControlPlane *IstioControlPlaneReference `json:"istioControlPlane,omitempty"`
 	// If true OneBrokerPerNode ensures that each kafka broker will be placed on a different node unless a custom
 	// Affinity definition overrides this behavior
 	OneBrokerPerNode bool `json:"oneBrokerPerNode"`
@@ -521,7 +520,7 @@ type IstioIngressConfig struct {
 	Annotations               map[string]string   `json:"annotations,omitempty"`
 	TLSOptions                *v1beta1.TLSOptions `json:"gatewayConfig,omitempty"`
 	VirtualServiceAnnotations map[string]string   `json:"virtualServiceAnnotations,omitempty"`
-	// Envs allows to add additional env vars to the istio meshgateway resource
+	// Envs allows to add additional env vars to the istio ingress gateway deployment
 	Envs []*corev1.EnvVar `json:"envs,omitempty"`
 	// If specified and supported by the platform, traffic through the
 	// cloud-provider load-balancer will be restricted to the specified client

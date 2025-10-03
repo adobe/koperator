@@ -5,10 +5,10 @@
 
 Currently it supports Kubernetes secrets only, but it can be extended to refer to secrets in custom secret stores as well.
 
-There are two main approaches to load secrets and one for testing. 
- 
+There are two main approaches to load secrets and one for testing.
+
 1. Load the secrets and return with their value directly if `ValueFrom` is set.
-1. Load the secrets in the background if `MountFrom` is set, but return only the full path where they should be available in a container. 
+1. Load the secrets in the background if `MountFrom` is set, but return only the full path where they should be available in a container.
 It's the callers responsibility to make those secrets available on that given path, e.g. by creating an aggregated secret with all
 the referenced secrets and mount it into the container through a secret volume (this is how we use it).
 1. Load the value directly if `Value` is set. (This is only good for testing.)
