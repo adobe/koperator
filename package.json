@@ -1,0 +1,27 @@
+{
+  "name": "koperator-docs",
+  "version": "1.0.0",
+  "description": "Documentation site for Koperator",
+  "main": "index.js",
+  "scripts": {
+    "build": "hugo --gc --minify",
+    "serve": "hugo server --buildDrafts --buildFuture",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/adobe/koperator.git"
+  },
+  "keywords": [
+    "hugo",
+    "documentation",
+    "koperator"
+  ],
+  "author": "Adobe",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "autoprefixer": "^10.4.16",
+    "postcss": "^8.4.32",
+    "postcss-cli": "^11.0.0"
+  }
+}

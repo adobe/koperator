@@ -1,6 +1,6 @@
 ---
 title: Support
-weight: 800
+weight: 999
 ---
 
 {{% include-headless "kafka-operator-intro.md" %}}

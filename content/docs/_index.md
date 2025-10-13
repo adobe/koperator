@@ -148,5 +148,35 @@ For detailed KRaft configuration and deployment guides, see the [KRaft Mode Docu
 
 For detailed Istio integration configuration, troubleshooting, and migration guides, see the [Istio Integration Guide]({{< relref "istio-integration.md" >}}).
 
+## Getting Started
+
+### Quick Start
+
+For users who want to get started quickly with Koperator, follow the standard installation and deployment guides:
+
+1. **[Install the Operator]({{< relref "install-kafka-operator.md" >}})** - Install Koperator and its dependencies
+2. **[Deploy a Kafka Cluster]({{< relref "install-kafka-operator.md#deploy-a-kafka-cluster" >}})** - Create your first Kafka cluster
+3. **[Test Your Deployment]({{< relref "test.md" >}})** - Validate your cluster with producers and consumers
+
+### End-to-End Tutorial - The Hard Way
+
+For users who want to understand every component and learn Kafka on Kubernetes from the ground up, we provide a comprehensive tutorial inspired by Kelsey Hightower's "kubernetes-the-hard-way":
+
+**[Kafka on Kubernetes - The Hard Way]({{< relref "e2e-tutorial/_index.md" >}})**
+
+This tutorial walks you through:
+- Setting up a multi-node Kubernetes cluster with kind
+- Installing all dependencies manually (cert-manager, ZooKeeper, Prometheus)
+- Deploying a production-ready Kafka cluster with monitoring
+- Testing performance, disaster recovery, and troubleshooting
+
+**Perfect for:**
+- Learning how all components work together
+- Understanding Kafka deployment architecture
+- Preparing for production deployments
+- Troubleshooting and debugging skills
+
+**Time commitment:** 2-3 hours
+
 ---
 Apache Kafka, Kafka, and the Kafka logo are either registered trademarks or trademarks of The Apache Software Foundation in the United States and other countries.
