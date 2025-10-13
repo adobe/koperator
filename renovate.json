@@ -14,10 +14,7 @@
     "docker:enableMajor",
     "group:allDigest"
   ],
-  "postUpdateOptions": [
-    "gomodTidy",
-    "gomodUpdateImportPaths"
-  ],
+
   "customManagers": [
     {
       "customType": "regex",
@@ -36,8 +33,8 @@
       "matchManagers": [
         "gomod"
       ],
-      "rangeStrategy": "replace",
-      "description": "Prevent downgrades for all Go modules - only allow upgrades"
+      "enabled": false,
+      "description": "Disable Go module updates - handled by automated workflow: .github/workflows/update-go-deps.yml"
     },
     {
       "matchCategories": [
@@ -52,7 +49,6 @@
         "major"
       ],
       "matchManagers": [
-        "gomod",
         "github-actions",
         "maven",
         "dockerfile",
@@ -70,7 +66,6 @@
         "digest"
       ],
       "matchManagers": [
-        "gomod",
         "github-actions",
         "maven",
         "dockerfile",
@@ -79,11 +74,6 @@
         "helm-values",
         "docker"
       ]
-    },
-    {
-      "matchManagers": ["gomod"],
-      "matchDepTypes": ["indirect"],
-      "enabled": false
     }
   ]
 }
