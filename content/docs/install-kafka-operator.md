@@ -18,7 +18,7 @@ The operator installs version 3.9.1 of Apache Kafka, and can run on:
 
 - A Kubernetes cluster (minimum 6 vCPU and 10 GB RAM). Red Hat OpenShift is also supported in Koperator version 0.24 and newer, but note that it needs some permissions for certain components to function.
 
-> We believe in the `separation of concerns` principle, thus the Koperator does not install nor manage Apache ZooKeeper or cert-manager.
+> We believe in the `separation of concerns` principle, thus the Koperator does not install nor manage Apache ZooKeeper or cert-manager. Note that ZooKeeper is only required for traditional Kafka deployments - KRaft mode deployments do not require ZooKeeper.
 
 ## Install Koperator and its requirements independently {#install-kafka-operator-and-its-requirements-independently}
 
@@ -195,12 +195,14 @@ Koperator uses [cert-manager](https://cert-manager.io) for issuing certificates 
     cert-manager-webhook-56889bfc96-x8szj      1/1     Running   0          117s
     ```
 
-### Install zookeeper-operator with Helm {#install-zookeeper-operator-with-helm}
+### Install zookeeper-operator with Helm (Optional for KRaft mode) {#install-zookeeper-operator-with-helm}
 
-Koperator requires [Apache Zookeeper](https://zookeeper.apache.org) for Kafka operations. You must:
+Koperator can use either [Apache Zookeeper](https://zookeeper.apache.org) or KRaft mode for Kafka cluster coordination:
 
-- Deploy zookeeper-operator if your environment doesn't have an instance of it yet.
-- Create a Zookeeper cluster if there is none in your environment yet for your Kafka cluster.
+- **For traditional deployments**: Deploy zookeeper-operator if your environment doesn't have an instance of it yet, and create a Zookeeper cluster if there is none in your environment yet for your Kafka cluster.
+- **For KRaft mode deployments**: ZooKeeper is not required. Skip this section and see {{% xref "/docs/kraft.md" %}} for KRaft configuration.
+
+If you're deploying a traditional Kafka cluster (non-KRaft), you must:
 
 > Note: You are recommended to create a separate ZooKeeper deployment for each Kafka cluster. If you want to share the same ZooKeeper cluster across multiple Kafka cluster instances, use a unique zk path in the KafkaCluster CR to avoid conflicts (even with previous defunct KafkaCluster instances).
 
@@ -489,9 +491,10 @@ Koperator can be deployed using its [Helm chart](https://github.com/adobe/kopera
 1. Install the Koperator CustomResourceDefinition resources (adjust the version number to the Koperator release you want to install). This is performed in a separate step to allow you to uninstall and reinstall Koperator without deleting your installed custom resources.
 
     ```bash
-    kubectl create \
-    --validate=false \
-    -f https://github.com/adobe/koperator/releases/download/v{{< param "latest_version" >}}/kafka-operator.crds.yaml
+    kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_cruisecontroloperations.yaml
+    kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_kafkaclusters.yaml
+    kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_kafkatopics.yaml
+    kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_kafkausers.yaml
     ```
 
     Expected output:
@@ -537,17 +540,30 @@ Koperator can be deployed using its [Helm chart](https://github.com/adobe/kopera
         clusterrole.rbac.authorization.k8s.io/system:openshift:scc:anyuid added: "system:serviceaccount:{NAMESPACE_FOR_KAFKA_CLUSTER_BROKER_SERVICE_ACCOUNT}:{KAFKA_CLUSTER_BROKER_SERVICE_ACCOUNT_NAME}"
         ```
 
-1. Install Koperator into the *kafka* namespace:
+1. Install Koperator into the *kafka* namespace using the OCI Helm chart from GitHub Container Registry:
+
+    > 📦 **View available versions**: [ghcr.io/adobe/koperator/kafka-operator](https://github.com/adobe/koperator/pkgs/container/koperator%2Fkafka-operator/versions)
 
     ```bash
-    helm install \
-    kafka-operator \
-    oci://ghcr.io/adobe/koperator/kafka-operator \
-    --version {{< param "latest_version" >}} \
-    --namespace=kafka \
-    --create-namespace \
-    --atomic \
-    --debug
+    # Install the latest release
+    helm install kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator --namespace=kafka --create-namespace
+
+    # Or install a specific version (replace with desired version)
+    helm install kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator --version {{< param "latest_version" >}} --namespace=kafka --create-namespace
+    ```
+
+    #### Pull and inspect the chart before installation
+
+    ```bash
+    # Pull the chart locally
+    helm pull oci://ghcr.io/adobe/helm-charts/kafka-operator --version {{< param "latest_version" >}}
+
+    # Extract and inspect
+    tar -xzf kafka-operator-{{< param "latest_version" >}}.tgz
+    helm template kafka-operator ./kafka-operator/
+
+    # Install from local chart
+    helm install kafka-operator ./kafka-operator/ --namespace=kafka --create-namespace
     ```
 
     Expected output:
@@ -600,6 +616,14 @@ Koperator can be deployed using its [Helm chart](https://github.com/adobe/kopera
         kubectl create \
         -n kafka \
         -f https://raw.githubusercontent.com/adobe/koperator/v{{< param "latest_version" >}}/config/samples/simplekafkacluster_ssl.yaml
+        ```
+
+    - To create a sample Kafka cluster using KRaft mode (ZooKeeper-free), run the following command. For details on KRaft configuration, see {{% xref "/docs/kraft.md" %}}.
+
+        ```bash
+        kubectl create \
+        -n kafka \
+        -f https://raw.githubusercontent.com/adobe/koperator/master/config/samples/kraft/simplekafkacluster_kraft.yaml
         ```
 
     Expected output:

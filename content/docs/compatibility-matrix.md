@@ -13,7 +13,7 @@ This page shows you the list of supported Koperator versions, and the versions o
 
 |Image|Go version|
 |-|-|
-|ghcr.io/adobe/koperator/kafka-operator:0.28.0-adobe-20250921|1.25|
+|ghcr.io/adobe/koperator/kafka-operator:0.28.0-adobe-20250923|1.25|
 
 ## Available Apache Kafka images
 

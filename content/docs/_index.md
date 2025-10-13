@@ -11,6 +11,7 @@ The Koperator (formerly called Banzai Cloud Kafka Operator) is a Kubernetes oper
 [Apache Kafka](https://kafka.apache.org) is an open-source distributed streaming platform, and some of the main features of the **Koperator** are:
 
 - the provisioning of secure and production-ready Kafka clusters
+- **KRaft mode support** for ZooKeeper-free Kafka deployments
 - **fine grained** broker configuration support
 - advanced and highly configurable External Access via LoadBalancers using **Envoy**
 - graceful Kafka cluster **scaling and rebalancing**
@@ -123,6 +124,18 @@ Kafka operates with three type of configurations:
 Read-only config requires broker restart to update all the others may be updated dynamically.
 Operator CRD distinguishes these fields, and proceed with the right action. It can be a rolling upgrade, or
 a dynamic reconfiguration.
+
+### KRaft Mode Support (ZooKeeper-free Kafka)
+
+Koperator supports Apache Kafka's KRaft mode, which eliminates the dependency on ZooKeeper:
+
+- **Simplified Architecture**: Deploy Kafka clusters without requiring a separate ZooKeeper cluster
+- **Better Scalability**: Improved metadata handling for large-scale deployments
+- **Future-Ready**: KRaft is the future of Kafka and the recommended approach for new deployments
+- **Flexible Node Roles**: Support for dedicated controller nodes, broker nodes, or combined roles
+- **Production Ready**: Full support for SSL, monitoring, and all Koperator features in KRaft mode with Kafka 3.9.1
+
+For detailed KRaft configuration and deployment guides, see the [KRaft Mode Documentation]({{< relref "kraft.md" >}}).
 
 ### Seamless Istio mesh support
 

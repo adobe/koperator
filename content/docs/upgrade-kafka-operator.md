@@ -6,20 +6,23 @@ weight: 15
 
 When upgrading your Koperator deployment to a new version, complete the following steps.
 
-1. Download the CRDs for the new release from the [Koperator releases page](https://github.com/adobe/koperator/releases). They are included in the assets of the release.
+1. Update the CRDs for the new release from the main repository.
 
     {{< warning >}}**Hazard of data loss** Do not delete the old CRD from the cluster. Deleting the CRD removes your Kafka cluster.{{< /warning >}}
 
-1. Replace the KafkaCluster CRD with the new one on your cluster by running the following command (replace &lt;versionnumber> with the release you are upgrading to, for example, **v0.14.0**).
+1. Replace the KafkaCluster CRDs with the new ones on your cluster by running the following commands:
 
     ```bash
-    kubectl replace --validate=false -f https://github.com/adobe/koperator/releases/download/<versionnumber>/kafka-operator.crds.yaml
+    kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_cruisecontroloperations.yaml
+    kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_kafkaclusters.yaml
+    kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_kafkatopics.yaml
+    kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_kafkausers.yaml
     ```
 
 1. Update your Koperator deployment by running:
 
     ```bash
     helm upgrade kafka-operator \
-    oci://ghcr.io/adobe/koperator/kafka-operator \
+    oci://ghcr.io/adobe/helm-charts/kafka-operator \
     --namespace=kafka
     ```

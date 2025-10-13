@@ -41,10 +41,18 @@ The following tips and commands can help you to troubleshoot your Koperator inst
     kubectl get KafkaCluster kafka -n kafka -o jsonpath="{.status}" |jq
     ```
 
-1. Check the status of your ZooKeeper deployment, and the logs of the zookeeper-operator and zookeeper pods.
+1. Check the status of your cluster coordination system:
+
+    **For ZooKeeper-based clusters**: Check the status of your ZooKeeper deployment, and the logs of the zookeeper-operator and zookeeper pods.
 
     ```bash
     kubectl get pods -n zookeeper
+    ```
+
+    **For KRaft-based clusters**: Check the status of your controller nodes (they will have names like *kafka-controller-3-xxx*):
+
+    ```bash
+    kubectl get pods -n kafka | grep controller
     ```
 
 ## Check the KafkaCluster configuration
@@ -198,6 +206,9 @@ Before asking for help, prepare the following information to make troubleshootin
 - Kafka broker logs
 - Koperator configuration
 - Kafka cluster configuration (**kubectl describe KafkaCluster kafka -n kafka**)
-- ZooKeeper configuration (**kubectl describe ZookeeperCluster zookeeper-server -n zookeeper**)
-- ZooKeeper logs (**kubectl logs zookeeper-operator-5c9b597bcc-vkdz9 -n zookeeper**)
+- For ZooKeeper-based clusters:
+  - ZooKeeper configuration (**kubectl describe ZookeeperCluster zookeeper-server -n zookeeper**)
+  - ZooKeeper logs (**kubectl logs zookeeper-operator-5c9b597bcc-vkdz9 -n zookeeper**)
+- For KRaft-based clusters:
+  - Controller node logs (**kubectl logs kafka-controller-3-xxx -n kafka**)
 Do not forget to remove any sensitive information (for example, passwords and private keys) before sharing.

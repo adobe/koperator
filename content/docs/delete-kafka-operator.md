@@ -75,7 +75,10 @@ In case you want to delete the Koperator from your cluster, note that because of
 
 1. Delete Koperator Custom Resource Definitions (CRDs).
     ```
-    kubectl delete -f https://github.com/adobe/koperator/releases/download/v{{< param "latest_version" >}}/kafka-operator.crds.yaml
+    kubectl delete -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_cruisecontroloperations.yaml
+    kubectl delete -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_kafkaclusters.yaml
+    kubectl delete -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_kafkatopics.yaml
+    kubectl delete -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_kafkausers.yaml
     ```
 
 ## Uninstall Prometheus operator

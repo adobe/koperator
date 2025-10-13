@@ -1,0 +1,77 @@
+kubectl create -n kafka -f - <<EOF
+apiVersion: kafka.banzaicloud.io/v1beta1
+kind: KafkaCluster
+metadata:
+  name: kafka-kraft
+spec:
+  kRaft: true
+  headlessServiceEnabled: true
+  clusterImage: "ghcr.io/adobe/koperator/kafka:2.13-3.9.1"
+  
+  brokerConfigGroups:
+    default:
+      storageConfigs:
+        - mountPath: "/kafka-logs"
+          pvcSpec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 10Gi
+    broker:
+      processRoles:
+        - broker
+      storageConfigs:
+        - mountPath: "/kafka-logs-broker"
+          pvcSpec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 10Gi
+
+  brokers:
+    # Broker-only nodes
+    - id: 0
+      brokerConfigGroup: "broker"
+    - id: 1
+      brokerConfigGroup: "broker"
+    - id: 2
+      brokerConfigGroup: "broker"
+    
+    # Controller-only nodes
+    - id: 3
+      brokerConfigGroup: "default"
+      brokerConfig:
+        processRoles:
+          - controller
+    - id: 4
+      brokerConfigGroup: "default"
+      brokerConfig:
+        processRoles:
+          - controller
+    - id: 5
+      brokerConfigGroup: "default"
+      brokerConfig:
+        processRoles:
+          - controller
+
+  listenersConfig:
+    internalListeners:
+      - type: "plaintext"
+        name: "internal"
+        containerPort: 29092
+        usedForInnerBrokerCommunication: true
+      - type: "plaintext"
+        name: "controller"
+        containerPort: 29093
+        usedForInnerBrokerCommunication: false
+        usedForControllerCommunication: true
+
+  cruiseControlConfig:
+    cruiseControlTaskSpec:
+      RetryDurationMinutes: 5
+    topicConfig:
+      partitions: 12
+      replicationFactor: 3
+EOF

@@ -78,3 +78,11 @@ You can set node [affinity](https://kubernetes.io/docs/concepts/scheduling-evict
 You can configure your brokers to use custom [storage classes](https://kubernetes.io/docs/concepts/storage/storage-classes/).
 
 - [Custom storage class](https://github.com/adobe/koperator/blob/master/config/samples/simplekafkacluster_ebs_csi.yaml)
+
+## Kafka cluster with KRaft mode (ZooKeeper-free)
+
+You can deploy Kafka clusters using KRaft mode, which eliminates the need for ZooKeeper by using Kafka's built-in consensus mechanism. This is the future of Kafka and is recommended for new deployments.
+
+- [Simple KafkaCluster with KRaft mode](https://github.com/adobe/koperator/blob/master/config/samples/kraft/simplekafkacluster_kraft.yaml)
+
+For detailed information about KRaft configuration and deployment, see {{% xref "../../kraft.md" %}}.

@@ -74,12 +74,15 @@ How to setup the environment for the Kafka Performance Test.
 1. Install the Koperator CustomResourceDefinition resources (adjust the version number to the Koperator release you want to install) and the corresponding version of Koperator, the Operator for managing Apache Kafka on Kubernetes.
 
     ```bash
-    kubectl create --validate=false -f https://github.com/adobe/koperator/releases/download/v{{< param "latest_version" >}}/kafka-operator.crds.yaml
+    kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_cruisecontroloperations.yaml
+    kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_kafkaclusters.yaml
+    kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_kafkatopics.yaml
+    kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_kafkausers.yaml
     ```
 
     ```bash
     helm install kafka-operator \
-    oci://ghcr.io/adobe/koperator/kafka-operator \
+    oci://ghcr.io/adobe/helm-charts/kafka-operator \
     --namespace=kafka \
     --create-namespace
     ```
