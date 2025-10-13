@@ -294,20 +294,32 @@ release: check-release ## Tag and push a release.
 	git tag -a ${REL_TAG} -m ${RELEASE_MSG}
 	git push origin ${REL_TAG}
 
+define update-module-deps
+	echo "Updating $(1) deps"; \
+	cd $(1); \
+	go mod tidy; \
+	for m in $$(go list -mod=readonly -m -f '{{ if and (not .Replace) (not .Indirect) (not .Main)}}{{.Path}}{{end}}' all); do \
+		go get -u $$m; \
+	done; \
+	go mod tidy
+endef
+
 update-go-deps: ## Update Go modules dependencies.
-	@echo "Finding all directories with go.mod files..."
-	@for gomod in $$(find . -name "go.mod" | sort); do \
+	@echo "Updating third_party modules first (deepest to shallowest)..."
+	@for gomod in $$(find ./third_party -name "go.mod" 2>/dev/null | awk '{print length, $$0}' | sort -rn | cut -d' ' -f2-); do \
 		dir=$$(dirname $$gomod); \
-		( \
-		echo "Updating $$dir deps"; \
-		cd $$dir; \
-		go mod tidy; \
-		for m in $$(go list -mod=readonly -m -f '{{ if and (not .Replace) (not .Indirect) (not .Main)}}{{.Path}}{{end}}' all); do \
-			go get -u $$m; \
-		done; \
-		go mod tidy \
-		) \
+		($(call update-module-deps,$$dir)); \
 	done
+	@echo "Updating properties, api, and root modules..."
+	@for dir in ./properties ./api .; do \
+		if [ -f $$dir/go.mod ]; then \
+			($(call update-module-deps,$$dir)); \
+		fi \
+	done
+	@echo "Updating tests/e2e module last..."
+	@if [ -f ./tests/e2e/go.mod ]; then \
+		($(call update-module-deps,./tests/e2e)); \
+	fi
 
 tidy: ## Run go mod tidy in all Go modules.
 	@echo "Finding all directories with go.mod files..."
