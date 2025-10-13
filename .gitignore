@@ -27,9 +27,11 @@ charts/koperator/requirements.lock
 
 !/.idea/go.imports.xml
 !/.idea/copyright
+!/.idea/codeStyles
 !/.idea/encodings.xml
 !/.idea/externalDependencies.xml
-!/.idea/koperator.iml
+!/.idea/golinter.xml
+!/.idea/kafka-operator.iml
 !/.idea/misc.xml
 !/.idea/modules.xml
 !/.idea/vcs.xml
@@ -40,8 +42,6 @@ cover.out
 testbin/*
 
 manager_image_patch.yaml
-
-.idea
 
 # Go workspace files, see https://github.com/banzaicloud/koperator/pull/978 for
 # the reasoning why we decided not to commit these.
