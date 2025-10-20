@@ -155,13 +155,13 @@ func (r CruiseControlState) IsSucceeded() bool {
 }
 
 // IsDiskRebalanceSucceeded returns true if CruiseControlVolumeState is disk rebalance succeeded
-func (r CruiseControlVolumeState) IsDiskRebalanceSucceeded() bool {
-	return r == GracefulDiskRebalanceSucceeded
+func (s CruiseControlVolumeState) IsDiskRebalanceSucceeded() bool {
+	return s == GracefulDiskRebalanceSucceeded
 }
 
 // IsDiskRemovalSucceeded returns true if CruiseControlVolumeState is disk removal succeeded
-func (r CruiseControlVolumeState) IsDiskRemovalSucceeded() bool {
-	return r == GracefulDiskRemovalSucceeded
+func (s CruiseControlVolumeState) IsDiskRemovalSucceeded() bool {
+	return s == GracefulDiskRemovalSucceeded
 }
 
 // IsSSL determines if the receiver is using SSL
@@ -248,99 +248,186 @@ const (
 	// WaitingForRackAwareness states the broker is waiting for the rack awareness config
 	WaitingForRackAwareness RackAwarenessState = "WaitingForRackAwareness"
 
-	// Upscale cruise control states
-	// GracefulUpscaleRequired states that a broker upscale is required
+	// GracefulUpscaleRequired indicates that a broker upscale operation is needed.
+	// This is the initial state when new brokers are added to the cluster and Cruise Control
+	// needs to rebalance partitions to distribute load across the new brokers.
+	// Transition: Required -> Scheduled -> Running -> Succeeded/CompletedWithError/Paused
 	GracefulUpscaleRequired CruiseControlState = "GracefulUpscaleRequired"
-	// GracefulUpscaleRunning states that the broker upscale task is still running in CC
+	// GracefulUpscaleRunning indicates that the broker upscale task is actively executing in Cruise Control.
+	// During this state, CC is moving partition replicas to the new brokers to balance the cluster load.
+	// The operation may take significant time depending on cluster size and data volume.
 	GracefulUpscaleRunning CruiseControlState = "GracefulUpscaleRunning"
-	// GracefulUpscaleScheduled states that the broker upscale CCOperation is created and the task is waiting for execution
+	// GracefulUpscaleScheduled indicates that a CruiseControlOperation resource has been created
+	// for the broker upscale task and is waiting in the queue for execution.
+	// This state occurs when CC is busy with other operations or waiting for prerequisites.
 	GracefulUpscaleScheduled CruiseControlState = "GracefulUpscaleScheduled"
-	// GracefulUpscaleSucceeded states the broker is updated gracefully OR
-	// states that the broker is part of the initial cluster creation where CC topic is still in creating stage
+	// GracefulUpscaleSucceeded indicates that the broker upscale completed successfully and
+	// partitions have been rebalanced across the new brokers. This is also the state for brokers
+	// that are part of the initial cluster creation while the Cruise Control topic is being created.
 	GracefulUpscaleSucceeded CruiseControlState = "GracefulUpscaleSucceeded"
-	// GracefulUpscaleCompletedWithError states that the broker upscale task completed with an error
+	// GracefulUpscaleCompletedWithError indicates that the broker upscale task finished but
+	// encountered errors during execution. The operation may be retried automatically depending
+	// on the error type and retry policy configuration.
 	GracefulUpscaleCompletedWithError CruiseControlState = "GracefulUpscaleCompletedWithError"
-	// GracefulUpscalePaused states that the broker upscale task is completed with an error and it will not be retried, it is paused
+	// GracefulUpscalePaused indicates that the broker upscale task encountered an error and
+	// has been paused. The operation will not be automatically retried and requires manual
+	// intervention to resolve the issue before resuming.
 	GracefulUpscalePaused CruiseControlState = "GracefulUpscalePaused"
+
 	// Downscale cruise control states
-	// GracefulDownscaleRequired states that a broker downscale is required
+
+	// GracefulDownscaleRequired indicates that a broker downscale operation is needed.
+	// This state is set when brokers are being removed from the cluster and Cruise Control
+	// must migrate all partition replicas off the brokers before they can be safely decommissioned.
+	// Transition: Required -> Scheduled -> Running -> Succeeded/CompletedWithError/Paused
 	GracefulDownscaleRequired CruiseControlState = "GracefulDownscaleRequired"
-	// GracefulDownscaleScheduled states that the broker downscale CCOperation is created and the task is waiting for execution
+	// GracefulDownscaleScheduled indicates that a CruiseControlOperation resource has been created
+	// for the broker downscale task and is waiting in the queue for execution.
+	// This state occurs when CC is busy with other operations or waiting for prerequisites.
 	GracefulDownscaleScheduled CruiseControlState = "GracefulDownscaleScheduled"
-	// GracefulDownscaleRunning states that the broker downscale is still running in CC
+	// GracefulDownscaleRunning indicates that the broker downscale task is actively executing in Cruise Control.
+	// During this state, CC is moving all partition replicas off the brokers being removed to ensure
+	// no data loss occurs. This operation may take significant time depending on data volume.
 	GracefulDownscaleRunning CruiseControlState = "GracefulDownscaleRunning"
-	// GracefulDownscaleSucceeded states that the broker downscaled gracefully
+	// GracefulDownscaleSucceeded indicates that the broker downscale completed successfully.
+	// All partition replicas have been migrated off the removed brokers and they can be safely
+	// decommissioned without data loss or service interruption.
 	GracefulDownscaleSucceeded CruiseControlState = "GracefulDownscaleSucceeded"
-	// GracefulDownscaleCompletedWithError states that the broker downscale task completed with an error
+	// GracefulDownscaleCompletedWithError indicates that the broker downscale task finished but
+	// encountered errors during execution. The operation may be retried automatically depending
+	// on the error type and retry policy configuration.
 	GracefulDownscaleCompletedWithError CruiseControlState = "GracefulDownscaleCompletedWithError"
-	// GracefulDownscalePaused states that the broker downscale task is completed with an error and it will not be retried, it is paused. In this case further downscale tasks can be executed
+	// GracefulDownscalePaused indicates that the broker downscale task encountered an error and
+	// has been paused. The operation will not be automatically retried and requires manual intervention.
+	// Note: In this state, further downscale tasks can still be executed for other brokers.
 	GracefulDownscalePaused CruiseControlState = "GracefulDownscalePaused"
 
 	// Disk removal cruise control states
-	// GracefulDiskRemovalRequired states that the broker volume needs to be removed
+
+	// GracefulDiskRemovalRequired indicates that a broker volume needs to be removed from the cluster.
+	// This state is set when storage volumes are being decommissioned and Cruise Control must migrate
+	// all partition replicas off the volume before it can be safely removed.
+	// Transition: Required -> Scheduled -> Running -> Succeeded/CompletedWithError/Paused
 	GracefulDiskRemovalRequired CruiseControlVolumeState = "GracefulDiskRemovalRequired"
-	// GracefulDiskRemovalRunning states that for the broker volume a CC disk removal is in progress
+	// GracefulDiskRemovalRunning indicates that a Cruise Control disk removal operation is actively
+	// executing for the broker volume. During this state, CC is moving all partition replicas from
+	// the volume to other available disks to ensure no data loss occurs.
 	GracefulDiskRemovalRunning CruiseControlVolumeState = "GracefulDiskRemovalRunning"
-	// GracefulDiskRemovalSucceeded states that the for the broker volume removal has succeeded
+	// GracefulDiskRemovalSucceeded indicates that the broker volume removal completed successfully.
+	// All partition replicas have been migrated off the volume and it can be safely removed
+	// from the broker without data loss or service interruption.
 	GracefulDiskRemovalSucceeded CruiseControlVolumeState = "GracefulDiskRemovalSucceeded"
-	// GracefulDiskRemovalScheduled states that the broker volume removal CCOperation is created and the task is waiting for execution
+	// GracefulDiskRemovalScheduled indicates that a CruiseControlOperation resource has been created
+	// for the volume removal task and is waiting in the queue for execution.
+	// This state occurs when CC is busy with other operations or waiting for prerequisites.
 	GracefulDiskRemovalScheduled CruiseControlVolumeState = "GracefulDiskRemovalScheduled"
-	// GracefulDiskRemovalCompletedWithError states that the broker volume removal task completed with an error
+	// GracefulDiskRemovalCompletedWithError indicates that the broker volume removal task finished
+	// but encountered errors during execution. The operation may be retried automatically depending
+	// on the error type and retry policy configuration.
 	GracefulDiskRemovalCompletedWithError CruiseControlVolumeState = "GracefulDiskRemovalCompletedWithError"
-	// GracefulDiskRemovalPaused states that the broker volume removal task is completed with an error and it will not be retried, it is paused
+	// GracefulDiskRemovalPaused indicates that the broker volume removal task encountered an error
+	// and has been paused. The operation will not be automatically retried and requires manual
+	// intervention to resolve the issue before resuming.
 	GracefulDiskRemovalPaused CruiseControlVolumeState = "GracefulDiskRemovalPaused"
 
 	// Disk rebalance cruise control states
-	// GracefulDiskRebalanceRequired states that the broker volume needs a CC disk rebalance
+
+	// GracefulDiskRebalanceRequired indicates that a broker volume needs disk rebalancing.
+	// This state is set when storage utilization is uneven across volumes and Cruise Control
+	// should redistribute partition replicas to achieve better balance and performance.
+	// Transition: Required -> Scheduled -> Running -> Succeeded/CompletedWithError/Paused
 	GracefulDiskRebalanceRequired CruiseControlVolumeState = "GracefulDiskRebalanceRequired"
-	// GracefulDiskRebalanceRunning states that for the broker volume a CC disk rebalance is in progress
+	// GracefulDiskRebalanceRunning indicates that a Cruise Control disk rebalance operation is
+	// actively executing for the broker volume. During this state, CC is moving partition replicas
+	// between volumes to achieve more even storage utilization and improve performance.
 	GracefulDiskRebalanceRunning CruiseControlVolumeState = "GracefulDiskRebalanceRunning"
-	// GracefulDiskRebalanceSucceeded states that the for the broker volume rebalance has succeeded
+	// GracefulDiskRebalanceSucceeded indicates that the broker volume rebalance completed successfully.
+	// Partition replicas have been redistributed across volumes to achieve better storage balance
+	// and the volume is now optimally utilized.
 	GracefulDiskRebalanceSucceeded CruiseControlVolumeState = "GracefulDiskRebalanceSucceeded"
-	// GracefulDiskRebalanceScheduled states that the broker volume rebalance CCOperation is created and the task is waiting for execution
+	// GracefulDiskRebalanceScheduled indicates that a CruiseControlOperation resource has been created
+	// for the volume rebalance task and is waiting in the queue for execution.
+	// This state occurs when CC is busy with other operations or waiting for prerequisites.
 	GracefulDiskRebalanceScheduled CruiseControlVolumeState = "GracefulDiskRebalanceScheduled"
-	// GracefulDiskRebalanceCompletedWithError states that the broker volume rebalance task completed with an error
+	// GracefulDiskRebalanceCompletedWithError indicates that the broker volume rebalance task finished
+	// but encountered errors during execution. The operation may be retried automatically depending
+	// on the error type and retry policy configuration.
 	GracefulDiskRebalanceCompletedWithError CruiseControlVolumeState = "GracefulDiskRebalanceCompletedWithError"
-	// GracefulDiskRebalancePaused states that the broker volume rebalance task is completed with an error and it will not be retried, it is paused
+	// GracefulDiskRebalancePaused indicates that the broker volume rebalance task encountered an error
+	// and has been paused. The operation will not be automatically retried and requires manual
+	// intervention to resolve the issue before resuming.
 	GracefulDiskRebalancePaused CruiseControlVolumeState = "GracefulDiskRebalancePaused"
 
-	// CruiseControlTopicNotReady states the CC required topic is not yet created
+	// CruiseControlTopicNotReady indicates that the Cruise Control metrics topic has not been created yet.
+	// This internal topic is required for CC to collect and store broker metrics. Operations cannot
+	// proceed until this topic is successfully created and ready.
 	CruiseControlTopicNotReady CruiseControlTopicStatus = "CruiseControlTopicNotReady"
-	// CruiseControlTopicReady states the CC required topic is created
+	// CruiseControlTopicReady indicates that the Cruise Control metrics topic has been successfully created
+	// and is ready to receive broker metrics. This is a prerequisite for CC operations to execute.
 	CruiseControlTopicReady CruiseControlTopicStatus = "CruiseControlTopicReady"
-	// CruiseControlTaskActive states the CC task is scheduled but not yet running
+	// CruiseControlTaskActive indicates that a Cruise Control task has been scheduled and is waiting
+	// in the queue but has not yet started execution. This occurs when CC is processing other tasks
+	// or waiting for required conditions to be met.
 	CruiseControlTaskActive CruiseControlUserTaskState = "Active"
-	// CruiseControlTaskInExecution states the CC task is executing
+	// CruiseControlTaskInExecution indicates that a Cruise Control task is currently executing.
+	// During this state, CC is actively performing the requested operation such as rebalancing
+	// partitions, adding/removing brokers, or moving replicas between disks.
 	CruiseControlTaskInExecution CruiseControlUserTaskState = "InExecution"
-	// CruiseControlTaskCompleted states the CC task completed successfully
+	// CruiseControlTaskCompleted indicates that a Cruise Control task finished successfully.
+	// The requested operation has been completed without errors and the cluster is in the desired state.
 	CruiseControlTaskCompleted CruiseControlUserTaskState = "Completed"
-	// CruiseControlTaskCompletedWithError states the CC task completed with error
+	// CruiseControlTaskCompletedWithError indicates that a Cruise Control task finished but encountered
+	// errors during execution. The task may have partially completed or failed entirely. Check the
+	// error details to determine if retry or manual intervention is needed.
 	CruiseControlTaskCompletedWithError CruiseControlUserTaskState = "CompletedWithError"
-	// KafkaClusterReconciling states that the cluster is still in reconciling stage
+	// KafkaClusterReconciling indicates that the Kafka cluster is in the reconciliation phase.
+	// During this state, the operator is working to bring the cluster to the desired state by
+	// creating, updating, or deleting resources. This is a transitional state during initial
+	// cluster creation or when applying configuration changes.
 	KafkaClusterReconciling ClusterState = "ClusterReconciling"
-	// KafkaClusterRollingUpgrading states that the cluster is rolling upgrading
+	// KafkaClusterRollingUpgrading indicates that the Kafka cluster is performing a rolling upgrade.
+	// Brokers are being restarted one at a time to apply configuration changes, version upgrades,
+	// or other updates while maintaining cluster availability and minimizing service disruption.
 	KafkaClusterRollingUpgrading ClusterState = "ClusterRollingUpgrading"
-	// KafkaClusterRunning states that the cluster is in running state
+	// KafkaClusterRunning indicates that the Kafka cluster is in a healthy running state.
+	// All brokers are operational, configurations are in sync, and the cluster is ready to
+	// handle producer and consumer traffic without ongoing maintenance operations.
 	KafkaClusterRunning ClusterState = "ClusterRunning"
 
-	// ConfigInSync states that the generated brokerConfig is in sync with the Broker
+	// ConfigInSync indicates that the generated broker configuration matches the actual configuration
+	// running on the broker. No configuration changes are pending and the broker is operating with
+	// the desired settings.
 	ConfigInSync ConfigurationState = "ConfigInSync"
-	// ConfigOutOfSync states that the generated brokerConfig is out of sync with the Broker
+	// ConfigOutOfSync indicates that the generated broker configuration differs from the actual
+	// configuration running on the broker. A rolling restart or dynamic update may be required
+	// to apply the pending configuration changes.
 	ConfigOutOfSync ConfigurationState = "ConfigOutOfSync"
-	// PerBrokerConfigInSync states that the generated per-broker brokerConfig is in sync with the Broker
+	// PerBrokerConfigInSync indicates that the generated per-broker dynamic configuration is in sync
+	// with the broker's actual configuration. Per-broker configs are broker-specific settings that
+	// can be updated dynamically without requiring a broker restart.
 	PerBrokerConfigInSync PerBrokerConfigurationState = "PerBrokerConfigInSync"
-	// PerBrokerConfigOutOfSync states that the generated per-broker brokerConfig is out of sync with the Broker
+	// PerBrokerConfigOutOfSync indicates that the generated per-broker dynamic configuration differs
+	// from the broker's actual configuration. The operator will attempt to apply these changes
+	// dynamically using Kafka's configuration API without restarting the broker.
 	PerBrokerConfigOutOfSync PerBrokerConfigurationState = "PerBrokerConfigOutOfSync"
-	// PerBrokerConfigError states that the generated per-broker brokerConfig can not be set in the Broker
+	// PerBrokerConfigError indicates that the operator failed to apply the per-broker dynamic
+	// configuration to the broker. This may be due to invalid configuration values, broker API
+	// errors, or permission issues. Manual intervention may be required to resolve the error.
 	PerBrokerConfigError PerBrokerConfigurationState = "PerBrokerConfigError"
 
-	// SecurityProtocolSSL
+	// SecurityProtocolSSL enables SSL/TLS encryption for broker communication without SASL authentication.
+	// This protocol provides encryption in transit but relies on SSL/TLS certificates for authentication.
 	SecurityProtocolSSL SecurityProtocol = "ssl"
-	// SecurityProtocolPlaintext
+	// SecurityProtocolPlaintext uses unencrypted communication with no authentication.
+	// This protocol should only be used in trusted networks as all data is transmitted in clear text.
 	SecurityProtocolPlaintext SecurityProtocol = "plaintext"
-	// SecurityProtocolSaslSSL
+	// SecurityProtocolSaslSSL combines SASL authentication with SSL/TLS encryption.
+	// This protocol provides both strong authentication (via SASL mechanisms like SCRAM, GSSAPI, etc.)
+	// and encryption in transit, making it the most secure option for production environments.
 	SecurityProtocolSaslSSL SecurityProtocol = "sasl_ssl"
-	// SecurityProtocolSaslPlaintext
+	// SecurityProtocolSaslPlaintext enables SASL authentication over unencrypted connections.
+	// This protocol provides authentication but transmits data in clear text, including credentials
+	// during the authentication handshake. Use with caution and only in trusted networks.
 	SecurityProtocolSaslPlaintext SecurityProtocol = "sasl_plaintext"
 
 	// SSLClientAuthRequired states that the client authentication is required when SSL is enabled

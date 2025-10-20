@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  REPOSITORY: koperator_e2e_test  
+  REPOSITORY: koperator_e2e_test
 
 jobs:
   build:
@@ -20,7 +20,7 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
-        
+
       - name: Clean workspace
         run: |
           # Remove any existing go.work files to ensure clean module resolution
@@ -35,7 +35,7 @@ jobs:
         uses: azure/setup-helm@v4
         with:
           version: '3.19.0'
-          
+
       - name: Clean Go module cache
         run: |
           # Clean any existing Go module cache to avoid conflicts
@@ -47,13 +47,17 @@ jobs:
           # Ensure proper permissions
           chmod -R 755 ~/go/pkg/mod
           chmod -R 755 ~/.cache/go-build
-          
-      # Enable Tmate Session if you'd like to Debut the E2E Kind Cluster
-      # - name: Setup tmate session
-      #   uses: mxschmitt/action-tmate@v3
-      #   with:
-      #     detached: true
-      
+
+      # Enable Tmate Session to debug the E2E Kind Cluster
+      # Only activates when re-running the workflow in debug mode
+      - name: Setup tmate session
+        if: ${{ runner.debug == '1' }}
+        continue-on-error: true
+        uses: mxschmitt/action-tmate@v3
+        with:
+          detached: true
+          limit-access-to-actor: true
+
       - name: Build docker image
         run: |
           IMG=$REPOSITORY:$GITHUB_SHA make docker-build
@@ -75,7 +79,7 @@ jobs:
           cd properties && go mod download && cd ..
           cd tests/e2e && go mod download && cd ../..
 
-          
+
       - name: Run E2E tests
         env:
            KUBECONFIG: ${{ steps.setup-kind.outputs.kubeconfig }}

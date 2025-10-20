@@ -24,6 +24,8 @@ import (
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/banzaicloud/koperator/api/v1beta1"
 )
@@ -129,6 +131,70 @@ var _ = Describe("KafkaClusterController", func() {
 				log.Info("check reconciles on delete", "reconciles", reconciles)
 				return reconciles
 			}, 10).Should(BeNumerically("==", expectedNumOfReconciles))
+		})
+	})
+
+	Context("Reconcile - Basic Object Lifecycle", func() {
+		It("should successfully create a KafkaCluster CR", func() {
+			By("creating the KafkaCluster CR")
+			err := k8sClient.Create(ctx, kafkaCluster)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("verifying the cluster exists")
+			cluster := &v1beta1.KafkaCluster{}
+			err = k8sClient.Get(ctx, types.NamespacedName{
+				Name:      kafkaClusterName,
+				Namespace: namespace,
+			}, cluster)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(cluster.Name).To(Equal(kafkaClusterName))
+		})
+
+		It("should allow updating KafkaCluster spec", func() {
+			By("creating the KafkaCluster CR")
+			err := k8sClient.Create(ctx, kafkaCluster)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("updating the cluster spec")
+			cluster := &v1beta1.KafkaCluster{}
+			err = k8sClient.Get(ctx, types.NamespacedName{
+				Name:      kafkaClusterName,
+				Namespace: namespace,
+			}, cluster)
+			Expect(err).NotTo(HaveOccurred())
+
+			if cluster.Annotations == nil {
+				cluster.Annotations = make(map[string]string)
+			}
+			cluster.Annotations["test-key"] = "test-value"
+			err = k8sClient.Update(ctx, cluster)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("verifying the update was applied")
+			updatedCluster := &v1beta1.KafkaCluster{}
+			err = k8sClient.Get(ctx, types.NamespacedName{
+				Name:      kafkaClusterName,
+				Namespace: namespace,
+			}, updatedCluster)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(updatedCluster.Annotations["test-key"]).To(Equal("test-value"))
+		})
+
+		It("should handle multiple clusters in same namespace", func() {
+			By("creating first cluster")
+			err := k8sClient.Create(ctx, kafkaCluster)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("creating second cluster")
+			cluster2 := createMinimalKafkaClusterCR(fmt.Sprintf("%s-2", kafkaClusterName), namespace)
+			err = k8sClient.Create(ctx, cluster2)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("verifying both clusters exist")
+			list := &v1beta1.KafkaClusterList{}
+			err = k8sClient.List(ctx, list, &client.ListOptions{Namespace: namespace})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(len(list.Items)).To(BeNumerically(">=", 2))
 		})
 	})
 })
