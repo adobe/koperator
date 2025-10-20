@@ -708,7 +708,7 @@ spec:
   # monitoringConfig describes the monitoring related configs
   #monitoringConfig:
   # jmxImage describes the used prometheus jmx exporter agent container
-  #  jmxImage: "ghcr.io/amuraru/jmx-javaagent:0.19.2"
+  #  jmxImage: "ghcr.io/adobe/koperator/jmx-javaagent:1.4.0"
   # pathToJar describes the path to the jar file in the given image
   #  pathToJar: "/jmx_prometheus_javaagent.jar"
   # kafkaJMXExporterConfig describes jmx exporter config for Kafka
