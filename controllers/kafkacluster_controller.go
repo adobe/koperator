@@ -194,6 +194,10 @@ func (r *KafkaClusterReconciler) Reconcile(ctx context.Context, request ctrl.Req
 		if err := k8sutil.UpdateRollingUpgradeState(r.Client, instance, time.Now(), log); err != nil {
 			return requeueWithError(log, err.Error(), err)
 		}
+		// Don't transition to Running state while rolling upgrade is in progress
+		// The state will be updated to Running by the kafka reconciler when the upgrade completes
+		log.Info("Rolling upgrade in progress, keeping current state")
+		return reconciled()
 	}
 
 	if err := k8sutil.UpdateCRStatus(r.Client, instance, v1beta1.KafkaClusterRunning, log); err != nil {
@@ -300,16 +304,15 @@ func (r *KafkaClusterReconciler) checkFinalizers(ctx context.Context, cluster *v
 		// user finalizations are done before it does its final cleanup
 		log.Info("Tearing down any PKI resources for the kafkacluster")
 		if err = pki.GetPKIManager(r.Client, cluster, v1beta1.PKIBackendProvided).FinalizePKI(ctx); err != nil {
-			switch err.(type) {
-			case errorfactory.ResourceNotReady:
+			// Use errors.As for consistency with the rest of the controller
+			if errors.As(err, &errorfactory.ResourceNotReady{}) {
 				log.Info("The PKI is not ready to be torn down")
 				return ctrl.Result{
 					Requeue:      true,
 					RequeueAfter: time.Duration(5) * time.Second,
 				}, nil
-			default:
-				return requeueWithError(log, "failed to finalize PKI", err)
 			}
+			return requeueWithError(log, "failed to finalize PKI", err)
 		}
 	}
 
@@ -356,6 +359,7 @@ func (r *KafkaClusterReconciler) updateAndFetchLatest(ctx context.Context, clust
 	if err != nil {
 		return nil, err
 	}
+
 	cluster.TypeMeta = typeMeta
 	return cluster, nil
 }

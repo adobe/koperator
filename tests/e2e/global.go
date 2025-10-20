@@ -127,7 +127,9 @@ var (
 		ReleaseName:  "zookeeper-operator",
 		Namespace:    "zookeeper",
 		SetValues: map[string]string{
-			"crd.create": "false",
+			"crd.create":       "false",
+			"image.repository": "ghcr.io/adobe/zookeeper-operator",
+			"image.tag":        "0.2.15-adobe-20250923",
 		},
 		RemoteCRDPathVersionTemplate: "https://raw.githubusercontent.com/adobe/zookeeper-operator/%s/config/crd/bases/zookeeper.pravega.io_zookeeperclusters.yaml",
 		HelmExtraArguments: map[string][]string{

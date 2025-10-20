@@ -84,6 +84,9 @@ metadata:
     namespace: zookeeper
 spec:
     replicas: 1
+    image:
+        repository: ghcr.io/adobe/zookeeper-operator/zookeeper
+        tag: 3.8.4-0.2.15-adobe-20250923
     persistence:
         reclaimPolicy: Delete
 EOF
