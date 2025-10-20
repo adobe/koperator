@@ -234,7 +234,7 @@ func configureBrokerKRaftMode(bConfig *v1beta1.BrokerConfig, brokerID int32, kaf
 			}
 		}
 	} else if bConfig.IsBrokerOnlyNode() {
-		// "listeners" configuration cannot contain controller configuration when the node is a broker-only node
+		// "listeners" configuration cannot contain broker configuration when the node is a broker-only node
 		var nonControllerListener []string
 		for _, listener := range listenerConfig {
 			if listener[:len(controllerListenerName)] != strings.ToUpper(controllerListenerName) {

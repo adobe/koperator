@@ -31,7 +31,7 @@ operator:
   # the Cert-manager's Custom Resource Namespace must be included in the comma separated list.
   # When it is empty, all namespaces will be watched.
   # -- List of namespaces where Operator watches for custom resources.<br><br>**Note** that the operator still requires to read the cluster-scoped `Node` labels to configure `rack awareness`. Make sure the operator ServiceAccount is granted `get` permissions on this `Node` resource when using limited RBACs.
-  namespaces: "kafka, cert-manager"
+  namespaces: ""
   # -- Enable verbose logging
   verboseLogging: false
   # -- Enable development logging
