@@ -5,16 +5,12 @@ metadata:
     controller-tools.k8s.io: "1.0"
   name: kafka
 spec:
+  kRaft: true
   headlessServiceEnabled: false
   ingressController: "istioingress"
-  istioControlPlane:
-    name: icp-v115x-sample # The name of the existing istio control plane should be used here
-    namespace: istio-system
   istioIngressConfig:
     gatewayConfig:
       mode: ISTIO_MUTUAL
-  zkAddresses:
-    - "zookeeper-server-client.zookeeper:2181"
   oneBrokerPerNode: false
   clusterImage: "ghcr.io/adobe/koperator/kafka:2.13-3.9.1"
   readOnlyConfig: |
@@ -24,8 +20,6 @@ spec:
     cruise.control.metrics.topic.replication.factor=2
   brokerConfigGroups:
     default:
-      brokerAnnotations:
-        sidecar.istio.io/userVolumeMount: '[{"name":"exitfile", "mountPath":"/var/run/wait", "readonly":true}]'
       storageConfigs:
         - mountPath: "/kafka-logs"
           pvcSpec:
@@ -34,13 +28,41 @@ spec:
             resources:
               requests:
                 storage: 10Gi
+    broker:
+      processRoles:
+        - broker
+      storageConfigs:
+        - mountPath: "/kafka-logs-broker"
+          pvcSpec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 10Gi
+      brokerAnnotations:
+        sidecar.istio.io/userVolumeMount: '[{"name":"exitfile", "mountPath":"/var/run/wait", "readonly":true}]'
   brokers:
     - id: 0
-      brokerConfigGroup: "default"
+      brokerConfigGroup: "broker"
     - id: 1
-      brokerConfigGroup: "default"
+      brokerConfigGroup: "broker"
     - id: 2
+      brokerConfigGroup: "broker"
+    - id: 3
       brokerConfigGroup: "default"
+      brokerConfig:
+        processRoles:
+          - controller
+    - id: 4
+      brokerConfigGroup: "default"
+      brokerConfig:
+        processRoles:
+          - controller
+    - id: 5
+      brokerConfigGroup: "default"
+      brokerConfig:
+        processRoles:
+          - controller
   rollingUpgradeConfig:
     failureThreshold: 1
   listenersConfig:
@@ -59,6 +81,7 @@ spec:
         name: "external"
         externalStartingPort: 19090
         containerPort: 9094
+        hostnameOverride: "ingress.test.host.com"
   cruiseControlConfig:
     topicConfig:
       partitions: 12
@@ -68,22 +91,6 @@ spec:
       #
       # This is an example property file for Kafka Cruise Control. See KafkaCruiseControlConfig for more details.
       # Configuration for the metadata client.
-      # =======================================
-      # The maximum interval in milliseconds between two metadata refreshes.
-      #metadata.max.age.ms=300000
-      # Client id for the Cruise Control. It is used for the metadata client.
-      #client.id=kafka-cruise-control
-      # The size of TCP send buffer bytes for the metadata client.
-      #send.buffer.bytes=131072
-      # The size of TCP receive buffer size for the metadata client.
-      #receive.buffer.bytes=131072
-      # The time to wait before disconnect an idle TCP connection.
-      #connections.max.idle.ms=540000
-      # The time to wait before reconnect to a given host.
-      #reconnect.backoff.ms=50
-      # The time to wait for a response from a host after sending a request.
-      #request.timeout.ms=30000
-      # Configurations for the load monitor
       # =======================================
       # The number of metric fetcher thread to fetch metrics for the Kafka cluster
       num.metric.fetchers=1
@@ -120,7 +127,6 @@ spec:
       min.samples.per.broker.metrics.window=1
       # The configuration for the BrokerCapacityConfigFileResolver (supports JBOD and non-JBOD broker capacities)
       capacity.config.file=config/capacity.json
-      #capacity.config.file=config/capacityJBOD.json
       # Configurations for the analyzer
       # =======================================
       # The list of goals to optimize the Kafka cluster for with pre-computed proposals
@@ -167,8 +173,6 @@ spec:
       max.replicas.per.broker=10000
       # The number of threads to use for proposal candidate precomputing.
       num.proposal.precompute.threads=1
-      # the topics that should be excluded from the partition movement.
-      #topics.excluded.from.partition.movement
       # Configurations for the executor
       # =======================================
       # The max number of partitions to move in/out on a given broker at a given time.
@@ -187,10 +191,6 @@ spec:
       anomaly.detection.goals=com.linkedin.kafka.cruisecontrol.analyzer.goals.ReplicaCapacityGoal,com.linkedin.kafka.cruisecontrol.analyzer.goals.DiskCapacityGoal,com.linkedin.kafka.cruisecontrol.analyzer.goals.NetworkInboundCapacityGoal,com.linkedin.kafka.cruisecontrol.analyzer.goals.NetworkOutboundCapacityGoal,com.linkedin.kafka.cruisecontrol.analyzer.goals.CpuCapacityGoal
       # The interested metrics for metric anomaly analyzer.
       metric.anomaly.analyzer.metrics=BROKER_PRODUCE_LOCAL_TIME_MS_MAX,BROKER_PRODUCE_LOCAL_TIME_MS_MEAN,BROKER_CONSUMER_FETCH_LOCAL_TIME_MS_MAX,BROKER_CONSUMER_FETCH_LOCAL_TIME_MS_MEAN,BROKER_FOLLOWER_FETCH_LOCAL_TIME_MS_MAX,BROKER_FOLLOWER_FETCH_LOCAL_TIME_MS_MEAN,BROKER_LOG_FLUSH_TIME_MS_MAX,BROKER_LOG_FLUSH_TIME_MS_MEAN
-      ## Adjust accordingly if your metrics reporter is an older version and does not produce these metrics.
-      #metric.anomaly.analyzer.metrics=BROKER_PRODUCE_LOCAL_TIME_MS_50TH,BROKER_PRODUCE_LOCAL_TIME_MS_999TH,BROKER_CONSUMER_FETCH_LOCAL_TIME_MS_50TH,BROKER_CONSUMER_FETCH_LOCAL_TIME_MS_999TH,BROKER_FOLLOWER_FETCH_LOCAL_TIME_MS_50TH,BROKER_FOLLOWER_FETCH_LOCAL_TIME_MS_999TH,BROKER_LOG_FLUSH_TIME_MS_50TH,BROKER_LOG_FLUSH_TIME_MS_999TH
-      # The zk path to store failed broker information.
-      failed.brokers.zk.path=/CruiseControlBrokerList
       # Topic config provider class
       topic.config.provider.class=com.linkedin.kafka.cruisecontrol.config.KafkaTopicConfigProvider
       # The cluster configurations for the KafkaTopicConfigProvider
@@ -205,12 +205,6 @@ spec:
       max.active.user.tasks=25
       # Enable self healing for all anomaly detectors, unless the particular anomaly detector is explicitly disabled
       self.healing.enabled=true
-      # Enable self healing for broker failure detector
-      #self.healing.broker.failure.enabled=true
-      # Enable self healing for goal violation detector
-      #self.healing.goal.violation.enabled=true
-      # Enable self healing for metric anomaly detector
-      #self.healing.metric.anomaly.enabled=true
       # configurations for the webserver
       # ================================
       # HTTP listen port
@@ -224,18 +218,12 @@ spec:
       # Value for Access-Control-Request-Method
       webserver.http.cors.allowmethods=OPTIONS,GET,POST
       # Headers that should be exposed to the Browser (Webapp)
-      # This is a special header that is used by the
-      # User Tasks subsystem and should be explicitly
-      # Enabled when CORS mode is used as part of the
-      # Admin Interface
       webserver.http.cors.exposeheaders=User-Task-ID
       # REST API default prefix
-      # (dont forget the ending *)
       webserver.api.urlprefix=/kafkacruisecontrol/*
       # Location where the Cruise Control frontend is deployed
       webserver.ui.diskpath=./cruise-control-ui/dist/
       # URL path prefix for UI
-      # (dont forget the ending *)
       webserver.ui.urlprefix=/*
       # Time After which request is converted to Async
       webserver.request.maxBlockTimeMs=10000
@@ -253,3 +241,4 @@ spec:
       {
         "min.insync.replicas": 3
       }
+

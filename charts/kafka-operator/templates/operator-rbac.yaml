@@ -27,18 +27,6 @@ metadata:
     app.kubernetes.io/component: operator
 rules:
 - apiGroups:
-  - servicemesh.cisco.com
-  resources:
-  - istiomeshgateways
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
   - networking.istio.io
   resources:
   - '*'

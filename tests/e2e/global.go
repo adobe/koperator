@@ -53,6 +53,45 @@ var (
 		},
 	}
 
+	// istio base installation
+	istioBaseHelmDescriptor = helmDescriptor{
+		Repository:   "https://istio-release.storage.googleapis.com/charts",
+		ChartName:    "base",
+		ChartVersion: "1.27.1",
+		ReleaseName:  "istio-base",
+		Namespace:    "istio-system",
+		SetValues: map[string]string{
+			"defaultRevision": "",
+		},
+	}
+
+	// istio istiod installation
+	istiodHelmDescriptor = helmDescriptor{
+		Repository:   "https://istio-release.storage.googleapis.com/charts",
+		ChartName:    "istiod",
+		ChartVersion: "1.27.1",
+		ReleaseName:  "istiod",
+		Namespace:    "istio-system",
+		SetValues: map[string]string{
+			"revision": "",
+		},
+	}
+
+	// istio ingress gateway installation
+	istioIngressGatewayHelmDescriptor = helmDescriptor{
+		Repository:   "https://istio-release.storage.googleapis.com/charts",
+		ChartName:    "gateway",
+		ChartVersion: "1.27.1",
+		ReleaseName:  "istio-ingressgateway",
+		Namespace:    "istio-system",
+		SetValues: map[string]string{
+			"service.type":        "LoadBalancer",
+			"revision":            "",
+			"autoscaling.enabled": "false",
+			"replicaCount":        "1",
+		},
+	}
+
 	// koperatorLocalHelmDescriptor describes the Koperator Helm component with
 	// a local chart and version.
 	koperatorLocalHelmDescriptor = func() helmDescriptor {
