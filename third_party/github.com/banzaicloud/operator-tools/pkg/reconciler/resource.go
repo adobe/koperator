@@ -191,8 +191,9 @@ func MatchImmutableErrorMessages(errorMessage string) bool {
 	return false
 }
 
-// NewGenericReconciler returns GenericResourceReconciler
 // Deprecated: use NewReconcilerWith
+
+// NewGenericReconciler returns GenericResourceReconciler
 func NewGenericReconciler(c client.Client, log logr.Logger, opts ReconcilerOpts) *GenericResourceReconciler {
 	if opts.Scheme == nil {
 		opts.Scheme = runtime.NewScheme()
