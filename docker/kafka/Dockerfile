@@ -1,36 +1,41 @@
+ARG scala_version=2.13
+ARG kafka_version=3.9.1 # renovate: datasource=github-tags depName=apache/kafka
+ARG java_version=21
+
 FROM alpine:latest@sha256:4b7ce07002c69e8f3d704a9c5d6fd3053be500b7f1c69fc0d80990c2ad8dd412 AS kafka_dist
 
-ARG scala_version=2.13
-ARG kafka_version=3.9.1
+ARG scala_version
+ARG kafka_version
 ARG kafka_distro_base_url=https://downloads.apache.org/kafka
 
 ENV kafka_distro=kafka_$scala_version-$kafka_version.tgz
 ENV kafka_distro_asc=$kafka_distro.asc
 
-RUN apk add --no-cache gnupg
-
 WORKDIR /var/tmp
 
-RUN wget -q $kafka_distro_base_url/$kafka_version/$kafka_distro
-RUN wget -q $kafka_distro_base_url/$kafka_version/$kafka_distro_asc
-RUN wget -q $kafka_distro_base_url/KEYS
-
-RUN gpg --import KEYS
-RUN gpg --verify $kafka_distro_asc $kafka_distro
-
-RUN tar -xzf $kafka_distro
-RUN rm -r kafka_$scala_version-$kafka_version/bin/windows
+# Download, verify, extract and clean up Kafka in single layer
+RUN apk add --no-cache gnupg wget && \
+    wget -q $kafka_distro_base_url/$kafka_version/$kafka_distro && \
+    wget -q $kafka_distro_base_url/$kafka_version/$kafka_distro_asc && \
+    wget -q $kafka_distro_base_url/KEYS && \
+    gpg --import KEYS && \
+    gpg --verify $kafka_distro_asc $kafka_distro && \
+    tar -xzf $kafka_distro && \
+    rm -rf kafka_$scala_version-$kafka_version/bin/windows \
+           kafka_$scala_version-$kafka_version/site-docs \
+           $kafka_distro $kafka_distro_asc KEYS && \
+    find kafka_$scala_version-$kafka_version -name "*.bat" -delete
 
 
 # backported from https://github.com/docker-library/openjdk/blob/master/18/jdk/slim-bullseye/Dockerfile
 FROM debian:bullseye-slim@sha256:52927eff8153b563244f98cdc802ba97918afcdf67f9e4867cbf1f7afb3d147b
 
-ARG scala_version=2.13
-ARG kafka_version=3.9.1
+ARG scala_version
+ARG kafka_version
+ARG java_version
 ARG VERSION
 ARG BUILT_AT
 ARG COMMIT
-
 
 RUN set -eux; \
 	apt-get update; \
@@ -39,24 +44,24 @@ RUN set -eux; \
 	; \
 	rm -rf /var/lib/apt/lists/*
 
-ENV JAVA_HOME /usr/local/openjdk-21
-ENV PATH $JAVA_HOME/bin:$PATH
+ENV JAVA_HOME=/usr/local/openjdk-${java_version}
+ENV PATH=$JAVA_HOME/bin:$PATH
 
 # Default to UTF-8 file.encoding
-ENV LANG C.UTF-8
-ENV JAVA_VERSION 21
+ENV LANG=C.UTF-8
+ENV JAVA_VERSION=${java_version}
 
 RUN set -eux; \
 	\
 	arch="$(dpkg --print-architecture)"; \
 	case "$arch" in \
 		'amd64') \
-			downloadUrl='https://download.oracle.com/java/21/latest/jdk-21_linux-x64_bin.tar.gz'; \
-			downloadSha256='https://download.oracle.com/java/21/latest/jdk-21_linux-x64_bin.tar.gz.sha256'; \
+			downloadUrl="https://download.oracle.com/java/${java_version}/latest/jdk-${java_version}_linux-x64_bin.tar.gz"; \
+			downloadSha256="https://download.oracle.com/java/${java_version}/latest/jdk-${java_version}_linux-x64_bin.tar.gz.sha256"; \
 			;; \
 		'arm64') \
-			downloadUrl='https://download.oracle.com/java/21/latest/jdk-21_linux-aarch64_bin.tar.gz'; \
-			downloadSha256='https://download.oracle.com/java/21/latest/jdk-21_linux-aarch64_bin.tar.gz.sha256'; \
+			downloadUrl="https://download.oracle.com/java/${java_version}/latest/jdk-${java_version}_linux-aarch64_bin.tar.gz"; \
+			downloadSha256="https://download.oracle.com/java/${java_version}/latest/jdk-${java_version}_linux-aarch64_bin.tar.gz.sha256"; \
 			;; \
 		*) echo >&2 "error: unsupported architecture: '$arch'"; exit 1 ;; \
 	esac; \
@@ -80,6 +85,9 @@ RUN set -eux; \
 		--no-same-owner \
 	; \
 	rm openjdk.tgz*; \
+	\
+# Remove JMODs (not needed for runtime, only for jlink custom images)
+	rm -rf "$JAVA_HOME/jmods"; \
 	\
 	apt-mark auto '.*' > /dev/null; \
 	[ -z "$savedAptMark" ] || apt-mark manual $savedAptMark > /dev/null; \
@@ -117,18 +125,25 @@ ENV KAFKA_VERSION=$kafka_version \
 
 ENV PATH=${PATH}:${KAFKA_HOME}/bin
 
-RUN mkdir ${KAFKA_HOME} && apt-get update && apt-get -y upgrade && apt-get install curl -y && apt-get clean
+# Install minimal dependencies, setup Kafka, and clean up in single layer
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* && \
+    mkdir -p ${KAFKA_HOME}/libs/extensions
 
 COPY --from=kafka_dist /var/tmp/kafka_$scala_version-$kafka_version ${KAFKA_HOME}
 COPY opt/kafka/config/log4j.properties ${KAFKA_HOME}/config/log4j.properties
 
-
-RUN chmod a+x ${KAFKA_HOME}/bin/*.sh
-RUN chmod g+rwX ${KAFKA_HOME} && mkdir -p ${KAFKA_HOME}/libs/extensions && chmod g+rwX ${KAFKA_HOME}/libs/extensions
+# Optimize Kafka installation: remove unnecessary files and set permissions
+RUN chmod a+x ${KAFKA_HOME}/bin/*.sh && \
+    chmod g+rwX ${KAFKA_HOME} ${KAFKA_HOME}/libs/extensions && \
+    rm -rf ${KAFKA_HOME}/bin/windows ${KAFKA_HOME}/site-docs && \
+    find ${KAFKA_HOME} -name "*.bat" -delete
 
 # Add metadata labels
 LABEL org.opencontainers.image.title="Apache Kafka"
-LABEL org.opencontainers.image.description="Apache Kafka with OpenJDK 21"
+LABEL org.opencontainers.image.description="Apache Kafka with Oracle JDK ${java_version}"
 LABEL org.opencontainers.image.vendor="Adobe"
 LABEL org.opencontainers.image.licenses="Apache-2.0"
 LABEL org.opencontainers.image.source="https://github.com/adobe/koperator"
