@@ -15,7 +15,8 @@
 package reconciler
 
 import (
-	"emperror.dev/errors"
+	"errors"
+
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -38,5 +39,5 @@ func (c *CombinedResult) Combine(sub *reconcile.Result, err error) {
 }
 
 func (c *CombinedResult) CombineErr(err error) {
-	c.Err = errors.Combine(c.Err, err)
+	c.Err = errors.Join(c.Err, err)
 }

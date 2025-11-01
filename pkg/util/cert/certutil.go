@@ -24,13 +24,14 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"math/big"
 	mathrand "math/rand"
 	"strings"
 	"time"
 
-	"emperror.dev/errors"
+	emperrors "emperror.dev/errors"
 	jks "github.com/pavlo-v-chernykh/keystore-go/v4"
 	corev1 "k8s.io/api/core/v1"
 
@@ -320,17 +321,17 @@ func GenerateSigningRequestInPemFormat(priv *rsa.PrivateKey, commonName string, 
 func checkSSLCertInJKS(data map[string][]byte) error {
 	var err error
 	if len(data[v1alpha1.TLSJKSTrustStore]) == 0 {
-		err = errors.Combine(err, fmt.Errorf("%s entry is missing", v1alpha1.TLSJKSTrustStore))
+		err = errors.Join(err, fmt.Errorf("%s entry is missing", v1alpha1.TLSJKSTrustStore))
 	}
 	if len(data[v1alpha1.TLSJKSKeyStore]) == 0 {
-		err = errors.Combine(err, fmt.Errorf("%s entry is missing", v1alpha1.TLSJKSKeyStore))
+		err = errors.Join(err, fmt.Errorf("%s entry is missing", v1alpha1.TLSJKSKeyStore))
 	}
 	if len(data[v1alpha1.PasswordKey]) == 0 {
-		err = errors.Combine(err, fmt.Errorf("%s entry is missing", v1alpha1.PasswordKey))
+		err = errors.Join(err, fmt.Errorf("%s entry is missing", v1alpha1.PasswordKey))
 	}
 
 	if err != nil {
-		err = errors.WrapIff(err, "there is missing data entry for JKS format based certificates")
+		err = emperrors.WrapIff(err, "there is missing data entry for JKS format based certificates")
 	}
 
 	return err
@@ -338,7 +339,7 @@ func checkSSLCertInJKS(data map[string][]byte) error {
 
 func CheckSSLCertSecret(secret *corev1.Secret) error {
 	if err := checkSSLCertInJKS(secret.Data); err != nil {
-		return errors.WrapIfWithDetails(err, "couldn't get certificates from secret", "name", secret.GetName(), "namespace", secret.GetNamespace())
+		return emperrors.WrapIfWithDetails(err, "couldn't get certificates from secret", "name", secret.GetName(), "namespace", secret.GetNamespace())
 	}
 	return nil
 }
@@ -355,7 +356,7 @@ func ParseTrustStoreToCaChain(truststore, password []byte) ([]*x509.Certificate,
 	for _, alias := range aliases {
 		trustedEntry, err := jksTrustStore.GetTrustedCertificateEntry(alias)
 		if err != nil && !errors.Is(err, jks.ErrWrongEntryType) {
-			return nil, errors.WrapIf(err, "couldn't get trusted entry from truststore")
+			return nil, emperrors.WrapIf(err, "couldn't get trusted entry from truststore")
 		}
 		if err == nil {
 			trustedEntries = append(trustedEntries, trustedEntry)
@@ -370,7 +371,7 @@ func ParseTrustStoreToCaChain(truststore, password []byte) ([]*x509.Certificate,
 	for _, trustedEntry := range trustedEntries {
 		caCert, err := x509.ParseCertificates(trustedEntry.Certificate.Content)
 		if err != nil {
-			return nil, errors.WrapIf(err, "couldn't parse trusted certificate entry")
+			return nil, emperrors.WrapIf(err, "couldn't parse trusted certificate entry")
 		}
 		caCerts = append(caCerts, caCert...)
 	}
@@ -389,7 +390,7 @@ func ParseKeyStoreToTLSCertificate(keystore, password []byte) (tls.Certificate, 
 	for _, alias := range aliases {
 		privateEntry, err := jksKeyStore.GetPrivateKeyEntry(alias, password)
 		if err != nil && !errors.Is(err, jks.ErrWrongEntryType) {
-			return tls.Certificate{}, errors.WrapIf(err, "couldn't get private key entry from keystore")
+			return tls.Certificate{}, emperrors.WrapIf(err, "couldn't get private key entry from keystore")
 		}
 		if err == nil {
 			privateEntries = append(privateEntries, privateEntry)

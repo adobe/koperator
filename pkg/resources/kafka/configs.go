@@ -16,9 +16,10 @@
 package kafka
 
 import (
+	"errors"
 	"strconv"
 
-	"emperror.dev/errors"
+	emperrors "emperror.dev/errors"
 	"github.com/IBM/sarama"
 	"github.com/go-logr/logr"
 
@@ -42,7 +43,7 @@ func (r *Reconciler) reconcilePerBrokerDynamicConfig(brokerId int32, brokerConfi
 
 	fullPerBrokerConfig, err := properties.NewFromString(brokerConfig.Config)
 	if err != nil {
-		return errors.WrapIf(err, "could not parse broker configuration")
+		return emperrors.WrapIf(err, "could not parse broker configuration")
 	}
 
 	currentPerBrokerConfigState := r.KafkaCluster.Status.BrokersState[strconv.Itoa(int(brokerId))].PerBrokerConfigurationState
@@ -53,7 +54,7 @@ func (r *Reconciler) reconcilePerBrokerDynamicConfig(brokerId int32, brokerConfi
 	// overwrite configs from configmap
 	configsFromConfigMap, err := properties.NewFromString(configMap.Data[kafka.ConfigPropertyName])
 	if err != nil {
-		return errors.WrapIf(err, "could not parse broker configuration from configmap")
+		return emperrors.WrapIf(err, "could not parse broker configuration from configmap")
 	}
 	for _, perBrokerConfig := range kafka.PerBrokerConfigs {
 		if configProperty, ok := configsFromConfigMap.Get(perBrokerConfig); ok {
@@ -65,7 +66,7 @@ func (r *Reconciler) reconcilePerBrokerDynamicConfig(brokerId int32, brokerConfi
 	brokerConfigKeys := fullPerBrokerConfig.Keys()
 	response, err := kClient.DescribePerBrokerConfig(brokerId, brokerConfigKeys)
 	if err != nil {
-		return errors.WrapIfWithDetails(err, "could not describe broker config", v1beta1.BrokerIdLabelKey, brokerId)
+		return emperrors.WrapIfWithDetails(err, "could not describe broker config", v1beta1.BrokerIdLabelKey, brokerId)
 	}
 
 	if shouldUpdatePerBrokerConfig(response, fullPerBrokerConfig) {
@@ -73,7 +74,7 @@ func (r *Reconciler) reconcilePerBrokerDynamicConfig(brokerId int32, brokerConfi
 			log.V(1).Info("setting per broker config status to out of sync")
 			statusErr := k8sutil.UpdateBrokerStatus(r.Client, []string{strconv.Itoa(int(brokerId))}, r.KafkaCluster, v1beta1.PerBrokerConfigOutOfSync, log)
 			if statusErr != nil {
-				return errors.WrapIfWithDetails(err, "updating status for per-broker configuration status failed", v1beta1.BrokerIdLabelKey, brokerId)
+				return emperrors.WrapIfWithDetails(err, "updating status for per-broker configuration status failed", v1beta1.BrokerIdLabelKey, brokerId)
 			}
 		}
 
@@ -82,21 +83,21 @@ func (r *Reconciler) reconcilePerBrokerDynamicConfig(brokerId int32, brokerConfi
 		if err != nil {
 			statusErr := k8sutil.UpdateBrokerStatus(r.Client, []string{strconv.Itoa(int(brokerId))}, r.KafkaCluster, v1beta1.PerBrokerConfigError, log)
 			if statusErr != nil {
-				err = errors.Combine(err, statusErr)
+				err = errors.Join(err, statusErr)
 			}
-			return errors.WrapIfWithDetails(err, "could not validate per-broker broker config", v1beta1.BrokerIdLabelKey, brokerId)
+			return emperrors.WrapIfWithDetails(err, "could not validate per-broker broker config", v1beta1.BrokerIdLabelKey, brokerId)
 		}
 
 		// alter the config
 		err = kClient.AlterPerBrokerConfig(brokerId, util.ConvertPropertiesToMapStringPointer(fullPerBrokerConfig), false)
 		if err != nil {
-			return errors.WrapIfWithDetails(err, "could not alter broker config", v1beta1.BrokerIdLabelKey, brokerId)
+			return emperrors.WrapIfWithDetails(err, "could not alter broker config", v1beta1.BrokerIdLabelKey, brokerId)
 		}
 
 		// query the updated config
 		response, err := kClient.DescribePerBrokerConfig(brokerId, brokerConfigKeys)
 		if err != nil {
-			return errors.WrapIfWithDetails(err, "could not describe broker config", v1beta1.BrokerIdLabelKey, brokerId)
+			return emperrors.WrapIfWithDetails(err, "could not describe broker config", v1beta1.BrokerIdLabelKey, brokerId)
 		}
 
 		// update per-broker config status based on the response
@@ -106,13 +107,13 @@ func (r *Reconciler) reconcilePerBrokerDynamicConfig(brokerId int32, brokerConfi
 
 		statusErr := k8sutil.UpdateBrokerStatus(r.Client, []string{strconv.Itoa(int(brokerId))}, r.KafkaCluster, v1beta1.PerBrokerConfigInSync, log)
 		if statusErr != nil {
-			return errors.WrapIfWithDetails(err, "updating status for per-broker configuration status failed", v1beta1.BrokerIdLabelKey, brokerId)
+			return emperrors.WrapIfWithDetails(err, "updating status for per-broker configuration status failed", v1beta1.BrokerIdLabelKey, brokerId)
 		}
 	} else if currentPerBrokerConfigState != v1beta1.PerBrokerConfigInSync {
 		log.V(1).Info("setting per broker config status to in sync")
 		statusErr := k8sutil.UpdateBrokerStatus(r.Client, []string{strconv.Itoa(int(brokerId))}, r.KafkaCluster, v1beta1.PerBrokerConfigInSync, log)
 		if statusErr != nil {
-			return errors.WrapIfWithDetails(err, "updating status for per-broker configuration status failed", v1beta1.BrokerIdLabelKey, brokerId)
+			return emperrors.WrapIfWithDetails(err, "updating status for per-broker configuration status failed", v1beta1.BrokerIdLabelKey, brokerId)
 		}
 	}
 
@@ -128,28 +129,28 @@ func (r *Reconciler) reconcileClusterWideDynamicConfig() error {
 
 	currentConfig, err := kClient.DescribeClusterWideConfig()
 	if err != nil {
-		return errors.WrapIf(err, "could not describe cluster wide broker config")
+		return emperrors.WrapIf(err, "could not describe cluster wide broker config")
 	}
 
 	currentClusterWideConfig, err := util.ConvertConfigEntryListToProperties(currentConfig)
 	if err != nil {
-		return errors.WrapIf(err, "could not convert current cluster-wide config to properties")
+		return emperrors.WrapIf(err, "could not convert current cluster-wide config to properties")
 	}
 
 	parsedClusterWideConfig, err := properties.NewFromString(r.KafkaCluster.Spec.ClusterWideConfig)
 	if err != nil {
-		return errors.WrapIf(err, "could not parse cluster-wide broker config")
+		return emperrors.WrapIf(err, "could not parse cluster-wide broker config")
 	}
 
 	if !currentClusterWideConfig.Equal(parsedClusterWideConfig) {
 		err = kClient.AlterClusterWideConfig(util.ConvertPropertiesToMapStringPointer(parsedClusterWideConfig), true)
 		if err != nil {
-			return errors.WrapIf(err, "validation of cluster wide config update failed")
+			return emperrors.WrapIf(err, "validation of cluster wide config update failed")
 		}
 
 		err = kClient.AlterClusterWideConfig(util.ConvertPropertiesToMapStringPointer(parsedClusterWideConfig), false)
 		if err != nil {
-			return errors.WrapIf(err, "could not alter cluster wide broker config")
+			return emperrors.WrapIf(err, "could not alter cluster wide broker config")
 		}
 	}
 

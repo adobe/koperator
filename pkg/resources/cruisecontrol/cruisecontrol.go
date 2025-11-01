@@ -17,9 +17,10 @@ package cruisecontrol
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
-	"emperror.dev/errors"
+	emperrors "emperror.dev/errors"
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -97,18 +98,18 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 		genErr := generateCCTopic(r.KafkaCluster, r.Client, r.KafkaClientProvider, log.WithName("generateCCTopic"))
 		if genErr != nil {
 			updateErr := k8sutil.UpdateCRStatus(r.Client, r.KafkaCluster, v1beta1.CruiseControlTopicNotReady, log)
-			return errors.Combine(genErr, updateErr)
+			return errors.Join(genErr, updateErr)
 		}
 		statusErr := k8sutil.UpdateCRStatus(r.Client, r.KafkaCluster, v1beta1.CruiseControlTopicReady, log)
 		if statusErr != nil {
-			return errors.WrapIf(statusErr, "could not update CC topic status")
+			return emperrors.WrapIf(statusErr, "could not update CC topic status")
 		}
 
 		if r.KafkaCluster.Status.CruiseControlTopicStatus == v1beta1.CruiseControlTopicReady {
 			o := r.service()
 			err := k8sutil.Reconcile(log, r.Client, o, r.KafkaCluster)
 			if err != nil {
-				return errors.WrapIfWithDetails(err, "failed to reconcile resource", "resource", o.GetObjectKind().GroupVersionKind())
+				return emperrors.WrapIfWithDetails(err, "failed to reconcile resource", "resource", o.GetObjectKind().GroupVersionKind())
 			}
 
 			var config *corev1.ConfigMap
@@ -130,13 +131,13 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 			}
 			capacityConfig, err := GenerateCapacityConfig(r.KafkaCluster, log, config)
 			if err != nil {
-				return errors.WrapIf(err, "failed to generate capacity config")
+				return emperrors.WrapIf(err, "failed to generate capacity config")
 			}
 
 			o = r.configMap(clientPass, capacityConfig, log)
 			err = k8sutil.Reconcile(log, r.Client, o, r.KafkaCluster)
 			if err != nil {
-				return errors.WrapIfWithDetails(err, "failed to reconcile resource", "resource", o.GetObjectKind().GroupVersionKind())
+				return emperrors.WrapIfWithDetails(err, "failed to reconcile resource", "resource", o.GetObjectKind().GroupVersionKind())
 			}
 
 			podAnnotations := GeneratePodAnnotations(
@@ -147,7 +148,7 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 			o = r.deployment(podAnnotations)
 			err = k8sutil.Reconcile(log, r.Client, o, r.KafkaCluster)
 			if err != nil {
-				return errors.WrapIfWithDetails(err, "failed to reconcile resource", "resource", o.GetObjectKind().GroupVersionKind())
+				return emperrors.WrapIfWithDetails(err, "failed to reconcile resource", "resource", o.GetObjectKind().GroupVersionKind())
 			}
 		}
 	}
@@ -180,14 +181,14 @@ func (r *Reconciler) getClientSecret() (*corev1.Secret, error) {
 			return nil, errorfactory.New(errorfactory.ResourceNotReady{}, err, "client secret not ready")
 		}
 
-		return nil, errors.WrapIfWithDetails(err, "failed to get client secret")
+		return nil, emperrors.WrapIfWithDetails(err, "failed to get client secret")
 	}
 
 	if err := certutil.CheckSSLCertSecret(clientSecret); err != nil {
 		if r.KafkaCluster.Spec.GetClientSSLCertSecretName() == "" {
-			return nil, errorfactory.New(errorfactory.ResourceNotReady{}, errors.Errorf("SSL JKS certificate has not generated properly yet into client secret: %s", clientSecret.Name), "checking secret data fields")
+			return nil, errorfactory.New(errorfactory.ResourceNotReady{}, errors.New("SSL JKS certificate has not generated properly yet into client secret: "+clientSecret.Name), "checking secret data fields")
 		}
-		return nil, errors.WrapIfWithDetails(err, "failed to get certificates from client secret")
+		return nil, emperrors.WrapIfWithDetails(err, "failed to get certificates from client secret")
 	}
 
 	return clientSecret, nil
