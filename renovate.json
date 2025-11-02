@@ -19,10 +19,34 @@
     {
       "customType": "regex",
       "managerFilePatterns": [
-        "/Makefile/"
+        "/Makefile/",
+        "/Dockerfile$/"
       ],
       "matchStrings": [
         "(?<depName>\\w+)_VERSION\\s*=\\s*(?<currentValue>[^\\s]+)\\s*#\\s*renovate:\\s*datasource=(?<datasource>[^\\s]+)\\s*depName=(?<packageName>[^\\s]+)"
+      ],
+      "datasourceTemplate": "{{datasource}}",
+      "depNameTemplate": "{{packageName}}"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "tests/e2e/versions.go"
+      ],
+      "matchStrings": [
+        "\\s*(?<depName>\\w+)\\s*=\\s*\"(?<currentValue>[^\"]+)\"\\s*//\\s*renovate:\\s*datasource=(?<datasource>[^\\s]+)\\s*depName=(?<packageName>[^\\s]+)(?:\\s*registryUrl=(?<registryUrl>[^\\s]+))?"
+      ],
+      "datasourceTemplate": "{{datasource}}",
+      "depNameTemplate": "{{packageName}}",
+      "registryUrlTemplate": "{{#if registryUrl}}{{{registryUrl}}}{{/if}}"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "api/v1beta1/kafkacluster_types.go"
+      ],
+      "matchStrings": [
+        "\\s*(?<depName>\\w+)\\s*=\\s*\"(?<currentValue>[^\"]+)\"\\s*//\\s*renovate:\\s*datasource=(?<datasource>[^\\s]+)\\s*depName=(?<packageName>[^\\s]+)"
       ],
       "datasourceTemplate": "{{datasource}}",
       "depNameTemplate": "{{packageName}}"
@@ -43,6 +67,52 @@
       "pinDigests": true
     },
     {
+      "groupName": "config samples docker images",
+      "groupSlug": "config-samples-docker",
+      "matchFilePatterns": [
+        "config/samples/**",
+        "docs/benchmarks/infrastructure/**",
+        "tests/e2e/templates/**"
+      ],
+      "matchManagers": [
+        "helm-values"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor",
+        "patch"
+      ]
+    },
+    {
+      "groupName": "kafka docker images (major)",
+      "groupSlug": "kafka-docker-major",
+      "matchFilePatterns": [
+        "docker/**"
+      ],
+      "matchManagers": [
+        "dockerfile",
+        "custom.regex"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ]
+    },
+    {
+      "groupName": "kafka docker images (minor/patch)",
+      "groupSlug": "kafka-docker-minor-patch",
+      "matchFilePatterns": [
+        "docker/**"
+      ],
+      "matchManagers": [
+        "dockerfile",
+        "custom.regex"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ]
+    },
+    {
       "groupName": "all major dependencies",
       "groupSlug": "all-major",
       "matchUpdateTypes": [
@@ -55,6 +125,12 @@
         "docker-compose",
         "custom.regex",
         "helm-values"
+      ],
+      "excludeFilePatterns": [
+        "docker/**",
+        "config/samples/**",
+        "docs/benchmarks/infrastructure/**",
+        "tests/e2e/templates/**"
       ]
     },
     {
@@ -73,6 +149,12 @@
         "custom.regex",
         "helm-values",
         "docker"
+      ],
+      "excludeFilePatterns": [
+        "docker/**",
+        "config/samples/**",
+        "docs/benchmarks/infrastructure/**",
+        "tests/e2e/templates/**"
       ]
     }
   ]

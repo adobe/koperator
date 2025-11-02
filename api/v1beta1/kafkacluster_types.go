@@ -53,10 +53,13 @@ const (
 	IsControllerNodeKey = "isControllerNode"
 
 	// DefaultCruiseControlImage is the default CC image used when users don't specify it in CruiseControlConfig.Image
-	DefaultCruiseControlImage = "adobe/cruise-control:3.0.3-adbe-20250804"
+	DefaultCruiseControlImage = "adobe/cruise-control:3.0.3-adbe-20250804" // renovate: datasource=docker depName=adobe/cruise-control
 
 	// DefaultKafkaImage is the default Kafka image used when users don't specify it in KafkaClusterSpec.ClusterImage
-	DefaultKafkaImage = "ghcr.io/adobe/koperator/kafka:2.13-3.9.1"
+	DefaultKafkaImage = "ghcr.io/adobe/koperator/kafka:2.13-3.9.1" // renovate: datasource=docker depName=ghcr.io/adobe/koperator/kafka
+
+	// DefaultMonitorImage is the default JMX monitor image used when users don't specify it in MonitoringConfig.JmxImage
+	DefaultMonitorImage = "ghcr.io/adobe/koperator/jmx-javaagent:1.4.0" // renovate: datasource=docker depName=ghcr.io/adobe/koperator/jmx-javaagent
 
 	// ControllerNodeProcessRole represents the node is a controller node
 	ControllerNodeProcessRole = "controller"
@@ -91,7 +94,7 @@ const (
 	defaultEnvoyLimitResourceMemory   = "100Mi"
 
 	// KafkaClusterDeployment.spec.template.spec.container["envoy"].image
-	defaultEnvoyImage = "envoyproxy/envoy:v1.22.2"
+	defaultEnvoyImage = "envoyproxy/envoy:v1.22.2" // renovate: datasource=docker depName=envoyproxy/envoy
 
 	/* Broker Config */
 
@@ -110,7 +113,7 @@ const (
 	/* Cruise Control Config */
 
 	// CruiseControlDeployment.spec.template.spec.container["%s-cruisecontrol"].image
-	defaultCruiseControlImage = "adobe/cruise-control:3.0.3-adbe-20250804"
+	defaultCruiseControlImage = "adobe/cruise-control:3.0.3-adbe-20250804" // renovate: datasource=docker depName=adobe/cruise-control
 
 	// CruiseControlDeployment.spec.template.spec.container["%s-cruisecontrol"].resources
 	defaultCruiseControlRequestResourceCpu    = "200m"
@@ -126,7 +129,7 @@ const (
 	defaultKafkaClusterK8sClusterDomain  = "cluster.local"
 
 	// KafkaBroker.spec.container["kafka"].image
-	defaultKafkaImage = "ghcr.io/adobe/koperator/kafka:2.13-3.9.1"
+	defaultKafkaImage = "ghcr.io/adobe/koperator/kafka:2.13-3.9.1" // renovate: datasource=docker depName=ghcr.io/adobe/koperator/kafka
 
 	/* Istio Ingress Config */
 
@@ -142,10 +145,6 @@ const (
 	defaultReplicas = 1
 
 	/* Monitor Config */
-
-	// KafkaBrokerPod.spec.initContainer[jmx-exporter].image
-	// kafkaClusterDeployment.spec.template.spec.initContainer["jmx-exporter"].image
-	defaultMonitorImage = "ghcr.io/amuraru/jmx-javaagent:0.19.2"
 
 	// KafkaBrokerPod.spec.initContainer["jmx-exporter"].command
 	// kafkaClusterDeployment.spec.template.spec.initContainer["jmx-exporter"].command
@@ -1296,7 +1295,7 @@ func (mConfig *MonitoringConfig) GetImage() string {
 	if mConfig.JmxImage != "" {
 		return mConfig.JmxImage
 	}
-	return defaultMonitorImage
+	return DefaultMonitorImage
 }
 
 // GetPathToJar returns the path in the used Image for Prometheus JMX exporter
