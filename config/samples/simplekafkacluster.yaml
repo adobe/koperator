@@ -7,7 +7,7 @@ metadata:
 spec:
   kRaft: false
   monitoringConfig:
-    jmxImage: "ghcr.io/amuraru/jmx-javaagent:0.19.2"
+    jmxImage: "ghcr.io/adobe/koperator/jmx-javaagent:1.4.0"
   headlessServiceEnabled: true
   zkAddresses:
     - "zookeeper-server-client.zookeeper:2181"

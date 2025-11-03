@@ -27,7 +27,7 @@ var (
 	certManagerHelmDescriptor = helmDescriptor{
 		Repository:   "https://charts.jetstack.io",
 		ChartName:    "cert-manager",
-		ChartVersion: "v1.18.2",
+		ChartVersion: CertManagerVersion,
 		ReleaseName:  "cert-manager",
 		Namespace:    "cert-manager",
 		SetValues: map[string]string{
@@ -42,7 +42,7 @@ var (
 	contourIngressControllerHelmDescriptor = helmDescriptor{
 		Repository:   "https://projectcontour.github.io/helm-charts",
 		ChartName:    "contour",
-		ChartVersion: "0.1.0",
+		ChartVersion: ContourVersion,
 		ReleaseName:  "contour",
 		Namespace:    "projectcontour",
 		SetValues: map[string]string{
@@ -94,7 +94,7 @@ var (
 	prometheusOperatorHelmDescriptor = helmDescriptor{
 		Repository:   "https://prometheus-community.github.io/helm-charts",
 		ChartName:    "kube-prometheus-stack",
-		ChartVersion: "77.12.0",
+		ChartVersion: PrometheusOperatorVersion,
 		ReleaseName:  "prometheus-operator",
 		Namespace:    "prometheus",
 		SetValues: map[string]string{
@@ -123,13 +123,13 @@ var (
 	zookeeperOperatorHelmDescriptor = helmDescriptor{
 		Repository:   "",
 		ChartName:    "oci://ghcr.io/adobe/helm-charts/zookeeper-operator",
-		ChartVersion: "0.2.15-adobe-20250923",
+		ChartVersion: ZookeeperOperatorVersion,
 		ReleaseName:  "zookeeper-operator",
 		Namespace:    "zookeeper",
 		SetValues: map[string]string{
 			"crd.create":       "false",
 			"image.repository": "ghcr.io/adobe/zookeeper-operator",
-			"image.tag":        "0.2.15-adobe-20250923",
+			"image.tag":        ZookeeperOperatorVersion,
 		},
 		RemoteCRDPathVersionTemplate: "https://raw.githubusercontent.com/adobe/zookeeper-operator/%s/config/crd/bases/zookeeper.pravega.io_zookeeperclusters.yaml",
 		HelmExtraArguments: map[string][]string{
