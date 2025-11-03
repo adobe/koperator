@@ -698,7 +698,7 @@ func expectEnvoyDeployment(ctx context.Context, kafkaCluster *v1beta1.KafkaClust
 	Expect(templateSpec.Containers).To(HaveLen(1))
 	container := templateSpec.Containers[0]
 	Expect(container.Name).To(Equal("envoy"))
-	Expect(container.Image).To(Equal("envoyproxy/envoy:v1.22.2"))
+	Expect(container.Image).To(Equal(v1beta1.DefaultEnvoyImage))
 
 	if kafkaCluster.Spec.KRaftMode {
 		expectEnvoyDeploymentKRaft(container)

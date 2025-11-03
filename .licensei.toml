@@ -16,6 +16,7 @@ ignored = [
   "github.com/rcrowley/go-metrics",
   "go.uber.org/atomic",
   "go.uber.org/multierr",
+  "go.uber.org/mock",
   "emperror.dev/errors",
   "emperror.dev/emperror",
   "go.uber.org/zap",
