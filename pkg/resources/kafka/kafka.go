@@ -953,7 +953,10 @@ func (r *Reconciler) handleRollingUpgrade(log logr.Logger, desiredPod, currentPo
 		desiredPod.Spec.Tolerations = uniqueTolerations
 	}
 	// Check if the resource actually updated or if labels match TaintedBrokersSelector
-	patchResult, err := patch.DefaultPatchMaker.Calculate(currentPod, desiredPod)
+	opts := []patch.CalculateOption{
+		k8sutil.IgnoreMutationWebhookFields(),
+	}
+	patchResult, err := patch.DefaultPatchMaker.Calculate(currentPod, desiredPod, opts...)
 	switch {
 	case err != nil:
 		log.Error(err, "could not match objects", "kind", desiredType)

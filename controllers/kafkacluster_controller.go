@@ -385,15 +385,18 @@ func SetupKafkaClusterWithManager(mgr ctrl.Manager) *ctrl.Builder {
 				}
 				return false
 			},
-			UpdateFunc: func(e event.UpdateEvent) bool {
-				switch newObj := e.ObjectNew.(type) {
-				case *corev1.Pod, *corev1.ConfigMap, *corev1.PersistentVolumeClaim:
-					patchResult, err := patch.DefaultPatchMaker.Calculate(e.ObjectOld, e.ObjectNew)
-					if err != nil {
-						log.Error(err, "could not match objects", "kind", e.ObjectOld.GetObjectKind())
-					} else if patchResult.IsEmpty() {
-						return false
-					}
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			switch newObj := e.ObjectNew.(type) {
+			case *corev1.Pod, *corev1.ConfigMap, *corev1.PersistentVolumeClaim:
+				opts := []patch.CalculateOption{
+					k8sutil.IgnoreMutationWebhookFields(),
+				}
+				patchResult, err := patch.DefaultPatchMaker.Calculate(e.ObjectOld, e.ObjectNew, opts...)
+				if err != nil {
+					log.Error(err, "could not match objects", "kind", e.ObjectOld.GetObjectKind())
+				} else if patchResult.IsEmpty() {
+					return false
+				}
 				case *v1beta1.KafkaCluster:
 					oldObj := e.ObjectOld.(*v1beta1.KafkaCluster)
 					if !reflect.DeepEqual(oldObj.Spec, newObj.Spec) ||
