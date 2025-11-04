@@ -39,6 +39,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 )
 
 var c client.Client
@@ -63,9 +64,22 @@ func TestMain(m *testing.M) {
 	}
 
 	code := m.Run()
-	if err := t.Stop(); err != nil {
-		stdlog.Fatal(err)
+
+	// Stop the test environment with a timeout to prevent hanging
+	stopDone := make(chan error, 1)
+	go func() {
+		stopDone <- t.Stop()
+	}()
+
+	select {
+	case err := <-stopDone:
+		if err != nil {
+			stdlog.Printf("Warning: failed to stop test environment: %v", err)
+		}
+	case <-time.After(10 * time.Second):
+		stdlog.Printf("Warning: test environment stop timed out after 10 seconds")
 	}
+
 	os.Exit(code)
 }
 
@@ -114,7 +128,12 @@ func TestGetCurrentAlerts(t *testing.T) {
 
 	log := logf.Log.WithName("alertmanager")
 
-	mgr, err := manager.New(cfg, manager.Options{Scheme: scheme.Scheme})
+	mgr, err := manager.New(cfg, manager.Options{
+		Scheme: scheme.Scheme,
+		Metrics: metricsserver.Options{
+			BindAddress: "0", // Disable metrics server to avoid port conflicts
+		},
+	})
 	g.Expect(err).NotTo(gomega.HaveOccurred())
 	c = mgr.GetClient()
 	ctx, cancelFunc := context.WithCancel(context.Background())

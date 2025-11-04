@@ -68,11 +68,9 @@ var _ = Describe("CruiseControllerTaskController", func() {
 			kafkaCluster.Annotations[clusterregv1alpha1.OwnershipAnnotation] = "id"
 			err := k8sClient.Create(ctx, kafkaCluster)
 			Expect(err).ToNot(HaveOccurred())
-			Eventually(func() int {
-				reconciles := kafkaClusterReconciler.NumOfRequests()
-				log.Info("check reconciles on create", "reconciles", reconciles)
-				return reconciles
-			}, 10).Should(BeNumerically("==", expectedNumOfReconciles))
+			Consistently(func() int {
+				return kafkaClusterReconciler.NumOfRequests()
+			}, 5, 1).Should(BeNumerically("==", expectedNumOfReconciles))
 
 			By("updating the KafkaCluster CR Status")
 			kafkaCluster.Status.BrokersState = map[string]v1beta1.BrokerState{
@@ -94,20 +92,16 @@ var _ = Describe("CruiseControllerTaskController", func() {
 			}
 			err = k8sClient.Status().Update(ctx, kafkaCluster)
 			Expect(err).ToNot(HaveOccurred())
-			Eventually(func() int {
-				reconciles := kafkaClusterReconciler.NumOfRequests()
-				log.Info("check reconciles on update", "reconciles", reconciles)
-				return reconciles
-			}, 10).Should(BeNumerically("==", expectedNumOfReconciles))
+			Consistently(func() int {
+				return kafkaClusterReconciler.NumOfRequests()
+			}, 5, 1).Should(BeNumerically("==", expectedNumOfReconciles))
 
 			By("deleting the KafkaCluster CR")
 			err = k8sClient.Delete(ctx, kafkaCluster)
 			Expect(err).ToNot(HaveOccurred())
-			Eventually(func() int {
-				reconciles := kafkaClusterReconciler.NumOfRequests()
-				log.Info("check reconciles on delete", "reconciles", reconciles)
-				return reconciles
-			}, 10).Should(BeNumerically("==", expectedNumOfReconciles))
+			Consistently(func() int {
+				return kafkaClusterReconciler.NumOfRequests()
+			}, 5, 1).Should(BeNumerically("==", expectedNumOfReconciles))
 		})
 	})
 
@@ -118,10 +112,8 @@ var _ = Describe("CruiseControllerTaskController", func() {
 			err := k8sClient.Create(ctx, kafkaCluster)
 			Expect(err).ToNot(HaveOccurred())
 			Eventually(func() int {
-				reconciles := kafkaClusterReconciler.NumOfRequests()
-				log.Info("check reconciles on create", "reconciles", reconciles)
-				return reconciles
-			}, 10).Should(BeNumerically("==", expectedNumOfReconciles))
+				return kafkaClusterReconciler.NumOfRequests()
+			}, 10, 1).Should(BeNumerically("==", expectedNumOfReconciles))
 
 			By("updating the KafkaCluster CR Status")
 			expectedNumOfReconciles += 1
@@ -145,20 +137,16 @@ var _ = Describe("CruiseControllerTaskController", func() {
 			err = k8sClient.Status().Update(ctx, kafkaCluster)
 			Expect(err).ToNot(HaveOccurred())
 			Eventually(func() int {
-				reconciles := kafkaClusterReconciler.NumOfRequests()
-				log.Info("check reconciles on update", "reconciles", reconciles)
-				return reconciles
-			}, 10).Should(BeNumerically("==", expectedNumOfReconciles))
+				return kafkaClusterReconciler.NumOfRequests()
+			}, 10, 1).Should(BeNumerically("==", expectedNumOfReconciles))
 
 			By("deleting the KafkaCluster CR")
 			expectedNumOfReconciles += 1
 			err = k8sClient.Delete(ctx, kafkaCluster)
 			Expect(err).ToNot(HaveOccurred())
 			Eventually(func() int {
-				reconciles := kafkaClusterReconciler.NumOfRequests()
-				log.Info("check reconciles on delete", "reconciles", reconciles)
-				return reconciles
-			}, 10).Should(BeNumerically("==", expectedNumOfReconciles))
+				return kafkaClusterReconciler.NumOfRequests()
+			}, 10, 1).Should(BeNumerically("==", expectedNumOfReconciles))
 		})
 	})
 })
