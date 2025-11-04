@@ -55,7 +55,7 @@ func crds() {
 
 	lister.Header = heredoc.Doc(`
 		# Available Types
-		
+
 		For more information please click on the name
 		<center>
 

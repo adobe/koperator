@@ -46,12 +46,12 @@ runs:
       chmod 600 $kubeconfig_path
       echo "kubeconfig=$(echo $kubeconfig_path)" >> $GITHUB_OUTPUT
     shell: bash
-  
+
   - name: Install cloud-provider-kind
     id: cloud-provider-kind
     run: |
       echo "Install cloud-provider-kind"
       go install sigs.k8s.io/cloud-provider-kind@latest
-      kubectl label node e2e-kind-control-plane node.kubernetes.io/exclude-from-external-load-balancers- 
+      kubectl label node e2e-kind-control-plane node.kubernetes.io/exclude-from-external-load-balancers-
       ~/go/bin/cloud-provider-kind &
     shell: bash
