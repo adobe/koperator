@@ -24,13 +24,13 @@ import (
 
 func example(client runtimeClient.Client, logger logr.Logger) {
   resourceReconciler := reconciler.NewReconcilerWith(client, reconciler.WithLog(logger))
-  
+
   serviceObject := &corev1.Service{
     Spec: corev1.ServiceSpec{
       ...
     },
   }
-  
+
   result, err := resourceReconciler.ReconcileResource(serviceObject, reconciler.StatePresent)
 }
 
