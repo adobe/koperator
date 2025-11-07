@@ -204,11 +204,15 @@ deploy: install-kustomize install ## Deploy controller into the configured Kuber
 manifests: bin/controller-gen ## Generate (Kubebuilder) manifests e.g. CRD, RBAC etc.
 	cd api && $(CONTROLLER_GEN) $(CRD_OPTIONS) webhook paths="./..." output:crd:artifacts:config=../config/base/crds output:webhook:artifacts:config=../config/base/webhook
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role paths="./controllers/..." output:rbac:artifacts:config=./config/base/rbac
-	## Regenerate CRDs for the helm chart
+	## Regenerate CRDs and RBAC for the helm chart
 	cp config/base/crds/kafka.banzaicloud.io_cruisecontroloperations.yaml $(HELM_CRD_PATH)/cruisecontroloperations.yaml
 	cp config/base/crds/kafka.banzaicloud.io_kafkaclusters.yaml $(HELM_CRD_PATH)/kafkaclusters.yaml
 	cp config/base/crds/kafka.banzaicloud.io_kafkatopics.yaml $(HELM_CRD_PATH)/kafkatopics.yaml
 	cp config/base/crds/kafka.banzaicloud.io_kafkausers.yaml $(HELM_CRD_PATH)/kafkausers.yaml
+	@sed -n '1,/# RBAC_RULES_START - Do not edit between markers, managed by make manifests/p' charts/kafka-operator/templates/operator-rbac.yaml > charts/kafka-operator/templates/operator-rbac.yaml.tmp
+	@awk '/^rules:$$/,0' config/base/rbac/role.yaml | tail -n +2 >> charts/kafka-operator/templates/operator-rbac.yaml.tmp
+	@sed -n '/# RBAC_RULES_END/,$$p' charts/kafka-operator/templates/operator-rbac.yaml >> charts/kafka-operator/templates/operator-rbac.yaml.tmp
+	@mv charts/kafka-operator/templates/operator-rbac.yaml.tmp charts/kafka-operator/templates/operator-rbac.yaml
 
 fmt: ## Run go fmt against code.
 	go fmt ./...

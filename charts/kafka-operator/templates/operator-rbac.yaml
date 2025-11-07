@@ -26,10 +26,14 @@ metadata:
     app.kubernetes.io/version: {{ .Chart.AppVersion }}
     app.kubernetes.io/component: operator
 rules:
+# RBAC_RULES_START - Do not edit between markers, managed by make manifests
 - apiGroups:
-  - servicemesh.cisco.com
+  - ""
   resources:
-  - istiomeshgateways
+  - configmaps
+  - persistentvolumeclaims
+  - secrets
+  - services
   verbs:
   - create
   - delete
@@ -38,221 +42,59 @@ rules:
   - patch
   - update
   - watch
-- apiGroups:
-  - networking.istio.io
-  resources:
-  - '*'
-  verbs:
-  - '*'
-- apiGroups:
-  - projectcontour.io
-  resources:
-  - '*'
-  verbs:
-  - '*'
 - apiGroups:
   - ""
   resources:
   - events
   verbs:
   - create
+  - patch
 - apiGroups:
   - ""
   resources:
   - namespaces
+  - nodes
   verbs:
   - get
   - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - update
   - watch
 - apiGroups:
   - apps
   resources:
   - deployments
   verbs:
+  - create
+  - delete
   - get
   - list
-  - watch
-  - create
-  - update
   - patch
-  - delete
+  - update
+  - watch
 - apiGroups:
   - apps
   resources:
   - deployments/status
   verbs:
   - get
-  - update
-  - patch
-- apiGroups:
-  - ""
-  resources:
-  - configmaps
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - kafka.banzaicloud.io
-  resources:
-  - kafkaclusters
-  - kafkatopics
-  - kafkausers
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-  - deletecollection
-- apiGroups:
-  - kafka.banzaicloud.io
-  resources:
-  - kafkaclusters/status
-  - kafkatopics/status
-  - kafkausers/status
-  verbs:
-  - get
-  - update
-  - patch
-- apiGroups:
-  - kafka.banzaicloud.io
-  resources:
-  - kafkaclusters/finalizers
-  verbs:
-  - create
-  - delete
   - patch
   - update
-- apiGroups:
-  - kafka.banzaicloud.io
-  resources:
-  - kafkausers/finalizers
-  verbs:
-  - create
-  - delete
-  - patch
-  - update
-- apiGroups:
-  - kafka.banzaicloud.io
-  resources:
-  - kafkatopics/finalizers
-  verbs:
-  - create
-  - delete
-  - patch
-  - update
-- apiGroups:
-  - kafka.banzaicloud.io
-  resources:
-  - cruisecontroloperations
-  verbs:
-  - create
-  - delete
-  - deletecollection
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - kafka.banzaicloud.io
-  resources:
-  - cruisecontroloperations/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - kafka.banzaicloud.io
-  resources:
-  - cruisecontroloperations/finalizers
-  verbs:
-  - create
-  - delete
-  - patch
-  - update
-- apiGroups:
-  - ""
-  resources:
-  - persistentvolumeclaims
-  verbs:
-  - get
-  - update
-  - create
-  - watch
-  - list
-  - delete
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  verbs:
-  - get
-  - update
-  - create
-  - watch
-  - list
-  - delete
-- apiGroups:
-  - ""
-  resources:
-  - nodes
-  verbs:
-  - get
-  - list
-  - watch
-{{- if .Values.webhook.enabled }}
-- apiGroups:
-  - admissionregistration.k8s.io
-  resources:
-  - mutatingwebhookconfigurations
-  - validatingwebhookconfigurations
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-{{- end }}
-- apiGroups:
-  - ""
-  resources:
-  - secrets
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - ""
-  resources:
-  - services
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
 - apiGroups:
   - cert-manager.io
   resources:
-  - issuers
-  - clusterissuers
   - certificates
+  - clusterissuers
+  - issuers
   verbs:
   - create
   - delete
@@ -298,6 +140,62 @@ rules:
   - update
   - watch
 - apiGroups:
+  - kafka.banzaicloud.io
+  resources:
+  - cruisecontroloperations
+  - kafkatopics
+  - kafkausers
+  verbs:
+  - create
+  - delete
+  - deletecollection
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - kafka.banzaicloud.io
+  resources:
+  - cruisecontroloperations/finalizers
+  - kafkaclusters/finalizers
+  - kafkatopics/finalizers
+  - kafkausers/finalizers
+  verbs:
+  - create
+  - delete
+  - patch
+  - update
+- apiGroups:
+  - kafka.banzaicloud.io
+  resources:
+  - cruisecontroloperations/status
+  - kafkaclusters/status
+  - kafkatopics/status
+  - kafkausers/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - kafka.banzaicloud.io
+  resources:
+  - kafkaclusters
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - networking.istio.io
+  resources:
+  - '*'
+  verbs:
+  - '*'
+- apiGroups:
   - policy
   resources:
   - poddisruptionbudgets
@@ -309,6 +207,31 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - projectcontour.io
+  resources:
+  - httpproxies
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - servicemesh.cisco.com
+  resources:
+  - istiomeshgateways
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+# RBAC_RULES_END
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
