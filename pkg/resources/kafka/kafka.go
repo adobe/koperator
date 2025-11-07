@@ -55,6 +55,7 @@ import (
 	certutil "github.com/banzaicloud/koperator/pkg/util/cert"
 	contourutils "github.com/banzaicloud/koperator/pkg/util/contour"
 	envoyutils "github.com/banzaicloud/koperator/pkg/util/envoy"
+	envoygatewayutils "github.com/banzaicloud/koperator/pkg/util/envoygateway"
 	"github.com/banzaicloud/koperator/pkg/util/kafka"
 	pkicommon "github.com/banzaicloud/koperator/pkg/util/pki"
 )
@@ -1411,7 +1412,12 @@ func (r *Reconciler) getBrokerHost(log logr.Logger, defaultHost string, broker b
 		// portNumber = eListener.ContainerPort
 	case corev1.ServiceTypeLoadBalancer:
 		if eListener.TLSEnabled() {
-			brokerHost = iConfig.EnvoyConfig.GetBrokerHostname(broker.Id)
+			// Check which ingress controller is being used
+			if iConfig.EnvoyConfig != nil {
+				brokerHost = iConfig.EnvoyConfig.GetBrokerHostname(broker.Id)
+			} else if iConfig.EnvoyGatewayConfig != nil {
+				brokerHost = iConfig.EnvoyGatewayConfig.GetBrokerHostname(broker.Id)
+			}
 			if brokerHost == "" {
 				return "", errors.New("brokerHostnameTemplate is not set in the ingress service settings")
 			}
@@ -1437,7 +1443,10 @@ func (r *Reconciler) createStandardExternalListenerStatuses(log logr.Logger, eLi
 		}
 		if iConfig.HostnameOverride != "" {
 			host = iConfig.HostnameOverride
-		} else if eListener.GetAccessMethod() == corev1.ServiceTypeLoadBalancer {
+		} else if eListener.GetAccessMethod() == corev1.ServiceTypeLoadBalancer &&
+			(r.KafkaCluster.Spec.GetIngressController() == envoyutils.IngressControllerName ||
+				r.KafkaCluster.Spec.GetIngressController() == contourutils.IngressControllerName) {
+			// For envoy and contour ingress controllers, get the LoadBalancer service
 			foundLBService, err = getServiceFromExternalListener(r.Client, r.KafkaCluster, eListener.Name, iConfigName)
 			if err != nil {
 				return nil, errors.WrapIfWithDetails(err, "could not get service corresponding to the external listener", "externalListenerName", eListener.Name)
@@ -1450,7 +1459,9 @@ func (r *Reconciler) createStandardExternalListenerStatuses(log logr.Logger, eLi
 		}
 
 		// optionally add all brokers service to the top of the list
-		if eListener.GetAccessMethod() != corev1.ServiceTypeNodePort {
+		if eListener.GetAccessMethod() != corev1.ServiceTypeNodePort &&
+			(r.KafkaCluster.Spec.GetIngressController() == envoyutils.IngressControllerName ||
+				r.KafkaCluster.Spec.GetIngressController() == contourutils.IngressControllerName) {
 			if foundLBService == nil {
 				foundLBService, err = getServiceFromExternalListener(r.Client, r.KafkaCluster, eListener.Name, iConfigName)
 				if err != nil {
@@ -1650,6 +1661,10 @@ func getServiceFromExternalListener(client client.Client, cluster *banzaiv1beta1
 			iControllerServiceName = fmt.Sprintf(contourutils.ContourServiceNameWithScope, eListenerName, ingressConfigName, cluster.GetName())
 			iControllerServiceName = strings.ReplaceAll(iControllerServiceName, "_", "-")
 		}
+	case envoygatewayutils.IngressControllerName:
+		// EnvoyGateway uses Gateway API resources, not LoadBalancer services
+		// Return an error to indicate this is not supported for EnvoyGateway
+		return nil, errors.New("EnvoyGateway does not use LoadBalancer services; use Gateway API resources instead")
 	}
 
 	err := client.Get(context.TODO(), types.NamespacedName{Name: iControllerServiceName, Namespace: cluster.GetNamespace()}, foundLBService)

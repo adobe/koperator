@@ -13,6 +13,7 @@ spec:
   propagateLabels: false
   oneBrokerPerNode: false
   clusterImage: "ghcr.io/adobe/koperator/kafka:2.13-3.9.1"
+  ingressController: "envoy"
   readOnlyConfig: |
     auto.create.topics.enable=false
     cruise.control.metrics.topic.auto.create=true
@@ -54,7 +55,6 @@ spec:
       brokerConfig:
         processRoles:
           - controller
-          # - broker
     - id: 4
       brokerConfigGroup: "default"
       brokerConfig:
@@ -67,35 +67,12 @@ spec:
           - controller
   rollingUpgradeConfig:
     failureThreshold: 1
-  listenersConfig:
-    internalListeners:
-      - type: "plaintext"
-        name: "internal"
-        containerPort: 29092
-        usedForInnerBrokerCommunication: true
-      - type: "plaintext"
-        name: "controller"
-        containerPort: 29093
-        usedForInnerBrokerCommunication: false
-        usedForControllerCommunication: true
   cruiseControlConfig:
-    # podSecurityContext:
-    #  runAsNonRoot: false
-    # securityContext:
-    #  privileged: true
     cruiseControlTaskSpec:
       RetryDurationMinutes: 5
     topicConfig:
       partitions: 12
       replicationFactor: 3
-#    resourceRequirements:
-#      requests:
-#        cpu: 500m
-#        memory: 1Gi
-#      limits:
-#        cpu: 500m
-#        memory: 1Gi
-#    image: "adobe/cruise-control:3.0.3-adbe-20250804"
     config: |
       # Copyright 2017 LinkedIn Corp. Licensed under the BSD 2-Clause License (the "License"). See License in the project root for license information.
       #
@@ -282,3 +259,20 @@ spec:
       {
         "min.insync.replicas": 3
       }
+  listenersConfig:
+    internalListeners:
+      - type: "plaintext"
+        name: "internal"
+        containerPort: 29092
+        usedForInnerBrokerCommunication: true
+      - type: "plaintext"
+        name: "controller"
+        containerPort: 29093
+        usedForInnerBrokerCommunication: false
+        usedForControllerCommunication: true
+    externalListeners:
+    - type: "plaintext"
+      name: "external"
+      externalStartingPort: 19090
+      containerPort: 9094
+

@@ -142,6 +142,12 @@ func checkExternalListenerStartingPort(kafkaClusterSpec *banzaicloudv1beta1.Kafk
 	var allErrs field.ErrorList
 	const maxPort int32 = 65535
 	for i, extListener := range kafkaClusterSpec.ListenersConfig.ExternalListeners {
+		// Skip port validation when TLS is enabled (externalStartingPort == -1)
+		// In TLS mode, GetAnyCastPort() is used instead of externalStartingPort + brokerId
+		if extListener.TLSEnabled() {
+			continue
+		}
+
 		var outOfRangeBrokerIDs, collidingPortsBrokerIDs []int32
 		for _, broker := range kafkaClusterSpec.Brokers {
 			externalPort := util.GetExternalPortForBroker(extListener.ExternalStartingPort, broker.Id)

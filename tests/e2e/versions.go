@@ -24,6 +24,9 @@ const (
 	// ContourVersion is the version of Contour ingress controller Helm chart
 	ContourVersion = "0.2.1" // renovate: datasource=helm depName=contour registryUrl=https://projectcontour.github.io/helm-charts
 
+	// EnvoyGatewayVersion is the version of Envoy Gateway Helm chart
+	EnvoyGatewayVersion = "v1.5.4" // renovate: datasource=helm depName=gateway-helm registryUrl=https://gateway.envoyproxy.io
+
 	// PrometheusOperatorVersion is the version of kube-prometheus-stack Helm chart
 	PrometheusOperatorVersion = "80.13.0" // renovate: datasource=helm depName=kube-prometheus-stack registryUrl=https://prometheus-community.github.io/helm-charts
 

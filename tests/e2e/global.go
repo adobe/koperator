@@ -53,6 +53,25 @@ var (
 		},
 	}
 
+	// envoyGatewayHelmDescriptor describes the Envoy Gateway Helm component
+	// The Helm chart installs Gateway API CRDs and Envoy Gateway CRDs automatically
+	envoyGatewayHelmDescriptor = helmDescriptor{
+		Repository:   "",
+		ChartName:    "oci://docker.io/envoyproxy/gateway-helm",
+		ChartVersion: EnvoyGatewayVersion,
+		ReleaseName:  "eg",
+		Namespace:    "envoy-gateway-system",
+		SetValues: map[string]string{
+			"deployment.envoyGateway.resources.limits.cpu":      "500m",
+			"deployment.envoyGateway.resources.limits.memory":   "1024Mi",
+			"deployment.envoyGateway.resources.requests.cpu":    "100m",
+			"deployment.envoyGateway.resources.requests.memory": "256Mi",
+		},
+		HelmExtraArguments: map[string][]string{
+			"install": {"--timeout", "10m"},
+		},
+	}
+
 	// koperatorLocalHelmDescriptor describes the Koperator Helm component with
 	// a local chart and version.
 	koperatorLocalHelmDescriptor = func() helmDescriptor {

@@ -282,6 +282,70 @@ func requireRemoveContourCRDs(kubectlOptions k8s.KubectlOptions) {
 	})
 }
 
+func requireUninstallingEnvoyGateway(kubectlOptions k8s.KubectlOptions) {
+	ginkgo.When("Uninstalling Envoy Gateway", func() {
+		requireUninstallingEnvoyGatewayHelmChart(kubectlOptions)
+		requireRemoveEnvoyGatewayCRDs(kubectlOptions)
+		requireRemoveNamespace(kubectlOptions, envoyGatewayHelmDescriptor.Namespace)
+	})
+}
+
+func requireUninstallingEnvoyGatewayHelmChart(kubectlOptions k8s.KubectlOptions) {
+	ginkgo.It("Uninstalling Envoy Gateway Helm chart", func() {
+		err := envoyGatewayHelmDescriptor.uninstallHelmChart(kubectlOptions, true)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		ginkgo.By("Cleaning up Envoy Gateway Helm hook resources")
+		// Envoy Gateway Helm chart uses hooks that create resources not cleaned up by helm uninstall
+		// Explicitly delete known leftover resources
+
+		// Delete ServiceAccount in envoy-gateway-system namespace
+		namespacedOpts := kubectlOptions
+		namespacedOpts.Namespace = envoyGatewayHelmDescriptor.Namespace
+		err = deleteK8sResourceNoErrNotFound(namespacedOpts, defaultDeletionTimeout, "serviceaccount", "eg-gateway-helm-certgen")
+		if err != nil && !isKubectlNotFoundError(err) {
+			ginkgo.By(fmt.Sprintf("Warning: Failed to delete ServiceAccount eg-gateway-helm-certgen: %v", err))
+		}
+
+		// Delete MutatingWebhookConfiguration (cluster-scoped)
+		// Note: The full name includes the namespace suffix
+		clusterOpts := kubectlOptions
+		clusterOpts.Namespace = ""
+		webhookName := fmt.Sprintf("envoy-gateway-topology-injector.%s", envoyGatewayHelmDescriptor.Namespace)
+		err = deleteK8sResourceNoErrNotFound(clusterOpts, defaultDeletionTimeout, "mutatingwebhookconfiguration", webhookName)
+		if err != nil && !isKubectlNotFoundError(err) {
+			ginkgo.By(fmt.Sprintf("Warning: Failed to delete MutatingWebhookConfiguration %s: %v", webhookName, err))
+		}
+
+		ginkgo.By("Verifying Envoy Gateway helm chart resources cleanup")
+
+		k8sResourceKinds, err := listK8sResourceKinds(kubectlOptions, "")
+		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
+
+		envoyGatewayAvailableResourceKinds := stringSlicesInstersect(dependencyCRDs.EnvoyGateway(), k8sResourceKinds)
+		envoyGatewayAvailableResourceKinds = append(envoyGatewayAvailableResourceKinds, basicK8sResourceKinds()...)
+
+		remainedResources, err := getK8sResources(kubectlOptions,
+			envoyGatewayAvailableResourceKinds,
+			fmt.Sprintf(managedByHelmLabelTemplate, envoyGatewayHelmDescriptor.ReleaseName),
+			"",
+			kubectlArgGoTemplateKindNameNamespace,
+			"--all-namespaces")
+		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
+
+		gomega.Expect(remainedResources).Should(gomega.BeEmpty())
+	})
+}
+
+func requireRemoveEnvoyGatewayCRDs(kubectlOptions k8s.KubectlOptions) {
+	ginkgo.It("Removing Envoy Gateway CRDs", func() {
+		for _, crd := range dependencyCRDs.EnvoyGateway() {
+			err := deleteK8sResourceNoErrNotFound(kubectlOptions, defaultDeletionTimeout, crdKind, crd)
+			gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
+		}
+	})
+}
+
 // requireRemoveNamespace deletes the indicated namespace object
 func requireRemoveNamespace(kubectlOptions k8s.KubectlOptions, namespace string) {
 	ginkgo.It(fmt.Sprintf("Removing namespace %s", namespace), func() {

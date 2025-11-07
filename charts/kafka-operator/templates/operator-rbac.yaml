@@ -26,46 +26,7 @@ metadata:
     app.kubernetes.io/version: {{ .Chart.AppVersion }}
     app.kubernetes.io/component: operator
 rules:
-- apiGroups:
-  - projectcontour.io
-  resources:
-  - '*'
-  verbs:
-  - '*'
-- apiGroups:
-  - ""
-  resources:
-  - events
-  verbs:
-  - create
-- apiGroups:
-  - ""
-  resources:
-  - namespaces
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - apps
-  resources:
-  - deployments
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - apps
-  resources:
-  - deployments/status
-  verbs:
-  - get
-  - update
-  - patch
+# RBAC_RULES_START - Do not edit between markers, managed by make manifests
 - apiGroups:
   - ""
   resources:
@@ -179,6 +140,20 @@ rules:
   - update
   - watch
 - apiGroups:
+  - gateway.networking.k8s.io
+  resources:
+  - gateways
+  - tcproutes
+  - tlsroutes
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - kafka.banzaicloud.io
   resources:
   - cruisecontroloperations
@@ -229,12 +204,6 @@ rules:
   - update
   - watch
 - apiGroups:
-  - networking.istio.io
-  resources:
-  - '*'
-  verbs:
-  - '*'
-- apiGroups:
   - policy
   resources:
   - poddisruptionbudgets
@@ -250,18 +219,6 @@ rules:
   - projectcontour.io
   resources:
   - httpproxies
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - servicemesh.cisco.com
-  resources:
-  - istiomeshgateways
   verbs:
   - create
   - delete

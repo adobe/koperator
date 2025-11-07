@@ -61,7 +61,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.35.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.38.6 // indirect
 	github.com/aws/smithy-go v1.23.0 // indirect
-	github.com/banzaicloud/istio-client-go v0.0.17 // indirect
 	github.com/banzaicloud/koperator/properties v0.4.1 // indirect
 	github.com/banzaicloud/operator-tools v0.28.10 // indirect
 	github.com/boombuler/barcode v1.0.1 // indirect

@@ -6,13 +6,31 @@ metadata:
   name: kafka
   namespace: kafka
 spec:
-  kRaft: true
   monitoringConfig:
     jmxImage: "ghcr.io/adobe/koperator/jmx-javaagent:1.4.0"
   headlessServiceEnabled: true
+  zkAddresses:
+    - "zookeeper-server-client.zookeeper:2181"
   propagateLabels: false
   oneBrokerPerNode: false
   clusterImage: "ghcr.io/adobe/koperator/kafka:2.13-3.9.1"
+  ingressController: "envoy"
+  listenersConfig:
+    internalListeners:
+      - type: "plaintext"
+        name: "internal"
+        containerPort: 29092
+        usedForInnerBrokerCommunication: true
+      - type: "plaintext"
+        name: "controller"
+        containerPort: 29093
+        usedForInnerBrokerCommunication: false
+        usedForControllerCommunication: true
+    externalListeners:
+      - type: "plaintext"
+        name: "external"
+        externalStartingPort: 19090
+        containerPort: 9094
   readOnlyConfig: |
     auto.create.topics.enable=false
     cruise.control.metrics.topic.auto.create=true
@@ -28,74 +46,24 @@ spec:
             resources:
               requests:
                 storage: 10Gi
-    broker:
-      processRoles:
-        - broker
-      storageConfigs:
-        - mountPath: "/kafka-logs-broker"
-          pvcSpec:
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 10Gi
       brokerAnnotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "9020"
   brokers:
     - id: 0
-      brokerConfigGroup: "broker"
+      brokerConfigGroup: "default"
     - id: 1
-      brokerConfigGroup: "broker"
+      brokerConfigGroup: "default"
     - id: 2
-      brokerConfigGroup: "broker"
-    - id: 3
       brokerConfigGroup: "default"
-      brokerConfig:
-        processRoles:
-          - controller
-          # - broker
-    - id: 4
-      brokerConfigGroup: "default"
-      brokerConfig:
-        processRoles:
-          - controller
-    - id: 5
-      brokerConfigGroup: "default"
-      brokerConfig:
-        processRoles:
-          - controller
   rollingUpgradeConfig:
     failureThreshold: 1
-  listenersConfig:
-    internalListeners:
-      - type: "plaintext"
-        name: "internal"
-        containerPort: 29092
-        usedForInnerBrokerCommunication: true
-      - type: "plaintext"
-        name: "controller"
-        containerPort: 29093
-        usedForInnerBrokerCommunication: false
-        usedForControllerCommunication: true
   cruiseControlConfig:
-    # podSecurityContext:
-    #  runAsNonRoot: false
-    # securityContext:
-    #  privileged: true
     cruiseControlTaskSpec:
       RetryDurationMinutes: 5
     topicConfig:
       partitions: 12
       replicationFactor: 3
-#    resourceRequirements:
-#      requests:
-#        cpu: 500m
-#        memory: 1Gi
-#      limits:
-#        cpu: 500m
-#        memory: 1Gi
-#    image: "adobe/cruise-control:3.0.3-adbe-20250804"
     config: |
       # Copyright 2017 LinkedIn Corp. Licensed under the BSD 2-Clause License (the "License"). See License in the project root for license information.
       #
@@ -222,6 +190,10 @@ spec:
       metric.anomaly.analyzer.metrics=BROKER_PRODUCE_LOCAL_TIME_MS_MAX,BROKER_PRODUCE_LOCAL_TIME_MS_MEAN,BROKER_CONSUMER_FETCH_LOCAL_TIME_MS_MAX,BROKER_CONSUMER_FETCH_LOCAL_TIME_MS_MEAN,BROKER_FOLLOWER_FETCH_LOCAL_TIME_MS_MAX,BROKER_FOLLOWER_FETCH_LOCAL_TIME_MS_MEAN,BROKER_LOG_FLUSH_TIME_MS_MAX,BROKER_LOG_FLUSH_TIME_MS_MEAN
       ## Adjust accordingly if your metrics reporter is an older version and does not produce these metrics.
       #metric.anomaly.analyzer.metrics=BROKER_PRODUCE_LOCAL_TIME_MS_50TH,BROKER_PRODUCE_LOCAL_TIME_MS_999TH,BROKER_CONSUMER_FETCH_LOCAL_TIME_MS_50TH,BROKER_CONSUMER_FETCH_LOCAL_TIME_MS_999TH,BROKER_FOLLOWER_FETCH_LOCAL_TIME_MS_50TH,BROKER_FOLLOWER_FETCH_LOCAL_TIME_MS_999TH,BROKER_LOG_FLUSH_TIME_MS_50TH,BROKER_LOG_FLUSH_TIME_MS_999TH
+      # The zk path to store failed broker information.
+      failed.brokers.zk.path=/CruiseControlBrokerList
+      # Topic config provider class
+      topic.config.provider.class=com.linkedin.kafka.cruisecontrol.config.KafkaTopicConfigProvider
       # The cluster configurations for the KafkaTopicConfigProvider
       cluster.configs.file=config/clusterConfigs.json
       # The maximum time in milliseconds to store the response and access details of a completed user task.
@@ -282,3 +254,5 @@ spec:
       {
         "min.insync.replicas": 3
       }
+
+
