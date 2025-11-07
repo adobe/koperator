@@ -290,8 +290,220 @@ func TestCleanMutationWebhookFields(t *testing.T) {
 	})
 }
 
-func TestIgnoreScaleOpsFields(t *testing.T) {
-	tests := []struct {
+// Helper functions for creating test pods
+func createBasicPod() *corev1.Pod {
+	return &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "test-pod",
+			Namespace:   "default",
+			Annotations: map[string]string{},
+			Labels:      map[string]string{},
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:  "kafka",
+					Image: "kafka:latest",
+				},
+			},
+		},
+	}
+}
+
+func createScaleOpsAffinity() *corev1.Affinity {
+	return &corev1.Affinity{
+		NodeAffinity: &corev1.NodeAffinity{
+			PreferredDuringSchedulingIgnoredDuringExecution: []corev1.PreferredSchedulingTerm{
+				{
+					Weight: 95,
+					Preference: corev1.NodeSelectorTerm{
+						MatchExpressions: []corev1.NodeSelectorRequirement{
+							{
+								Key:      "scaleops.sh/node-packing",
+								Operator: corev1.NodeSelectorOpIn,
+								Values:   []string{"high"},
+							},
+						},
+					},
+				},
+				{
+					Weight: 50,
+					Preference: corev1.NodeSelectorTerm{
+						MatchExpressions: []corev1.NodeSelectorRequirement{
+							{
+								Key:      "scaleops.sh/node-packing",
+								Operator: corev1.NodeSelectorOpIn,
+								Values:   []string{"medium"},
+							},
+						},
+					},
+				},
+			},
+		},
+		PodAffinity: &corev1.PodAffinity{
+			PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
+				{
+					Weight: 100,
+					PodAffinityTerm: corev1.PodAffinityTerm{
+						LabelSelector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "scaleops.sh/managed-unevictable",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"true"},
+								},
+							},
+						},
+						TopologyKey: "kubernetes.io/hostname",
+					},
+				},
+			},
+		},
+	}
+}
+
+func createKafkaContainer(image, cpuRequest string) corev1.Container {
+	container := corev1.Container{
+		Name:  "kafka",
+		Image: image,
+	}
+	if cpuRequest != "" {
+		container.Resources = corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse(cpuRequest),
+				corev1.ResourceMemory: resource.MustParse("4Gi"),
+			},
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("4"),
+				corev1.ResourceMemory: resource.MustParse("4Gi"),
+			},
+		}
+	}
+	return container
+}
+
+func createComplexScaleOpsPodBefore() *corev1.Pod {
+	return &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pipeline-kafka-101-4s7b2",
+			Namespace: "default",
+			Annotations: map[string]string{
+				"scaleops.sh/admission":          "true",
+				"scaleops.sh/applied-policy":     "high-availability",
+				"scaleops.sh/managed-containers": "{}",
+				"scaleops.sh/pod-owner-grouping": "kafkabroker",
+				"app":                            "kafka",
+			},
+			Labels: map[string]string{
+				"scaleops.sh/managed":             "true",
+				"scaleops.sh/managed-unevictable": "true",
+				"scaleops.sh/pod-owner-grouping":  "kafkabroker",
+				"app":                             "kafka",
+				"brokerId":                        "101",
+			},
+		},
+		Spec: corev1.PodSpec{
+			Affinity: &corev1.Affinity{
+				NodeAffinity: &corev1.NodeAffinity{
+					PreferredDuringSchedulingIgnoredDuringExecution: []corev1.PreferredSchedulingTerm{
+						{
+							Weight: 95,
+							Preference: corev1.NodeSelectorTerm{
+								MatchExpressions: []corev1.NodeSelectorRequirement{
+									{
+										Key:      "scaleops.sh/node-packing",
+										Operator: corev1.NodeSelectorOpIn,
+										Values:   []string{"high"},
+									},
+								},
+							},
+						},
+					},
+				},
+				PodAffinity: &corev1.PodAffinity{
+					PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
+						{
+							Weight: 100,
+							PodAffinityTerm: corev1.PodAffinityTerm{
+								LabelSelector: &metav1.LabelSelector{
+									MatchExpressions: []metav1.LabelSelectorRequirement{
+										{
+											Key:      "scaleops.sh/managed-unevictable",
+											Operator: metav1.LabelSelectorOpIn,
+											Values:   []string{"true"},
+										},
+									},
+								},
+								TopologyKey: "kubernetes.io/hostname",
+							},
+						},
+					},
+				},
+			},
+			Containers: []corev1.Container{
+				createKafkaContainer("kafka:3.9.1", "697m"),
+				{
+					Name:  "fluent-bit",
+					Image: "fluent-bit:latest",
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("100m"),
+							corev1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("100m"),
+							corev1.ResourceMemory: resource.MustParse("256Mi"),
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func createComplexScaleOpsPodAfter() *corev1.Pod {
+	return &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pipeline-kafka-101-4s7b2",
+			Namespace: "default",
+			Annotations: map[string]string{
+				"app": "kafka",
+			},
+			Labels: map[string]string{
+				"app":      "kafka",
+				"brokerId": "101",
+			},
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				createKafkaContainer("kafka:3.9.1", "1"),
+				{
+					Name:  "fluent-bit",
+					Image: "fluent-bit:latest",
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("100m"),
+							corev1.ResourceMemory: resource.MustParse("256Mi"),
+						},
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("100m"),
+							corev1.ResourceMemory: resource.MustParse("256Mi"),
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func getScaleOpsTestCases() []struct {
+	name        string
+	currentPod  *corev1.Pod
+	modifiedPod *corev1.Pod
+	expectDiff  bool
+	description string
+} {
+	return []struct {
 		name        string
 		currentPod  *corev1.Pod
 		modifiedPod *corev1.Pod
@@ -300,391 +512,104 @@ func TestIgnoreScaleOpsFields(t *testing.T) {
 	}{
 		{
 			name: "ignore scaleops annotations and labels",
-			currentPod: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-pod",
-					Namespace: "default",
-					Annotations: map[string]string{
-						"scaleops.sh/admission":                 "true",
-						"scaleops.sh/applied-policy":            "high-availability",
-						"scaleops.sh/last-applied-resources":    "{}",
-						"scaleops.sh/managed-containers":        "{}",
-						"scaleops.sh/managed-keep-limit-cpu":    "true",
-						"scaleops.sh/managed-keep-limit-memory": "true",
-						"scaleops.sh/origin-resources":          "{}",
-						"scaleops.sh/pod-owner-grouping":        "kafkabroker",
-						"scaleops.sh/pod-owner-identifier":      "pipeline-kafka-123",
-						"app":                                   "kafka",
-					},
-					Labels: map[string]string{
-						"scaleops.sh/applied-recommendation": "kafkabroker-pipeline-kafka-123",
-						"scaleops.sh/managed":                "true",
-						"scaleops.sh/managed-unevictable":    "true",
-						"scaleops.sh/pod-owner-grouping":     "kafkabroker",
-						"scaleops.sh/pod-owner-identifier":   "pipeline-kafka-123",
-						"app":                                "kafka",
-					},
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name:  "kafka",
-							Image: "kafka:latest",
-						},
-					},
-				},
-			},
-			modifiedPod: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-pod",
-					Namespace: "default",
-					Annotations: map[string]string{
-						"app": "kafka",
-					},
-					Labels: map[string]string{
-						"app": "kafka",
-					},
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name:  "kafka",
-							Image: "kafka:latest",
-						},
-					},
-				},
-			},
+			currentPod: func() *corev1.Pod {
+				pod := createBasicPod()
+				pod.Annotations = map[string]string{
+					"scaleops.sh/admission":                 "true",
+					"scaleops.sh/applied-policy":            "high-availability",
+					"scaleops.sh/last-applied-resources":    "{}",
+					"scaleops.sh/managed-containers":        "{}",
+					"scaleops.sh/managed-keep-limit-cpu":    "true",
+					"scaleops.sh/managed-keep-limit-memory": "true",
+					"scaleops.sh/origin-resources":          "{}",
+					"scaleops.sh/pod-owner-grouping":        "kafkabroker",
+					"scaleops.sh/pod-owner-identifier":      "pipeline-kafka-123",
+					"app":                                   "kafka",
+				}
+				pod.Labels = map[string]string{
+					"scaleops.sh/applied-recommendation": "kafkabroker-pipeline-kafka-123",
+					"scaleops.sh/managed":                "true",
+					"scaleops.sh/managed-unevictable":    "true",
+					"scaleops.sh/pod-owner-grouping":     "kafkabroker",
+					"scaleops.sh/pod-owner-identifier":   "pipeline-kafka-123",
+					"app":                                "kafka",
+				}
+				return pod
+			}(),
+			modifiedPod: func() *corev1.Pod {
+				pod := createBasicPod()
+				pod.Annotations["app"] = "kafka"
+				pod.Labels["app"] = "kafka"
+				return pod
+			}(),
 			expectDiff:  false,
 			description: "ScaleOps annotations and labels should be ignored",
 		},
 		{
 			name: "ignore scaleops-modified resources",
-			currentPod: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-pod",
-					Namespace: "default",
-					Annotations: map[string]string{
-						"scaleops.sh/managed-containers": "{}",
-						"scaleops.sh/pod-owner-grouping": "kafkabroker",
-					},
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name:  "kafka",
-							Image: "kafka:latest",
-							Resources: corev1.ResourceRequirements{
-								Requests: corev1.ResourceList{
-									corev1.ResourceCPU:    resource.MustParse("697m"),
-									corev1.ResourceMemory: resource.MustParse("4Gi"),
-								},
-								Limits: corev1.ResourceList{
-									corev1.ResourceCPU:    resource.MustParse("4"),
-									corev1.ResourceMemory: resource.MustParse("4Gi"),
-								},
-							},
-						},
-					},
-				},
-			},
-			modifiedPod: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-pod",
-					Namespace: "default",
-					Annotations: map[string]string{
-						"scaleops.sh/managed-containers": "{}",
-						"scaleops.sh/pod-owner-grouping": "kafkabroker",
-					},
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name:  "kafka",
-							Image: "kafka:latest",
-							Resources: corev1.ResourceRequirements{
-								Requests: corev1.ResourceList{
-									corev1.ResourceCPU:    resource.MustParse("1"),
-									corev1.ResourceMemory: resource.MustParse("4Gi"),
-								},
-								Limits: corev1.ResourceList{
-									corev1.ResourceCPU:    resource.MustParse("4"),
-									corev1.ResourceMemory: resource.MustParse("4Gi"),
-								},
-							},
-						},
-					},
-				},
-			},
+			currentPod: func() *corev1.Pod {
+				pod := createBasicPod()
+				pod.Annotations = map[string]string{
+					"scaleops.sh/managed-containers": "{}",
+					"scaleops.sh/pod-owner-grouping": "kafkabroker",
+				}
+				pod.Spec.Containers[0] = createKafkaContainer("kafka:latest", "697m")
+				return pod
+			}(),
+			modifiedPod: func() *corev1.Pod {
+				pod := createBasicPod()
+				pod.Annotations = map[string]string{
+					"scaleops.sh/managed-containers": "{}",
+					"scaleops.sh/pod-owner-grouping": "kafkabroker",
+				}
+				pod.Spec.Containers[0] = createKafkaContainer("kafka:latest", "1")
+				return pod
+			}(),
 			expectDiff:  false,
 			description: "ScaleOps-modified resources should be ignored when annotations present",
 		},
 		{
 			name: "ignore scaleops-added affinity rules",
-			currentPod: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-pod",
-					Namespace: "default",
-				},
-				Spec: corev1.PodSpec{
-					Affinity: &corev1.Affinity{
-						NodeAffinity: &corev1.NodeAffinity{
-							PreferredDuringSchedulingIgnoredDuringExecution: []corev1.PreferredSchedulingTerm{
-								{
-									Weight: 95,
-									Preference: corev1.NodeSelectorTerm{
-										MatchExpressions: []corev1.NodeSelectorRequirement{
-											{
-												Key:      "scaleops.sh/node-packing",
-												Operator: corev1.NodeSelectorOpIn,
-												Values:   []string{"high"},
-											},
-										},
-									},
-								},
-								{
-									Weight: 50,
-									Preference: corev1.NodeSelectorTerm{
-										MatchExpressions: []corev1.NodeSelectorRequirement{
-											{
-												Key:      "scaleops.sh/node-packing",
-												Operator: corev1.NodeSelectorOpIn,
-												Values:   []string{"medium"},
-											},
-										},
-									},
-								},
-							},
-						},
-						PodAffinity: &corev1.PodAffinity{
-							PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
-								{
-									Weight: 100,
-									PodAffinityTerm: corev1.PodAffinityTerm{
-										LabelSelector: &metav1.LabelSelector{
-											MatchExpressions: []metav1.LabelSelectorRequirement{
-												{
-													Key:      "scaleops.sh/managed-unevictable",
-													Operator: metav1.LabelSelectorOpIn,
-													Values:   []string{"true"},
-												},
-											},
-										},
-										TopologyKey: "kubernetes.io/hostname",
-									},
-								},
-							},
-						},
-					},
-					Containers: []corev1.Container{
-						{
-							Name:  "kafka",
-							Image: "kafka:latest",
-						},
-					},
-				},
-			},
-			modifiedPod: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-pod",
-					Namespace: "default",
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name:  "kafka",
-							Image: "kafka:latest",
-						},
-					},
-				},
-			},
+			currentPod: func() *corev1.Pod {
+				pod := createBasicPod()
+				pod.Spec.Affinity = createScaleOpsAffinity()
+				return pod
+			}(),
+			modifiedPod: createBasicPod(),
 			expectDiff:  false,
 			description: "ScaleOps-added affinity rules should be ignored",
 		},
 		{
 			name: "detect image changes even with scaleops",
-			currentPod: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-pod",
-					Namespace: "default",
-					Annotations: map[string]string{
-						"scaleops.sh/pod-owner-grouping": "kafkabroker",
-					},
-					Labels: map[string]string{
-						"scaleops.sh/managed": "true",
-					},
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name:  "kafka",
-							Image: "kafka:3.6.1",
-						},
-					},
-				},
-			},
-			modifiedPod: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-pod",
-					Namespace: "default",
-					Annotations: map[string]string{
-						"scaleops.sh/pod-owner-grouping": "kafkabroker",
-					},
-					Labels: map[string]string{
-						"scaleops.sh/managed": "true",
-					},
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name:  "kafka",
-							Image: "kafka:3.9.1",
-						},
-					},
-				},
-			},
+			currentPod: func() *corev1.Pod {
+				pod := createBasicPod()
+				pod.Annotations["scaleops.sh/pod-owner-grouping"] = "kafkabroker"
+				pod.Labels["scaleops.sh/managed"] = "true"
+				pod.Spec.Containers[0].Image = "kafka:3.6.1"
+				return pod
+			}(),
+			modifiedPod: func() *corev1.Pod {
+				pod := createBasicPod()
+				pod.Annotations["scaleops.sh/pod-owner-grouping"] = "kafkabroker"
+				pod.Labels["scaleops.sh/managed"] = "true"
+				pod.Spec.Containers[0].Image = "kafka:3.9.1"
+				return pod
+			}(),
 			expectDiff:  true,
 			description: "Image changes should be detected even with ScaleOps annotations",
 		},
 		{
-			name: "complex scaleops scenario - all mutations ignored",
-			currentPod: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "pipeline-kafka-101-4s7b2",
-					Namespace: "default",
-					Annotations: map[string]string{
-						"scaleops.sh/admission":          "true",
-						"scaleops.sh/applied-policy":     "high-availability",
-						"scaleops.sh/managed-containers": "{}",
-						"scaleops.sh/pod-owner-grouping": "kafkabroker",
-						"app":                            "kafka",
-					},
-					Labels: map[string]string{
-						"scaleops.sh/managed":             "true",
-						"scaleops.sh/managed-unevictable": "true",
-						"scaleops.sh/pod-owner-grouping":  "kafkabroker",
-						"app":                             "kafka",
-						"brokerId":                        "101",
-					},
-				},
-				Spec: corev1.PodSpec{
-					Affinity: &corev1.Affinity{
-						NodeAffinity: &corev1.NodeAffinity{
-							PreferredDuringSchedulingIgnoredDuringExecution: []corev1.PreferredSchedulingTerm{
-								{
-									Weight: 95,
-									Preference: corev1.NodeSelectorTerm{
-										MatchExpressions: []corev1.NodeSelectorRequirement{
-											{
-												Key:      "scaleops.sh/node-packing",
-												Operator: corev1.NodeSelectorOpIn,
-												Values:   []string{"high"},
-											},
-										},
-									},
-								},
-							},
-						},
-						PodAffinity: &corev1.PodAffinity{
-							PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
-								{
-									Weight: 100,
-									PodAffinityTerm: corev1.PodAffinityTerm{
-										LabelSelector: &metav1.LabelSelector{
-											MatchExpressions: []metav1.LabelSelectorRequirement{
-												{
-													Key:      "scaleops.sh/managed-unevictable",
-													Operator: metav1.LabelSelectorOpIn,
-													Values:   []string{"true"},
-												},
-											},
-										},
-										TopologyKey: "kubernetes.io/hostname",
-									},
-								},
-							},
-						},
-					},
-					Containers: []corev1.Container{
-						{
-							Name:  "kafka",
-							Image: "kafka:3.9.1",
-							Resources: corev1.ResourceRequirements{
-								Requests: corev1.ResourceList{
-									corev1.ResourceCPU:    resource.MustParse("697m"),
-									corev1.ResourceMemory: resource.MustParse("4Gi"),
-								},
-								Limits: corev1.ResourceList{
-									corev1.ResourceCPU:    resource.MustParse("4"),
-									corev1.ResourceMemory: resource.MustParse("4Gi"),
-								},
-							},
-						},
-						{
-							Name:  "fluent-bit",
-							Image: "fluent-bit:latest",
-							Resources: corev1.ResourceRequirements{
-								Requests: corev1.ResourceList{
-									corev1.ResourceCPU:    resource.MustParse("100m"),
-									corev1.ResourceMemory: resource.MustParse("100Mi"),
-								},
-								Limits: corev1.ResourceList{
-									corev1.ResourceCPU:    resource.MustParse("100m"),
-									corev1.ResourceMemory: resource.MustParse("256Mi"),
-								},
-							},
-						},
-					},
-				},
-			},
-			modifiedPod: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "pipeline-kafka-101-4s7b2",
-					Namespace: "default",
-					Annotations: map[string]string{
-						"app": "kafka",
-					},
-					Labels: map[string]string{
-						"app":      "kafka",
-						"brokerId": "101",
-					},
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name:  "kafka",
-							Image: "kafka:3.9.1",
-							Resources: corev1.ResourceRequirements{
-								Requests: corev1.ResourceList{
-									corev1.ResourceCPU:    resource.MustParse("1"),
-									corev1.ResourceMemory: resource.MustParse("4Gi"),
-								},
-								Limits: corev1.ResourceList{
-									corev1.ResourceCPU:    resource.MustParse("4"),
-									corev1.ResourceMemory: resource.MustParse("4Gi"),
-								},
-							},
-						},
-						{
-							Name:  "fluent-bit",
-							Image: "fluent-bit:latest",
-							Resources: corev1.ResourceRequirements{
-								Requests: corev1.ResourceList{
-									corev1.ResourceCPU:    resource.MustParse("100m"),
-									corev1.ResourceMemory: resource.MustParse("256Mi"),
-								},
-								Limits: corev1.ResourceList{
-									corev1.ResourceCPU:    resource.MustParse("100m"),
-									corev1.ResourceMemory: resource.MustParse("256Mi"),
-								},
-							},
-						},
-					},
-				},
-			},
+			name:        "complex scaleops scenario - all mutations ignored",
+			currentPod:  createComplexScaleOpsPodBefore(),
+			modifiedPod: createComplexScaleOpsPodAfter(),
 			expectDiff:  false,
 			description: "Complex ScaleOps scenario: all ScaleOps mutations should be ignored",
 		},
 	}
+}
+
+func TestIgnoreScaleOpsFields(t *testing.T) {
+	tests := getScaleOpsTestCases()
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
