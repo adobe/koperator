@@ -34,7 +34,7 @@ if [[ -n "${CLUSTER_ID}" ]]; then
   # If the storage is already formatted (e.g. broker restarts), the kafka-storage.sh will skip formatting for that storage
   # thus we can safely run the storage format command regardless if the storage has been formatted or not
   echo "Formatting KRaft storage with cluster ID ${CLUSTER_ID}"
-  /opt/kafka/bin/kafka-storage.sh format --cluster-id "${CLUSTER_ID}" -c /config/broker-config
+  /opt/kafka/bin/kafka-storage.sh format --cluster-id="${CLUSTER_ID}" -c /config/broker-config
 
   # Adding or removing controller nodes to the Kafka cluster would trigger cluster rolling upgrade so all the nodes in the cluster are aware of the newly added/removed controllers.
   # When this happens, Kafka's local quorum state file would be outdated since it is static and the Kafka server can't be started with conflicting controllers info (compared to info stored in ConfigMap),

@@ -169,7 +169,7 @@ type KafkaClusterSpec struct {
 	RollingUpgradeConfig        RollingUpgradeConfig    `json:"rollingUpgradeConfig"`
 	// Selector for broker pods that need to be recycled/reconciled
 	TaintedBrokersSelector *metav1.LabelSelector `json:"taintedBrokersSelector,omitempty"`
-	// +kubebuilder:validation:Enum=envoy;contour
+	// +kubebuilder:validation:Enum=envoy;contour;envoygateway
 	// IngressController specifies the type of the ingress controller to be used for external listeners.
 	IngressController string `json:"ingressController,omitempty"`
 	// If true OneBrokerPerNode ensures that each kafka broker will be placed on a different node unless a custom
@@ -179,13 +179,14 @@ type KafkaClusterSpec struct {
 	// when false, they will be kept so the Kafka cluster remains available for those Kafka clients which are still using the previous ingress setting.
 	// +kubebuilder:default=false
 	// +optional
-	RemoveUnusedIngressResources bool                 `json:"removeUnusedIngressResources,omitempty"`
-	PropagateLabels              bool                 `json:"propagateLabels,omitempty"`
-	CruiseControlConfig          CruiseControlConfig  `json:"cruiseControlConfig"`
-	EnvoyConfig                  EnvoyConfig          `json:"envoyConfig,omitempty"`
-	ContourIngressConfig         ContourIngressConfig `json:"contourIngressConfig,omitempty"`
-	MonitoringConfig             MonitoringConfig     `json:"monitoringConfig,omitempty"`
-	AlertManagerConfig           *AlertManagerConfig  `json:"alertManagerConfig,omitempty"`
+	RemoveUnusedIngressResources bool                      `json:"removeUnusedIngressResources,omitempty"`
+	PropagateLabels              bool                      `json:"propagateLabels,omitempty"`
+	CruiseControlConfig          CruiseControlConfig       `json:"cruiseControlConfig"`
+	EnvoyConfig                  EnvoyConfig               `json:"envoyConfig,omitempty"`
+	ContourIngressConfig         ContourIngressConfig      `json:"contourIngressConfig,omitempty"`
+	EnvoyGatewayConfig           EnvoyGatewayIngressConfig `json:"envoyGatewayConfig,omitempty"`
+	MonitoringConfig             MonitoringConfig          `json:"monitoringConfig,omitempty"`
+	AlertManagerConfig           *AlertManagerConfig       `json:"alertManagerConfig,omitempty"`
 	// Envs defines environment variables for Kafka broker Pods.
 	// Adding the "+" prefix to the name prepends the value to that environment variable instead of overwriting it.
 	// Add the "+" suffix to append.
@@ -588,6 +589,24 @@ func (c EnvoyConfig) GetBrokerHostname(brokerId int32) string {
 	return strings.Replace(c.BrokerHostnameTemplate, "%id", strconv.Itoa(int(brokerId)), 1)
 }
 
+// GetBrokerHostname returns the broker hostname for the given broker ID
+func (c EnvoyGatewayIngressConfig) GetBrokerHostname(brokerId int32) string {
+	return strings.Replace(c.BrokerHostnameTemplate, "%id", strconv.Itoa(int(brokerId)), 1)
+}
+
+// GetGatewayClassName returns the GatewayClassName or default value
+func (c EnvoyGatewayIngressConfig) GetGatewayClassName() string {
+	if c.GatewayClassName == "" {
+		return "eg"
+	}
+	return c.GatewayClassName
+}
+
+// GetAnnotations returns the annotations for the Gateway resource
+func (c EnvoyGatewayIngressConfig) GetAnnotations() map[string]string {
+	return util.CloneMap(c.Annotations)
+}
+
 // We use -1 for ExternalStartingPort value to enable TLS on envoy
 func (c ExternalListenerConfig) TLSEnabled() bool {
 	return c.ExternalStartingPort == -1
@@ -686,8 +705,9 @@ type Config struct {
 
 type IngressConfig struct {
 	IngressServiceSettings `json:",inline"`
-	EnvoyConfig            *EnvoyConfig          `json:"envoyConfig,omitempty"`
-	ContourIngressConfig   *ContourIngressConfig `json:"contourIngressConfig,omitempty"`
+	EnvoyConfig            *EnvoyConfig               `json:"envoyConfig,omitempty"`
+	ContourIngressConfig   *ContourIngressConfig      `json:"contourIngressConfig,omitempty"`
+	EnvoyGatewayConfig     *EnvoyGatewayIngressConfig `json:"envoyGatewayConfig,omitempty"`
 }
 
 type ContourIngressConfig struct {
@@ -695,6 +715,25 @@ type ContourIngressConfig struct {
 	TLSSecretName string `json:"tlsSecretName"`
 	// Broker hostname template for Contour IngressRoute resource to generate broker hostnames.
 	BrokerFQDNTemplate string `json:"brokerFQDNTemplate"`
+}
+
+type EnvoyGatewayIngressConfig struct {
+	// GatewayClassName is the name of the GatewayClass resource to use
+	// +optional
+	GatewayClassName string `json:"gatewayClassName,omitempty"`
+	// GatewayName is the name of the Gateway resource to create
+	// +optional
+	GatewayName string `json:"gatewayName,omitempty"`
+	// TLSSecretName is the name of the secret containing TLS certificates for TLS termination
+	// +optional
+	TLSSecretName string `json:"tlsSecretName,omitempty"`
+	// BrokerHostnameTemplate is the template for generating broker hostnames (e.g., "kafka-%id.example.com")
+	// The %id placeholder will be replaced with the broker ID
+	// +optional
+	BrokerHostnameTemplate string `json:"brokerHostnameTemplate,omitempty"`
+	// Annotations to add to the Gateway resource
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 // InternalListenerConfig defines the internal listener config for Kafka

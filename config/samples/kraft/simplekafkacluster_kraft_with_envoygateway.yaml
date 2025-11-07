@@ -1,3 +1,29 @@
+---
+# Self-signed issuer for creating TLS certificates
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: envoygateway-selfsigned-issuer
+  namespace: kafka
+spec:
+  selfSigned: {}
+---
+# TLS certificate for Envoy Gateway
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: envoygateway-tls-cert
+  namespace: kafka
+spec:
+  secretName: envoygateway-tls-secret
+  issuerRef:
+    name: envoygateway-selfsigned-issuer
+    kind: Issuer
+  dnsNames:
+    - "*.kafka.cluster.local"
+    - "kafka.cluster.local"
+  commonName: "kafka.cluster.local"
+---
 apiVersion: kafka.banzaicloud.io/v1beta1
 kind: KafkaCluster
 metadata:
@@ -13,6 +39,29 @@ spec:
   propagateLabels: false
   oneBrokerPerNode: false
   clusterImage: "ghcr.io/adobe/koperator/kafka:2.13-3.9.1"
+  ingressController: "envoygateway"
+  envoyGatewayConfig:
+    gatewayClassName: "eg"
+    tlsSecretName: "envoygateway-tls-secret"
+    brokerHostnameTemplate: "broker-%id.kafka.cluster.local"
+  listenersConfig:
+    internalListeners:
+      - type: "plaintext"
+        name: "internal"
+        containerPort: 29092
+        usedForInnerBrokerCommunication: true
+      - type: "plaintext"
+        name: "controller"
+        containerPort: 29093
+        usedForInnerBrokerCommunication: false
+        usedForControllerCommunication: true
+    externalListeners:
+      - accessMethod: LoadBalancer
+        containerPort: 29095
+        externalStartingPort: -1
+        name: envoyg
+        type: plaintext
+        usedForInnerBrokerCommunication: false
   readOnlyConfig: |
     auto.create.topics.enable=false
     cruise.control.metrics.topic.auto.create=true
@@ -67,35 +116,12 @@ spec:
           - controller
   rollingUpgradeConfig:
     failureThreshold: 1
-  listenersConfig:
-    internalListeners:
-      - type: "plaintext"
-        name: "internal"
-        containerPort: 29092
-        usedForInnerBrokerCommunication: true
-      - type: "plaintext"
-        name: "controller"
-        containerPort: 29093
-        usedForInnerBrokerCommunication: false
-        usedForControllerCommunication: true
   cruiseControlConfig:
-    # podSecurityContext:
-    #  runAsNonRoot: false
-    # securityContext:
-    #  privileged: true
     cruiseControlTaskSpec:
       RetryDurationMinutes: 5
     topicConfig:
       partitions: 12
       replicationFactor: 3
-#    resourceRequirements:
-#      requests:
-#        cpu: 500m
-#        memory: 1Gi
-#      limits:
-#        cpu: 500m
-#        memory: 1Gi
-#    image: "adobe/cruise-control:3.0.3-adbe-20250804"
     config: |
       # Copyright 2017 LinkedIn Corp. Licensed under the BSD 2-Clause License (the "License"). See License in the project root for license information.
       #
@@ -282,3 +308,4 @@ spec:
       {
         "min.insync.replicas": 3
       }
+

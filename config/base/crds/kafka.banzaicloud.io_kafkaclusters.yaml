@@ -20780,6 +20780,31 @@ spec:
                       type: object
                     type: array
                 type: object
+              envoyGatewayConfig:
+                properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    description: Annotations to add to the Gateway resource
+                    type: object
+                  brokerHostnameTemplate:
+                    description: |-
+                      BrokerHostnameTemplate is the template for generating broker hostnames (e.g., "kafka-%id.example.com")
+                      The %id placeholder will be replaced with the broker ID
+                    type: string
+                  gatewayClassName:
+                    description: GatewayClassName is the name of the GatewayClass
+                      resource to use
+                    type: string
+                  gatewayName:
+                    description: GatewayName is the name of the Gateway resource to
+                      create
+                    type: string
+                  tlsSecretName:
+                    description: TLSSecretName is the name of the secret containing
+                      TLS certificates for TLS termination
+                    type: string
+                type: object
               envs:
                 description: |-
                   Envs defines environment variables for Kafka broker Pods.
@@ -20948,6 +20973,7 @@ spec:
                 enum:
                 - envoy
                 - contour
+                - envoygateway
                 type: string
               kRaft:
                 default: false
@@ -22609,6 +22635,33 @@ spec:
                                           - whenUnsatisfiable
                                           type: object
                                         type: array
+                                    type: object
+                                  envoyGatewayConfig:
+                                    properties:
+                                      annotations:
+                                        additionalProperties:
+                                          type: string
+                                        description: Annotations to add to the Gateway
+                                          resource
+                                        type: object
+                                      brokerHostnameTemplate:
+                                        description: |-
+                                          BrokerHostnameTemplate is the template for generating broker hostnames (e.g., "kafka-%id.example.com")
+                                          The %id placeholder will be replaced with the broker ID
+                                        type: string
+                                      gatewayClassName:
+                                        description: GatewayClassName is the name
+                                          of the GatewayClass resource to use
+                                        type: string
+                                      gatewayName:
+                                        description: GatewayName is the name of the
+                                          Gateway resource to create
+                                        type: string
+                                      tlsSecretName:
+                                        description: TLSSecretName is the name of
+                                          the secret containing TLS certificates for
+                                          TLS termination
+                                        type: string
                                     type: object
                                   externalTrafficPolicy:
                                     description: |-
