@@ -37,9 +37,12 @@ func IgnoreMutationWebhookFields() patch.CalculateOption {
 			return current, modified, nil
 		}
 
+		// Check if ScaleOps is managing resources in EITHER pod
+		isScaleOpsManaged := isScaleOpsManagedPod(currentPod) || isScaleOpsManagedPod(modifiedPod)
+
 		// Remove fields that mutation webhooks commonly modify
-		currentPod = cleanMutationWebhookFields(currentPod)
-		modifiedPod = cleanMutationWebhookFields(modifiedPod)
+		currentPod = cleanMutationWebhookFields(currentPod, isScaleOpsManaged)
+		modifiedPod = cleanMutationWebhookFields(modifiedPod, isScaleOpsManaged)
 
 		currentBytes, err := json.Marshal(currentPod)
 		if err != nil {
@@ -55,14 +58,137 @@ func IgnoreMutationWebhookFields() patch.CalculateOption {
 	}
 }
 
-func cleanMutationWebhookFields(pod *corev1.Pod) *corev1.Pod {
+// isScaleOpsManagedPod checks if a pod is managed by ScaleOps
+func isScaleOpsManagedPod(pod *corev1.Pod) bool {
+	return pod.Annotations != nil && (pod.Annotations["scaleops.sh/managed-containers"] != "" ||
+		pod.Annotations["scaleops.sh/pod-owner-grouping"] != "")
+}
+
+func cleanMutationWebhookFields(pod *corev1.Pod, isScaleOpsManaged bool) *corev1.Pod {
 	// Create a copy to avoid modifying the original
 	cleaned := pod.DeepCopy()
 
 	// Remove mutation webhook annotations that should not trigger reconciliation
 	if cleaned.Annotations != nil {
+		// Gatekeeper annotations
 		delete(cleaned.Annotations, "gatekeeper.sh/mutation-id")
 		delete(cleaned.Annotations, "gatekeeper.sh/mutations")
+
+		// ScaleOps annotations
+		delete(cleaned.Annotations, "scaleops.sh/admission")
+		delete(cleaned.Annotations, "scaleops.sh/applied-policy")
+		delete(cleaned.Annotations, "scaleops.sh/last-applied-resources")
+		delete(cleaned.Annotations, "scaleops.sh/managed-containers")
+		delete(cleaned.Annotations, "scaleops.sh/managed-keep-limit-cpu")
+		delete(cleaned.Annotations, "scaleops.sh/managed-keep-limit-memory")
+		delete(cleaned.Annotations, "scaleops.sh/origin-resources")
+		delete(cleaned.Annotations, "scaleops.sh/pod-owner-grouping")
+		delete(cleaned.Annotations, "scaleops.sh/pod-owner-identifier")
+
+		// Remove the last-applied annotation that may contain ScaleOps fields
+		// Note: This is regenerated on updates by the k8s-objectmatcher library
+		delete(cleaned.Annotations, "banzaicloud.com/last-applied")
+
+		// If annotations map is empty, set to nil to normalize comparison
+		if len(cleaned.Annotations) == 0 {
+			cleaned.Annotations = nil
+		}
+	}
+
+	// Remove ScaleOps labels
+	if cleaned.Labels != nil {
+		delete(cleaned.Labels, "scaleops.sh/applied-recommendation")
+		delete(cleaned.Labels, "scaleops.sh/managed")
+		delete(cleaned.Labels, "scaleops.sh/managed-unevictable")
+		delete(cleaned.Labels, "scaleops.sh/pod-owner-grouping")
+		delete(cleaned.Labels, "scaleops.sh/pod-owner-identifier")
+
+		// If labels map is empty, set to nil to normalize comparison
+		if len(cleaned.Labels) == 0 {
+			cleaned.Labels = nil
+		}
+	}
+
+	// Remove ScaleOps-added affinity rules (preferred scheduling only)
+	if cleaned.Spec.Affinity != nil {
+		if cleaned.Spec.Affinity.NodeAffinity != nil {
+			// Remove preferred node affinity added by ScaleOps (node-packing)
+			if cleaned.Spec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution != nil {
+				var filtered []corev1.PreferredSchedulingTerm
+				for _, term := range cleaned.Spec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution {
+					// Keep only terms that are NOT ScaleOps node-packing preferences
+					isScaleOpsTerm := false
+					for _, expr := range term.Preference.MatchExpressions {
+						if expr.Key == "scaleops.sh/node-packing" {
+							isScaleOpsTerm = true
+							break
+						}
+					}
+					if !isScaleOpsTerm {
+						filtered = append(filtered, term)
+					}
+				}
+				if len(filtered) == 0 {
+					cleaned.Spec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution = nil
+				} else {
+					cleaned.Spec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution = filtered
+				}
+			}
+			// Clean up empty NodeAffinity
+			if cleaned.Spec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution == nil &&
+				cleaned.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
+				cleaned.Spec.Affinity.NodeAffinity = nil
+			}
+		}
+
+		if cleaned.Spec.Affinity.PodAffinity != nil {
+			// Remove preferred pod affinity added by ScaleOps (managed-unevictable)
+			if cleaned.Spec.Affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution != nil {
+				var filtered []corev1.WeightedPodAffinityTerm
+				for _, term := range cleaned.Spec.Affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution {
+					// Keep only terms that are NOT ScaleOps managed-unevictable preferences
+					isScaleOpsTerm := false
+					if term.PodAffinityTerm.LabelSelector != nil {
+						for _, expr := range term.PodAffinityTerm.LabelSelector.MatchExpressions {
+							if expr.Key == "scaleops.sh/managed-unevictable" {
+								isScaleOpsTerm = true
+								break
+							}
+						}
+					}
+					if !isScaleOpsTerm {
+						filtered = append(filtered, term)
+					}
+				}
+				if len(filtered) == 0 {
+					cleaned.Spec.Affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution = nil
+				} else {
+					cleaned.Spec.Affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution = filtered
+				}
+			}
+			// Clean up empty PodAffinity
+			if cleaned.Spec.Affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution == nil &&
+				cleaned.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
+				cleaned.Spec.Affinity.PodAffinity = nil
+			}
+		}
+
+		// Clean up empty Affinity
+		if cleaned.Spec.Affinity.NodeAffinity == nil &&
+			cleaned.Spec.Affinity.PodAffinity == nil &&
+			cleaned.Spec.Affinity.PodAntiAffinity == nil {
+			cleaned.Spec.Affinity = nil
+		}
+	}
+
+	// Clean resources if ScaleOps is managing them
+	if isScaleOpsManaged {
+		for i := range cleaned.Spec.InitContainers {
+			cleaned.Spec.InitContainers[i].Resources = corev1.ResourceRequirements{}
+		}
+		for i := range cleaned.Spec.Containers {
+			cleaned.Spec.Containers[i].Resources = corev1.ResourceRequirements{}
+		}
 	}
 
 	// Clean security context fields commonly set by PSPs/Gatekeeper
