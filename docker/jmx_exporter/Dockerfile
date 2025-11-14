@@ -1,6 +1,6 @@
 ARG JMX_EXPORTER_VERSION=1.5.0 # renovate: datasource=github-releases depName=prometheus/jmx_exporter
 
-FROM maven:3-amazoncorretto-21@sha256:0d4b06890e8ecece68c7854e606f09dcdbc11644c98fb4a96a24193f3084275a AS build
+FROM maven:3-amazoncorretto-21@sha256:c7fb7661ddc880221e4517cc146d3debda3fcf0142aca98b140335078fac55d1 AS build
 ARG JMX_EXPORTER_VERSION
 
 # Install wget to download the release tarball

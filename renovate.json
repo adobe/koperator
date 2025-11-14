@@ -22,10 +22,11 @@
         "/(^|/)Dockerfile$/"
       ],
       "matchStrings": [
-        "(?<depName>\\w+)_VERSION\\s*=\\s*(?<currentValue>[^\\s]+)\\s*#\\s*renovate:\\s*datasource=(?<datasource>[^\\s]+)\\s*depName=(?<packageName>[^\\s]+)"
+        "(?<depName>[A-Z][A-Z0-9_]*)_VERSION\\s*=\\s*(?<currentValue>[^\\s]+)\\s*#\\s*renovate:\\s*datasource=(?<datasource>[^\\s]+)\\s*depName=(?<packageName>[^\\s]+)(?:\\s*extractVersion=(?<extractVersion>[^\\s]+))?"
       ],
       "datasourceTemplate": "{{datasource}}",
-      "depNameTemplate": "{{packageName}}"
+      "depNameTemplate": "{{packageName}}",
+      "extractVersionTemplate": "{{#if extractVersion}}{{{extractVersion}}}{{/if}}"
     },
     {
       "customType": "regex",
