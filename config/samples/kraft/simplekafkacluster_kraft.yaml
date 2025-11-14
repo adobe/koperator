@@ -4,6 +4,7 @@ metadata:
   labels:
     controller-tools.k8s.io: "1.0"
   name: kafka
+  namespace: kafka
 spec:
   kRaft: true
   monitoringConfig:

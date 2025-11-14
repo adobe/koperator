@@ -16,9 +16,11 @@
 package e2e
 
 import (
+	"sync"
+
 	"github.com/gruntwork-io/terratest/modules/k8s"
-	ginkgo "github.com/onsi/ginkgo/v2"
-	gomega "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 func testInstall() bool {
@@ -31,39 +33,92 @@ func testInstall() bool {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 
-		ginkgo.When("Installing cert-manager", func() {
-			ginkgo.It("Installing cert-manager Helm chart", func() {
-				err = certManagerHelmDescriptor.installHelmChart(kubectlOptions)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			})
+		ginkgo.It("Installing infrastructure components in parallel", func() {
+			var wg sync.WaitGroup
+			errChan := make(chan error, 3)
+
+			// Install cert-manager, Contour, and Envoy Gateway in parallel
+			wg.Add(3)
+
+			go func() {
+				defer wg.Done()
+				ginkgo.By("Installing cert-manager Helm chart")
+				if installErr := certManagerHelmDescriptor.installHelmChart(kubectlOptions); installErr != nil {
+					errChan <- installErr
+				}
+			}()
+
+			go func() {
+				defer wg.Done()
+				ginkgo.By("Installing Contour Helm chart")
+				if installErr := contourIngressControllerHelmDescriptor.installHelmChart(kubectlOptions); installErr != nil {
+					errChan <- installErr
+				}
+			}()
+
+			go func() {
+				defer wg.Done()
+				ginkgo.By("Installing Envoy Gateway Helm chart")
+				if installErr := envoyGatewayHelmDescriptor.installHelmChart(kubectlOptions); installErr != nil {
+					errChan <- installErr
+				}
+			}()
+
+			wg.Wait()
+			close(errChan)
+
+			// Check for errors
+			for installErr := range errChan {
+				gomega.Expect(installErr).NotTo(gomega.HaveOccurred())
+			}
 		})
 
-		ginkgo.When("Installing contour ingress controller", func() {
-			ginkgo.It("Installing contour Helm chart", func() {
-				err = contourIngressControllerHelmDescriptor.installHelmChart(kubectlOptions)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			})
+		ginkgo.It("Creating Envoy Gateway GatewayClass", func() {
+			gatewayClassManifest := `apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: eg
+spec:
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller`
+			err = applyK8sResourceManifestFromString(kubectlOptions, gatewayClassManifest)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 
-		ginkgo.When("Installing zookeeper-operator", func() {
-			ginkgo.It("Installing zookeeper-operator Helm chart", func() {
-				err = zookeeperOperatorHelmDescriptor.installHelmChart(kubectlOptions)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			})
+		ginkgo.It("Installing dependency operators in parallel", func() {
+			var wg sync.WaitGroup
+			errChan := make(chan error, 2)
+
+			// Install zookeeper-operator and prometheus-operator in parallel
+			wg.Add(2)
+
+			go func() {
+				defer wg.Done()
+				ginkgo.By("Installing zookeeper-operator Helm chart")
+				if installErr := zookeeperOperatorHelmDescriptor.installHelmChart(kubectlOptions); installErr != nil {
+					errChan <- installErr
+				}
+			}()
+
+			go func() {
+				defer wg.Done()
+				ginkgo.By("Installing prometheus-operator Helm chart")
+				if installErr := prometheusOperatorHelmDescriptor.installHelmChart(kubectlOptions); installErr != nil {
+					errChan <- installErr
+				}
+			}()
+
+			wg.Wait()
+			close(errChan)
+
+			// Check for errors
+			for installErr := range errChan {
+				gomega.Expect(installErr).NotTo(gomega.HaveOccurred())
+			}
 		})
 
-		ginkgo.When("Installing prometheus-operator", func() {
-			ginkgo.It("Installing prometheus-operator Helm chart", func() {
-				err = prometheusOperatorHelmDescriptor.installHelmChart(kubectlOptions)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			})
-		})
-
-		ginkgo.When("Installing Koperator", func() {
-			ginkgo.It("Installing Koperator Helm chart", func() {
-				err = koperatorLocalHelmDescriptor.installHelmChart(kubectlOptions)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			})
+		ginkgo.It("Installing Koperator Helm chart", func() {
+			err = koperatorLocalHelmDescriptor.installHelmChart(kubectlOptions)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 	})
 }

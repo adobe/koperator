@@ -42,15 +42,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	istioclientv1beta1 "github.com/banzaicloud/istio-client-go/pkg/networking/v1beta1"
-
-	banzaiistiov1alpha1 "github.com/banzaicloud/istio-operator/api/v2/v1alpha1"
-
 	certv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
+	gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 
 	contour "github.com/projectcontour/contour/apis/projectcontour/v1"
 
@@ -77,11 +75,10 @@ func init() {
 
 	_ = banzaicloudv1beta1.AddToScheme(scheme)
 
-	_ = banzaiistiov1alpha1.AddToScheme(scheme)
-
-	_ = istioclientv1beta1.AddToScheme(scheme)
-
 	_ = contour.AddToScheme(scheme)
+
+	_ = gatewayv1.Install(scheme)
+	_ = gatewayv1alpha2.Install(scheme)
 	// +kubebuilder:scaffold:scheme
 }
 

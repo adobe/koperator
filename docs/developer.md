@@ -37,4 +37,4 @@ Minikube does not have a load balancer implementation, thus our envoy service wi
 A possible solution to overcome this problem is to use https://github.com/elsonrodriguez/minikube-lb-patch. The operator will be able to proceed if you run the following command:
 ```go
 kubectl run minikube-lb-patch --replicas=1 --image=elsonrodriguez/minikube-lb-patch:0.1 --namespace=kube-system
-``` 
+```

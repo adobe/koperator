@@ -1,4 +1,4 @@
-// Copyright © 2023 Cisco Systems, Inc. and/or its affiliates
+// Copyright © 2019 Cisco Systems, Inc. and/or its affiliates
 // Copyright 2025 Adobe. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,56 +16,35 @@
 package scale
 
 import (
+	"context"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/assert"
 )
 
-func TestParseBrokerIDsAndLogDirToMap(t *testing.T) {
-	testCases := []struct {
-		testName            string
-		brokerIDsAndLogDirs string
-		want                map[int32][]string
-		wantErr             bool
-	}{
-		{
-			testName:            "valid input",
-			brokerIDsAndLogDirs: "102-/kafka-logs3/kafka,101-/kafka-logs3/kafka,101-/kafka-logs2/kafka",
-			want: map[int32][]string{
-				101: {"/kafka-logs3/kafka", "/kafka-logs2/kafka"},
-				102: {"/kafka-logs3/kafka"},
-			},
-			wantErr: false,
-		},
-		{
-			testName:            "empty input",
-			brokerIDsAndLogDirs: "",
-			want:                map[int32][]string{},
-			wantErr:             false,
-		},
-		{
-			testName:            "invalid format",
-			brokerIDsAndLogDirs: "1-dirA,2-dirB,1",
-			want:                nil,
-			wantErr:             true,
-		},
-		{
-			testName:            "invalid broker ID",
-			brokerIDsAndLogDirs: "1-dirA,abc-dirB,1-dirC",
-			want:                nil,
-			wantErr:             true,
-		},
-	}
+func TestNewCruiseControlScaler(t *testing.T) {
+	scaler, err := NewCruiseControlScaler(context.Background(), "http://localhost:9090")
 
-	for _, tc := range testCases {
-		t.Run(tc.testName, func(t *testing.T) {
-			got, err := parseBrokerIDsAndLogDirsToMap(tc.brokerIDsAndLogDirs)
-			if tc.wantErr {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-				require.Equal(t, tc.want, got)
-			}
-		})
-	}
+	assert.NoError(t, err)
+	assert.NotNil(t, scaler)
+}
+
+func TestIsReady(t *testing.T) {
+	scaler, err := NewCruiseControlScaler(context.Background(), "http://localhost:9090")
+	assert.NoError(t, err)
+
+	// Test IsReady method
+	ready := scaler.IsReady(context.Background())
+	// This will be false since we're not actually connected to Cruise Control
+	assert.False(t, ready)
+}
+
+func TestIsUp(t *testing.T) {
+	scaler, err := NewCruiseControlScaler(context.Background(), "http://localhost:9090")
+	assert.NoError(t, err)
+
+	// Test IsUp method
+	up := scaler.IsUp(context.Background())
+	// This will be false since we're not actually connected to Cruise Control
+	assert.False(t, up)
 }

@@ -22,6 +22,11 @@ import (
 	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
+const (
+	// kcatTLSParams defines the TLS parameters for kcat when using SSL security protocol
+	kcatTLSParams = "-X security.protocol=SSL -X ssl.key.location=/ssl/certs/tls.key -X ssl.certificate.location=/ssl/certs/tls.crt -X ssl.ca.location=/ssl/certs/ca.crt"
+)
+
 // consumingMessagesInternally consuming messages based on parameters from Kafka cluster.
 // It returns messages in string slice.
 func consumingMessagesInternally(kubectlOptions k8s.KubectlOptions, kcatPodName string, internalKafkaAddress string, topicName string, tlsMode bool) (string, error) {
@@ -29,7 +34,7 @@ func consumingMessagesInternally(kubectlOptions k8s.KubectlOptions, kcatPodName 
 
 	kcatTLSParameters := ""
 	if tlsMode {
-		kcatTLSParameters += "-X security.protocol=SSL -X ssl.key.location=/ssl/certs/tls.key -X ssl.certificate.location=/ssl/certs/tls.crt -X ssl.ca.location=/ssl/certs/ca.crt"
+		kcatTLSParameters += kcatTLSParams
 	}
 
 	consumedMessages, err := k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(),
@@ -53,7 +58,7 @@ func producingMessagesInternally(kubectlOptions k8s.KubectlOptions, kcatPodName 
 
 	kcatTLSParameters := ""
 	if tlsMode {
-		kcatTLSParameters += "-X security.protocol=SSL -X ssl.key.location=/ssl/certs/tls.key -X ssl.certificate.location=/ssl/certs/tls.crt -X ssl.ca.location=/ssl/certs/ca.crt"
+		kcatTLSParameters += kcatTLSParams
 	}
 
 	_, err := k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(),
@@ -63,6 +68,69 @@ func producingMessagesInternally(kubectlOptions k8s.KubectlOptions, kcatPodName 
 		"--",
 		"/bin/sh", "-c", fmt.Sprintf("echo %s | kcat -L -b %s %s -t %s -P",
 			message, internalKafkaAddress, kcatTLSParameters, topicName),
+	)
+
+	return err
+}
+
+// It returns messages in string slice.
+func consumingMessagesExternallyViaKcat(kubectlOptions k8s.KubectlOptions, kcatPodName string, externalKafkaAddresses []string, topicName string, tlsMode bool) (string, error) {
+	ginkgo.By(fmt.Sprintf("Consuming messages from external addresses: '%v' topicName: '%s'", externalKafkaAddresses, topicName))
+
+	kcatTLSParameters := ""
+	if tlsMode {
+		kcatTLSParameters += kcatTLSParams
+	}
+
+	// Join external addresses with comma for kcat bootstrap servers
+	bootstrapServers := ""
+	for i, addr := range externalKafkaAddresses {
+		if i > 0 {
+			bootstrapServers += ","
+		}
+		bootstrapServers += addr
+	}
+
+	consumedMessages, err := k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(),
+		k8s.NewKubectlOptions(kubectlOptions.ContextName, kubectlOptions.ConfigPath, ""),
+		"exec", kcatPodName,
+		"-n", kubectlOptions.Namespace,
+		"--",
+		"/bin/sh", "-c", fmt.Sprintf("kcat -L -b %s %s -t %s -e -C ", bootstrapServers, kcatTLSParameters, topicName),
+	)
+
+	if err != nil {
+		return "", err
+	}
+
+	return consumedMessages, nil
+}
+
+// producingMessagesExternallyViaKcat produces messages to external addresses using kcat.
+func producingMessagesExternallyViaKcat(kubectlOptions k8s.KubectlOptions, kcatPodName string, externalKafkaAddresses []string, topicName string, message string, tlsMode bool) error {
+	ginkgo.By(fmt.Sprintf("Producing messages: '%s' to external addresses: '%v' topicName: '%s'", message, externalKafkaAddresses, topicName))
+
+	kcatTLSParameters := ""
+	if tlsMode {
+		kcatTLSParameters += kcatTLSParams
+	}
+
+	// Join external addresses with comma for kcat bootstrap servers
+	bootstrapServers := ""
+	for i, addr := range externalKafkaAddresses {
+		if i > 0 {
+			bootstrapServers += ","
+		}
+		bootstrapServers += addr
+	}
+
+	_, err := k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(),
+		k8s.NewKubectlOptions(kubectlOptions.ContextName, kubectlOptions.ConfigPath, ""),
+		"exec", kcatPodName,
+		"-n", kubectlOptions.Namespace,
+		"--",
+		"/bin/sh", "-c", fmt.Sprintf("echo %s | kcat -L -b %s %s -t %s -P",
+			message, bootstrapServers, kcatTLSParameters, topicName),
 	)
 
 	return err
