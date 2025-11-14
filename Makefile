@@ -18,10 +18,10 @@ RELEASE_MSG ?= "koperator release"
 REL_TAG = $(shell ./scripts/increment_version.sh -${RELEASE_TYPE} ${TAG})
 
 # Version constants
-GOLANGCI_VERSION = 2.6.0 # renovate: datasource=github-releases depName=golangci/golangci-lint
+GOLANGCI_VERSION = 2.6.1 # renovate: datasource=github-releases depName=golangci/golangci-lint
 LICENSEI_VERSION = 0.9.0 # renovate: datasource=github-releases depName=goph/licensei
 CONTROLLER_GEN_VERSION = v0.19.0 # renovate: datasource=github-releases depName=kubernetes-sigs/controller-tools
-ENVTEST_K8S_VERSION = 1.34.1 # renovate: datasource=github-releases depName=kubernetes/kubernetes
+ENVTEST_K8S_VERSION = 1.34.1 # renovate: datasource=github-releases depName=kubernetes-sigs/controller-tools extractVersion=^envtest-v(?<version>.+)$
 SETUP_ENVTEST_VERSION := latest
 ADDLICENSE_VERSION := 1.2.0 # renovate: datasource=github-releases depName=google/addlicense
 GOTEMPLATE_VERSION := 3.12.0 # renovate: datasource=github-releases depName=cznic/gotemplate
