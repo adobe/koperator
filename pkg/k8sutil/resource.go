@@ -164,7 +164,10 @@ func Reconcile(log logr.Logger, client runtimeClient.Client, desired runtime.Obj
 
 // CheckIfObjectUpdated checks if the given object is updated using K8sObjectMatcher
 func CheckIfObjectUpdated(log logr.Logger, desiredType reflect.Type, current, desired runtime.Object) bool {
-	patchResult, err := patch.DefaultPatchMaker.Calculate(current, desired)
+	opts := []patch.CalculateOption{
+		IgnoreMutationWebhookFields(),
+	}
+	patchResult, err := patch.DefaultPatchMaker.Calculate(current, desired, opts...)
 	if err != nil {
 		log.Error(err, "could not match objects", "kind", desiredType)
 		return true

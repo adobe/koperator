@@ -391,7 +391,10 @@ func SetupKafkaClusterWithManager(mgr ctrl.Manager) *ctrl.Builder {
 			UpdateFunc: func(e event.UpdateEvent) bool {
 				switch newObj := e.ObjectNew.(type) {
 				case *corev1.Pod, *corev1.ConfigMap, *corev1.PersistentVolumeClaim:
-					patchResult, err := patch.DefaultPatchMaker.Calculate(e.ObjectOld, e.ObjectNew)
+					opts := []patch.CalculateOption{
+						k8sutil.IgnoreMutationWebhookFields(),
+					}
+					patchResult, err := patch.DefaultPatchMaker.Calculate(e.ObjectOld, e.ObjectNew, opts...)
 					if err != nil {
 						log.Error(err, "could not match objects", "kind", e.ObjectOld.GetObjectKind())
 					} else if patchResult.IsEmpty() {
