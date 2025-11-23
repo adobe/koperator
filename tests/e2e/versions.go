@@ -25,7 +25,7 @@ const (
 	ContourVersion = "0.1.0" // renovate: datasource=helm depName=contour registryUrl=https://projectcontour.github.io/helm-charts
 
 	// PrometheusOperatorVersion is the version of kube-prometheus-stack Helm chart
-	PrometheusOperatorVersion = "79.6.1" // renovate: datasource=helm depName=kube-prometheus-stack registryUrl=https://prometheus-community.github.io/helm-charts
+	PrometheusOperatorVersion = "79.7.1" // renovate: datasource=helm depName=kube-prometheus-stack registryUrl=https://prometheus-community.github.io/helm-charts
 
 	// ZookeeperOperatorVersion is the version of zookeeper-operator
 	ZookeeperOperatorVersion = "0.2.15-adobe-20250923" // renovate: datasource=docker depName=ghcr.io/adobe/helm-charts/zookeeper-operator
