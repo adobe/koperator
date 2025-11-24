@@ -40,7 +40,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Set up Go 1.25
         uses: actions/setup-go@v6
         with:
@@ -72,7 +72,7 @@ jobs:
       packages: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
@@ -122,7 +122,7 @@ jobs:
       packages: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Update Chart.yaml version, values.yaml image tag, and README.md
         run: |
           sed -i "s/^version:.*/version: \"${{ needs.prepare.outputs.tag }}\"/" charts/kafka-operator/Chart.yaml
