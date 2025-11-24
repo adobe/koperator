@@ -5,14 +5,14 @@ go 1.25
 require (
 	github.com/banzaicloud/go-cruise-control v0.6.0
 	github.com/compose-spec/compose-go/v2 v2.9.1
-	github.com/docker/cli v29.0.1+incompatible
+	github.com/docker/cli v29.0.2+incompatible
 	github.com/docker/compose/v2 v2.40.3
 	github.com/go-logr/logr v1.4.3
 	github.com/go-logr/zapr v1.3.0
 	github.com/onsi/ginkgo/v2 v2.27.2
 	github.com/onsi/gomega v1.38.2
 	github.com/pkg/errors v0.9.1
-	go.uber.org/zap v1.27.0
+	go.uber.org/zap v1.27.1
 )
 
 require (
