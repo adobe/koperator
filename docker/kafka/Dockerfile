@@ -86,8 +86,8 @@ RUN set -eux; \
 	; \
 	rm openjdk.tgz*; \
 	\
-# Remove JMODs (not needed for runtime, only for jlink custom images)
-	rm -rf "$JAVA_HOME/jmods"; \
+# Remove JMODs and src.zip (not needed for runtime, only for development)
+	rm -rf "$JAVA_HOME/jmods" "$JAVA_HOME/lib/src.zip"; \
 	\
 	apt-mark auto '.*' > /dev/null; \
 	[ -z "$savedAptMark" ] || apt-mark manual $savedAptMark > /dev/null; \
