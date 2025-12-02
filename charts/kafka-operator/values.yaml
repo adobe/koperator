@@ -95,7 +95,7 @@ prometheusMetrics:
       # -- Auth proxy container image repository
       repository: quay.io/brancz/kube-rbac-proxy
       # -- Auth proxy container image tag
-      tag: v0.20.0
+      tag: v0.20.1
       # -- Auth proxy container image pull policy
       pullPolicy: IfNotPresent
     serviceAccount:
