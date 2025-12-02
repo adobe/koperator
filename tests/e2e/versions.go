@@ -22,10 +22,10 @@ const (
 	CertManagerVersion = "v1.19.1" // renovate: datasource=helm depName=cert-manager registryUrl=https://charts.jetstack.io
 
 	// ContourVersion is the version of Contour ingress controller Helm chart
-	ContourVersion = "0.1.0" // renovate: datasource=helm depName=contour registryUrl=https://projectcontour.github.io/helm-charts
+	ContourVersion = "0.2.0" // renovate: datasource=helm depName=contour registryUrl=https://projectcontour.github.io/helm-charts
 
 	// PrometheusOperatorVersion is the version of kube-prometheus-stack Helm chart
-	PrometheusOperatorVersion = "79.8.2" // renovate: datasource=helm depName=kube-prometheus-stack registryUrl=https://prometheus-community.github.io/helm-charts
+	PrometheusOperatorVersion = "79.10.0" // renovate: datasource=helm depName=kube-prometheus-stack registryUrl=https://prometheus-community.github.io/helm-charts
 
 	// ZookeeperOperatorVersion is the version of zookeeper-operator
 	ZookeeperOperatorVersion = "0.2.15-adobe-20250923" // renovate: datasource=docker depName=ghcr.io/adobe/helm-charts/zookeeper-operator
