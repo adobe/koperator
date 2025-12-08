@@ -4,9 +4,9 @@ go 1.25
 
 require (
 	github.com/golang/protobuf v1.5.4
-	google.golang.org/genproto/googleapis/api v0.0.0-20251124214823-79d6a2a48846
+	google.golang.org/genproto/googleapis/api v0.0.0-20251202230838-ff82c1b0f217
 	google.golang.org/protobuf v1.36.10
-	istio.io/api v1.28.0
+	istio.io/api v1.28.1
 	k8s.io/api v0.34.2
 	k8s.io/apimachinery v0.34.2
 	sigs.k8s.io/controller-runtime v0.22.4
