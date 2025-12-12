@@ -72,7 +72,7 @@ jobs:
           chmod -R 755 ~/.cache/go-build
 
       - name: License cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: .licensei.cache
           key: ci-license-v1-${{ hashFiles('**/go.sum') }}
@@ -117,7 +117,7 @@ jobs:
           make test
 
       - name: Save license cache
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: .licensei.cache
           key: ci-license-v1-${{ hashFiles('**/go.sum') }}
