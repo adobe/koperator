@@ -4,11 +4,11 @@ go 1.25
 
 require (
 	github.com/golang/protobuf v1.5.4
-	google.golang.org/genproto/googleapis/api v0.0.0-20251124214823-79d6a2a48846
-	google.golang.org/protobuf v1.36.10
-	istio.io/api v1.28.0
-	k8s.io/api v0.34.2
-	k8s.io/apimachinery v0.34.2
+	google.golang.org/genproto/googleapis/api v0.0.0-20251213004720-97cd9d5aeac2
+	google.golang.org/protobuf v1.36.11
+	istio.io/api v1.28.1
+	k8s.io/api v0.34.3
+	k8s.io/apimachinery v0.34.3
 	sigs.k8s.io/controller-runtime v0.22.4
 )
 
@@ -25,8 +25,8 @@ require (
 	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
-	golang.org/x/net v0.47.0 // indirect
-	golang.org/x/text v0.31.0 // indirect
+	golang.org/x/net v0.48.0 // indirect
+	golang.org/x/text v0.32.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/utils v0.0.0-20251002143259-bc988d571ff4 // indirect

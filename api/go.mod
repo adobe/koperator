@@ -6,9 +6,9 @@ require (
 	dario.cat/mergo v1.0.2
 	emperror.dev/errors v0.8.1
 	github.com/banzaicloud/istio-client-go v0.0.17
-	github.com/cert-manager/cert-manager v1.19.1
-	k8s.io/api v0.34.2
-	k8s.io/apimachinery v0.34.2
+	github.com/cert-manager/cert-manager v1.19.2
+	k8s.io/api v0.34.3
+	k8s.io/apimachinery v0.34.3
 	sigs.k8s.io/controller-runtime v0.22.4
 )
 
@@ -33,8 +33,8 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
-	golang.org/x/net v0.47.0 // indirect
-	golang.org/x/text v0.31.0 // indirect
+	golang.org/x/net v0.48.0 // indirect
+	golang.org/x/text v0.32.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
