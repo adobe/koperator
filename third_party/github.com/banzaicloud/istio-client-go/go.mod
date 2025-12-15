@@ -2,7 +2,7 @@ module github.com/banzaicloud/istio-client-go
 
 go 1.25
 
-require k8s.io/apimachinery v0.34.2
+require k8s.io/apimachinery v0.34.3
 
 require (
 	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
