@@ -10,7 +10,7 @@ PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 BIN_DIR := $(PROJECT_DIR)/bin
 
 # Version constants
-CONTROLLER_GEN_VERSION = v0.19.0 # renovate: datasource=github-releases depName=kubernetes-sigs/controller-tools
+CONTROLLER_GEN_VERSION = v0.20.0 # renovate: datasource=github-releases depName=kubernetes-sigs/controller-tools
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
