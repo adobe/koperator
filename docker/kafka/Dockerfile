@@ -2,7 +2,7 @@ ARG scala_version=2.13
 ARG kafka_version=3.9.1 # renovate: datasource=github-tags depName=apache/kafka
 ARG java_version=21
 
-FROM alpine:latest@sha256:4b7ce07002c69e8f3d704a9c5d6fd3053be500b7f1c69fc0d80990c2ad8dd412 AS kafka_dist
+FROM alpine:latest@sha256:865b95f46d98cf867a156fe4a135ad3fe50d2056aa3f25ed31662dff6da4eb62 AS kafka_dist
 
 ARG scala_version
 ARG kafka_version
@@ -28,7 +28,7 @@ RUN apk add --no-cache gnupg wget && \
 
 
 # backported from https://github.com/docker-library/openjdk/blob/master/18/jdk/slim-bullseye/Dockerfile
-FROM debian:bullseye-slim@sha256:530a3348fc4b5734ffe1a137ddbcee6850154285251b53c3425c386ea8fac77b
+FROM debian:bullseye-slim@sha256:c5f48c942c667e70d7e64b124cfc939c25a4a43207c0d14b45844d762dc1d50f
 
 ARG scala_version
 ARG kafka_version

@@ -1,6 +1,6 @@
 ARG JMX_EXPORTER_VERSION=1.5.0 # renovate: datasource=github-releases depName=prometheus/jmx_exporter
 
-FROM maven:3-amazoncorretto-21@sha256:c7fb7661ddc880221e4517cc146d3debda3fcf0142aca98b140335078fac55d1 AS build
+FROM maven:3-amazoncorretto-21@sha256:def455126ccc18635cb64779d592bbe2558cb9bd6fed23c154918c90111b78b5 AS build
 ARG JMX_EXPORTER_VERSION
 
 # Install wget to download the release tarball
@@ -18,7 +18,7 @@ RUN mvn -B -Dmaven.javadoc.skip=true -Dskip.javadoc=true \
     -Dmaven.compiler.source=21 -Dmaven.compiler.target=21 -Dmaven.compiler.release=21 \
     clean package -pl jmx_prometheus_javaagent -am
 
-FROM alpine:latest@sha256:4b7ce07002c69e8f3d704a9c5d6fd3053be500b7f1c69fc0d80990c2ad8dd412
+FROM alpine:latest@sha256:865b95f46d98cf867a156fe4a135ad3fe50d2056aa3f25ed31662dff6da4eb62
 ARG JMX_EXPORTER_VERSION
 COPY --from=build /src/jmx_prometheus_javaagent/target/jmx_prometheus_javaagent-${JMX_EXPORTER_VERSION}.jar /opt/jmx_exporter/
 RUN ln -s /opt/jmx_exporter/jmx_prometheus_javaagent-${JMX_EXPORTER_VERSION}.jar /jmx_prometheus_javaagent.jar
