@@ -607,7 +607,7 @@ func (c EnvoyGatewayIngressConfig) GetAnnotations() map[string]string {
 	return util.CloneMap(c.Annotations)
 }
 
-// We use -1 for ExternalStartingPort value to enable TLS on envoy
+// TLSEnabled We use -1 for ExternalStartingPort value to enable TLS on envoy
 func (c ExternalListenerConfig) TLSEnabled() bool {
 	return c.ExternalStartingPort == -1
 }
@@ -617,7 +617,7 @@ type SSLSecrets struct {
 	TLSSecretName   string                  `json:"tlsSecretName"`
 	JKSPasswordName string                  `json:"jksPasswordName,omitempty"`
 	Create          bool                    `json:"create,omitempty"`
-	IssuerRef       *cmmeta.ObjectReference `json:"issuerRef,omitempty"`
+	IssuerRef       *cmmeta.IssuerReference `json:"issuerRef,omitempty"`
 	// +kubebuilder:validation:Enum={"cert-manager"}
 	PKIBackend PKIBackend `json:"pkiBackend,omitempty"`
 }
@@ -656,7 +656,7 @@ type IngressServiceSettings struct {
 	// "Cluster" obscures the client source IP and may cause a second hop to
 	// another node, but should have good overall load-spreading.
 	// +optional
-	ExternalTrafficPolicy corev1.ServiceExternalTrafficPolicyType `json:"externalTrafficPolicy,omitempty"`
+	ExternalTrafficPolicy corev1.ServiceExternalTrafficPolicy `json:"externalTrafficPolicy,omitempty"`
 	// Service Type string describes ingress methods for a service
 	// Only "NodePort" and "LoadBalancer" is supported.
 	// Default value is LoadBalancer
