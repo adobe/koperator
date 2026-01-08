@@ -87,3 +87,5 @@ jobs:
           # Clean any existing go.work files to avoid workspace conflicts
           rm -f go.work go.work.sum
           IMG_E2E=$REPOSITORY:$GITHUB_SHA make test-e2e
+
+

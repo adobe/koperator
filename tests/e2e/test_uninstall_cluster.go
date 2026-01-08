@@ -50,3 +50,31 @@ func testUninstallKafkaCluster() bool { //nolint:unparam // Note: respecting Gin
 		requireDeleteKafkaCluster(kubectlOptions, kafkaClusterName)
 	})
 }
+
+func testUninstallEnvoyGatewayKafkaCluster(manifestPath string) bool { //nolint:unparam // Note: respecting Ginkgo testing interface by returning bool.
+	return ginkgo.When("Uninstalling Envoy Gateway Kafka cluster and cert-manager resources", func() {
+		var kubectlOptions k8s.KubectlOptions
+		var err error
+
+		ginkgo.It("Acquiring K8s config and context", func() {
+			kubectlOptions, err = kubectlOptionsForCurrentContext()
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		})
+
+		kubectlOptions.Namespace = koperatorLocalHelmDescriptor.Namespace
+
+		// Delete KafkaCluster CR first
+		requireDeleteKafkaCluster(kubectlOptions, kafkaClusterName)
+
+		// Delete cert-manager resources (Certificate and Issuer)
+		ginkgo.It("Deleting cert-manager Certificate", func() {
+			err := deleteK8sResourceNoErrNotFound(kubectlOptions, defaultDeletionTimeout, "certificate", "envoygateway-tls-cert")
+			gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
+		})
+
+		ginkgo.It("Deleting cert-manager Issuer", func() {
+			err := deleteK8sResourceNoErrNotFound(kubectlOptions, defaultDeletionTimeout, "issuer", "envoygateway-selfsigned-issuer")
+			gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
+		})
+	})
+}

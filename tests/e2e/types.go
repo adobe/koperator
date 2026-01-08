@@ -22,10 +22,11 @@ import (
 )
 
 type dependencyCRDsType struct {
-	zookeeper   []string
-	prometheus  []string
-	certManager []string
-	contour     []string
+	zookeeper    []string
+	prometheus   []string
+	certManager  []string
+	contour      []string
+	envoyGateway []string
 }
 
 func (c *dependencyCRDsType) Zookeeper() []string {
@@ -40,6 +41,9 @@ func (c *dependencyCRDsType) CertManager() []string {
 func (c *dependencyCRDsType) Contour() []string {
 	return c.contour
 }
+func (c *dependencyCRDsType) EnvoyGateway() []string {
+	return c.envoyGateway
+}
 
 func (c *dependencyCRDsType) Initialize(kubectlOptions k8s.KubectlOptions) error {
 	var err error
@@ -50,6 +54,10 @@ func (c *dependencyCRDsType) Initialize(kubectlOptions k8s.KubectlOptions) error
 	c.contour, err = listK8sResourceKinds(kubectlOptions, apiGroupKoperatorDependencies()["contour"])
 	if err != nil {
 		return fmt.Errorf("initialize Contour Ingress Controller CRDs error: %w", err)
+	}
+	c.envoyGateway, err = listK8sResourceKinds(kubectlOptions, apiGroupKoperatorDependencies()["envoy-gateway"])
+	if err != nil {
+		return fmt.Errorf("initialize Envoy Gateway CRDs error: %w", err)
 	}
 	c.prometheus, err = listK8sResourceKinds(kubectlOptions, apiGroupKoperatorDependencies()["prometheus"])
 	if err != nil {
