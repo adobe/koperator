@@ -1088,7 +1088,7 @@ func (in *SSLSecrets) DeepCopyInto(out *SSLSecrets) {
 	*out = *in
 	if in.IssuerRef != nil {
 		in, out := &in.IssuerRef, &out.IssuerRef
-		*out = new(apismetav1.ObjectReference)
+		*out = new(apismetav1.IssuerReference)
 		**out = **in
 	}
 }
