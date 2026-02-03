@@ -63,5 +63,10 @@ func testUninstall() bool {
 			ConfigPath:  kubectlOptions.ConfigPath,
 			Namespace:   contourIngressControllerHelmDescriptor.Namespace,
 		})
+		requireUninstallingEnvoyGateway(k8s.KubectlOptions{
+			ContextName: kubectlOptions.ContextName,
+			ConfigPath:  kubectlOptions.ConfigPath,
+			Namespace:   envoyGatewayHelmDescriptor.Namespace,
+		})
 	})
 }

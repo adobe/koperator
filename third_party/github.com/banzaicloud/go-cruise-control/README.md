@@ -36,7 +36,7 @@ func main() {
 
 	// Create Context with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 30 * time.Second)
-	defer cancel() 
+	defer cancel()
 
 	// Optionally set request Reason to Context which will sent to Cruise Control as part of the HTTP request
 	ctx = client.ContextWithReason("example")

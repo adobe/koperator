@@ -5,7 +5,7 @@ Configure volumes in custom types for underlying pods in a uniform way.
 
 ```go
 type SomeCustomApp struct {
-	BufferStorage *volume.KubernetesVolume `json:"bufferStorage,omitempty"` 
+	BufferStorage *volume.KubernetesVolume `json:"bufferStorage,omitempty"`
 }
 ```
 

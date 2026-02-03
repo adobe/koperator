@@ -33,7 +33,7 @@ MATCHING_METRIC=$(curl -s "$JMX_ENDPOINT" | grep "^${METRIC_PREFIX}" | awk '$2 =
 
 # If it's not empty, it means we found a metric with a value of 1.0.
 if [ -n "$MATCHING_METRIC" ]; then
-    # Determine the state of the controller using the last field name of the metric 
+    # Determine the state of the controller using the last field name of the metric
     # Possible values are leader, candidate, voted, follower, unattached, observer
     STATE=$(echo "$MATCHING_METRIC" | rev | cut -d'_' -f1 | rev)
 

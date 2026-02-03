@@ -83,10 +83,11 @@ const (
 
 func apiGroupKoperatorDependencies() map[string]string {
 	return map[string]string{
-		"cert-manager": "cert-manager.io",
-		"zookeeper":    "zookeeper.pravega.io",
-		"prometheus":   "monitoring.coreos.com",
-		"contour":      "projectcontour.io",
+		"cert-manager":  "cert-manager.io",
+		"zookeeper":     "zookeeper.pravega.io",
+		"prometheus":    "monitoring.coreos.com",
+		"contour":       "projectcontour.io",
+		"envoy-gateway": "gateway.networking.k8s.io",
 	}
 }
 
@@ -127,9 +128,6 @@ func koperatorRelatedResourceKinds() []string {
 		"kafkaclusters.kafka.banzaicloud.io",
 		"kafkausers.kafka.banzaicloud.io",
 		"cruisecontroloperations.kafka.banzaicloud.io",
-		"istiomeshgateways.servicemesh.cisco.com",
-		"virtualservices.networking.istio.io",
-		"gateways.networking.istio.io",
 		"clusterissuers.cert-manager.io",
 		"servicemonitors.monitoring.coreos.com",
 	}

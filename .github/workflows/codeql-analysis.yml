@@ -60,17 +60,17 @@ jobs:
       run: |
         # Build main module
         go build ./...
-        
+
         # Build api module
         cd api
         go build ./...
         cd ..
-        
+
         # Build properties module
         cd properties
         go build ./...
         cd ..
-        
+
         # Build main binary
         go build -o bin/manager main.go
 

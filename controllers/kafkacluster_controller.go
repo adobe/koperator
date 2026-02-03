@@ -48,7 +48,7 @@ import (
 	"github.com/banzaicloud/koperator/pkg/resources/cruisecontrol"
 	"github.com/banzaicloud/koperator/pkg/resources/cruisecontrolmonitoring"
 	"github.com/banzaicloud/koperator/pkg/resources/envoy"
-	"github.com/banzaicloud/koperator/pkg/resources/istioingress"
+	"github.com/banzaicloud/koperator/pkg/resources/envoygateway"
 	"github.com/banzaicloud/koperator/pkg/resources/kafka"
 	"github.com/banzaicloud/koperator/pkg/resources/kafkamonitoring"
 	"github.com/banzaicloud/koperator/pkg/resources/nodeportexternalaccess"
@@ -87,10 +87,10 @@ type KafkaClusterReconciler struct {
 // +kubebuilder:rbac:groups=kafka.banzaicloud.io,resources=kafkaclusters,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=kafka.banzaicloud.io,resources=kafkaclusters/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=kafka.banzaicloud.io,resources=kafkaclusters/finalizers,verbs=create;update;patch;delete
-// +kubebuilder:rbac:groups=servicemesh.cisco.com,resources=istiomeshgateways,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=networking.istio.io,resources=*,verbs=*
-// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=projectcontour.io,resources=httpproxies,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=gateways,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=tlsroutes,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=tcproutes,verbs=get;list;watch;create;update;patch;delete
 
 func (r *KafkaClusterReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
 	log := logr.FromContextOrDiscard(ctx)
@@ -123,9 +123,9 @@ func (r *KafkaClusterReconciler) Reconcile(ctx context.Context, request ctrl.Req
 
 	reconcilers := []resources.ComponentReconciler{
 		envoy.New(r.Client, instance),
-		istioingress.New(r.Client, instance),
 		nodeportexternalaccess.New(r.Client, instance),
 		contouringress.New(r.Client, instance),
+		envoygateway.New(r.Client, instance),
 		kafkamonitoring.New(r.Client, instance),
 		cruisecontrolmonitoring.New(r.Client, instance),
 		kafka.New(r.Client, r.DirectClient, instance, r.KafkaClientProvider),
