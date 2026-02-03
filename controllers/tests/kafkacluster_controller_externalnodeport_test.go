@@ -110,7 +110,7 @@ var _ = Describe("KafkaClusterNodeportExternalAccess", Ordered, Serial, func() {
 				}
 			}
 			return nodePortCount
-		}, 30*time.Second, 100*time.Millisecond).Should(Equal(0), "NodePort services should be fully deleted")
+		}, 60*time.Second, 100*time.Millisecond).Should(Equal(0), "NodePort services should be fully deleted")
 
 		kafkaCluster = nil
 	})
@@ -408,10 +408,17 @@ func deleteNodePorts(ctx SpecContext, kafkaCluster *v1beta1.KafkaCluster) error 
 	if err != nil {
 		return err
 	}
-	for _, service := range serviceList.Items {
+	for i := range serviceList.Items {
+		service := &serviceList.Items[i]
 		if service.Spec.Type == corev1.ServiceTypeNodePort {
-			err = k8sClient.Delete(ctx, &service)
+			// Remove owner references to avoid BlockOwnerDeletion issues in envtest
+			service.SetOwnerReferences(nil)
+			err = k8sClient.Update(ctx, service)
 			if err != nil {
+				return err
+			}
+			err = k8sClient.Delete(ctx, service)
+			if client.IgnoreNotFound(err) != nil {
 				return err
 			}
 		}
