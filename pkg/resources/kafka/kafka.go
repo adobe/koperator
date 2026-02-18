@@ -964,11 +964,11 @@ func (r *Reconciler) handleRollingUpgrade(log logr.Logger, desiredPod, currentPo
 			r.KafkaCluster.Status.BrokersState[currentPod.Labels[banzaiv1beta1.BrokerIdLabelKey]].ConfigurationState == banzaiv1beta1.ConfigInSync &&
 			!k8sutil.IsPodContainsEvictedContainer(currentPod) &&
 			!k8sutil.IsPodContainsShutdownContainer(currentPod) {
-			log.V(1).Info("resource is in sync")
+			log.Info("resource is in sync")
 			return nil
 		}
 	default:
-		log.V(1).Info("kafka pod resource diffs",
+		log.Info("kafka pod resource diffs",
 			"patch", string(patchResult.Patch),
 			"current", string(patchResult.Current),
 			"modified", string(patchResult.Modified),
