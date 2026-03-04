@@ -322,8 +322,7 @@ func downScale(ctx context.Context, log logr.Logger, labels model.LabelSet, clie
 		brokerID = string(broker)
 	} else {
 		cruiseControlURL := scale.CruiseControlURLFromKafkaCluster(cr)
-		// FIXME: we should reuse the context of passed to AController.Start() here
-		cc, err := scale.NewCruiseControlScaler(context.TODO(), cruiseControlURL)
+		cc, err := scale.NewCruiseControlScaler(ctx, cruiseControlURL)
 		if err != nil {
 			return errors.WrapIfWithDetails(err, "failed to initialize Cruise Control Scaler",
 				"cruise control url", cruiseControlURL)
