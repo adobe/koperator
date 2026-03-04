@@ -197,10 +197,6 @@ func (r *KafkaClusterReconciler) Reconcile(ctx context.Context, request ctrl.Req
 		if err := k8sutil.UpdateRollingUpgradeState(r.Client, instance, time.Now(), log); err != nil {
 			return requeueWithError(log, err.Error(), err)
 		}
-		// Don't transition to Running state while rolling upgrade is in progress
-		// The state will be updated to Running by the kafka reconciler when the upgrade completes
-		log.Info("Rolling upgrade in progress, keeping current state")
-		return reconciled()
 	}
 
 	if err := k8sutil.UpdateCRStatus(r.Client, instance, v1beta1.KafkaClusterRunning, log); err != nil {
