@@ -88,13 +88,7 @@ func (r *Reconciler) getConfigProperties(bConfig *v1beta1.BrokerConfig, broker v
 	}
 
 	mountPathsNew := generateStorageConfig(bConfig.StorageConfigs)
-	mountPathsMerged, isMountPathRemoved := mergeMountPaths(mountPathsOld, mountPathsNew)
-
-	if isMountPathRemoved {
-		log.Error(errors.New("removed storage is found in the KafkaCluster CR"),
-			"removing storage from broker is not supported", v1beta1.BrokerIdLabelKey, broker.Id, "mountPaths",
-			mountPathsOld, "mountPaths in kafkaCluster CR ", mountPathsNew)
-	}
+	mountPathsMerged := getEffectiveLogDirsMountPaths(mountPathsOld, mountPathsNew, fmt.Sprintf("%d", broker.Id), r.KafkaCluster)
 
 	if len(mountPathsMerged) != 0 {
 		if err := config.Set(kafkautils.KafkaConfigBrokerLogDirectory, strings.Join(mountPathsMerged, ",")); err != nil {
@@ -314,6 +308,50 @@ func mergeMountPaths(mountPathsOld, mountPathsNew []string) ([]string, bool) {
 	}
 
 	return mountPathsMerged, isMountPathRemoved
+}
+
+func getEffectiveLogDirsMountPaths(mountPathsOld, mountPathsNew []string, brokerID string, kafkaCluster *v1beta1.KafkaCluster) []string {
+	mountPathsEffective := append([]string{}, mountPathsNew...)
+	if len(mountPathsOld) == 0 {
+		return mountPathsEffective
+	}
+
+	newMountPathsSet := make(map[string]struct{}, len(mountPathsNew))
+	for _, path := range mountPathsNew {
+		newMountPathsSet[path] = struct{}{}
+	}
+
+	for _, oldPath := range mountPathsOld {
+		if _, found := newMountPathsSet[oldPath]; found {
+			continue
+		}
+
+		if shouldKeepRemovedLogDirInConfig(oldPath, brokerID, kafkaCluster) {
+			mountPathsEffective = append(mountPathsEffective, oldPath)
+		}
+	}
+
+	return mountPathsEffective
+}
+
+func shouldKeepRemovedLogDirInConfig(logDirPath, brokerID string, kafkaCluster *v1beta1.KafkaCluster) bool {
+	if kafkaCluster == nil {
+		return false
+	}
+
+	brokerState, found := kafkaCluster.Status.BrokersState[brokerID]
+	if !found || brokerState.GracefulActionState.VolumeStates == nil {
+		return false
+	}
+
+	volumePath := strings.TrimSuffix(logDirPath, "/kafka")
+	volumeState, found := brokerState.GracefulActionState.VolumeStates[volumePath]
+	if !found {
+		return false
+	}
+
+	ccVolumeState := volumeState.CruiseControlVolumeState
+	return ccVolumeState.IsDiskRemoval() || ccVolumeState.IsDiskRebalance()
 }
 
 func generateSuperUsers(users []string) (suStrings []string) {
