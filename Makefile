@@ -6,7 +6,7 @@ BIN_DIR := $(PROJECT_DIR)/bin
 BOILERPLATE_DIR := $(PROJECT_DIR)/hack/boilerplate
 
 # Image URL to use all building/pushing image targets
-TAG ?= $(shell git describe --tags --abbrev=0 --match '[0-9].*[0-9].*[0-9]*' 2>/dev/null )
+TAG ?= $(shell git describe --tags --dirty --always --abbrev=0 --match '[0-9].*[0-9].*[0-9]*' 2>/dev/null)
 IMG ?= ghcr.io/adobe/kafka-operator:$(TAG)
 
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
@@ -171,7 +171,7 @@ test: generate fmt vet bin/setup-envtest
 	cd third_party/github.com/banzaicloud/go-cruise-control && \
 	go test -v -parallel 2 -failfast ./... -cover -covermode=count -coverprofile cover.out -test.v -test.paniconexit0
 
-# Run e2e tests
+# Run e2e tests. Set IMG_E2E to use a custom operator image; otherwise the chart default is used.
 test-e2e:
 	cd tests/e2e && IMG_E2E=${IMG_E2E} go test . \
 		-v \
