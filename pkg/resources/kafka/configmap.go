@@ -285,31 +285,6 @@ func configureBrokerZKMode(brokerID int32, kafkaCluster *v1beta1.KafkaCluster, c
 	}
 }
 
-// mergeMountPaths is merges the new mountPaths with the old.
-// It returns the merged []string and a bool which true or false depend on mountPathsNew contains or not all of the elements of the mountPathsOld
-func mergeMountPaths(mountPathsOld, mountPathsNew []string) ([]string, bool) {
-	var mountPathsMerged []string
-	mountPathsMerged = append(mountPathsMerged, mountPathsNew...)
-	isMountPathRemoved := false
-	// Merging the new mountPaths with the old. If any of them is removed we can check the difference in the mountPathsOldLen
-	for i := range mountPathsOld {
-		found := false
-		for k := range mountPathsNew {
-			if mountPathsOld[i] == mountPathsNew[k] {
-				found = true
-				break
-			}
-		}
-		// if this is a new mountPath then add it to the current
-		if !found {
-			mountPathsMerged = append(mountPathsMerged, mountPathsOld[i])
-			isMountPathRemoved = true
-		}
-	}
-
-	return mountPathsMerged, isMountPathRemoved
-}
-
 func getEffectiveLogDirsMountPaths(mountPathsOld, mountPathsNew []string, brokerID string, kafkaCluster *v1beta1.KafkaCluster) []string {
 	mountPathsEffective := append([]string{}, mountPathsNew...)
 	if len(mountPathsOld) == 0 {

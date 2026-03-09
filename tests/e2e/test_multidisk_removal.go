@@ -49,6 +49,7 @@ func testMultiDiskRemoval() bool {
 		ginkgo.It("Acquiring K8s config and context", func() {
 			kubectlOptions, err = kubectlOptionsForCurrentContext()
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			kubectlOptions.Namespace = koperatorLocalHelmDescriptor.Namespace
 		})
 
 		ginkgo.It("Applying single-disk manifest to trigger disk removal", func() {

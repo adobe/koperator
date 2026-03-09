@@ -73,59 +73,6 @@ zookeeper.connect=zookeeper-server-client.zookeeper:2181/
 	}
 }
 
-func TestMergeMountPaths(t *testing.T) {
-	tests := []struct {
-		testName                string
-		mountPathNew            []string
-		mountPathOld            []string
-		expectedMergedMountPath []string
-		expectedRemoved         bool
-	}{
-		{
-			testName:                "no old mountPath",
-			mountPathNew:            []string{"/kafka-logs3/kafka", "/kafka-logs/kafka", "/kafka-logs2/kafka", "/kafka-logs4/kafka"},
-			mountPathOld:            []string{},
-			expectedMergedMountPath: []string{"/kafka-logs3/kafka", "/kafka-logs/kafka", "/kafka-logs2/kafka", "/kafka-logs4/kafka"},
-			expectedRemoved:         false,
-		},
-		{
-			testName:                "same",
-			mountPathNew:            []string{"/kafka-logs3/kafka", "/kafka-logs/kafka", "/kafka-logs2/kafka", "/kafka-logs4/kafka"},
-			mountPathOld:            []string{"/kafka-logs3/kafka", "/kafka-logs/kafka", "/kafka-logs2/kafka", "/kafka-logs4/kafka"},
-			expectedMergedMountPath: []string{"/kafka-logs3/kafka", "/kafka-logs/kafka", "/kafka-logs2/kafka", "/kafka-logs4/kafka"},
-			expectedRemoved:         false,
-		},
-		{
-			testName:                "changed order",
-			mountPathNew:            []string{"/kafka-logs/kafka", "/kafka-logs3/kafka", "/kafka-logs2/kafka", "/kafka-logs4/kafka"},
-			mountPathOld:            []string{"/kafka-logs3/kafka", "/kafka-logs/kafka", "/kafka-logs2/kafka", "/kafka-logs4/kafka"},
-			expectedMergedMountPath: []string{"/kafka-logs/kafka", "/kafka-logs3/kafka", "/kafka-logs2/kafka", "/kafka-logs4/kafka"},
-			expectedRemoved:         false,
-		},
-		{
-			testName:                "removed one",
-			mountPathNew:            []string{"/kafka-logs/kafka", "/kafka-logs2/kafka", "/kafka-logs4/kafka"},
-			mountPathOld:            []string{"/kafka-logs3/kafka", "/kafka-logs/kafka", "/kafka-logs2/kafka", "/kafka-logs4/kafka"},
-			expectedMergedMountPath: []string{"/kafka-logs/kafka", "/kafka-logs2/kafka", "/kafka-logs4/kafka", "/kafka-logs3/kafka"},
-			expectedRemoved:         true,
-		},
-		{
-			testName:                "removed all",
-			mountPathNew:            []string{},
-			mountPathOld:            []string{"/kafka-logs3/kafka", "/kafka-logs/kafka", "/kafka-logs2/kafka", "/kafka-logs4/kafka"},
-			expectedMergedMountPath: []string{"/kafka-logs3/kafka", "/kafka-logs/kafka", "/kafka-logs2/kafka", "/kafka-logs4/kafka"},
-			expectedRemoved:         true,
-		},
-	}
-	for _, test := range tests {
-		mergedMountPaths, isRemoved := mergeMountPaths(test.mountPathOld, test.mountPathNew)
-		if !reflect.DeepEqual(mergedMountPaths, test.expectedMergedMountPath) {
-			t.Errorf("testName: %s, expected: %s, got: %s", test.testName, test.expectedMergedMountPath, mergedMountPaths)
-		}
-		require.Equal(t, test.expectedRemoved, isRemoved)
-	}
-}
-
 func TestGetEffectiveLogDirsMountPaths(t *testing.T) {
 	tests := []struct {
 		testName          string
