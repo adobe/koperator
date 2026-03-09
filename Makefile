@@ -181,6 +181,14 @@ test-e2e:
 		--ginkgo.trace \
 		--ginkgo.v
 
+# Kind cluster name used by test-e2e-local (must match the cluster you create with kind create cluster --name <name>).
+KIND_CLUSTER ?= koperator-e2e
+
+# Build operator image, load it into kind, and run e2e tests with that image. Use when testing local changes.
+test-e2e-local: docker-build
+	kind load docker-image $(IMG) --name $(KIND_CLUSTER)
+	$(MAKE) test-e2e IMG_E2E=$(IMG)
+
 manager: generate fmt vet ## Generate (kubebuilder) and build manager binary.
 	go build -o bin/manager main.go
 

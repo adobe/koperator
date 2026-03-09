@@ -191,8 +191,9 @@ func (helmDescriptor *helmDescriptor) installHelmChart(kubectlOptions k8s.Kubect
 	switch {
 	case isInstalled:
 		installedChartName, installedChartVersion := helmRelease.chartNameAndVersion()
+		expectedChartName := chartNameForComparison(helmDescriptor.ChartName)
 
-		if installedChartName != helmDescriptor.ChartName {
+		if installedChartName != expectedChartName {
 			return errors.Errorf(
 				"Installed Helm chart name '%s' mismatches Helm descriptor chart name to be installed '%s'",
 				installedChartName, helmDescriptor.ChartName,
@@ -386,6 +387,19 @@ func (helmRelease *HelmRelease) chartNameAndVersion() (string, string) {
 	return groups[1], groups[2]
 }
 
+// chartNameForComparison returns the chart name to compare with the installed release.
+// For OCI refs (oci://host/path/chart-name), Helm reports only the last segment as the chart name.
+func chartNameForComparison(descriptorChartName string) string {
+	if strings.HasPrefix(descriptorChartName, "oci://") {
+		path := strings.TrimPrefix(descriptorChartName, "oci://")
+		if i := strings.LastIndex(path, "/"); i >= 0 && i+1 < len(path) {
+			return path[i+1:]
+		}
+		return path
+	}
+	return descriptorChartName
+}
+
 // listHelmReleases returns a slice of Helm releases retrieved from the cluster
 // using the specified kubectl context and namespace.
 func listHelmReleases(kubectlOptions k8s.KubectlOptions) ([]*HelmRelease, error) {
@@ -415,8 +429,16 @@ func listHelmReleases(kubectlOptions k8s.KubectlOptions) ([]*HelmRelease, error)
 		return nil, errors.WrapIf(err, "listing Helm releases failed")
 	}
 
+	// Helm may print WARNINGs (e.g. kubeconfig permissions) to stdout before the JSON.
+	// Parse only the JSON array: from the first '[' to the end.
+	jsonStart := strings.Index(output, "[")
+	if jsonStart < 0 {
+		return nil, errors.WrapIfWithDetails(errors.New("no JSON array in helm list output"), "parsing Helm releases failed", "output", output)
+	}
+	jsonBytes := strings.TrimSpace(output[jsonStart:])
+
 	var releases []*HelmRelease
-	err = json.Unmarshal([]byte(output), &releases)
+	err = json.Unmarshal([]byte(jsonBytes), &releases)
 	if err != nil {
 		return nil, errors.WrapIfWithDetails(err, "parsing Helm releases failed", "output", output)
 	}
