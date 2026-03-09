@@ -615,7 +615,7 @@ func (r *Reconciler) reconcileKafkaPodDelete(ctx context.Context, log logr.Logge
 			if err != nil {
 				return errors.WrapIfWithDetails(err, "could not delete broker", "id", broker.Labels[banzaiv1beta1.BrokerIdLabelKey])
 			}
-			log.Info("broker pod deleted", banzaiv1beta1.BrokerIdLabelKey, broker.Labels[banzaiv1beta1.BrokerIdLabelKey], "pod", broker.GetName())
+			log.Info("broker pod deleted, no longer present in spec", banzaiv1beta1.BrokerIdLabelKey, broker.Labels[banzaiv1beta1.BrokerIdLabelKey], "pod", broker.GetName())
 			configMapName := fmt.Sprintf(brokerConfigTemplate+"-%s", r.KafkaCluster.Name, broker.Labels[banzaiv1beta1.BrokerIdLabelKey])
 			err = r.Delete(context.TODO(), &corev1.ConfigMap{ObjectMeta: templates.ObjectMeta(configMapName, apiutil.LabelsForKafka(r.KafkaCluster.Name), r.KafkaCluster)})
 			if err != nil {
@@ -964,8 +964,15 @@ func (r *Reconciler) handleRollingUpgrade(log logr.Logger, desiredPod, currentPo
 			r.KafkaCluster.Status.BrokersState[currentPod.Labels[banzaiv1beta1.BrokerIdLabelKey]].ConfigurationState == banzaiv1beta1.ConfigInSync &&
 			!k8sutil.IsPodContainsEvictedContainer(currentPod) &&
 			!k8sutil.IsPodContainsShutdownContainer(currentPod) {
-			log.V(1).Info("resource is in sync")
+			log.V(1).Info("broker pod is in sync", "pod", currentPod.GetName(), banzaiv1beta1.BrokerIdLabelKey, currentPod.Labels[banzaiv1beta1.BrokerIdLabelKey])
 			return nil
+		} else {
+			log.V(1).Info("broker pod is in crashloop or not in sync",
+				"pod", currentPod.GetName(),
+				"configSync", r.KafkaCluster.Status.BrokersState[currentPod.Labels[banzaiv1beta1.BrokerIdLabelKey]].ConfigurationState == banzaiv1beta1.ConfigInSync,
+				"evicted", k8sutil.IsPodContainsEvictedContainer(currentPod),
+				"shutdown", k8sutil.IsPodContainsShutdownContainer(currentPod),
+				"terminated", k8sutil.IsPodContainsTerminatedContainer(currentPod))
 		}
 	default:
 		log.V(1).Info("kafka pod resource diffs",
@@ -1426,8 +1433,9 @@ func (r *Reconciler) getBrokerHost(log logr.Logger, defaultHost string, broker b
 func (r *Reconciler) createExternalListenerStatuses(log logr.Logger) (map[string]banzaiv1beta1.ListenerStatusList, error) {
 	extListenerStatuses := make(map[string]banzaiv1beta1.ListenerStatusList, len(r.KafkaCluster.Spec.ListenersConfig.ExternalListeners))
 	for _, eListener := range r.KafkaCluster.Spec.ListenersConfig.ExternalListeners {
+		effectiveController := eListener.GetIngressController(&r.KafkaCluster.Spec)
 		// in case if external listener uses loadbalancer type of service and istioControlPlane is not specified than we skip this listener from status update. In this way this external listener will not be in the configmap.
-		if eListener.GetAccessMethod() == corev1.ServiceTypeLoadBalancer && r.KafkaCluster.Spec.GetIngressController() == istioingressutils.IngressControllerName && r.KafkaCluster.Spec.IstioControlPlane == nil {
+		if eListener.GetAccessMethod() == corev1.ServiceTypeLoadBalancer && effectiveController == istioingressutils.IngressControllerName && r.KafkaCluster.Spec.IstioControlPlane == nil {
 			continue
 		}
 		var host string
@@ -1445,7 +1453,7 @@ func (r *Reconciler) createExternalListenerStatuses(log logr.Logger) (map[string
 			if iConfig.HostnameOverride != "" {
 				host = iConfig.HostnameOverride
 			} else if eListener.GetAccessMethod() == corev1.ServiceTypeLoadBalancer {
-				foundLBService, err = getServiceFromExternalListener(r.Client, r.KafkaCluster, eListener.Name, iConfigName)
+				foundLBService, err = getServiceFromExternalListener(r.Client, r.KafkaCluster, eListener.Name, iConfigName, effectiveController)
 				if err != nil {
 					return nil, errors.WrapIfWithDetails(err, "could not get service corresponding to the external listener", "externalListenerName", eListener.Name)
 				}
@@ -1459,7 +1467,7 @@ func (r *Reconciler) createExternalListenerStatuses(log logr.Logger) (map[string
 			// optionally add all brokers service to the top of the list
 			if eListener.GetAccessMethod() != corev1.ServiceTypeNodePort {
 				if foundLBService == nil {
-					foundLBService, err = getServiceFromExternalListener(r.Client, r.KafkaCluster, eListener.Name, iConfigName)
+					foundLBService, err = getServiceFromExternalListener(r.Client, r.KafkaCluster, eListener.Name, iConfigName, effectiveController)
 					if err != nil {
 						return nil, errors.WrapIfWithDetails(err, "could not get service corresponding to the external listener", "externalListenerName", eListener.Name)
 					}
@@ -1622,10 +1630,10 @@ func (r *Reconciler) getBrokerAz(pod *corev1.Pod, kafkaBrokerAvailabilityZoneMap
 }
 
 func getServiceFromExternalListener(client client.Client, cluster *banzaiv1beta1.KafkaCluster,
-	eListenerName string, ingressConfigName string) (*corev1.Service, error) {
+	eListenerName string, ingressConfigName string, effectiveController string) (*corev1.Service, error) {
 	foundLBService := &corev1.Service{}
 	var iControllerServiceName string
-	switch cluster.Spec.GetIngressController() {
+	switch effectiveController {
 	case istioingressutils.IngressControllerName:
 		if ingressConfigName == util.IngressConfigGlobalName {
 			iControllerServiceName = fmt.Sprintf(istioingressutils.MeshGatewayNameTemplate, eListenerName, cluster.GetName())

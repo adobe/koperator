@@ -289,8 +289,9 @@ func GetIngressConfigs(kafkaClusterSpec v1beta1.KafkaClusterSpec,
 	eListenerConfig v1beta1.ExternalListenerConfig) (map[string]v1beta1.IngressConfig, string, error) {
 	var ingressConfigs map[string]v1beta1.IngressConfig
 	var defaultIngressConfigName string
-	// Merge specific external listener configuration with the global one if none specified
-	switch kafkaClusterSpec.GetIngressController() {
+	// Use effective controller for this listener (per-listener override or cluster default)
+	effectiveController := eListenerConfig.GetIngressController(&kafkaClusterSpec)
+	switch effectiveController {
 	case envoyutils.IngressControllerName:
 		if eListenerConfig.Config != nil {
 			defaultIngressConfigName = eListenerConfig.Config.DefaultIngressConfig
@@ -376,7 +377,7 @@ func GetIngressConfigs(kafkaClusterSpec v1beta1.KafkaClusterSpec,
 			}
 		}
 	default:
-		return nil, "", errors.NewWithDetails("not supported ingress type", "name", kafkaClusterSpec.GetIngressController())
+		return nil, "", errors.NewWithDetails("not supported ingress type", "name", effectiveController)
 	}
 	return ingressConfigs, defaultIngressConfigName, nil
 }
@@ -602,10 +603,6 @@ func RetryOnError(backoff wait.Backoff, fn func() error, isRetryableError func(e
 
 func RetryOnConflict(backoff wait.Backoff, fn func() error) error {
 	return RetryOnError(backoff, fn, apierrors.IsConflict)
-}
-
-func GetExternalPortForBroker(externalStartingPort, brokerId int32) int32 {
-	return externalStartingPort + brokerId
 }
 
 // Generage MD5 hash for a given string

@@ -22,6 +22,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/banzaicloud/koperator/api/v1beta1"
+	"github.com/banzaicloud/koperator/pkg/util/contour"
 	"github.com/banzaicloud/koperator/pkg/util/istioingress"
 
 	"gotest.tools/assert"
@@ -297,6 +298,24 @@ func TestGetIngressConfigs(t *testing.T) {
 		},
 	}
 
+	defaultKafkaClusterWithContour := &v1beta1.KafkaClusterSpec{
+		IngressController: contour.IngressControllerName,
+		ContourIngressConfig: v1beta1.ContourIngressConfig{
+			TLSSecretName:      "contour-tls",
+			BrokerFQDNTemplate: "broker-%id.contour.example.com",
+		},
+	}
+
+	// Cluster default envoy but has ContourIngressConfig for per-listener override test
+	clusterEnvoyWithContourConfig := &v1beta1.KafkaClusterSpec{
+		IngressController: "envoy",
+		EnvoyConfig:       defaultKafkaClusterWithEnvoy.EnvoyConfig,
+		ContourIngressConfig: v1beta1.ContourIngressConfig{
+			TLSSecretName:      "contour-tls",
+			BrokerFQDNTemplate: "broker-%id.contour.example.com",
+		},
+	}
+
 	testCases := []struct {
 		globalConfig                     v1beta1.KafkaClusterSpec
 		externalListenerSpecifiedConfigs v1beta1.ExternalListenerConfig
@@ -470,6 +489,41 @@ func TestGetIngressConfigs(t *testing.T) {
 						Annotations: map[string]string{"az2": "region"},
 						Replicas:    1,
 					},
+				},
+			},
+		},
+		// Per-listener ingress override: cluster default envoy, listener specifies contour -> contour config
+		{
+			*clusterEnvoyWithContourConfig,
+			v1beta1.ExternalListenerConfig{
+				CommonListenerSpec: v1beta1.CommonListenerSpec{
+					Type:          "plaintext",
+					Name:          "external",
+					ContainerPort: 9094,
+				},
+				ExternalStartingPort: 19090,
+				IngressController:    contour.IngressControllerName,
+			},
+			map[string]v1beta1.IngressConfig{
+				IngressConfigGlobalName: {
+					ContourIngressConfig: &clusterEnvoyWithContourConfig.ContourIngressConfig,
+				},
+			},
+		},
+		// Cluster default contour, listener has no override -> contour config (backward compatibility)
+		{
+			*defaultKafkaClusterWithContour,
+			v1beta1.ExternalListenerConfig{
+				CommonListenerSpec: v1beta1.CommonListenerSpec{
+					Type:          "plaintext",
+					Name:          "external",
+					ContainerPort: 9094,
+				},
+				ExternalStartingPort: 19090,
+			},
+			map[string]v1beta1.IngressConfig{
+				IngressConfigGlobalName: {
+					ContourIngressConfig: &defaultKafkaClusterWithContour.ContourIngressConfig,
 				},
 			},
 		},

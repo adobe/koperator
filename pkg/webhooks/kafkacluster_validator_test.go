@@ -248,6 +248,26 @@ func TestCheckExternalListenerStartingPort(t *testing.T) {
 						"test-external2", int32(8081), int32(8080), int32(29092), []int32{11})),
 			),
 		},
+		{
+			testName: "valid config: valid ports when tls is enableed",
+			kafkaClusterSpec: v1beta1.KafkaClusterSpec{
+				Brokers: []v1beta1.Broker{{Id: 0}, {Id: 1}, {Id: 2}},
+				ListenersConfig: v1beta1.ListenersConfig{
+					ExternalListeners: []v1beta1.ExternalListenerConfig{
+						{
+							CommonListenerSpec: v1beta1.CommonListenerSpec{
+								Name:          "test-external1",
+								ContainerPort: 29095,
+								Type:          "plaintext",
+							},
+							ExternalStartingPort: -1,
+							AnyCastPort:          util.Int32Pointer(9097),
+						},
+					},
+				},
+			},
+			expected: nil,
+		},
 	}
 
 	for _, testCase := range testCases {
@@ -382,6 +402,140 @@ func TestCheckTargetPortsCollisionForEnvoy(t *testing.T) {
 		t.Run(testCase.testName, func(t *testing.T) {
 			got := checkTargetPortsCollisionForEnvoy(&testCase.kafkaClusterSpec)
 			require.Equal(t, testCase.expected, got)
+		})
+	}
+}
+
+func TestCheckExternalListenerIngressController(t *testing.T) {
+	testCases := []struct {
+		testName         string
+		kafkaClusterSpec v1beta1.KafkaClusterSpec
+		expected         field.ErrorList
+	}{
+		{
+			testName: "valid: empty per-listener ingressController (use cluster default)",
+			kafkaClusterSpec: v1beta1.KafkaClusterSpec{
+				ListenersConfig: v1beta1.ListenersConfig{
+					ExternalListeners: []v1beta1.ExternalListenerConfig{
+						{CommonListenerSpec: v1beta1.CommonListenerSpec{Name: "ext1"}, ExternalStartingPort: 19090},
+					},
+				},
+			},
+			expected: nil,
+		},
+		{
+			testName: "valid: per-listener envoy",
+			kafkaClusterSpec: v1beta1.KafkaClusterSpec{
+				ListenersConfig: v1beta1.ListenersConfig{
+					ExternalListeners: []v1beta1.ExternalListenerConfig{
+						{CommonListenerSpec: v1beta1.CommonListenerSpec{Name: "ext1"}, ExternalStartingPort: 19090, IngressController: "envoy"},
+					},
+				},
+			},
+			expected: nil,
+		},
+		{
+			testName: "valid: per-listener contour and istioingress",
+			kafkaClusterSpec: v1beta1.KafkaClusterSpec{
+				ListenersConfig: v1beta1.ListenersConfig{
+					ExternalListeners: []v1beta1.ExternalListenerConfig{
+						{CommonListenerSpec: v1beta1.CommonListenerSpec{Name: "ext1"}, ExternalStartingPort: 19090, IngressController: "contour"},
+						{CommonListenerSpec: v1beta1.CommonListenerSpec{Name: "ext2"}, ExternalStartingPort: 29090, IngressController: "istioingress"},
+					},
+				},
+			},
+			expected: nil,
+		},
+		{
+			testName: "invalid: per-listener ingressController nginx",
+			kafkaClusterSpec: v1beta1.KafkaClusterSpec{
+				ListenersConfig: v1beta1.ListenersConfig{
+					ExternalListeners: []v1beta1.ExternalListenerConfig{
+						{CommonListenerSpec: v1beta1.CommonListenerSpec{Name: "ext1"}, ExternalStartingPort: 19090, IngressController: "nginx"},
+					},
+				},
+			},
+			expected: field.ErrorList{
+				field.Invalid(
+					field.NewPath("spec").Child("listenersConfig").Child("externalListeners").Index(0).Child("ingressController"),
+					"nginx",
+					"ingressController must be one of: envoy, contour, istioingress"),
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.testName, func(t *testing.T) {
+			got := checkExternalListenerIngressController(&tc.kafkaClusterSpec)
+			require.Equal(t, tc.expected, got)
+		})
+	}
+}
+
+func TestCheckIstioControlPlaneRequiredWhenIstioIngress(t *testing.T) {
+	testCases := []struct {
+		testName         string
+		kafkaClusterSpec v1beta1.KafkaClusterSpec
+		expected         field.ErrorList
+	}{
+		{
+			testName: "valid: no listener uses istioingress",
+			kafkaClusterSpec: v1beta1.KafkaClusterSpec{
+				ListenersConfig: v1beta1.ListenersConfig{
+					ExternalListeners: []v1beta1.ExternalListenerConfig{
+						{CommonListenerSpec: v1beta1.CommonListenerSpec{Name: "ext1"}, ExternalStartingPort: 19090, IngressController: "envoy"},
+					},
+				},
+			},
+			expected: nil,
+		},
+		{
+			testName: "valid: listener uses istioingress and IstioControlPlane is set",
+			kafkaClusterSpec: v1beta1.KafkaClusterSpec{
+				IstioControlPlane: &v1beta1.IstioControlPlaneReference{Name: "cp", Namespace: "istio-system"},
+				ListenersConfig: v1beta1.ListenersConfig{
+					ExternalListeners: []v1beta1.ExternalListenerConfig{
+						{CommonListenerSpec: v1beta1.CommonListenerSpec{Name: "ext1"}, ExternalStartingPort: 19090, IngressController: "istioingress"},
+					},
+				},
+			},
+			expected: nil,
+		},
+		{
+			testName: "invalid: listener effective controller istioingress but IstioControlPlane nil",
+			kafkaClusterSpec: v1beta1.KafkaClusterSpec{
+				ListenersConfig: v1beta1.ListenersConfig{
+					ExternalListeners: []v1beta1.ExternalListenerConfig{
+						{CommonListenerSpec: v1beta1.CommonListenerSpec{Name: "ext1"}, ExternalStartingPort: 19090, IngressController: "istioingress"},
+					},
+				},
+			},
+			expected: field.ErrorList{
+				field.Required(
+					field.NewPath("spec").Child("istioControlPlane"),
+					"istioControlPlane must be set when any external listener uses ingressController istioingress"),
+			},
+		},
+		{
+			testName: "invalid: cluster default istioingress, no per-listener override, IstioControlPlane nil",
+			kafkaClusterSpec: v1beta1.KafkaClusterSpec{
+				IngressController: "istioingress",
+				ListenersConfig: v1beta1.ListenersConfig{
+					ExternalListeners: []v1beta1.ExternalListenerConfig{
+						{CommonListenerSpec: v1beta1.CommonListenerSpec{Name: "ext1"}, ExternalStartingPort: 19090},
+					},
+				},
+			},
+			expected: field.ErrorList{
+				field.Required(
+					field.NewPath("spec").Child("istioControlPlane"),
+					"istioControlPlane must be set when any external listener uses ingressController istioingress"),
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.testName, func(t *testing.T) {
+			got := checkIstioControlPlaneRequiredWhenIstioIngress(&tc.kafkaClusterSpec)
+			require.Equal(t, tc.expected, got)
 		})
 	}
 }

@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"sync/atomic"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -104,6 +105,26 @@ var _ = Describe("KafkaClusterWithContourIngressController", Label("contour"), f
 	When("configuring Contour ingress expect broker ClusterIp svc", func() {
 		It("should reconcile object properly", func(ctx SpecContext) {
 			expectContour(ctx, kafkaCluster)
+		})
+	})
+	When("listener removed and RemoveUnusedIngressResources=true", func() {
+		It("should remove contour resources for that listener", func(ctx SpecContext) {
+			expectContour(ctx, kafkaCluster)
+			By("updating listener to use envoy and enabling RemoveUnusedIngressResources")
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: kafkaCluster.Namespace, Name: kafkaCluster.Name}, kafkaCluster)).To(Succeed())
+			kafkaCluster.Spec.RemoveUnusedIngressResources = true
+			el := kafkaCluster.Spec.ListenersConfig.ExternalListeners[0]
+			kafkaCluster.Spec.ListenersConfig.ExternalListeners = []v1beta1.ExternalListenerConfig{}
+			Expect(k8sClient.Update(ctx, kafkaCluster)).To(Succeed())
+			waitForClusterRunningState(ctx, kafkaCluster, namespace)
+			By("expecting contour HTTPProxy and ClusterIP services for that listener to be deleted")
+			ingressConfigName := "ingress1"
+			serviceName := fmt.Sprintf(contourutils.ContourServiceNameWithScope, el.Name, ingressConfigName, kafkaCluster.GetName())
+			var svc corev1.Service
+			Eventually(ctx, func() bool {
+				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: kafkaCluster.Namespace, Name: serviceName}, &svc)
+				return err != nil
+			}).WithTimeout(30 * time.Second).Should(BeTrue())
 		})
 	})
 })
