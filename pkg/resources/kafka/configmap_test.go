@@ -176,6 +176,46 @@ func TestGetEffectiveLogDirsMountPaths(t *testing.T) {
 			},
 			expectedEffective: []string{"/kafka-logs/kafka", "/kafka-logs2/kafka"},
 		},
+		{
+			testName:      "removed path with disk removal completed with error - path not in effective",
+			mountPathsOld: []string{"/kafka-logs/kafka", "/kafka-logs2/kafka"},
+			mountPathsNew: []string{"/kafka-logs/kafka"},
+			brokerID:      "0",
+			kafkaCluster: &v1beta1.KafkaCluster{
+				Status: v1beta1.KafkaClusterStatus{
+					BrokersState: map[string]v1beta1.BrokerState{
+						"0": {
+							GracefulActionState: v1beta1.GracefulActionState{
+								VolumeStates: map[string]v1beta1.VolumeState{
+									"/kafka-logs2": {CruiseControlVolumeState: v1beta1.GracefulDiskRemovalCompletedWithError},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedEffective: []string{"/kafka-logs/kafka"},
+		},
+		{
+			testName:      "removed path with disk rebalance paused - path not in effective",
+			mountPathsOld: []string{"/kafka-logs/kafka", "/kafka-logs2/kafka"},
+			mountPathsNew: []string{"/kafka-logs/kafka"},
+			brokerID:      "0",
+			kafkaCluster: &v1beta1.KafkaCluster{
+				Status: v1beta1.KafkaClusterStatus{
+					BrokersState: map[string]v1beta1.BrokerState{
+						"0": {
+							GracefulActionState: v1beta1.GracefulActionState{
+								VolumeStates: map[string]v1beta1.VolumeState{
+									"/kafka-logs2": {CruiseControlVolumeState: v1beta1.GracefulDiskRebalancePaused},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedEffective: []string{"/kafka-logs/kafka"},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.testName, func(t *testing.T) {

@@ -325,8 +325,13 @@ func shouldKeepRemovedLogDirInConfig(logDirPath, brokerID string, kafkaCluster *
 		return false
 	}
 
-	ccVolumeState := volumeState.CruiseControlVolumeState
-	return ccVolumeState.IsDiskRemoval() || ccVolumeState.IsDiskRebalance()
+	switch volumeState.CruiseControlVolumeState {
+	case v1beta1.GracefulDiskRemovalRequired, v1beta1.GracefulDiskRemovalScheduled, v1beta1.GracefulDiskRemovalRunning,
+		v1beta1.GracefulDiskRebalanceRequired, v1beta1.GracefulDiskRebalanceScheduled, v1beta1.GracefulDiskRebalanceRunning:
+		return true
+	default:
+		return false
+	}
 }
 
 func generateSuperUsers(users []string) (suStrings []string) {
