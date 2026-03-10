@@ -329,6 +329,9 @@ func shouldKeepRemovedLogDirInConfig(logDirPath, brokerID string, kafkaCluster *
 	case v1beta1.GracefulDiskRemovalRequired, v1beta1.GracefulDiskRemovalScheduled, v1beta1.GracefulDiskRemovalRunning,
 		v1beta1.GracefulDiskRebalanceRequired, v1beta1.GracefulDiskRebalanceScheduled, v1beta1.GracefulDiskRebalanceRunning:
 		return true
+	case v1beta1.GracefulDiskRemovalSucceeded, v1beta1.GracefulDiskRemovalCompletedWithError, v1beta1.GracefulDiskRemovalPaused,
+		v1beta1.GracefulDiskRebalanceSucceeded, v1beta1.GracefulDiskRebalanceCompletedWithError, v1beta1.GracefulDiskRebalancePaused:
+		return false
 	default:
 		return false
 	}
