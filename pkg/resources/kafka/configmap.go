@@ -325,16 +325,13 @@ func shouldKeepRemovedLogDirInConfig(logDirPath, brokerID string, kafkaCluster *
 		return false
 	}
 
-	switch volumeState.CruiseControlVolumeState {
-	case v1beta1.GracefulDiskRemovalRequired, v1beta1.GracefulDiskRemovalScheduled, v1beta1.GracefulDiskRemovalRunning,
-		v1beta1.GracefulDiskRebalanceRequired, v1beta1.GracefulDiskRebalanceScheduled, v1beta1.GracefulDiskRebalanceRunning:
-		return true
-	case v1beta1.GracefulDiskRemovalSucceeded, v1beta1.GracefulDiskRemovalCompletedWithError, v1beta1.GracefulDiskRemovalPaused,
-		v1beta1.GracefulDiskRebalanceSucceeded, v1beta1.GracefulDiskRebalanceCompletedWithError, v1beta1.GracefulDiskRebalancePaused:
-		return false
-	default:
+	// Keep removed path until removal/rebalance is confirmed succeeded; drop only when state is absent or succeeded.
+	// On error or paused (unconfirmed success), keep the path to avoid data loss and allow retry.
+	s := volumeState.CruiseControlVolumeState
+	if s.IsDiskRemovalSucceeded() || s.IsDiskRebalanceSucceeded() {
 		return false
 	}
+	return s.IsDiskRemoval() || s.IsDiskRebalance()
 }
 
 func generateSuperUsers(users []string) (suStrings []string) {

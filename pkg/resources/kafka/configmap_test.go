@@ -177,7 +177,7 @@ func TestGetEffectiveLogDirsMountPaths(t *testing.T) {
 			expectedEffective: []string{"/kafka-logs/kafka", "/kafka-logs2/kafka"},
 		},
 		{
-			testName:      "removed path with disk removal completed with error - path not in effective",
+			testName:      "removed path with disk removal completed with error - path kept in effective (unconfirmed success, avoid data loss)",
 			mountPathsOld: []string{"/kafka-logs/kafka", "/kafka-logs2/kafka"},
 			mountPathsNew: []string{"/kafka-logs/kafka"},
 			brokerID:      "0",
@@ -194,10 +194,10 @@ func TestGetEffectiveLogDirsMountPaths(t *testing.T) {
 					},
 				},
 			},
-			expectedEffective: []string{"/kafka-logs/kafka"},
+			expectedEffective: []string{"/kafka-logs/kafka", "/kafka-logs2/kafka"},
 		},
 		{
-			testName:      "removed path with disk rebalance paused - path not in effective",
+			testName:      "removed path with disk rebalance paused - path kept in effective (unconfirmed success, avoid data loss)",
 			mountPathsOld: []string{"/kafka-logs/kafka", "/kafka-logs2/kafka"},
 			mountPathsNew: []string{"/kafka-logs/kafka"},
 			brokerID:      "0",
@@ -214,7 +214,7 @@ func TestGetEffectiveLogDirsMountPaths(t *testing.T) {
 					},
 				},
 			},
-			expectedEffective: []string{"/kafka-logs/kafka"},
+			expectedEffective: []string{"/kafka-logs/kafka", "/kafka-logs2/kafka"},
 		},
 	}
 	for _, test := range tests {
