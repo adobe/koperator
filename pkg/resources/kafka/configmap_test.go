@@ -73,56 +73,155 @@ zookeeper.connect=zookeeper-server-client.zookeeper:2181/
 	}
 }
 
-func TestMergeMountPaths(t *testing.T) {
+func TestGetEffectiveLogDirsMountPaths(t *testing.T) {
 	tests := []struct {
-		testName                string
-		mountPathNew            []string
-		mountPathOld            []string
-		expectedMergedMountPath []string
-		expectedRemoved         bool
+		testName          string
+		mountPathsOld     []string
+		mountPathsNew     []string
+		brokerID          string
+		kafkaCluster      *v1beta1.KafkaCluster
+		expectedEffective []string
 	}{
 		{
-			testName:                "no old mountPath",
-			mountPathNew:            []string{"/kafka-logs3/kafka", "/kafka-logs/kafka", "/kafka-logs2/kafka", "/kafka-logs4/kafka"},
-			mountPathOld:            []string{},
-			expectedMergedMountPath: []string{"/kafka-logs3/kafka", "/kafka-logs/kafka", "/kafka-logs2/kafka", "/kafka-logs4/kafka"},
-			expectedRemoved:         false,
+			testName:          "no broker state - effective is mountPathsNew only",
+			mountPathsOld:     []string{"/kafka-logs/kafka", "/kafka-logs2/kafka"},
+			mountPathsNew:     []string{"/kafka-logs/kafka"},
+			brokerID:          "0",
+			kafkaCluster:      nil,
+			expectedEffective: []string{"/kafka-logs/kafka"},
 		},
 		{
-			testName:                "same",
-			mountPathNew:            []string{"/kafka-logs3/kafka", "/kafka-logs/kafka", "/kafka-logs2/kafka", "/kafka-logs4/kafka"},
-			mountPathOld:            []string{"/kafka-logs3/kafka", "/kafka-logs/kafka", "/kafka-logs2/kafka", "/kafka-logs4/kafka"},
-			expectedMergedMountPath: []string{"/kafka-logs3/kafka", "/kafka-logs/kafka", "/kafka-logs2/kafka", "/kafka-logs4/kafka"},
-			expectedRemoved:         false,
+			testName:          "nil VolumeStates - effective is mountPathsNew only",
+			mountPathsOld:     []string{"/kafka-logs/kafka", "/kafka-logs2/kafka"},
+			mountPathsNew:     []string{"/kafka-logs/kafka"},
+			brokerID:          "0",
+			kafkaCluster:      &v1beta1.KafkaCluster{Status: v1beta1.KafkaClusterStatus{BrokersState: map[string]v1beta1.BrokerState{"0": {GracefulActionState: v1beta1.GracefulActionState{VolumeStates: nil}}}}},
+			expectedEffective: []string{"/kafka-logs/kafka"},
 		},
 		{
-			testName:                "changed order",
-			mountPathNew:            []string{"/kafka-logs/kafka", "/kafka-logs3/kafka", "/kafka-logs2/kafka", "/kafka-logs4/kafka"},
-			mountPathOld:            []string{"/kafka-logs3/kafka", "/kafka-logs/kafka", "/kafka-logs2/kafka", "/kafka-logs4/kafka"},
-			expectedMergedMountPath: []string{"/kafka-logs/kafka", "/kafka-logs3/kafka", "/kafka-logs2/kafka", "/kafka-logs4/kafka"},
-			expectedRemoved:         false,
+			testName:      "removed path with VolumeState in progress (GracefulDiskRemovalRequired) - path kept in effective",
+			mountPathsOld: []string{"/kafka-logs/kafka", "/kafka-logs2/kafka"},
+			mountPathsNew: []string{"/kafka-logs/kafka"},
+			brokerID:      "0",
+			kafkaCluster: &v1beta1.KafkaCluster{
+				Status: v1beta1.KafkaClusterStatus{
+					BrokersState: map[string]v1beta1.BrokerState{
+						"0": {
+							GracefulActionState: v1beta1.GracefulActionState{
+								VolumeStates: map[string]v1beta1.VolumeState{
+									"/kafka-logs2": {CruiseControlVolumeState: v1beta1.GracefulDiskRemovalRequired},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedEffective: []string{"/kafka-logs/kafka", "/kafka-logs2/kafka"},
 		},
 		{
-			testName:                "removed one",
-			mountPathNew:            []string{"/kafka-logs/kafka", "/kafka-logs2/kafka", "/kafka-logs4/kafka"},
-			mountPathOld:            []string{"/kafka-logs3/kafka", "/kafka-logs/kafka", "/kafka-logs2/kafka", "/kafka-logs4/kafka"},
-			expectedMergedMountPath: []string{"/kafka-logs/kafka", "/kafka-logs2/kafka", "/kafka-logs4/kafka", "/kafka-logs3/kafka"},
-			expectedRemoved:         true,
+			testName:      "removed path with state not found - path not in effective",
+			mountPathsOld: []string{"/kafka-logs/kafka", "/kafka-logs2/kafka"},
+			mountPathsNew: []string{"/kafka-logs/kafka"},
+			brokerID:      "0",
+			kafkaCluster: &v1beta1.KafkaCluster{
+				Status: v1beta1.KafkaClusterStatus{
+					BrokersState: map[string]v1beta1.BrokerState{
+						"0": {
+							GracefulActionState: v1beta1.GracefulActionState{
+								VolumeStates: map[string]v1beta1.VolumeState{},
+							},
+						},
+					},
+				},
+			},
+			expectedEffective: []string{"/kafka-logs/kafka"},
 		},
 		{
-			testName:                "removed all",
-			mountPathNew:            []string{},
-			mountPathOld:            []string{"/kafka-logs3/kafka", "/kafka-logs/kafka", "/kafka-logs2/kafka", "/kafka-logs4/kafka"},
-			expectedMergedMountPath: []string{"/kafka-logs3/kafka", "/kafka-logs/kafka", "/kafka-logs2/kafka", "/kafka-logs4/kafka"},
-			expectedRemoved:         true,
+			testName:      "removed path with IsDiskRemovalSucceeded - path not in effective",
+			mountPathsOld: []string{"/kafka-logs/kafka", "/kafka-logs2/kafka"},
+			mountPathsNew: []string{"/kafka-logs/kafka"},
+			brokerID:      "0",
+			kafkaCluster: &v1beta1.KafkaCluster{
+				Status: v1beta1.KafkaClusterStatus{
+					BrokersState: map[string]v1beta1.BrokerState{
+						"0": {
+							GracefulActionState: v1beta1.GracefulActionState{
+								VolumeStates: map[string]v1beta1.VolumeState{
+									"/kafka-logs2": {CruiseControlVolumeState: v1beta1.GracefulDiskRemovalSucceeded},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedEffective: []string{"/kafka-logs/kafka"},
+		},
+		{
+			testName:      "removed path with IsDiskRebalance - path kept in effective",
+			mountPathsOld: []string{"/kafka-logs/kafka", "/kafka-logs2/kafka"},
+			mountPathsNew: []string{"/kafka-logs/kafka"},
+			brokerID:      "0",
+			kafkaCluster: &v1beta1.KafkaCluster{
+				Status: v1beta1.KafkaClusterStatus{
+					BrokersState: map[string]v1beta1.BrokerState{
+						"0": {
+							GracefulActionState: v1beta1.GracefulActionState{
+								VolumeStates: map[string]v1beta1.VolumeState{
+									"/kafka-logs2": {CruiseControlVolumeState: v1beta1.GracefulDiskRebalanceRequired},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedEffective: []string{"/kafka-logs/kafka", "/kafka-logs2/kafka"},
+		},
+		{
+			testName:      "removed path with disk removal completed with error - path kept in effective (unconfirmed success, avoid data loss)",
+			mountPathsOld: []string{"/kafka-logs/kafka", "/kafka-logs2/kafka"},
+			mountPathsNew: []string{"/kafka-logs/kafka"},
+			brokerID:      "0",
+			kafkaCluster: &v1beta1.KafkaCluster{
+				Status: v1beta1.KafkaClusterStatus{
+					BrokersState: map[string]v1beta1.BrokerState{
+						"0": {
+							GracefulActionState: v1beta1.GracefulActionState{
+								VolumeStates: map[string]v1beta1.VolumeState{
+									"/kafka-logs2": {CruiseControlVolumeState: v1beta1.GracefulDiskRemovalCompletedWithError},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedEffective: []string{"/kafka-logs/kafka", "/kafka-logs2/kafka"},
+		},
+		{
+			testName:      "removed path with disk rebalance paused - path kept in effective (unconfirmed success, avoid data loss)",
+			mountPathsOld: []string{"/kafka-logs/kafka", "/kafka-logs2/kafka"},
+			mountPathsNew: []string{"/kafka-logs/kafka"},
+			brokerID:      "0",
+			kafkaCluster: &v1beta1.KafkaCluster{
+				Status: v1beta1.KafkaClusterStatus{
+					BrokersState: map[string]v1beta1.BrokerState{
+						"0": {
+							GracefulActionState: v1beta1.GracefulActionState{
+								VolumeStates: map[string]v1beta1.VolumeState{
+									"/kafka-logs2": {CruiseControlVolumeState: v1beta1.GracefulDiskRebalancePaused},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedEffective: []string{"/kafka-logs/kafka", "/kafka-logs2/kafka"},
 		},
 	}
 	for _, test := range tests {
-		mergedMountPaths, isRemoved := mergeMountPaths(test.mountPathOld, test.mountPathNew)
-		if !reflect.DeepEqual(mergedMountPaths, test.expectedMergedMountPath) {
-			t.Errorf("testName: %s, expected: %s, got: %s", test.testName, test.expectedMergedMountPath, mergedMountPaths)
-		}
-		require.Equal(t, test.expectedRemoved, isRemoved)
+		t.Run(test.testName, func(t *testing.T) {
+			got := getEffectiveLogDirsMountPaths(test.mountPathsOld, test.mountPathsNew, test.brokerID, test.kafkaCluster)
+			require.Equal(t, test.expectedEffective, got, "effective log dirs")
+		})
 	}
 }
 
