@@ -622,6 +622,24 @@ func TestGetStorageMountPaths(t *testing.T) {
 			},
 			expectedMountPaths: "test-log-1,test-log-2,test-log-3,test-log-4,test-log-5",
 		},
+		{
+			testName: "BrokerConfig with tiered storage cache should exclude it from mount paths",
+			brokerConfig: &BrokerConfig{
+				StorageConfigs: []StorageConfig{
+					{
+						MountPath: "test-log-1",
+					},
+					{
+						MountPath: "test-log-2",
+					},
+					{
+						MountPath:          "/tiered-storage-cache",
+						TieredStorageCache: true,
+					},
+				},
+			},
+			expectedMountPaths: "test-log-1,test-log-2",
+		},
 	}
 
 	for _, test := range testCases {

@@ -518,6 +518,12 @@ type StorageConfig struct {
 	// the `pvcSpec` is used by default.
 	// +optional
 	EmptyDir *corev1.EmptyDirVolumeSource `json:"emptyDir,omitempty"`
+
+	// TieredStorageCache indicates this storage is used for Kafka tiered storage cache
+	// (e.g., for rsm.config.fetch.chunk.cache.path). When set to true, this storage will be
+	// excluded from Cruise Control capacity calculations and will not be used as a Kafka log.dir.
+	// +optional
+	TieredStorageCache bool `json:"tieredStorageCache,omitempty"`
 }
 
 // ListenersConfig defines the Kafka listener types
@@ -947,16 +953,17 @@ func (bConfig *BrokerConfig) GetTerminationGracePeriod() int64 {
 }
 
 // GetStorageMountPaths returns a string with comma-separated storage mount paths that the broker uses
+// for Kafka log.dirs. Tiered storage cache volumes are excluded.
 func (bConfig *BrokerConfig) GetStorageMountPaths() string {
-	var mountPaths string
-	for i, sc := range bConfig.StorageConfigs {
-		if i != len(bConfig.StorageConfigs)-1 {
-			mountPaths += sc.MountPath + ","
-		} else {
-			mountPaths += sc.MountPath
+	var mountPaths []string
+	for _, sc := range bConfig.StorageConfigs {
+		// Skip tiered storage cache volumes - they should not be in log.dirs
+		if sc.TieredStorageCache {
+			continue
 		}
+		mountPaths = append(mountPaths, sc.MountPath)
 	}
-	return mountPaths
+	return strings.Join(mountPaths, ",")
 }
 
 // GetNodeSelector returns the node selector for cruise control
