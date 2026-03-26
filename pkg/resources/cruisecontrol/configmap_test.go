@@ -1017,4 +1017,105 @@ func TestGenerateCapacityConfigWithUserProvidedInput(t *testing.T) {
 			}
 		})
 	}
+
+	// Test tiered storage cache exclusion from capacity
+	t.Run("tiered storage cache should be excluded from capacity", func(t *testing.T) {
+		quantity, _ := resource.ParseQuantity("100Gi")
+		tieredCacheQuantity, _ := resource.ParseQuantity("50Gi")
+		cpuQuantity, _ := resource.ParseQuantity("2000m")
+
+		kafkaCluster := v1beta1.KafkaCluster{
+			Spec: v1beta1.KafkaClusterSpec{
+				Brokers: []v1beta1.Broker{
+					{
+						Id: 0,
+						BrokerConfig: &v1beta1.BrokerConfig{
+							Resources: &v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									"cpu": cpuQuantity,
+								},
+							},
+							StorageConfigs: []v1beta1.StorageConfig{
+								{
+									MountPath: "/kafka-logs",
+									PvcSpec: &v1.PersistentVolumeClaimSpec{
+										Resources: v1.VolumeResourceRequirements{
+											Requests: v1.ResourceList{
+												v1.ResourceStorage: quantity,
+											},
+										},
+									},
+								},
+								{
+									MountPath:          "/tiered-storage-cache",
+									TieredStorageCache: true,
+									PvcSpec: &v1.PersistentVolumeClaimSpec{
+										Resources: v1.VolumeResourceRequirements{
+											Requests: v1.ResourceList{
+												v1.ResourceStorage: tieredCacheQuantity,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			Status: v1beta1.KafkaClusterStatus{
+				BrokersState: map[string]v1beta1.BrokerState{
+					"0": {},
+				},
+			},
+		}
+
+		expectedConfiguration := `{
+    "brokerCapacities": [
+        {
+            "brokerId": "0",
+            "capacity": {
+                "DISK": {
+                    "/kafka-logs/kafka": "107374"
+                },
+                "CPU": "200",
+                "NW_IN": "125000",
+                "NW_OUT": "125000"
+            },
+            "doc": "Capacity unit used for disk is in MB, cpu is in percentage, network throughput is in KB."
+        }
+    ]
+}`
+
+		var actual JBODInvariantCapacityConfig
+		rawStringActual, err := GenerateCapacityConfig(&kafkaCluster, logr.Discard(), nil)
+		if err != nil {
+			t.Error(err, "could not generate capacity config")
+		}
+		err = json.Unmarshal([]byte(rawStringActual), &actual)
+		if err != nil {
+			t.Error(err, "could not unmarshal actual json")
+		}
+
+		var expected JBODInvariantCapacityConfig
+		err = json.Unmarshal([]byte(expectedConfiguration), &expected)
+		if err != nil {
+			t.Error(err, "could not unmarshal expected json")
+		}
+
+		if !reflect.DeepEqual(actual, expected) {
+			t.Errorf("Expected: %+v, got: %+v", expected, actual)
+		}
+
+		// Verify that tiered storage cache is NOT in the capacity
+		actualCapacity := actual.Capacities[0].(map[string]interface{})
+		diskCapacity := actualCapacity["capacity"].(map[string]interface{})["DISK"].(map[string]interface{})
+
+		if _, exists := diskCapacity["/tiered-storage-cache/kafka"]; exists {
+			t.Error("Tiered storage cache should not be in Cruise Control capacity")
+		}
+
+		if _, exists := diskCapacity["/kafka-logs/kafka"]; !exists {
+			t.Error("Regular storage should be in Cruise Control capacity")
+		}
+	})
 }

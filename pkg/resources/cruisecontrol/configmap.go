@@ -346,6 +346,13 @@ func generateBrokerDisks(brokerState v1beta1.Broker, kafkaClusterSpec v1beta1.Ka
 	// Generate log dir configuration
 	logDirs := make(map[string]string, len(storageConfigs))
 	for path, conf := range storageConfigs {
+		// Skip tiered storage cache volumes - they should not be included in Cruise Control capacity
+		if conf.TieredStorageCache {
+			log.V(1).Info("skipping tiered storage cache volume from Cruise Control capacity",
+				v1beta1.BrokerIdLabelKey, brokerState.Id, "mountPath", path)
+			continue
+		}
+
 		size := parseMountPathWithSize(conf)
 		log.V(1).Info(fmt.Sprintf("broker log.dir %s size in MB: %d", path, size), v1beta1.BrokerIdLabelKey, brokerState.Id)
 
