@@ -99,6 +99,12 @@ func testAddThenRemoveMiddleDisk() bool {
 			applyK8sResourceManifest(kubectlOptions, "../../config/samples/simplekafkacluster_threedisk.yaml")
 		})
 
+		ginkgo.It("Waiting for KafkaCluster to reach ClusterRunning state after adding disk", func() {
+			ginkgo.By("Waiting for KafkaCluster status.state=ClusterRunning and all Kafka broker pods Ready (same as install)")
+			err := waitForKafkaClusterWithPodStatusCheck(kubectlOptions, kafkaClusterName, multidiskRemovalTimeout)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		})
+
 		ginkgo.It("Applying manifest without middle disk to remove the second disk", func() {
 			ginkgo.By("Patching KafkaCluster to remove middle disk (storageConfigs: kafka-logs, kafka-logs3)")
 			applyK8sResourceManifest(kubectlOptions, "../../config/samples/simplekafkacluster_twodisk_no_middle.yaml")
