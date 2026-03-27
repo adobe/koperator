@@ -26,14 +26,28 @@ spec:
       # securityContext:
       #  privileged: true
       storageConfigs:
-        - mountPath: "/kafka-logs"
+        - mountPath: "/kafka-logs1"
           pvcSpec:
             accessModes:
               - ReadWriteOnce
             resources:
               requests:
-                storage: 10Gi
+                storage: 1Gi
         - mountPath: "/kafka-logs2"
+          pvcSpec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 1Gi
+        - mountPath: "/kafka-logs3"
+          pvcSpec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 5Gi
+        - mountPath: "/kafka-logs4"
           pvcSpec:
             accessModes:
               - ReadWriteOnce
