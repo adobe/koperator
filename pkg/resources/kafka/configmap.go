@@ -325,7 +325,7 @@ func shouldKeepRemovedLogDirInConfig(logDirPath, brokerID string, kafkaCluster *
 		return false
 	}
 
-	// Keep removed path until removal/rebalance is confirmed succeeded; drop only when state is absent or succeeded.
+	// Keep removed path until removal/rebalance is confirmed succeeded; drop only when state succeeded.
 	// On error or paused (unconfirmed success), keep the path to avoid data loss and allow retry.
 	s := volumeState.CruiseControlVolumeState
 	if s.IsDiskRemovalSucceeded() || s.IsDiskRebalanceSucceeded() {
