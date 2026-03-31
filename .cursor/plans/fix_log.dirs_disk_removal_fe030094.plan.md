@@ -18,10 +18,10 @@ isProject: false
 
 ## Problem Analysis
 
-- Current config generation in [/Users/dobre/work/koperator/pkg/resources/kafka/configmap.go](/Users/dobre/work/koperator/pkg/resources/kafka/configmap.go) always merges old + new mount paths:
+- Current config generation in [koperator/pkg/resources/kafka/configmap.go](koperator/pkg/resources/kafka/configmap.go) always merges old + new mount paths:
   - `mountPathsMerged, isMountPathRemoved := mergeMountPaths(mountPathsOld, mountPathsNew)`
   - This preserves removed paths indefinitely, even after `GracefulDiskRemovalSucceeded` and PVC deletion.
-- Disk-removal lifecycle state is already tracked in [/Users/dobre/work/koperator/pkg/resources/kafka/kafka.go](/Users/dobre/work/koperator/pkg/resources/kafka/kafka.go) (`GracefulActionState.VolumeStates`) and state semantics are defined in [/Users/dobre/work/koperator/api/v1beta1/common_types.go](/Users/dobre/work/koperator/api/v1beta1/common_types.go).
+- Disk-removal lifecycle state is already tracked in [koperator/pkg/resources/kafka/kafka.go](koperator/pkg/resources/kafka/kafka.go) (`GracefulActionState.VolumeStates`) and state semantics are defined in [koperator/api/v1beta1/common_types.go](koperator/api/v1beta1/common_types.go).
 - Your new tests indicate the intended behavior: keep removed path while removal/rebalance is active, drop it when state is missing or succeeded.
 
 ## Proposed Solution
@@ -31,20 +31,20 @@ isProject: false
   - For paths present only in old config (`mountPathsOld - mountPathsNew`), keep **only** if broker volume state for that mount path is active:
     - `CruiseControlVolumeState.IsDiskRemoval()` OR `CruiseControlVolumeState.IsDiskRebalance()`.
   - Drop removed paths when state is absent or `IsDiskRemovalSucceeded()`.
-- Implement helper in [/Users/dobre/work/koperator/pkg/resources/kafka/configmap.go](/Users/dobre/work/koperator/pkg/resources/kafka/configmap.go):
+- Implement helper in [koperator/pkg/resources/kafka/configmap.go](koperator/pkg/resources/kafka/configmap.go):
   - `getEffectiveLogDirsMountPaths(mountPathsOld, mountPathsNew, brokerID, kafkaCluster)`
 - Use this helper in `getConfigProperties()` when setting `log.dirs`.
 
 ## Test Plan
 
-- Unit tests in [/Users/dobre/work/koperator/pkg/resources/kafka/configmap_test.go](/Users/dobre/work/koperator/pkg/resources/kafka/configmap_test.go):
+- Unit tests in [koperator/pkg/resources/kafka/configmap_test.go](koperator/pkg/resources/kafka/configmap_test.go):
   - Keep your added `TestGetEffectiveLogDirsMountPaths` and ensure coverage includes:
     - no state -> drop removed path
     - removal/rebalance active -> keep removed path
     - removal succeeded -> drop removed path
-- E2E in [/Users/dobre/work/koperator/tests/e2e/test_multidisk_removal.go](/Users/dobre/work/koperator/tests/e2e/test_multidisk_removal.go):
+- E2E in [koperator/tests/e2e/test_multidisk_removal.go](koperator/tests/e2e/test_multidisk_removal.go):
   - Install multidisk sample, then apply single-disk sample, assert broker configmaps no longer contain removed path.
-- Suite wiring in [/Users/dobre/work/koperator/tests/e2e/koperator_suite_test.go](/Users/dobre/work/koperator/tests/e2e/koperator_suite_test.go) is already aligned.
+- Suite wiring in [koperator/tests/e2e/koperator_suite_test.go](koperator/tests/e2e/koperator_suite_test.go) is already aligned.
 
 ## Expected Outcome
 
