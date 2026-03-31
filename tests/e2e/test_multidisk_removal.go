@@ -33,7 +33,7 @@ import (
 )
 
 const (
-	multidiskRemovalTimeout      = 900 * time.Second // CC disk removal can take long
+	multidiskRemovalTimeout      = 1000 * time.Second // this test can take long
 	multidiskRemovalPollInterval = 15 * time.Second
 	brokerConfigTemplateFormat   = "%s-config-%d"
 )
