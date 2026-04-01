@@ -5100,6 +5100,12 @@ spec:
                                   the PersistentVolume backing this claim.
                                 type: string
                             type: object
+                          tieredStorageCache:
+                            description: |-
+                              TieredStorageCache indicates this storage is used for Kafka tiered storage cache
+                              (e.g., for rsm.config.fetch.chunk.cache.path). When set to true, this storage will be
+                              excluded from Cruise Control capacity calculations and will not be used as a Kafka log.dir.
+                            type: boolean
                         required:
                         - mountPath
                         type: object
@@ -12124,6 +12130,12 @@ spec:
                                       to the PersistentVolume backing this claim.
                                     type: string
                                 type: object
+                              tieredStorageCache:
+                                description: |-
+                                  TieredStorageCache indicates this storage is used for Kafka tiered storage cache
+                                  (e.g., for rsm.config.fetch.chunk.cache.path). When set to true, this storage will be
+                                  excluded from Cruise Control capacity calculations and will not be used as a Kafka log.dir.
+                                type: boolean
                             required:
                             - mountPath
                             type: object
