@@ -1,0 +1,98 @@
+apiVersion: kafka.banzaicloud.io/v1beta1
+kind: KafkaCluster
+metadata:
+  name: kafka-ts-resize
+  namespace: kafka
+spec:
+  kRaft: true
+  headlessServiceEnabled: true
+  oneBrokerPerNode: false
+  clusterImage: "ghcr.io/adobe/koperator/kafka:2.13-3.9.1"
+  readOnlyConfig: |
+    auto.create.topics.enable=false
+  rollingUpgradeConfig:
+    failureThreshold: 1
+  cruiseControlConfig:
+    topicConfig:
+      partitions: 1
+      replicationFactor: 2
+  brokers:
+    - id: 0
+      brokerConfig:
+        processRoles:
+          - broker
+        terminationGracePeriodSeconds: 10
+        storageConfigs:
+          - mountPath: "/kafka-logs"
+            pvcSpec:
+              accessModes:
+                - ReadWriteOnce
+              resources:
+                requests:
+                  storage: 2Gi
+          - mountPath: "/tiered-storage-cache"
+            tieredStorageCache: true
+            pvcSpec:
+              accessModes:
+                - ReadWriteOnce
+              resources:
+                requests:
+                  storage: 1Gi    # Reduced from 2Gi to trigger delete-and-recreate
+        resourceRequirements:
+          limits:
+            cpu: "1"
+            memory: 2Gi
+          requests:
+            cpu: "200m"
+            memory: 1Gi
+    - id: 1
+      brokerConfig:
+        processRoles:
+          - controller
+        terminationGracePeriodSeconds: 10
+        storageConfigs:
+          - mountPath: "/kafka-logs"
+            pvcSpec:
+              accessModes:
+                - ReadWriteOnce
+              resources:
+                requests:
+                  storage: 2Gi
+        resourceRequirements:
+          limits:
+            cpu: "500m"
+            memory: 1Gi
+          requests:
+            cpu: "100m"
+            memory: 512Mi
+    - id: 2
+      brokerConfig:
+        processRoles:
+          - broker
+        terminationGracePeriodSeconds: 10
+        storageConfigs:
+          - mountPath: "/kafka-logs"
+            pvcSpec:
+              accessModes:
+                - ReadWriteOnce
+              resources:
+                requests:
+                  storage: 2Gi
+        resourceRequirements:
+          limits:
+            cpu: "500m"
+            memory: 1Gi
+          requests:
+            cpu: "100m"
+            memory: 512Mi
+  listenersConfig:
+    internalListeners:
+      - type: "plaintext"
+        name: "internal"
+        containerPort: 29092
+        usedForInnerBrokerCommunication: true
+      - type: "plaintext"
+        name: "controller"
+        containerPort: 29093
+        usedForInnerBrokerCommunication: false
+        usedForControllerCommunication: true

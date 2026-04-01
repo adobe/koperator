@@ -68,6 +68,14 @@ const (
 	brokerConfigTemplate  = "%s-config"
 	brokerStorageTemplate = "%s-%d-storage-%d-"
 
+	// pvcCacheResizeStateAnnotation is set on PVCs during a tiered storage cache resize to track
+	// which PVC is the old one awaiting deletion and which is the new replacement.
+	pvcCacheResizeStateAnnotation = "koperator.adobe.com/cache-resize-state"
+	pvcCacheResizePendingDeletion = "pending-deletion"
+	pvcCacheResizeReplacement     = "replacement"
+	// pvcCacheResizeReplacesPVC records the name of the old PVC that the replacement supersedes.
+	pvcCacheResizeReplacesPVC = "koperator.adobe.com/replaces-pvc"
+
 	brokerConfigMapVolumeMount = "broker-config"
 	kafkaDataVolumeMount       = "kafka-data"
 
@@ -152,6 +160,17 @@ func getCreatedPvcForBroker(
 	if err != nil {
 		return nil, err
 	}
+
+	// Exclude PVCs that are pending deletion during a tiered storage cache resize.
+	// The replacement PVC (same mount path, smaller size) is already present and will be used instead.
+	n := 0
+	for _, pvc := range foundPvcList.Items {
+		if pvc.Annotations[pvcCacheResizeStateAnnotation] != pvcCacheResizePendingDeletion {
+			foundPvcList.Items[n] = pvc
+			n++
+		}
+	}
+	foundPvcList.Items = foundPvcList.Items[:n]
 
 	var missing []string
 	for i := range storageConfigs {
@@ -310,6 +329,12 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 					banzaiv1beta1.BrokerIdLabelKey, broker.Id, "mountPath", storage.MountPath)
 			}
 			if storage.PvcSpec == nil {
+				continue
+			}
+			// Tiered storage cache PVCs are only meaningful on broker nodes.
+			// Controller-only nodes do not serve Kafka client traffic or hold tiered-storage
+			// segment data, so skip cache PVCs for them.
+			if storage.TieredStorageCache && brokerConfig.IsControllerNode() && !brokerConfig.IsBrokerNode() {
 				continue
 			}
 			o, err := r.pvc(broker.Id, index, storage)
@@ -1180,8 +1205,130 @@ func (r *Reconciler) reconcileKafkaPvc(ctx context.Context, log logr.Logger, bro
 			}
 		}
 
-		// Handle disk removal
-		if len(pvcList.Items) > len(desiredPvcs) {
+		// Resolve pod existence once per broker — used by both cleanup and resize logic below.
+		// A pod with a non-nil DeletionTimestamp is Terminating: its containers have stopped (or
+		// are stopping) and any PVCs it mounted will be released once the pod is fully gone.
+		// Treating a Terminating pod as "not existing" lets the pending-deletion PVC be cleaned up
+		// during the Terminating window rather than waiting for the narrow gap between the pod being
+		// fully removed from etcd and the new pod being created in the same reconcile cycle.
+		brokerPodList := &corev1.PodList{}
+		brokerPodMatchingLabels := client.MatchingLabels(
+			apiutil.MergeLabels(
+				apiutil.LabelsForKafka(r.KafkaCluster.Name),
+				map[string]string{banzaiv1beta1.BrokerIdLabelKey: brokerId},
+			),
+		)
+		if err := r.List(ctx, brokerPodList, client.InNamespace(r.KafkaCluster.GetNamespace()), brokerPodMatchingLabels); err != nil {
+			return errorfactory.New(errorfactory.APIFailure{}, err, "getting broker pods failed", "brokerId", brokerId)
+		}
+		brokerPodExists := false
+		for i := range brokerPodList.Items {
+			if brokerPodList.Items[i].DeletionTimestamp == nil {
+				brokerPodExists = true
+				break
+			}
+		}
+
+		// Build a set of desired mount paths for orphaned-PVC detection below.
+		desiredMountPaths := make(map[string]bool, len(desiredPvcs))
+		for _, dp := range desiredPvcs {
+			desiredMountPaths[dp.Annotations["mountPath"]] = true
+		}
+
+		if brokerPodExists {
+			// Resize complete when the replacement PVC exists but the pending-deletion PVC is already gone:
+			// strip the replacement annotation so the PVC is treated as normal going forward.
+			var hasPendingDeletion bool
+			for _, pvc := range pvcList.Items {
+				if pvc.Annotations[pvcCacheResizeStateAnnotation] == pvcCacheResizePendingDeletion {
+					hasPendingDeletion = true
+					break
+				}
+			}
+			if !hasPendingDeletion {
+				for _, pvc := range pvcList.Items {
+					if pvc.Annotations[pvcCacheResizeStateAnnotation] == pvcCacheResizeReplacement {
+						pvcCopy := pvc.DeepCopy()
+						delete(pvcCopy.Annotations, pvcCacheResizeStateAnnotation)
+						delete(pvcCopy.Annotations, pvcCacheResizeReplacesPVC)
+						if err := r.Update(ctx, pvcCopy); err != nil {
+							return errorfactory.New(errorfactory.APIFailure{}, err,
+								"removing replacement annotation from tiered storage cache PVC failed", "pvc", pvc.Name)
+						}
+						log.Info("Tiered storage cache PVC resize complete, removed replacement annotation", "pvc", pvc.Name)
+					}
+				}
+			}
+		} else {
+			// Broker pod is down — safe to delete any PVCs that were waiting for the pod to stop.
+			for i := range pvcList.Items {
+				pvc := &pvcList.Items[i]
+				if pvc.Annotations[pvcCacheResizeStateAnnotation] == pvcCacheResizePendingDeletion {
+					log.Info("Broker pod is down — deleting pending-deletion tiered storage cache PVC",
+						"brokerId", brokerId, "pvc", pvc.Name)
+					if err := r.Delete(ctx, pvc); err != nil && !apierrors.IsNotFound(err) {
+						return errorfactory.New(errorfactory.APIFailure{}, err,
+							"deleting pending-deletion tiered storage cache PVC failed", "pvc", pvc.Name)
+					}
+				}
+			}
+			// Also delete replacement PVCs whose mount path is no longer desired — these are
+			// orphaned by a storage config removal that happened while a cache resize was in flight.
+			for i := range pvcList.Items {
+				pvc := &pvcList.Items[i]
+				if pvc.Annotations[pvcCacheResizeStateAnnotation] == pvcCacheResizeReplacement &&
+					!desiredMountPaths[pvc.Annotations["mountPath"]] {
+					log.Info("Broker pod is down — deleting orphaned replacement tiered storage cache PVC",
+						"brokerId", brokerId, "pvc", pvc.Name)
+					if err := r.Delete(ctx, pvc); err != nil && !apierrors.IsNotFound(err) {
+						return errorfactory.New(errorfactory.APIFailure{}, err,
+							"deleting orphaned replacement tiered storage cache PVC failed", "pvc", pvc.Name)
+					}
+				}
+			}
+			// Re-list so the rest of this iteration sees the current state.
+			if err := r.List(ctx, pvcList, client.InNamespace(r.KafkaCluster.GetNamespace()), matchingLabels); err != nil {
+				return errorfactory.New(errorfactory.APIFailure{}, err, "getting resource failed", "kind", desiredType)
+			}
+		}
+
+		// If the pod is still running and there are orphaned cache resize PVCs (storage config
+		// removed while a resize was in flight), trigger a rolling restart so the pod stops
+		// and we can delete the orphaned PVCs on the next cycle. Routing these through
+		// Cruise Control remove_disks would fail because cache paths are not Kafka log dirs.
+		if brokerPodExists {
+			var hasOrphanedCachePvc bool
+			for _, pvc := range pvcList.Items {
+				resizeState := pvc.Annotations[pvcCacheResizeStateAnnotation]
+				if (resizeState == pvcCacheResizePendingDeletion || resizeState == pvcCacheResizeReplacement) &&
+					!desiredMountPaths[pvc.Annotations["mountPath"]] {
+					hasOrphanedCachePvc = true
+					break
+				}
+			}
+			if hasOrphanedCachePvc {
+				log.Info("Orphaned cache resize PVCs detected with broker pod running — triggering rolling restart for safe cleanup",
+					"brokerId", brokerId)
+				if r.KafkaCluster.Status.BrokersState[brokerId].ConfigurationState != banzaiv1beta1.ConfigOutOfSync {
+					if err := k8sutil.UpdateBrokerStatus(r.Client, []string{brokerId}, r.KafkaCluster,
+						banzaiv1beta1.ConfigOutOfSync, log); err != nil {
+						return errorfactory.New(errorfactory.StatusUpdateError{}, err,
+							"could not mark broker ConfigOutOfSync for orphaned cache PVC cleanup", "brokerId", brokerId)
+					}
+				}
+				continue // Skip disk removal — wait for pod to stop before deleting cache PVCs.
+			}
+		}
+
+		// Handle disk removal — count only non-replacement PVCs to avoid false positives while a
+		// tiered storage cache resize is in flight (old + new PVC temporarily coexist).
+		effectivePvcCount := 0
+		for _, pvc := range pvcList.Items {
+			if pvc.Annotations[pvcCacheResizeStateAnnotation] != pvcCacheResizeReplacement {
+				effectivePvcCount++
+			}
+		}
+		if effectivePvcCount > len(desiredPvcs) {
 			waitForDiskRemovalToFinish, err = handleDiskRemoval(ctx, pvcList, desiredPvcs, r, brokerId, log, desiredType, brokerVolumesState)
 			if err != nil {
 				return err
@@ -1213,9 +1360,20 @@ func (r *Reconciler) reconcileKafkaPvc(ctx context.Context, log logr.Logger, bro
 
 			alreadyCreated := false
 			for _, pvc := range pvcList.Items {
-				if mountPath == pvc.Annotations["mountPath"] {
-					currentPvc = pvc.DeepCopy()
-					alreadyCreated = true
+				if mountPath != pvc.Annotations["mountPath"] {
+					continue
+				}
+				// Skip the old PVC that is waiting to be deleted once the broker pod stops.
+				// The replacement PVC (same mount path) will be matched on the next iteration.
+				if pvc.Annotations[pvcCacheResizeStateAnnotation] == pvcCacheResizePendingDeletion {
+					continue
+				}
+				currentPvc = pvc.DeepCopy()
+				alreadyCreated = true
+				// Trigger a CC disk rebalance only for regular data volumes.
+				// Tiered storage cache PVCs are ephemeral — CC must not account for them.
+				isCachePvc := pvc.Annotations["tieredStorageCache"] == "true"
+				if !isCachePvc {
 					// Checking pvc state, if bounded, so the broker has already restarted and the CC GracefulDiskRebalance has not happened yet,
 					// then we make it happening with status update.
 					// If disk removal was set, and the disk was added back, we also need to mark the volume for rebalance
@@ -1224,8 +1382,8 @@ func (r *Reconciler) reconcileKafkaPvc(ctx context.Context, log logr.Logger, bro
 						(!found || volumeState.CruiseControlVolumeState.IsDiskRemoval()) {
 						brokerVolumesState[mountPath] = banzaiv1beta1.VolumeState{CruiseControlVolumeState: banzaiv1beta1.GracefulDiskRebalanceRequired}
 					}
-					break
 				}
+				break
 			}
 
 			if !alreadyCreated {
@@ -1239,11 +1397,78 @@ func (r *Reconciler) reconcileKafkaPvc(ctx context.Context, log logr.Logger, bro
 				continue
 			}
 			if err == nil {
+				// A replacement PVC is the new smaller PVC staged during a tiered storage cache resize.
+				// It already has the right size; we only need to keep the rolling upgrade running so
+				// the broker pod stops and the pending-deletion PVC can be cleaned up.
+				if currentPvc.Annotations[pvcCacheResizeStateAnnotation] == pvcCacheResizeReplacement {
+					if r.KafkaCluster.Status.BrokersState[brokerId].ConfigurationState != banzaiv1beta1.ConfigOutOfSync {
+						if err := k8sutil.UpdateBrokerStatus(r.Client, []string{brokerId}, r.KafkaCluster,
+							banzaiv1beta1.ConfigOutOfSync, log); err != nil {
+							return errorfactory.New(errorfactory.StatusUpdateError{}, err,
+								"could not mark broker ConfigOutOfSync for pending tiered storage cache PVC resize", "brokerId", brokerId)
+						}
+					}
+					continue
+				}
+
 				if k8sutil.CheckIfObjectUpdated(log, desiredType, currentPvc, desiredPvc) {
 					if err := patch.DefaultAnnotator.SetLastAppliedAnnotation(desiredPvc); err != nil {
 						return errors.WrapIf(err, "could not apply last state to annotation")
 					}
 
+					// Check if this is a tiered storage cache volume
+					isTieredCache := currentPvc.Annotations["tieredStorageCache"] == "true"
+					desiredSize := desiredPvc.Spec.Resources.Requests.Storage().Value()
+					currentSize := currentPvc.Spec.Resources.Requests.Storage().Value()
+
+					// Tiered storage cache PVC shrink: stage the replacement PVC immediately so
+					// provisioning runs in parallel with rolling-upgrade gate evaluation.
+					// The old PVC is annotated pending-deletion and removed once the broker pod stops.
+					if isTieredCache && desiredSize < currentSize {
+						log.Info("Tiered storage cache size decrease detected — staging replacement PVC",
+							"brokerId", brokerId,
+							"mountPath", mountPath,
+							"currentSize", currentSize,
+							"desiredSize", desiredSize)
+
+						// Annotate old PVC so it is skipped by getCreatedPvcForBroker and cleaned up
+						// the moment the broker pod stops.
+						oldPvcCopy := currentPvc.DeepCopy()
+						oldPvcCopy.Annotations[pvcCacheResizeStateAnnotation] = pvcCacheResizePendingDeletion
+						if err := r.Update(ctx, oldPvcCopy); err != nil {
+							return errorfactory.New(errorfactory.APIFailure{}, err,
+								"annotating old tiered storage cache PVC for deletion failed", "pvc", currentPvc.Name)
+						}
+						log.Info("Marked old tiered storage cache PVC for deletion", "brokerId", brokerId, "pvc", currentPvc.Name)
+
+						// Create the replacement PVC immediately so provisioning starts now.
+						desiredPvc.Annotations[pvcCacheResizeStateAnnotation] = pvcCacheResizeReplacement
+						desiredPvc.Annotations[pvcCacheResizeReplacesPVC] = currentPvc.Name
+						if err := patch.DefaultAnnotator.SetLastAppliedAnnotation(desiredPvc); err != nil {
+							return errors.WrapIf(err, "could not apply last state to annotation")
+						}
+						if err := r.Create(ctx, desiredPvc); err != nil {
+							return errorfactory.New(errorfactory.APIFailure{}, err,
+								"creating replacement tiered storage cache PVC failed", "brokerId", brokerId)
+						}
+						log.Info("Created replacement tiered storage cache PVC",
+							"brokerId", brokerId, "pvc", desiredPvc.Name, "desiredSize", desiredSize)
+
+						// Trigger rolling upgrade so the broker pod is restarted and the old PVC
+						// can be deleted on the next reconcile cycle.
+						if r.KafkaCluster.Status.BrokersState[brokerId].ConfigurationState != banzaiv1beta1.ConfigOutOfSync {
+							log.Info("Marking broker ConfigOutOfSync to trigger rolling upgrade for tiered storage cache PVC resize",
+								"brokerId", brokerId)
+							if err := k8sutil.UpdateBrokerStatus(r.Client, []string{brokerId}, r.KafkaCluster,
+								banzaiv1beta1.ConfigOutOfSync, log); err != nil {
+								return errorfactory.New(errorfactory.StatusUpdateError{}, err,
+									"could not mark broker ConfigOutOfSync for tiered storage cache PVC resize", "brokerId", brokerId)
+							}
+						}
+						continue
+					}
+
+					// Regular validation: size decreases are forbidden for non-cache volumes.
 					if isDesiredStorageValueInvalid(desiredPvc, currentPvc) {
 						return errorfactory.New(errorfactory.InternalError{}, errors.New("could not modify pvc size"),
 							"one can not reduce the size of a PVC", "kind", desiredType)

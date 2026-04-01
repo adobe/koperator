@@ -62,6 +62,13 @@ func (r *Reconciler) pvc(brokerId int32, storageIndex int, storage v1beta1.Stora
 		return nil, errors.WrapIfWithDetails(err, "couldn't unmarshal Pvc spec", errCtx...)
 	}
 
+	annotations := map[string]string{"mountPath": storage.MountPath}
+
+	// Mark tiered storage cache PVCs with annotation for special handling
+	if storage.TieredStorageCache {
+		annotations["tieredStorageCache"] = "true"
+	}
+
 	return &corev1.PersistentVolumeClaim{
 		ObjectMeta: templates.ObjectMetaWithGeneratedNameAndAnnotations(
 			fmt.Sprintf(brokerStorageTemplate, r.KafkaCluster.Name, brokerId, storageIndex),
@@ -69,7 +76,7 @@ func (r *Reconciler) pvc(brokerId int32, storageIndex int, storage v1beta1.Stora
 				apiutil.LabelsForKafka(r.KafkaCluster.Name),
 				map[string]string{v1beta1.BrokerIdLabelKey: fmt.Sprintf("%d", brokerId)},
 			),
-			map[string]string{"mountPath": storage.MountPath}, r.KafkaCluster),
+			annotations, r.KafkaCluster),
 		Spec: pvcSpec,
 	}, nil
 }
