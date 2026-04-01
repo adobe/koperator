@@ -5100,7 +5100,7 @@ spec:
                                   the PersistentVolume backing this claim.
                                 type: string
                             type: object
-                        tieredStorageCache:
+                          tieredStorageCache:
                             description: |-
                               TieredStorageCache indicates this storage is used for Kafka tiered storage cache
                               (e.g., for rsm.config.fetch.chunk.cache.path). When set to true, this storage will be
