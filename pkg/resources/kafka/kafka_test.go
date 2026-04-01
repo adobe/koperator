@@ -32,8 +32,10 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 
+	"github.com/banzaicloud/k8s-objectmatcher/patch"
 	"github.com/banzaicloud/koperator/api/v1alpha1"
 	"github.com/banzaicloud/koperator/api/v1beta1"
 	controllerMocks "github.com/banzaicloud/koperator/controllers/tests/mocks"
@@ -1257,6 +1259,15 @@ func execPvcTest(t *testing.T, testCases []PvcTestCase) {
 				},
 			}
 
+			// Mock pod list — the new code always checks pod existence before disk removal.
+			// For these tests the broker pod is always absent.
+			mockClient.EXPECT().List(
+				context.TODO(),
+				gomock.AssignableToTypeOf(&corev1.PodList{}),
+				client.InNamespace("kafka"),
+				gomock.Any(),
+			).Return(nil).AnyTimes()
+
 			// Set up the mockClient to return the provided test.existingPvcs
 			mockClient.EXPECT().List(
 				context.TODO(),
@@ -1333,6 +1344,229 @@ func createPvc(name, brokerId, mountPath string) *corev1.PersistentVolumeClaim {
 		Status: corev1.PersistentVolumeClaimStatus{
 			Phase: corev1.ClaimBound,
 		},
+	}
+}
+
+func TestReconcileKafkaPvcTieredCacheResize(t *testing.T) {
+	t.Parallel()
+
+	const (
+		clusterName = "kafka"
+		namespace   = "kafka"
+		brokerId    = "0"
+		mountPath   = "/tiered-storage-cache"
+	)
+
+	makeTieredCachePvc := func(name, size string) *corev1.PersistentVolumeClaim {
+		qty := resource.MustParse(size)
+		pvc := &corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: namespace,
+				Labels: map[string]string{
+					v1beta1.BrokerIdLabelKey: brokerId,
+					v1beta1.AppLabelKey:      "kafka",
+					v1beta1.KafkaCRLabelKey:  clusterName,
+				},
+				Annotations: map[string]string{
+					"mountPath":          mountPath,
+					"tieredStorageCache": "true",
+				},
+			},
+			Spec: corev1.PersistentVolumeClaimSpec{
+				Resources: corev1.VolumeResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceStorage: qty,
+					},
+				},
+			},
+			Status: corev1.PersistentVolumeClaimStatus{Phase: corev1.ClaimBound},
+		}
+		// Set last-applied annotation so CheckIfObjectUpdated detects size differences
+		_ = patch.DefaultAnnotator.SetLastAppliedAnnotation(pvc)
+		return pvc
+	}
+
+	runningPod := corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "kafka-0",
+			Namespace: namespace,
+		},
+	}
+	terminatingPod := corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "kafka-0",
+			Namespace:         namespace,
+			DeletionTimestamp: &metav1.Time{Time: time.Now()},
+		},
+	}
+
+	testCases := []struct {
+		testName             string
+		existingPvc          *corev1.PersistentVolumeClaim
+		desiredPvc           *corev1.PersistentVolumeClaim
+		existingPods         []corev1.Pod
+		// expectedUpdatePvc: old PVC annotated pending-deletion, or annotation stripped on resize-complete
+		expectedUpdatePvc    bool
+		expectedCreatePvc    bool
+		expectedDeletePvc    bool
+		expectedError        bool
+	}{
+		{
+			// Pod is up: annotate old PVC as pending-deletion, create replacement PVC,
+			// set ConfigOutOfSync to trigger rolling upgrade. No error — state is durable.
+			testName:          "size decrease with running pod — old PVC annotated, replacement PVC created",
+			existingPvc:       makeTieredCachePvc("cache-pvc-1", "100Gi"),
+			desiredPvc:        makeTieredCachePvc("cache-pvc-new", "50Gi"),
+			existingPods:      []corev1.Pod{runningPod},
+			expectedUpdatePvc: true,
+			expectedCreatePvc: true,
+			expectedDeletePvc: false,
+			expectedError:     false,
+		},
+		{
+			// Terminating pod is treated as having no running pod: staging starts immediately
+			// so the replacement PVC is provisioned during the drain window.
+			testName:          "size decrease with terminating pod — old PVC annotated, replacement PVC created",
+			existingPvc:       makeTieredCachePvc("cache-pvc-1", "100Gi"),
+			desiredPvc:        makeTieredCachePvc("cache-pvc-new", "50Gi"),
+			existingPods:      []corev1.Pod{terminatingPod},
+			expectedUpdatePvc: true,
+			expectedCreatePvc: true,
+			expectedDeletePvc: false,
+			expectedError:     false,
+		},
+		{
+			// Pod is terminating and old PVC already has pending-deletion annotation:
+			// the Terminating pod is treated as gone, so cleanup fires immediately.
+			testName: "pending-deletion PVC with terminating pod — old PVC deleted",
+			existingPvc: func() *corev1.PersistentVolumeClaim {
+				pvc := makeTieredCachePvc("cache-pvc-1", "100Gi")
+				pvc.Annotations[pvcCacheResizeStateAnnotation] = pvcCacheResizePendingDeletion
+				return pvc
+			}(),
+			desiredPvc:        makeTieredCachePvc("cache-pvc-new", "50Gi"),
+			existingPods:      []corev1.Pod{terminatingPod},
+			expectedUpdatePvc: false,
+			expectedCreatePvc: true,
+			expectedDeletePvc: true,
+			expectedError:     false,
+		},
+		{
+			// Pod is already gone on first detection: stage the replacement anyway so the
+			// state machine is consistent. Cleanup of pending-deletion PVC happens on the
+			// next cycle once the annotation is observed.
+			testName:          "size decrease with pod already gone — old PVC annotated, replacement PVC created",
+			existingPvc:       makeTieredCachePvc("cache-pvc-1", "100Gi"),
+			desiredPvc:        makeTieredCachePvc("cache-pvc-new", "50Gi"),
+			existingPods:      []corev1.Pod{},
+			expectedUpdatePvc: true,
+			expectedCreatePvc: true,
+			expectedDeletePvc: false,
+			expectedError:     false,
+		},
+		{
+			// Pod is gone and old PVC already has pending-deletion annotation:
+			// cleanup fires — old PVC is deleted. Replacement PVC already exists.
+			testName: "size decrease with pod gone and old PVC pending-deletion — old PVC deleted",
+			existingPvc: func() *corev1.PersistentVolumeClaim {
+				pvc := makeTieredCachePvc("cache-pvc-1", "100Gi")
+				pvc.Annotations[pvcCacheResizeStateAnnotation] = pvcCacheResizePendingDeletion
+				return pvc
+			}(),
+			desiredPvc:        makeTieredCachePvc("cache-pvc-new", "50Gi"),
+			existingPods:      []corev1.Pod{},
+			expectedUpdatePvc: false,
+			expectedCreatePvc: true,
+			expectedDeletePvc: true,
+			expectedError:     false,
+		},
+		{
+			// size increase — no special handling, regular PVC update path.
+			testName:          "size increase — regular PVC update path",
+			existingPvc:       makeTieredCachePvc("cache-pvc-1", "50Gi"),
+			desiredPvc:        makeTieredCachePvc("cache-pvc-1", "100Gi"),
+			existingPods:      []corev1.Pod{},
+			expectedUpdatePvc: true,
+			expectedCreatePvc: false,
+			expectedDeletePvc: false,
+			expectedError:     false,
+		},
+	}
+
+	mockCtrl := gomock.NewController(t)
+
+	for _, test := range testCases {
+		test := test
+		t.Run(test.testName, func(t *testing.T) {
+			mockClient := mocks.NewMockClient(mockCtrl)
+			mockSubResourceClient := mocks.NewMockSubResourceClient(mockCtrl)
+
+			r := Reconciler{
+				Reconciler: resources.Reconciler{
+					Client: mockClient,
+					KafkaCluster: &v1beta1.KafkaCluster{
+						ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: namespace},
+						Spec: v1beta1.KafkaClusterSpec{
+							Brokers: []v1beta1.Broker{{
+								Id:           0,
+								BrokerConfig: &v1beta1.BrokerConfig{Roles: []string{"broker"}},
+							}},
+						},
+					},
+				},
+			}
+
+			// Mock PVC list — always returns the existing PVC
+			mockClient.EXPECT().List(
+				context.TODO(),
+				gomock.AssignableToTypeOf(&corev1.PersistentVolumeClaimList{}),
+				client.InNamespace(namespace),
+				gomock.Any(),
+			).Do(func(ctx context.Context, list *corev1.PersistentVolumeClaimList, opts ...client.ListOption) {
+				list.Items = []corev1.PersistentVolumeClaim{*test.existingPvc}
+			}).Return(nil).AnyTimes()
+
+			// Mock Pod list — returns the configured pods
+			mockClient.EXPECT().List(
+				context.TODO(),
+				gomock.AssignableToTypeOf(&corev1.PodList{}),
+				client.InNamespace(namespace),
+				gomock.Any(),
+			).Do(func(ctx context.Context, list *corev1.PodList, opts ...client.ListOption) {
+				list.Items = test.existingPods
+			}).Return(nil).AnyTimes()
+
+			// Mock PVC update (annotating pending-deletion or stripping replacement annotation)
+			if test.expectedUpdatePvc {
+				mockClient.EXPECT().Update(context.TODO(), gomock.AssignableToTypeOf(&corev1.PersistentVolumeClaim{})).Return(nil).AnyTimes()
+			}
+
+			// Mock PVC deletion
+			if test.expectedDeletePvc {
+				mockClient.EXPECT().Delete(context.TODO(), gomock.AssignableToTypeOf(&corev1.PersistentVolumeClaim{})).Return(nil).Times(1)
+			}
+
+			// Mock PVC creation
+			if test.expectedCreatePvc {
+				mockClient.EXPECT().Create(context.TODO(), gomock.AssignableToTypeOf(&corev1.PersistentVolumeClaim{})).Return(nil).Times(1)
+			}
+
+			mockClient.EXPECT().Status().Return(mockSubResourceClient).AnyTimes()
+			mockSubResourceClient.EXPECT().Update(context.Background(), gomock.AssignableToTypeOf(&v1beta1.KafkaCluster{})).Return(nil).AnyTimes()
+
+			brokersDesiredPvcs := map[string][]*corev1.PersistentVolumeClaim{
+				brokerId: {test.desiredPvc},
+			}
+
+			err := r.reconcileKafkaPvc(context.TODO(), logf.Log, brokersDesiredPvcs)
+
+			if test.expectedError {
+				assert.NotNil(t, err, "expected an error but got nil")
+			} else {
+				assert.Nil(t, err, "expected no error but got: %v", err)
+			}
+		})
 	}
 }
 
