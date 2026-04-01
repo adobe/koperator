@@ -12,10 +12,7 @@ spec:
     auto.create.topics.enable=false
   rollingUpgradeConfig:
     failureThreshold: 1
-  cruiseControlConfig:
-    topicConfig:
-      partitions: 1
-      replicationFactor: 2
+  cruiseControlConfig: {}
   brokers:
     - id: 0
       brokerConfig:
@@ -49,26 +46,6 @@ spec:
       brokerConfig:
         processRoles:
           - controller
-        terminationGracePeriodSeconds: 10
-        storageConfigs:
-          - mountPath: "/kafka-logs"
-            pvcSpec:
-              accessModes:
-                - ReadWriteOnce
-              resources:
-                requests:
-                  storage: 2Gi
-        resourceRequirements:
-          limits:
-            cpu: "500m"
-            memory: 1Gi
-          requests:
-            cpu: "100m"
-            memory: 512Mi
-    - id: 2
-      brokerConfig:
-        processRoles:
-          - broker
         terminationGracePeriodSeconds: 10
         storageConfigs:
           - mountPath: "/kafka-logs"

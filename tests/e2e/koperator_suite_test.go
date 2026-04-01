@@ -74,6 +74,7 @@ var _ = ginkgo.When("Testing e2e test altogether", ginkgo.Ordered, func() {
 	testProduceConsumeInternal()
 	testJmxExporter()
 	testUninstallKafkaCluster()
+	testTieredStorageCachePvcResize()
 	testUninstall()
 	snapshotClusterAndCompare(snapshottedInfo)
 })
