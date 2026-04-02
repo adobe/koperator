@@ -38,12 +38,14 @@ const (
 	tsResizeShrunkSize     = "1Gi"
 
 	// Annotation keys written by the cache-resize reconciler.
-	pvcResizeStateAnnotation = "koperator.adobe.com/cache-resize-state"
-	pvcResizeStatePending    = "pending-deletion"
+	pvcResizeStateAnnotation  = "koperator.adobe.com/cache-resize-state"
+	pvcResizeStatePending     = "pending-deletion"
 	pvcResizeStateReplacement = "replacement"
 
 	tsResizePhaseTimeout    = 10 * time.Minute
 	tsResizePollingInterval = 15 * time.Second
+
+	tsResizeBrokerID = 0
 )
 
 // pvcItem is a minimal representation of a PVC for assertion helpers.
@@ -53,10 +55,10 @@ type pvcItem struct {
 	StorageSize string
 }
 
-// listBrokerCachePVCs returns PVCs for the given broker that have the
+// listBrokerCachePVCs returns PVCs for broker tsResizeBrokerID that have the
 // tiered-storage-cache mount path annotation.
-func listBrokerCachePVCs(kubectlOptions k8s.KubectlOptions, clusterName string, brokerID int) ([]pvcItem, error) {
-	selector := fmt.Sprintf("%s=%s,brokerId=%d", kafkaCRLabelKey, clusterName, brokerID)
+func listBrokerCachePVCs(kubectlOptions k8s.KubectlOptions) ([]pvcItem, error) {
+	selector := fmt.Sprintf("%s=%s,brokerId=%d", kafkaCRLabelKey, tsResizeClusterName, tsResizeBrokerID)
 
 	rawOutput, err := k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &kubectlOptions,
 		"get", "persistentvolumeclaims",
@@ -252,7 +254,7 @@ func testTieredStorageCachePvcResize() bool {
 			gomega.Expect(broker0PodUID).NotTo(gomega.BeEmpty())
 
 			ginkgo.By("Verifying initial cache PVC size is " + tsResizeInitialSize)
-			pvcs, err := listBrokerCachePVCs(kubectlOptions, tsResizeClusterName, 0)
+			pvcs, err := listBrokerCachePVCs(kubectlOptions)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(pvcs).To(gomega.HaveLen(1), "expected exactly one cache PVC for broker 0")
 			gomega.Expect(pvcs[0].StorageSize).To(gomega.Equal(tsResizeInitialSize))
@@ -266,7 +268,7 @@ func testTieredStorageCachePvcResize() bool {
 		ginkgo.It("Phase 1: old PVC annotated pending-deletion and replacement PVC created", func() {
 			ginkgo.By("Waiting until both pending-deletion and replacement PVCs coexist for broker 0")
 			gomega.Eventually(context.Background(), func() error {
-				pvcs, err := listBrokerCachePVCs(kubectlOptions, tsResizeClusterName, 0)
+				pvcs, err := listBrokerCachePVCs(kubectlOptions)
 				if err != nil {
 					return err
 				}
@@ -308,7 +310,7 @@ func testTieredStorageCachePvcResize() bool {
 
 			ginkgo.By("Waiting for the pending-deletion PVC to be deleted")
 			gomega.Eventually(context.Background(), func() error {
-				pvcs, err := listBrokerCachePVCs(kubectlOptions, tsResizeClusterName, 0)
+				pvcs, err := listBrokerCachePVCs(kubectlOptions)
 				if err != nil {
 					return err
 				}
@@ -330,7 +332,7 @@ func testTieredStorageCachePvcResize() bool {
 
 			ginkgo.By("Waiting for replacement annotation to be stripped from the surviving PVC")
 			gomega.Eventually(context.Background(), func() error {
-				pvcs, err := listBrokerCachePVCs(kubectlOptions, tsResizeClusterName, 0)
+				pvcs, err := listBrokerCachePVCs(kubectlOptions)
 				if err != nil {
 					return err
 				}
@@ -345,7 +347,7 @@ func testTieredStorageCachePvcResize() bool {
 		})
 
 		ginkgo.It("Verifying the surviving cache PVC has the new size "+tsResizeShrunkSize, func() {
-			pvcs, err := listBrokerCachePVCs(kubectlOptions, tsResizeClusterName, 0)
+			pvcs, err := listBrokerCachePVCs(kubectlOptions)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(pvcs).To(gomega.HaveLen(1))
 			gomega.Expect(pvcs[0].StorageSize).To(gomega.Equal(tsResizeShrunkSize),
