@@ -1230,6 +1230,27 @@ func (r *Reconciler) reconcileKafkaPvc(ctx context.Context, log logr.Logger, bro
 			continue
 		}
 
+		// Delete tiered storage cache PVCs whose mount path is no longer desired.
+		// These are not Kafka log dirs so they must never go through CC disk removal.
+		for i := range pvcList.Items {
+			pvc := &pvcList.Items[i]
+			if pvc.Annotations["tieredStorageCache"] != annotationTrue {
+				continue
+			}
+			if !desiredMountPaths[pvc.Annotations["mountPath"]] {
+				log.Info("Deleting removed tiered storage cache PVC",
+					"brokerId", brokerId, "mountPath", pvc.Annotations["mountPath"], "pvc", pvc.Name)
+				if err := r.Delete(ctx, pvc); err != nil && !apierrors.IsNotFound(err) {
+					return errorfactory.New(errorfactory.APIFailure{}, err,
+						"deleting removed tiered storage cache PVC failed", "pvc", pvc.Name)
+				}
+			}
+		}
+		// Re-list so the disk removal count below reflects the deletions above.
+		if err := r.List(ctx, pvcList, client.InNamespace(r.KafkaCluster.GetNamespace()), matchingLabels); err != nil {
+			return errorfactory.New(errorfactory.APIFailure{}, err, "getting resource failed", "kind", desiredType)
+		}
+
 		// Handle disk removal — count only non-replacement PVCs to avoid false positives while a
 		// tiered storage cache resize is in flight (old + new PVC temporarily coexist).
 		effectivePvcCount := 0
@@ -1437,9 +1458,27 @@ func (r *Reconciler) reconcileDesiredPvcsForBroker(
 			}
 			currentPvc = pvc.DeepCopy()
 			alreadyCreated = true
+
+			// Backfill the tieredStorageCache annotation if the desired PVC has it but the existing
+			// PVC does not — handles PVCs created before the annotation was introduced.
+			if desiredPvc.Annotations["tieredStorageCache"] == annotationTrue &&
+				currentPvc.Annotations["tieredStorageCache"] != annotationTrue {
+				pvcCopy := currentPvc.DeepCopy()
+				if pvcCopy.Annotations == nil {
+					pvcCopy.Annotations = make(map[string]string)
+				}
+				pvcCopy.Annotations["tieredStorageCache"] = annotationTrue
+				if err := r.Update(ctx, pvcCopy); err != nil {
+					return errorfactory.New(errorfactory.APIFailure{}, err,
+						"backfilling tieredStorageCache annotation on existing PVC failed", "pvc", pvcCopy.Name)
+				}
+				log.Info("Backfilled tieredStorageCache annotation on existing PVC", "pvc", pvcCopy.Name)
+				currentPvc = pvcCopy
+			}
+
 			// Trigger a CC disk rebalance only for regular data volumes.
 			// Tiered storage cache PVCs are ephemeral — CC must not account for them.
-			if pvc.Annotations["tieredStorageCache"] != annotationTrue {
+			if currentPvc.Annotations["tieredStorageCache"] != annotationTrue {
 				// Checking pvc state, if bounded, so the broker has already restarted and the CC GracefulDiskRebalance has not happened yet,
 				// then we make it happening with status update.
 				// If disk removal was set, and the disk was added back, we also need to mark the volume for rebalance
@@ -1485,8 +1524,10 @@ func (r *Reconciler) reconcileDesiredPvcsForBroker(
 			return errors.WrapIf(err, "could not apply last state to annotation")
 		}
 
-		// Check if this is a tiered storage cache volume
-		isTieredCache := currentPvc.Annotations["tieredStorageCache"] == annotationTrue
+		// Check if this is a tiered storage cache volume. Fall back to the desired PVC annotation
+		// for PVCs created before the tieredStorageCache annotation was introduced.
+		isTieredCache := currentPvc.Annotations["tieredStorageCache"] == annotationTrue ||
+			desiredPvc.Annotations["tieredStorageCache"] == annotationTrue
 		desiredSize := desiredPvc.Spec.Resources.Requests.Storage().Value()
 		currentSize := currentPvc.Spec.Resources.Requests.Storage().Value()
 
