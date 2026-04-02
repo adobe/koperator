@@ -66,7 +66,7 @@ func (r *Reconciler) pvc(brokerId int32, storageIndex int, storage v1beta1.Stora
 
 	// Mark tiered storage cache PVCs with annotation for special handling
 	if storage.TieredStorageCache {
-		annotations["tieredStorageCache"] = "true"
+		annotations["tieredStorageCache"] = annotationTrue
 	}
 
 	return &corev1.PersistentVolumeClaim{

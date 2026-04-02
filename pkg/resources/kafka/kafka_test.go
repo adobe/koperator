@@ -31,11 +31,12 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/banzaicloud/k8s-objectmatcher/patch"
+
 	"github.com/banzaicloud/koperator/api/v1alpha1"
 	"github.com/banzaicloud/koperator/api/v1beta1"
 	controllerMocks "github.com/banzaicloud/koperator/controllers/tests/mocks"
@@ -1402,15 +1403,15 @@ func TestReconcileKafkaPvcTieredCacheResize(t *testing.T) {
 	}
 
 	testCases := []struct {
-		testName             string
-		existingPvc          *corev1.PersistentVolumeClaim
-		desiredPvc           *corev1.PersistentVolumeClaim
-		existingPods         []corev1.Pod
+		testName     string
+		existingPvc  *corev1.PersistentVolumeClaim
+		desiredPvc   *corev1.PersistentVolumeClaim
+		existingPods []corev1.Pod
 		// expectedUpdatePvc: old PVC annotated pending-deletion, or annotation stripped on resize-complete
-		expectedUpdatePvc    bool
-		expectedCreatePvc    bool
-		expectedDeletePvc    bool
-		expectedError        bool
+		expectedUpdatePvc bool
+		expectedCreatePvc bool
+		expectedDeletePvc bool
+		expectedError     bool
 	}{
 		{
 			// Pod is up: annotate old PVC as pending-deletion, create replacement PVC,
