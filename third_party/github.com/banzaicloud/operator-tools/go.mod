@@ -1,6 +1,6 @@
 module github.com/banzaicloud/operator-tools
 
-go 1.25
+go 1.25.0
 
 require (
 	emperror.dev/errors v0.8.1
