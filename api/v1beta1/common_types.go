@@ -216,6 +216,16 @@ type VolumeState struct {
 	CruiseControlOperationReference *corev1.LocalObjectReference `json:"cruiseControlOperationReference,omitempty"`
 }
 
+// CacheResizeState tracks the resize lifecycle of a tiered storage cache PVC for a given mount path.
+type CacheResizeState string
+
+const (
+	// CacheResizePendingDeletion indicates that the old cache PVC at this mount path is waiting
+	// to be deleted once the broker pod stops. A replacement PVC with the new desired size has
+	// already been created at the same mount path.
+	CacheResizePendingDeletion CacheResizeState = "pending-deletion"
+)
+
 // BrokerState holds information about broker state
 type BrokerState struct {
 	// RackAwarenessState holds info about rack awareness status
@@ -234,6 +244,9 @@ type BrokerState struct {
 	Image string `json:"image,omitempty"`
 	// Compressed data from broker configuration to restore broker pod in specific cases
 	ConfigurationBackup string `json:"configurationBackup,omitempty"`
+	// CacheVolumeStates tracks in-flight tiered storage cache PVC resize operations, keyed by mount path.
+	// An entry is present only while a resize is in progress; it is cleared once cleanup completes.
+	CacheVolumeStates map[string]CacheResizeState `json:"cacheVolumeStates,omitempty"`
 }
 
 const (

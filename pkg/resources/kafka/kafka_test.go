@@ -1403,24 +1403,24 @@ func TestReconcileKafkaPvcTieredCacheResize(t *testing.T) {
 	}
 
 	testCases := []struct {
-		testName     string
-		existingPvc  *corev1.PersistentVolumeClaim
-		desiredPvc   *corev1.PersistentVolumeClaim
-		existingPods []corev1.Pod
-		// expectedUpdatePvc: old PVC annotated pending-deletion, or annotation stripped on resize-complete
-		expectedUpdatePvc bool
-		expectedCreatePvc bool
-		expectedDeletePvc bool
-		expectedError     bool
+		testName                string
+		existingPvc             *corev1.PersistentVolumeClaim
+		desiredPvc              *corev1.PersistentVolumeClaim
+		existingPods            []corev1.Pod
+		initialCacheVolumeState v1beta1.CacheResizeState // pre-existing brokerState for mountPath, if any
+		expectedUpdatePvc       bool
+		expectedCreatePvc       bool
+		expectedDeletePvc       bool
+		expectedError           bool
 	}{
 		{
-			// Pod is up: annotate old PVC as pending-deletion, create replacement PVC,
-			// set ConfigOutOfSync to trigger rolling upgrade. No error — state is durable.
-			testName:          "size decrease with running pod — old PVC annotated, replacement PVC created",
+			// Pod is up, no prior resize state: record CacheResizePendingDeletion in brokerState,
+			// create replacement PVC, set ConfigOutOfSync to trigger rolling upgrade.
+			testName:          "size decrease with running pod — resize state recorded, replacement PVC created",
 			existingPvc:       makeTieredCachePvc("cache-pvc-1", "100Gi"),
 			desiredPvc:        makeTieredCachePvc("cache-pvc-new", "50Gi"),
 			existingPods:      []corev1.Pod{runningPod},
-			expectedUpdatePvc: true,
+			expectedUpdatePvc: false,
 			expectedCreatePvc: true,
 			expectedDeletePvc: false,
 			expectedError:     false,
@@ -1428,59 +1428,52 @@ func TestReconcileKafkaPvcTieredCacheResize(t *testing.T) {
 		{
 			// Terminating pod is treated as having no running pod: staging starts immediately
 			// so the replacement PVC is provisioned during the drain window.
-			testName:          "size decrease with terminating pod — old PVC annotated, replacement PVC created",
+			testName:          "size decrease with terminating pod — resize state recorded, replacement PVC created",
 			existingPvc:       makeTieredCachePvc("cache-pvc-1", "100Gi"),
 			desiredPvc:        makeTieredCachePvc("cache-pvc-new", "50Gi"),
 			existingPods:      []corev1.Pod{terminatingPod},
-			expectedUpdatePvc: true,
+			expectedUpdatePvc: false,
 			expectedCreatePvc: true,
 			expectedDeletePvc: false,
 			expectedError:     false,
 		},
 		{
-			// Pod is terminating and old PVC already has pending-deletion annotation:
-			// the Terminating pod is treated as gone, so cleanup fires immediately.
-			testName: "pending-deletion PVC with terminating pod — old PVC deleted",
-			existingPvc: func() *corev1.PersistentVolumeClaim {
-				pvc := makeTieredCachePvc("cache-pvc-1", "100Gi")
-				pvc.Annotations[pvcCacheResizeStateAnnotation] = pvcCacheResizePendingDeletion
-				return pvc
-			}(),
-			desiredPvc:        makeTieredCachePvc("cache-pvc-new", "50Gi"),
-			existingPods:      []corev1.Pod{terminatingPod},
-			expectedUpdatePvc: false,
-			expectedCreatePvc: true,
-			expectedDeletePvc: true,
-			expectedError:     false,
+			// Resize state already recorded and pod is terminating (treated as gone):
+			// cleanup fires — old PVC (larger size) is deleted, state is cleared.
+			testName:                "pending-deletion state with terminating pod — old PVC deleted",
+			existingPvc:             makeTieredCachePvc("cache-pvc-1", "100Gi"),
+			desiredPvc:              makeTieredCachePvc("cache-pvc-new", "50Gi"),
+			existingPods:            []corev1.Pod{terminatingPod},
+			initialCacheVolumeState: v1beta1.CacheResizePendingDeletion,
+			expectedUpdatePvc:       false,
+			expectedCreatePvc:       true,
+			expectedDeletePvc:       true,
+			expectedError:           false,
 		},
 		{
-			// Pod is already gone on first detection: stage the replacement anyway so the
-			// state machine is consistent. Cleanup of pending-deletion PVC happens on the
-			// next cycle once the annotation is observed.
-			testName:          "size decrease with pod already gone — old PVC annotated, replacement PVC created",
+			// Pod is already gone, no prior resize state: record state and create replacement PVC.
+			// Cleanup of old PVC happens on next cycle when reconciler re-observes the state.
+			testName:          "size decrease with pod already gone — resize state recorded, replacement PVC created",
 			existingPvc:       makeTieredCachePvc("cache-pvc-1", "100Gi"),
 			desiredPvc:        makeTieredCachePvc("cache-pvc-new", "50Gi"),
 			existingPods:      []corev1.Pod{},
-			expectedUpdatePvc: true,
+			expectedUpdatePvc: false,
 			expectedCreatePvc: true,
 			expectedDeletePvc: false,
 			expectedError:     false,
 		},
 		{
-			// Pod is gone and old PVC already has pending-deletion annotation:
-			// cleanup fires — old PVC is deleted. Replacement PVC already exists.
-			testName: "size decrease with pod gone and old PVC pending-deletion — old PVC deleted",
-			existingPvc: func() *corev1.PersistentVolumeClaim {
-				pvc := makeTieredCachePvc("cache-pvc-1", "100Gi")
-				pvc.Annotations[pvcCacheResizeStateAnnotation] = pvcCacheResizePendingDeletion
-				return pvc
-			}(),
-			desiredPvc:        makeTieredCachePvc("cache-pvc-new", "50Gi"),
-			existingPods:      []corev1.Pod{},
-			expectedUpdatePvc: false,
-			expectedCreatePvc: true,
-			expectedDeletePvc: true,
-			expectedError:     false,
+			// Resize state already recorded and pod is gone:
+			// cleanup fires — old PVC (larger size) is deleted, state is cleared.
+			testName:                "pending-deletion state with pod gone — old PVC deleted",
+			existingPvc:             makeTieredCachePvc("cache-pvc-1", "100Gi"),
+			desiredPvc:              makeTieredCachePvc("cache-pvc-new", "50Gi"),
+			existingPods:            []corev1.Pod{},
+			initialCacheVolumeState: v1beta1.CacheResizePendingDeletion,
+			expectedUpdatePvc:       false,
+			expectedCreatePvc:       true,
+			expectedDeletePvc:       true,
+			expectedError:           false,
 		},
 		{
 			// size increase — no special handling, regular PVC update path.
@@ -1503,18 +1496,28 @@ func TestReconcileKafkaPvcTieredCacheResize(t *testing.T) {
 			mockClient := mocks.NewMockClient(mockCtrl)
 			mockSubResourceClient := mocks.NewMockSubResourceClient(mockCtrl)
 
-			r := Reconciler{
-				Reconciler: resources.Reconciler{
-					Client: mockClient,
-					KafkaCluster: &v1beta1.KafkaCluster{
-						ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: namespace},
-						Spec: v1beta1.KafkaClusterSpec{
-							Brokers: []v1beta1.Broker{{
-								Id:           0,
-								BrokerConfig: &v1beta1.BrokerConfig{Roles: []string{"broker"}},
-							}},
+			kafkaCluster := &v1beta1.KafkaCluster{
+				ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: namespace},
+				Spec: v1beta1.KafkaClusterSpec{
+					Brokers: []v1beta1.Broker{{
+						Id:           0,
+						BrokerConfig: &v1beta1.BrokerConfig{Roles: []string{"broker"}},
+					}},
+				},
+			}
+			if test.initialCacheVolumeState != "" {
+				kafkaCluster.Status.BrokersState = map[string]v1beta1.BrokerState{
+					brokerId: {
+						CacheVolumeStates: map[string]v1beta1.CacheResizeState{
+							mountPath: test.initialCacheVolumeState,
 						},
 					},
+				}
+			}
+			r := Reconciler{
+				Reconciler: resources.Reconciler{
+					Client:       mockClient,
+					KafkaCluster: kafkaCluster,
 				},
 			}
 
