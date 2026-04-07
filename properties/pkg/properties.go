@@ -287,7 +287,7 @@ func (p *Properties) String() string {
 
 	for _, key := range p.Keys() {
 		if prop, found := p.Get(key); found {
-			props.WriteString(fmt.Sprintf("%s\n", prop))
+			fmt.Fprintf(&props, "%s\n", prop)
 		}
 	}
 	return props.String()
@@ -395,7 +395,7 @@ func (d DiffResult) String() string {
 	for _, k := range d.Keys() {
 		diff, ok := d[k]
 		if ok {
-			s.WriteString(fmt.Sprintf("- %s\n+ %s\n", diff[0], diff[1]))
+			fmt.Fprintf(&s, "- %s\n+ %s\n", diff[0], diff[1])
 		}
 	}
 	return s.String()
