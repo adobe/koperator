@@ -23825,6 +23825,16 @@ spec:
                 additionalProperties:
                   description: BrokerState holds information about broker state
                   properties:
+                    cacheVolumeStates:
+                      additionalProperties:
+                        description: CacheResizeState tracks the resize lifecycle of
+                          a tiered storage cache PVC for a given mount path.
+                        type: string
+                      description: CacheVolumeStates tracks in-flight tiered storage
+                        cache PVC resize operations, keyed by mount path. An entry
+                        is present only while a resize is in progress; it is cleared
+                        once cleanup completes.
+                      type: object
                     configurationBackup:
                       description: Compressed data from broker configuration to restore
                         broker pod in specific cases

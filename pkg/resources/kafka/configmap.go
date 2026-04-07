@@ -411,6 +411,10 @@ func getMountPathsFromBrokerConfigMap(configMap *corev1.ConfigMap) ([]string, er
 func generateStorageConfig(sConfig []v1beta1.StorageConfig) []string {
 	mountPaths := make([]string, 0, len(sConfig))
 	for _, storage := range sConfig {
+		// Tiered storage cache volumes are not Kafka log dirs — exclude them from log.dirs.
+		if storage.TieredStorageCache {
+			continue
+		}
 		mountPaths = append(mountPaths, util.StorageConfigKafkaMountPath(storage.MountPath))
 	}
 	return mountPaths
