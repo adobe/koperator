@@ -1244,60 +1244,13 @@ func (r *Reconciler) reconcileKafkaPvc(ctx context.Context, log logr.Logger, bro
 			continue
 		}
 
-		// Delete tiered storage cache PVCs whose mount path is no longer desired.
-		// These are not Kafka log dirs so they must never go through CC disk removal.
-		for i := range pvcList.Items {
-			pvc := &pvcList.Items[i]
-			if pvc.DeletionTimestamp != nil || pvc.Annotations["tieredStorageCache"] != annotationTrue {
-				continue
-			}
-			if !desiredMountPaths[pvc.Annotations["mountPath"]] {
-				log.Info("Deleting removed tiered storage cache PVC",
-					"brokerId", brokerId, "mountPath", pvc.Annotations["mountPath"], "pvc", pvc.Name)
-				if err := r.Delete(ctx, pvc); err != nil && !apierrors.IsNotFound(err) {
-					return errorfactory.New(errorfactory.APIFailure{}, err,
-						"deleting removed tiered storage cache PVC failed", "pvc", pvc.Name)
-				}
-			}
+		if err := r.deleteRemovedCachePVCs(ctx, log, brokerId, pvcList, desiredMountPaths); err != nil {
+			return err
 		}
 
-		// Delete duplicate non-terminating cache PVCs at desired mount paths when no resize is in
-		// flight. These are orphaned replacements from a double-staging race (two reconcile cycles
-		// both staged a replacement before the first deletion propagated). Keep only the Bound one;
-		// delete any Pending duplicates. Safe only when the broker pod is down.
 		if !brokerPodExists {
-			cacheVolumeStates := r.KafkaCluster.Status.BrokersState[brokerId].CacheVolumeStates
-			boundByMountPath := make(map[string]bool)
-			for _, pvc := range pvcList.Items {
-				if pvc.DeletionTimestamp != nil || pvc.Annotations["tieredStorageCache"] != annotationTrue {
-					continue
-				}
-				mp := pvc.Annotations["mountPath"]
-				if !desiredMountPaths[mp] || cacheVolumeStates[mp] == banzaiv1beta1.CacheResizePendingDeletion {
-					continue
-				}
-				if pvc.Status.Phase == corev1.ClaimBound {
-					boundByMountPath[mp] = true
-				}
-			}
-			for i := range pvcList.Items {
-				pvc := &pvcList.Items[i]
-				if pvc.DeletionTimestamp != nil || pvc.Annotations["tieredStorageCache"] != annotationTrue {
-					continue
-				}
-				mp := pvc.Annotations["mountPath"]
-				if !desiredMountPaths[mp] || cacheVolumeStates[mp] == banzaiv1beta1.CacheResizePendingDeletion {
-					continue
-				}
-				// Delete a Pending duplicate only when a Bound PVC already exists at this path.
-				if pvc.Status.Phase == corev1.ClaimPending && boundByMountPath[mp] {
-					log.Info("Deleting orphaned Pending cache PVC (duplicate at same mount path)",
-						"brokerId", brokerId, "mountPath", mp, "pvc", pvc.Name)
-					if err := r.Delete(ctx, pvc); err != nil && !apierrors.IsNotFound(err) {
-						return errorfactory.New(errorfactory.APIFailure{}, err,
-							"deleting orphaned Pending cache PVC failed", "pvc", pvc.Name)
-					}
-				}
+			if err := r.cleanupOrphanedDuplicateCachePVCs(ctx, log, brokerId, pvcList, desiredMountPaths); err != nil {
+				return err
 			}
 		}
 
@@ -1306,24 +1259,7 @@ func (r *Reconciler) reconcileKafkaPvc(ctx context.Context, log logr.Logger, bro
 			return errorfactory.New(errorfactory.APIFailure{}, err, "getting resource failed", "kind", desiredType)
 		}
 
-		// Handle disk removal — for mount paths with an in-flight cache resize two PVCs temporarily
-		// coexist (old pending-deletion + new replacement). Count each such path only once to avoid
-		// a false-positive disk-removal trigger.
-		cacheVolumeStates := r.KafkaCluster.Status.BrokersState[brokerId].CacheVolumeStates
-		countedCacheMountPaths := make(map[string]bool)
-		effectivePvcCount := 0
-		for _, pvc := range pvcList.Items {
-			mp := pvc.Annotations["mountPath"]
-			if cacheVolumeStates[mp] == banzaiv1beta1.CacheResizePendingDeletion {
-				if !countedCacheMountPaths[mp] {
-					countedCacheMountPaths[mp] = true
-					effectivePvcCount++
-				}
-			} else {
-				effectivePvcCount++
-			}
-		}
-		if effectivePvcCount > len(desiredPvcs) {
+		if r.effectivePvcCount(brokerId, pvcList) > len(desiredPvcs) {
 			waitForDiskRemovalToFinish, err = handleDiskRemoval(ctx, pvcList, desiredPvcs, r, brokerId, log, desiredType, brokerVolumesState)
 			if err != nil {
 				return err
@@ -1351,6 +1287,97 @@ func (r *Reconciler) reconcileKafkaPvc(ctx context.Context, log logr.Logger, bro
 	}
 
 	return nil
+}
+
+// deleteRemovedCachePVCs deletes tiered storage cache PVCs whose mount path is no longer desired.
+// These volumes are not Kafka log dirs and must never go through CC disk removal.
+func (r *Reconciler) deleteRemovedCachePVCs(
+	ctx context.Context,
+	log logr.Logger,
+	brokerId string,
+	pvcList *corev1.PersistentVolumeClaimList,
+	desiredMountPaths map[string]bool,
+) error {
+	for i := range pvcList.Items {
+		pvc := &pvcList.Items[i]
+		if pvc.DeletionTimestamp != nil || pvc.Annotations["tieredStorageCache"] != annotationTrue {
+			continue
+		}
+		if !desiredMountPaths[pvc.Annotations["mountPath"]] {
+			log.Info("Deleting removed tiered storage cache PVC",
+				"brokerId", brokerId, "mountPath", pvc.Annotations["mountPath"], "pvc", pvc.Name)
+			if err := r.Delete(ctx, pvc); err != nil && !apierrors.IsNotFound(err) {
+				return errorfactory.New(errorfactory.APIFailure{}, err,
+					"deleting removed tiered storage cache PVC failed", "pvc", pvc.Name)
+			}
+		}
+	}
+	return nil
+}
+
+// cleanupOrphanedDuplicateCachePVCs removes Pending cache PVCs when a Bound PVC already exists at
+// the same mount path and no resize is in flight. These are orphaned replacements left by a
+// double-staging race. Safe to call only when the broker pod is down.
+func (r *Reconciler) cleanupOrphanedDuplicateCachePVCs(
+	ctx context.Context,
+	log logr.Logger,
+	brokerId string,
+	pvcList *corev1.PersistentVolumeClaimList,
+	desiredMountPaths map[string]bool,
+) error {
+	cacheVolumeStates := r.KafkaCluster.Status.BrokersState[brokerId].CacheVolumeStates
+	boundByMountPath := make(map[string]bool)
+	for _, pvc := range pvcList.Items {
+		if pvc.DeletionTimestamp != nil || pvc.Annotations["tieredStorageCache"] != annotationTrue {
+			continue
+		}
+		mp := pvc.Annotations["mountPath"]
+		if !desiredMountPaths[mp] || cacheVolumeStates[mp] == banzaiv1beta1.CacheResizePendingDeletion {
+			continue
+		}
+		if pvc.Status.Phase == corev1.ClaimBound {
+			boundByMountPath[mp] = true
+		}
+	}
+	for i := range pvcList.Items {
+		pvc := &pvcList.Items[i]
+		if pvc.DeletionTimestamp != nil || pvc.Annotations["tieredStorageCache"] != annotationTrue {
+			continue
+		}
+		mp := pvc.Annotations["mountPath"]
+		if !desiredMountPaths[mp] || cacheVolumeStates[mp] == banzaiv1beta1.CacheResizePendingDeletion {
+			continue
+		}
+		if pvc.Status.Phase == corev1.ClaimPending && boundByMountPath[mp] {
+			log.Info("Deleting orphaned Pending cache PVC (duplicate at same mount path)",
+				"brokerId", brokerId, "mountPath", mp, "pvc", pvc.Name)
+			if err := r.Delete(ctx, pvc); err != nil && !apierrors.IsNotFound(err) {
+				return errorfactory.New(errorfactory.APIFailure{}, err,
+					"deleting orphaned Pending cache PVC failed", "pvc", pvc.Name)
+			}
+		}
+	}
+	return nil
+}
+
+// effectivePvcCount returns the number of PVCs for a broker, counting each pending-deletion cache
+// mount path only once (old + replacement coexist during a shrink but represent one logical disk).
+func (r *Reconciler) effectivePvcCount(brokerId string, pvcList *corev1.PersistentVolumeClaimList) int {
+	cacheVolumeStates := r.KafkaCluster.Status.BrokersState[brokerId].CacheVolumeStates
+	counted := make(map[string]bool)
+	total := 0
+	for _, pvc := range pvcList.Items {
+		mp := pvc.Annotations["mountPath"]
+		if cacheVolumeStates[mp] == banzaiv1beta1.CacheResizePendingDeletion {
+			if !counted[mp] {
+				counted[mp] = true
+				total++
+			}
+		} else {
+			total++
+		}
+	}
+	return total
 }
 
 // getBrokerPodExists returns true if a non-terminating pod exists for the given broker.
