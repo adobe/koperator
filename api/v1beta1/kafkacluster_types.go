@@ -165,7 +165,7 @@ type KafkaClusterSpec struct {
 	// a kafkaCluster instance on a Kind Cluster.
 	// +kubebuilder:default=false
 	// +optional
-	DebugEnabled    bool            `json:"debugEnabled"`
+	DebugEnabled    bool            `json:"debugEnabled,omitempty"`
 	ListenersConfig ListenersConfig `json:"listenersConfig"`
 	// Custom ports to expose in the container. Example use case: a custom kafka distribution, that includes an integrated metrics api endpoint
 	AdditionalPorts []corev1.ContainerPort `json:"additionalPorts,omitempty"`
