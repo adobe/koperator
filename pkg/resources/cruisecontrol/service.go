@@ -26,7 +26,7 @@ import (
 )
 
 func (r *Reconciler) service() runtime.Object {
-	return &corev1.Service{
+	svc := &corev1.Service{
 		ObjectMeta: templates.ObjectMeta(
 			fmt.Sprintf(serviceNameTemplate, r.KafkaCluster.Name),
 			apiutil.MergeLabels(ccLabelSelector(r.KafkaCluster.Name), r.KafkaCluster.Labels),
@@ -34,6 +34,7 @@ func (r *Reconciler) service() runtime.Object {
 		),
 		Spec: corev1.ServiceSpec{
 			Selector: ccLabelSelector(r.KafkaCluster.Name),
+			Type:     corev1.ServiceTypeClusterIP,
 			Ports: []corev1.ServicePort{
 				{
 					Name:       "cc",
@@ -50,4 +51,10 @@ func (r *Reconciler) service() runtime.Object {
 			},
 		},
 	}
+
+	if r.KafkaCluster.Spec.DebugEnabled {
+		svc.Spec.Type = corev1.ServiceTypeLoadBalancer
+	}
+
+	return svc
 }

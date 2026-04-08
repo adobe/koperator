@@ -19231,6 +19231,14 @@ spec:
                       type: object
                     type: array
                 type: object
+              debugEnabled:
+                default: false
+                description: |-
+                  DebugEnabled is used to decide whether to create a separate loadbalancer services for the
+                  Kafka and Cruise Control Pods. These services will expose the internal listener ports of the Kafka
+                  cluster with LoadBalancer type, which can be used for running Koperator on a local machine against
+                  a kafkaCluster instance on a Kind Cluster.
+                type: boolean
               disruptionBudget:
                 description: DisruptionBudget defines the configuration for PodDisruptionBudget
                   where the workload is managed by the kafka-operator
