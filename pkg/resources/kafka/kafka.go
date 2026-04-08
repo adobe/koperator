@@ -1665,14 +1665,6 @@ func (r *Reconciler) reconcileDesiredPvcsForBroker(
 			continue
 		}
 
-		if !k8sutil.CheckIfObjectUpdated(log, desiredType, currentPvc, desiredPvc) {
-			continue
-		}
-
-		if err := patch.DefaultAnnotator.SetLastAppliedAnnotation(desiredPvc); err != nil {
-			return errors.WrapIf(err, "could not apply last state to annotation")
-		}
-
 		// Check if this is a tiered storage cache volume. Fall back to the desired PVC annotation
 		// for PVCs created before the tieredStorageCache annotation was introduced.
 		isTieredCache := currentPvc.Annotations["tieredStorageCache"] == annotationTrue ||
@@ -1688,6 +1680,14 @@ func (r *Reconciler) reconcileDesiredPvcsForBroker(
 				return err
 			}
 			continue
+		}
+
+		if !k8sutil.CheckIfObjectUpdated(log, desiredType, currentPvc, desiredPvc) {
+			continue
+		}
+
+		if err := patch.DefaultAnnotator.SetLastAppliedAnnotation(desiredPvc); err != nil {
+			return errors.WrapIf(err, "could not apply last state to annotation")
 		}
 
 		// Regular validation: size decreases are forbidden for non-cache volumes.
