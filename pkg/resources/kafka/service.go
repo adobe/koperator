@@ -65,5 +65,4 @@ func (r *Reconciler) service(id int32, _ *v1beta1.BrokerConfig) runtime.Object {
 		svc.Spec.Type = corev1.ServiceTypeLoadBalancer
 	}
 	return svc
-
 }
