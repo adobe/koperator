@@ -6,7 +6,7 @@ BIN_DIR := $(PROJECT_DIR)/bin
 BOILERPLATE_DIR := $(PROJECT_DIR)/hack/boilerplate
 
 # Image URL to use all building/pushing image targets
-TAG ?= $(shell git describe --tags --abbrev=0 --match '[0-9].*[0-9].*[0-9]*' 2>/dev/null )
+TAG ?= $(shell git describe --tags --dirty --always --abbrev=0 --match '[0-9].*[0-9].*[0-9]*' 2>/dev/null)
 IMG ?= ghcr.io/adobe/kafka-operator:$(TAG)
 
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
@@ -18,9 +18,9 @@ RELEASE_MSG ?= "koperator release"
 REL_TAG = $(shell ./scripts/increment_version.sh -${RELEASE_TYPE} ${TAG})
 
 # Version constants
-GOLANGCI_VERSION = 2.7.2 # renovate: datasource=github-releases depName=golangci/golangci-lint
+GOLANGCI_VERSION = 2.11.4 # renovate: datasource=github-releases depName=golangci/golangci-lint
 LICENSEI_VERSION = 0.9.0 # renovate: datasource=github-releases depName=goph/licensei
-CONTROLLER_GEN_VERSION = v0.20.0 # renovate: datasource=github-releases depName=kubernetes-sigs/controller-tools
+CONTROLLER_GEN_VERSION = v0.20.1 # renovate: datasource=github-releases depName=kubernetes-sigs/controller-tools
 ENVTEST_K8S_VERSION = 1.35.0 # renovate: datasource=github-releases depName=kubernetes-sigs/controller-tools extractVersion=^envtest-v(?<version>.+)$
 SETUP_ENVTEST_VERSION := latest
 ADDLICENSE_VERSION := 1.2.0 # renovate: datasource=github-releases depName=google/addlicense
@@ -171,7 +171,7 @@ test: generate fmt vet bin/setup-envtest
 	cd third_party/github.com/banzaicloud/go-cruise-control && \
 	go test -v -parallel 2 -failfast ./... -cover -covermode=count -coverprofile cover.out -test.v -test.paniconexit0
 
-# Run e2e tests
+# Run e2e tests. Set IMG_E2E to use a custom operator image; otherwise the chart default is used.
 test-e2e:
 	cd tests/e2e && IMG_E2E=${IMG_E2E} go test . \
 		-v \
@@ -180,6 +180,14 @@ test-e2e:
 		--ginkgo.show-node-events \
 		--ginkgo.trace \
 		--ginkgo.v
+
+# Kind cluster name used by test-e2e-local (must match the cluster you create with kind create cluster --name <name>).
+KIND_CLUSTER ?= koperator-e2e
+
+# Build operator image, load it into kind, and run e2e tests with that image. Use when testing local changes.
+test-e2e-local: docker-build
+	kind load docker-image $(IMG) --name $(KIND_CLUSTER)
+	$(MAKE) test-e2e IMG_E2E=$(IMG)
 
 manager: generate fmt vet ## Generate (kubebuilder) and build manager binary.
 	go build -o bin/manager main.go
