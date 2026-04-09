@@ -32,7 +32,7 @@ jobs:
           go-version: '1.26'
 
       - name: Setup Helm
-        uses: azure/setup-helm@v4
+        uses: azure/setup-helm@v5
         with:
           version: '3.19.0'
 
