@@ -1,6 +1,6 @@
 module github.com/banzaicloud/go-cruise-control/integration_test
 
-go 1.25
+go 1.25.0
 
 require (
 	github.com/banzaicloud/go-cruise-control v0.6.0

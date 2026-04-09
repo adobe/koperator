@@ -1,4 +1,6 @@
 ---
+# Kind cluster config for e2e tests. Compatible with affinity tests that use
+# topology.kubernetes.io/zone (e.g. config/samples/simplekafkacluster_affinity.yaml).
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 nodes:
@@ -10,8 +12,26 @@ nodes:
         kubeletExtraArgs:
           node-labels: "ingress-ready=true"
   - role: worker
+    kubeadmConfigPatches:
+    - |
+      kind: JoinConfiguration
+      nodeRegistration:
+        kubeletExtraArgs:
+          node-labels: "topology.kubernetes.io/zone=zone-a"
   - role: worker
+    kubeadmConfigPatches:
+    - |
+      kind: JoinConfiguration
+      nodeRegistration:
+        kubeletExtraArgs:
+          node-labels: "topology.kubernetes.io/zone=zone-b"
   - role: worker
+    kubeadmConfigPatches:
+    - |
+      kind: JoinConfiguration
+      nodeRegistration:
+        kubeletExtraArgs:
+          node-labels: "topology.kubernetes.io/zone=zone-c"
 containerdConfigPatches:
 - |-
   [plugins."io.containerd.grpc.v1.cri".containerd]

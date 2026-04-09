@@ -69,7 +69,11 @@ var _ = ginkgo.When("Testing e2e test altogether", ginkgo.Ordered, func() {
 	testProduceConsumeInternalSSL(defaultTLSSecretName)
 	testJmxExporter()
 	testUninstallKafkaCluster()
+	testInstallKafkaCluster("../../config/samples/simplekafkacluster_4disk.yaml")
+	testMultiDiskRemoval()
+	testUninstallKafkaCluster()
 	testUninstallZookeeperCluster()
+	// kraft tests
 	testInstallKafkaCluster("../../config/samples/kraft/simplekafkacluster_kraft.yaml")
 	testProduceConsumeInternal()
 	testJmxExporter()
