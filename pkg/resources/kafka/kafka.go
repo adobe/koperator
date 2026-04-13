@@ -1327,7 +1327,7 @@ func handleDiskRemoval(ctx context.Context, pvcList *corev1.PersistentVolumeClai
 				log.Info("Graceful disk removal is in progress", "brokerId", brokerId, "mountPath", mountPathToRemove)
 				waitForDiskRemovalToFinish = true
 			case ccVolumeState.IsDiskRebalance():
-				log.Info("Graceful disk rebalance is in progress, waiting to mark disk for removal", "brokerId", brokerId, "mountPath", mountPathToRemove)
+				log.Info("Graceful disk rebalance is in progress, waiting for it to finish before marking disk for removal", "brokerId", brokerId, "mountPath", mountPathToRemove)
 				waitForDiskRemovalToFinish = true
 			default:
 				brokerVolumesState[mountPathToRemove] = banzaiv1beta1.VolumeState{CruiseControlVolumeState: banzaiv1beta1.GracefulDiskRemovalRequired}
