@@ -414,6 +414,7 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 	reorderedBrokers := reorderBrokers(runningBrokers, boundPersistentVolumeClaims, r.KafkaCluster.Spec.Brokers, r.KafkaCluster.Status.BrokersState, controllerID, log)
 
 	allBrokerDynamicConfigSucceeded := true
+	brokerStatus := make(map[int32]*banzaiv1beta1.BrokerConfig)
 	for _, broker := range reorderedBrokers {
 		brokerConfig, err := broker.GetBrokerConfig(r.KafkaCluster.Spec)
 		if err != nil {
@@ -454,9 +455,8 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 		if err != nil {
 			return err
 		}
-		if err = r.updateStatusWithDockerImageAndVersion(broker.Id, brokerConfig, log); err != nil {
-			return err
-		}
+		brokerStatus[broker.Id] = brokerConfig
+
 		// If dynamic configs can not be set then let the loop continue to the next broker,
 		// after the loop we return error. This solves that case when other brokers could get healthy,
 		// but the loop exits too soon because dynamic configs can not be set.
@@ -476,6 +476,10 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 	}
 
 	if err = r.reconcileClusterWideDynamicConfig(); err != nil {
+		return err
+	}
+
+	if err := r.updateStatusWithDockerImageAndVersion(brokerStatus, log); err != nil {
 		return err
 	}
 
@@ -922,21 +926,38 @@ func (r *Reconciler) reconcileKafkaPod(log logr.Logger, desiredPod *corev1.Pod, 
 	return nil
 }
 
-func (r *Reconciler) updateStatusWithDockerImageAndVersion(brokerId int32, brokerConfig *banzaiv1beta1.BrokerConfig,
-	log logr.Logger) error {
-	jmxExp := jmxextractor.NewJMXExtractor(r.KafkaCluster.GetNamespace(),
-		r.KafkaCluster.Spec.GetKubernetesClusterDomain(), r.KafkaCluster.GetName(), log)
+type brokerVersionResult struct {
+	brokerID     int32
+	kafkaVersion *banzaiv1beta1.KafkaVersion
+	err          error
+}
 
-	kafkaVersion, err := jmxExp.ExtractDockerImageAndVersion(brokerId, brokerConfig,
-		r.KafkaCluster.Spec.GetClusterImage(), r.KafkaCluster.Spec.HeadlessServiceEnabled)
-	if err != nil {
-		return err
+func (r *Reconciler) updateStatusWithDockerImageAndVersion(brokers map[int32]*banzaiv1beta1.BrokerConfig, log logr.Logger) error {
+	ch := make(chan brokerVersionResult, len(brokers))
+	for brokerID, brokerConfig := range brokers {
+		go func(id int32, cfg *banzaiv1beta1.BrokerConfig) {
+			jmxExp := jmxextractor.NewJMXExtractor(r.KafkaCluster.GetNamespace(),
+				r.KafkaCluster.Spec.GetKubernetesClusterDomain(), r.KafkaCluster.GetName(), log)
+			kv, err := jmxExp.ExtractDockerImageAndVersion(id, cfg,
+				r.KafkaCluster.Spec.GetClusterImage(), r.KafkaCluster.Spec.HeadlessServiceEnabled)
+			if err != nil {
+				ch <- brokerVersionResult{brokerID: id, err: err}
+				return
+			}
+			ch <- brokerVersionResult{brokerID: id, kafkaVersion: kv}
+		}(brokerID, brokerConfig)
 	}
-	err = k8sutil.UpdateBrokerStatus(r.Client, []string{strconv.Itoa(int(brokerId))}, r.KafkaCluster,
-		*kafkaVersion, log)
-	if err != nil {
-		return err
+
+	for range brokers {
+		result := <-ch
+		if result.err != nil {
+			return result.err
+		}
+		if err := k8sutil.UpdateBrokerStatus(r.Client, []string{strconv.Itoa(int(result.brokerID))}, r.KafkaCluster, *result.kafkaVersion, log); err != nil {
+			return err
+		}
 	}
+
 	return nil
 }
 
