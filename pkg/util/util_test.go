@@ -876,6 +876,123 @@ func TestFilterControllerOnlyNodes(t *testing.T) {
 	}
 }
 
+func TestShouldIncludeBroker(t *testing.T) {
+	testCases := []struct {
+		testName                 string
+		brokerConfig             *v1beta1.BrokerConfig
+		status                   v1beta1.KafkaClusterStatus
+		brokerID                 int
+		defaultIngressConfigName string
+		ingressConfigName        string
+		expected                 bool
+	}{
+		{
+			testName:                 "global Envoy listener, empty BrokerIngressMapping",
+			brokerConfig:             &v1beta1.BrokerConfig{},
+			status:                   v1beta1.KafkaClusterStatus{},
+			brokerID:                 0,
+			defaultIngressConfigName: "",
+			ingressConfigName:        "",
+			expected:                 true,
+		},
+		{
+			testName: "global Envoy listener, BrokerIngressMapping set to Contour config names (regression)",
+			brokerConfig: &v1beta1.BrokerConfig{
+				BrokerIngressMapping: []string{"external"},
+			},
+			status: v1beta1.KafkaClusterStatus{
+				BrokersState: map[string]v1beta1.BrokerState{
+					"0": {ExternalListenerConfigNames: []string{"external"}},
+				},
+			},
+			brokerID:                 0,
+			defaultIngressConfigName: "",
+			ingressConfigName:        "",
+			expected:                 true,
+		},
+		{
+			testName: "global Envoy listener, BrokerIngressMapping set to multiple Contour config names (regression)",
+			brokerConfig: &v1beta1.BrokerConfig{
+				BrokerIngressMapping: []string{"external", "corp"},
+			},
+			status:                   v1beta1.KafkaClusterStatus{},
+			brokerID:                 1,
+			defaultIngressConfigName: "",
+			ingressConfigName:        "",
+			expected:                 true,
+		},
+		{
+			testName: "named Contour listener, BrokerIngressMapping matches",
+			brokerConfig: &v1beta1.BrokerConfig{
+				BrokerIngressMapping: []string{"external"},
+			},
+			status:                   v1beta1.KafkaClusterStatus{},
+			brokerID:                 0,
+			defaultIngressConfigName: "external",
+			ingressConfigName:        "external",
+			expected:                 true,
+		},
+		{
+			testName: "named Contour listener, BrokerIngressMapping does not match",
+			brokerConfig: &v1beta1.BrokerConfig{
+				BrokerIngressMapping: []string{"external"},
+			},
+			status:                   v1beta1.KafkaClusterStatus{},
+			brokerID:                 0,
+			defaultIngressConfigName: "external",
+			ingressConfigName:        "corp",
+			expected:                 false,
+		},
+		{
+			testName:                 "named Contour listener, empty BrokerIngressMapping uses default",
+			brokerConfig:             &v1beta1.BrokerConfig{},
+			status:                   v1beta1.KafkaClusterStatus{},
+			brokerID:                 0,
+			defaultIngressConfigName: "external",
+			ingressConfigName:        "external",
+			expected:                 true,
+		},
+		{
+			testName: "KRaft controller-only node excluded",
+			brokerConfig: &v1beta1.BrokerConfig{
+				Roles: []string{"controller"},
+			},
+			status:                   v1beta1.KafkaClusterStatus{},
+			brokerID:                 0,
+			defaultIngressConfigName: "",
+			ingressConfigName:        "",
+			expected:                 false,
+		},
+		{
+			testName: "KRaft combined broker+controller node included",
+			brokerConfig: &v1beta1.BrokerConfig{
+				Roles: []string{"broker", "controller"},
+			},
+			status:                   v1beta1.KafkaClusterStatus{},
+			brokerID:                 0,
+			defaultIngressConfigName: "",
+			ingressConfigName:        "",
+			expected:                 true,
+		},
+		{
+			testName:                 "nil brokerConfig excluded",
+			brokerConfig:             nil,
+			status:                   v1beta1.KafkaClusterStatus{},
+			brokerID:                 0,
+			defaultIngressConfigName: "",
+			ingressConfigName:        "",
+			expected:                 false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.testName, func(t *testing.T) {
+			result := ShouldIncludeBroker(tc.brokerConfig, tc.status, tc.brokerID, tc.defaultIngressConfigName, tc.ingressConfigName)
+			require.Equal(t, tc.expected, result)
+		})
+	}
+}
+
 func TestConstructEListenerLabelName(t *testing.T) {
 	tests := []struct {
 		ingressConfigName string
