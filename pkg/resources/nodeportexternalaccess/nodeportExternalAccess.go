@@ -68,12 +68,21 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 						return err
 					}
 				} else if r.KafkaCluster.Spec.RemoveUnusedIngressResources {
-					// Cleaning up unused nodeport services
+					// Cleaning up unused nodeport services — only delete if the existing service is NodePort type.
+					// Other reconcilers (e.g. contour) use the same name template for ClusterIP services; deleting
+					// those would cause an infinite create/delete loop.
 					removeService := service.(client.Object)
-					if err := r.Delete(context.Background(), removeService); client.IgnoreNotFound(err) != nil {
-						return errors.Wrap(err, "error when removing unused nodeport services")
+					existing := &corev1.Service{}
+					err := r.Get(context.Background(), client.ObjectKeyFromObject(removeService), existing)
+					if client.IgnoreNotFound(err) != nil {
+						return errors.Wrap(err, "error when checking for unused nodeport service")
 					}
-					log.V(1).Info(fmt.Sprintf("Deleted nodePort service '%s' for external listener '%s'", removeService.GetName(), eListener.Name))
+					if err == nil && existing.Spec.Type == corev1.ServiceTypeNodePort {
+						if err := r.Delete(context.Background(), existing); client.IgnoreNotFound(err) != nil {
+							return errors.Wrap(err, "error when removing unused nodeport services")
+						}
+						log.V(1).Info(fmt.Sprintf("Deleted nodePort service '%s' for external listener '%s'", existing.GetName(), eListener.Name))
+					}
 				}
 			}
 		}
