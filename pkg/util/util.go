@@ -271,7 +271,7 @@ func ShouldIncludeBroker(brokerConfig *v1beta1.BrokerConfig, status v1beta1.Kafk
 	defaultIngressConfigName, ingressConfigName string) bool {
 	// in KRaft mode, controller only are excluded
 	if brokerConfig != nil && (len(brokerConfig.Roles) == 0 || brokerConfig.IsBrokerNode()) {
-		if len(brokerConfig.BrokerIngressMapping) == 0 && (ingressConfigName == defaultIngressConfigName || defaultIngressConfigName == "") ||
+		if (len(brokerConfig.BrokerIngressMapping) == 0 || defaultIngressConfigName == "") && (ingressConfigName == defaultIngressConfigName || defaultIngressConfigName == "") ||
 			apiutil.StringSliceContains(brokerConfig.BrokerIngressMapping, ingressConfigName) {
 			return true
 		}
