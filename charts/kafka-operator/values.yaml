@@ -103,6 +103,10 @@ prometheusMetrics:
       create: true
       # -- ServiceAccount used by prometheus auth proxy
       name: kafka-operator-authproxy
+  podMonitor:
+    # -- If true, create a PodMonitor for Prometheus metrics
+    enabled: false
+    interval: 30s
 
 # -- Health probes configuration
 healthProbes: {}
