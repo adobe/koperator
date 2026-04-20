@@ -117,6 +117,8 @@ spec:
       app.kubernetes.io/name: {{ include "kafka-operator.name" . }}
       app.kubernetes.io/instance: {{ .Release.Name }}
       app.kubernetes.io/component: operator
+      app: kafka-operator
+      component: operator
   replicas: {{ .Values.replicaCount }}
   template:
     metadata:
@@ -133,8 +135,8 @@ spec:
         app.kubernetes.io/name: {{ include "kafka-operator.name" . }}
         app.kubernetes.io/instance: {{ .Release.Name }}
         app.kubernetes.io/component: operator
-        app: prometheus
-        component: alertmanager
+        app: kafka-operator
+        component: operator
     spec:
     {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
