@@ -56,7 +56,7 @@ const (
 	DefaultCruiseControlImage = "adobe/cruise-control:3.0.3-adbe-20250804" // renovate: datasource=docker depName=adobe/cruise-control
 
 	// DefaultKafkaImage is the default Kafka image used when users don't specify it in KafkaClusterSpec.ClusterImage
-	DefaultKafkaImage = "ghcr.io/adobe/koperator/kafka:2.13-3.9.1" // renovate: datasource=docker depName=ghcr.io/adobe/koperator/kafka
+	DefaultKafkaImage = "ghcr.io/adobe/koperator/kafka:2.13-3.9.2" // renovate: datasource=docker depName=ghcr.io/adobe/koperator/kafka
 
 	// DefaultMonitorImage is the default JMX monitor image used when users don't specify it in MonitoringConfig.JmxImage
 	DefaultMonitorImage = "ghcr.io/adobe/koperator/jmx-javaagent:1.4.0" // renovate: datasource=docker depName=ghcr.io/adobe/koperator/jmx-javaagent
@@ -129,7 +129,7 @@ const (
 	defaultKafkaClusterK8sClusterDomain  = "cluster.local"
 
 	// KafkaBroker.spec.container["kafka"].image
-	defaultKafkaImage = "ghcr.io/adobe/koperator/kafka:2.13-3.9.1" // renovate: datasource=docker depName=ghcr.io/adobe/koperator/kafka
+	defaultKafkaImage = "ghcr.io/adobe/koperator/kafka:2.13-3.9.2" // renovate: datasource=docker depName=ghcr.io/adobe/koperator/kafka
 
 	/* Istio Ingress Config */
 

@@ -1,5 +1,5 @@
 ARG scala_version=2.13
-ARG kafka_version=3.9.1 # renovate: datasource=github-tags depName=apache/kafka
+ARG kafka_version=3.9.2 # renovate: datasource=github-tags depName=apache/kafka
 ARG java_version=21
 
 FROM alpine:latest@sha256:25109184c71bdad752c8312a8623239686a9a2071e8825f20acb8f2198c3f659 AS kafka_dist

@@ -12,7 +12,7 @@ spec:
     - "zookeeper-server-client.zookeeper:2181"
   propagateLabels: false
   oneBrokerPerNode: false
-  clusterImage: "ghcr.io/adobe/koperator/kafka:2.13-3.9.1"
+  clusterImage: "ghcr.io/adobe/koperator/kafka:2.13-3.9.2"
   ingressController: "contour"
   readOnlyConfig: |
     auto.create.topics.enable=false
