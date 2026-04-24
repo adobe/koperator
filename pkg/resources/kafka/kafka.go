@@ -547,7 +547,7 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 
 func (r *Reconciler) reconcileKafkaPodDelete(ctx context.Context, log logr.Logger) error {
 	podList := &corev1.PodList{}
-	err := r.List(context.TODO(), podList,
+	err := r.List(ctx, podList,
 		client.InNamespace(r.KafkaCluster.Namespace),
 		client.MatchingLabels(apiutil.LabelsForKafka(r.KafkaCluster.Name)),
 	)
@@ -575,8 +575,7 @@ func (r *Reconciler) reconcileKafkaPodDelete(ctx context.Context, log logr.Logge
 
 	if len(podsDeletedFromSpec) > 0 {
 		if !arePodsAlreadyDeleted(podsDeletedFromSpec, log) {
-			// FIXME: we should reuse the context of the Kafka Controller
-			cc, err := r.CruiseControlScalerFactory(context.TODO(), r.KafkaCluster)
+			cc, err := r.CruiseControlScalerFactory(ctx, r.KafkaCluster)
 			if err != nil {
 				return errorfactory.New(errorfactory.CruiseControlNotReady{}, err,
 					"failed to initialize Cruise Control Scaler", "cruise control url", scale.CruiseControlURLFromKafkaCluster(r.KafkaCluster))
