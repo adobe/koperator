@@ -29,6 +29,8 @@ helm install prometheus prometheus/kube-prometheus-stack --version 54.1.0 --name
 ### scaleops
 helm install --create-namespace -n scaleops-system --repo https://registry.scaleops.com/charts/ --username scaleops --password ${SCALEOPS_TOKEN} --set scaleopsToken=${SCALEOPS_TOKEN} --set clusterName=$(kubectl config current-context) scaleops scaleops
 k apply -f config/scaleops/CustomOwnerGrouping.yaml
+#### Scaleops Dashboard Port Forward
+k port-forward scaleops-dashboard-pod-xxxx 8080
 
 ## Run Koperator on Kind
 ### koperator - Run as container on Kind (Skip if you want to run koperator locally)
