@@ -26,6 +26,10 @@ helm install zookeeper-operator pravega/zookeeper-operator --version 0.2.15 --na
 helm repo add prometheus https://prometheus-community.github.io/helm-charts
 helm install prometheus prometheus/kube-prometheus-stack --version 54.1.0 --namespace prometheus --create-namespace 
 
+### scaleops
+helm install --create-namespace -n scaleops-system --repo https://registry.scaleops.com/charts/ --username scaleops --password ${SCALEOPS_TOKEN} --set scaleopsToken=${SCALEOPS_TOKEN} --set clusterName=$(kubectl config current-context) scaleops scaleops
+k apply -f config/scaleops/CustomOwnerGrouping.yaml
+
 ## Run Koperator on Kind
 ### koperator - Run as container on Kind (Skip if you want to run koperator locally)
 helm install kafka-operator charts/kafka-operator --set operator.image.repository=koperator_e2e_test --set operator.image.tag=latest --namespace kafka --create-namespace
@@ -35,13 +39,13 @@ helm install kafka-operator charts/kafka-operator --set operator.image.repositor
 sudo ~/go/bin/cloud-provider-kind &
 
 ### Start Local Koperator instance:
+kubectl create namespace kafka
+kubectl ens kafka
 make install
 make run
 
 ## Initialize Zookeeper and Kafka Cluster
-k apply -f config/samples/simplezookeeper.yaml -n zookeeper
-k create namespace kafka
-k ens kafka
+kubectl apply -f config/samples/simplezookeeper.yaml -n zookeeper
 k apply -f config/samples/simplekafkacluster.yaml -n kafka
 
 # NOTES for running koperator locally:
