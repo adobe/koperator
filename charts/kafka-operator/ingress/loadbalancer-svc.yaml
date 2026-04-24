@@ -1,0 +1,148 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: kafka
+    brokerId: "0"
+    kafka_cr: kafka
+  name: kafka-0-loadbalancer
+  namespace: kafka
+spec:
+  ports:
+  - name: tcp-internal
+    port: 29092
+    protocol: TCP
+    targetPort: 29092
+  - name: tcp-controller
+    port: 29093
+    protocol: TCP
+    targetPort: 29093
+  - name: metrics
+    port: 9020
+    protocol: TCP
+    targetPort: 9020
+  selector:
+    app: kafka
+    brokerId: "0"
+    kafka_cr: kafka
+  sessionAffinity: None
+  type: LoadBalancer
+status:
+  loadBalancer: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: kafka
+    brokerId: "1"
+    kafka_cr: kafka
+  name: kafka-1-loadbalancer
+  namespace: kafka
+spec:
+  ports:
+  - name: tcp-internal
+    port: 29092
+    protocol: TCP
+    targetPort: 29092
+  - name: tcp-controller
+    port: 29093
+    protocol: TCP
+    targetPort: 29093
+  - name: metrics
+    port: 9020
+    protocol: TCP
+    targetPort: 9020
+  selector:
+    app: kafka
+    brokerId: "1"
+    kafka_cr: kafka
+  sessionAffinity: None
+  type: LoadBalancer
+status:
+  loadBalancer: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: kafka
+    brokerId: "2"
+    kafka_cr: kafka
+  name: kafka-2-loadbalancer
+  namespace: kafka
+spec:
+  ports:
+  - name: tcp-internal
+    port: 29092
+    protocol: TCP
+    targetPort: 29092
+  - name: tcp-controller
+    port: 29093
+    protocol: TCP
+    targetPort: 29093
+  - name: metrics
+    port: 9020
+    protocol: TCP
+    targetPort: 9020
+  selector:
+    app: kafka
+    brokerId: "2"
+    kafka_cr: kafka
+  sessionAffinity: None
+  type: LoadBalancer
+status:
+  loadBalancer: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: kafka
+    kafka_cr: kafka
+  name: kafka-all-broker-loadbalancer
+  namespace: kafka
+spec:
+  ports:
+  - name: tcp-internal
+    port: 29092
+    protocol: TCP
+    targetPort: 29092
+  - name: tcp-controller
+    port: 29093
+    protocol: TCP
+    targetPort: 29093
+  selector:
+    app: kafka
+    kafka_cr: kafka
+  sessionAffinity: None
+  type: LoadBalancer
+status:
+  loadBalancer: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: cruisecontrol
+    controller-tools.k8s.io: "1.0"
+    kafka_cr: kafka
+  name: kafka-cruisecontrol-svc-loadbalancer
+  namespace: kafka
+spec:
+  ports:
+  - name: cc
+    port: 8090
+    protocol: TCP
+    targetPort: 8090
+  - name: metrics
+    port: 9020
+    protocol: TCP
+    targetPort: 9020
+  selector:
+    app: cruisecontrol
+    kafka_cr: kafka
+  sessionAffinity: None
+  type: LoadBalancer
+status:
+  loadBalancer: {}

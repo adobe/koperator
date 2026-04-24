@@ -1,0 +1,40 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kafka-0
+  labels:
+    app: kafka-0
+spec:
+  defaultBackend:
+    service:
+      name: kafka-0
+      port:
+        number: 9020
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kafka-1
+  labels:
+    app: kafka-1
+spec:
+  defaultBackend:
+    service:
+      name: kafka-1
+      port:
+        number: 9020
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kafka-2
+  labels:
+    app: kafka-2
+spec:
+  defaultBackend:
+    service:
+      name: kafka-2
+      port:
+        number: 9020
+
+

@@ -1,0 +1,58 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kafka-common
+  labels:
+    app: kafka
+spec:
+  rules:
+  - host: "kafka-0.kafka.svc.cluster.local"
+    http:
+      paths:
+      - pathType: Prefix
+        path: "/"
+        backend:
+          service:
+            name: kafka-0
+            port:
+              number: 9020
+  - host: "kafka-1.kafka.svc.cluster.local"
+    http:
+      paths:
+      - pathType: Prefix
+        path: "/"
+        backend:
+          service:
+            name: kafka-1
+            port:
+              number: 9020
+  - host: "kafka-2.kafka.svc.cluster.local"
+    http:
+      paths:
+      - pathType: Prefix
+        path: "/"
+        backend:
+          service:
+            name: kafka-2
+            port:
+              number: 9020
+  - host: "kafka-cruisecontrol-svc.kafka.svc.cluster.local"
+    http:
+      paths:
+      - pathType: Prefix
+        path: "/"
+        backend:
+          service:
+            name: kafka-cruisecontrol-svc
+            port:
+              number: 8090
+  - host: "kafka-all-broker.kafka.svc.cluster.local"
+    http:
+      paths:
+      - pathType: Prefix
+        path: "/"
+        backend:
+          service:
+            name: kafka-all-broker
+            port:
+              number: 29092

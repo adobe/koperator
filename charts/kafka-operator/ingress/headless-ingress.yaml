@@ -1,0 +1,13 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kafka-headless
+  labels:
+    app: kafka-headless
+spec:
+  defaultBackend:
+    service:
+      name: kafka-headless
+      port:
+        number: 9020
+---
