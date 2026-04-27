@@ -107,7 +107,7 @@ func createTestKafkaCluster(name, namespace string) *v1beta1.KafkaCluster {
 					BrokerConfigGroup: "default",
 				},
 			},
-			ClusterImage:         "ghcr.io/adobe/koperator/kafka:2.13-3.9.2",
+			ClusterImage:         "ghcr.io/adobe/koperator/kafka:2.13-3.9.1",
 			ZKAddresses:          []string{"zk:2181"},
 			ReadOnlyConfig:       "cruise.control.metrics.topic.auto.create=true",
 			RollingUpgradeConfig: v1beta1.RollingUpgradeConfig{FailureThreshold: 1, ConcurrentBrokerRestartCountPerRack: 1},
