@@ -188,13 +188,13 @@ EOF
 To send messages, run this command and type your test messages:
 
 ```sh
-kubectl -n kafka run kafka-producer -it --image=adobe/kafka:2.13-3.9.2 --rm=true --restart=Never -- /opt/kafka/bin/kafka-console-producer.sh --bootstrap-server kafka-headless:29092 --topic my-topic
+kubectl -n kafka run kafka-producer -it --image=adobe/kafka:2.13-3.9.1 --rm=true --restart=Never -- /opt/kafka/bin/kafka-console-producer.sh --bootstrap-server kafka-headless:29092 --topic my-topic
 ```
 
 To receive messages, run the following command:
 
 ```sh
-kubectl -n kafka run kafka-consumer -it --image=adobe/kafka:2.13-3.9.2 --rm=true --restart=Never -- /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server kafka-headless:29092 --topic my-topic --from-beginning
+kubectl -n kafka run kafka-consumer -it --image=adobe/kafka:2.13-3.9.1 --rm=true --restart=Never -- /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server kafka-headless:29092 --topic my-topic --from-beginning
 ```
 
 ## Documentation
