@@ -24,6 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	"github.com/go-logr/logr"
@@ -36,14 +37,18 @@ type KafkaClusterValidator struct {
 	Log logr.Logger
 }
 
-func (s KafkaClusterValidator) ValidateUpdate(ctx context.Context, _, kafkaClusterNew *banzaicloudv1beta1.KafkaCluster) (warnings admission.Warnings, err error) {
+func (s KafkaClusterValidator) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (warnings admission.Warnings, err error) {
 	var allErrs field.ErrorList
+	kafkaClusterOld := oldObj.(*banzaicloudv1beta1.KafkaCluster)
+	kafkaClusterNew := newObj.(*banzaicloudv1beta1.KafkaCluster)
 	log := s.Log.WithValues("name", kafkaClusterNew.GetName(), "namespace", kafkaClusterNew.GetNamespace())
 
 	listenerErrs := checkInternalAndExternalListeners(&kafkaClusterNew.Spec)
 	if listenerErrs != nil {
 		allErrs = append(allErrs, listenerErrs...)
 	}
+
+	allErrs = append(allErrs, checkTieredStorageCacheImmutability(&kafkaClusterOld.Spec, &kafkaClusterNew.Spec)...)
 
 	if len(allErrs) == 0 {
 		return nil, nil
@@ -76,6 +81,61 @@ func (s KafkaClusterValidator) ValidateCreate(ctx context.Context, kafkaCluster 
 
 func (s KafkaClusterValidator) ValidateDelete(_ context.Context, _ *banzaicloudv1beta1.KafkaCluster) (warnings admission.Warnings, err error) {
 	return nil, nil
+}
+
+// checkTieredStorageCacheImmutability rejects updates that flip the TieredStorageCache flag on an
+// existing storageConfigs entry (matched by mountPath, scoped per brokerConfigGroup or per broker).
+// Flipping false→true on a live data PVC silently removes it from log.dirs and Cruise Control
+// capacity, and enables a delete-and-recreate shrink path that bypasses graceful disk drain — an
+// irreversible data-loss vector when applied to a volume that already holds Kafka log segments.
+// To change this property, callers must remove the entry and re-add it in a subsequent apply.
+func checkTieredStorageCacheImmutability(oldSpec, newSpec *banzaicloudv1beta1.KafkaClusterSpec) field.ErrorList {
+	var allErrs field.ErrorList
+
+	for groupName, newGroup := range newSpec.BrokerConfigGroups {
+		oldGroup, ok := oldSpec.BrokerConfigGroups[groupName]
+		if !ok {
+			continue
+		}
+		groupPath := field.NewPath("spec").Child("brokerConfigGroups").Key(groupName).Child("storageConfigs")
+		allErrs = append(allErrs, diffTieredStorageCache(oldGroup.StorageConfigs, newGroup.StorageConfigs, groupPath)...)
+	}
+
+	oldByID := make(map[int32]banzaicloudv1beta1.Broker, len(oldSpec.Brokers))
+	for _, b := range oldSpec.Brokers {
+		oldByID[b.Id] = b
+	}
+	for i, newBroker := range newSpec.Brokers {
+		oldBroker, ok := oldByID[newBroker.Id]
+		if !ok || oldBroker.BrokerConfig == nil || newBroker.BrokerConfig == nil {
+			continue
+		}
+		brokerPath := field.NewPath("spec").Child("brokers").Index(i).Child("brokerConfig").Child("storageConfigs")
+		allErrs = append(allErrs, diffTieredStorageCache(oldBroker.BrokerConfig.StorageConfigs, newBroker.BrokerConfig.StorageConfigs, brokerPath)...)
+	}
+
+	return allErrs
+}
+
+func diffTieredStorageCache(oldConfigs, newConfigs []banzaicloudv1beta1.StorageConfig, basePath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	oldByPath := make(map[string]banzaicloudv1beta1.StorageConfig, len(oldConfigs))
+	for _, sc := range oldConfigs {
+		oldByPath[sc.MountPath] = sc
+	}
+	for i, newSC := range newConfigs {
+		oldSC, ok := oldByPath[newSC.MountPath]
+		if !ok {
+			continue
+		}
+		if oldSC.TieredStorageCache != newSC.TieredStorageCache {
+			allErrs = append(allErrs, field.Forbidden(
+				basePath.Index(i).Child("tieredStorageCache"),
+				immutableTieredStorageCacheErrMsg,
+			))
+		}
+	}
+	return allErrs
 }
 
 // checkListeners validates the spec.listenersConfig object

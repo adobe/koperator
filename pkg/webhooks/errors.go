@@ -29,6 +29,7 @@ const (
 	unsupportedRemovingStorageMsg                  = "removing storage from a broker is not supported"
 	invalidExternalListenerStartingPortErrMsg      = "invalid external listener starting port number"
 	invalidContainerPortForIngressControllerErrMsg = "invalid trarget port number for ingress controller deployment"
+	immutableTieredStorageCacheErrMsg              = "tieredStorageCache is immutable on existing storageConfigs entries; remove the entry and re-add to change"
 
 	// errorDuringValidationMsg is added to infrastructure errors (e.g. failed to connect), but not to field validation errors
 	errorDuringValidationMsg = "error during validation"
@@ -60,6 +61,10 @@ func IsAdmissionInvalidRemovingStorage(err error) bool {
 
 func IsAdmissionInvalidExternalListenerPort(err error) bool {
 	return apierrors.IsInvalid(err) && strings.Contains(err.Error(), invalidExternalListenerStartingPortErrMsg)
+}
+
+func IsAdmissionImmutableTieredStorageCache(err error) bool {
+	return apierrors.IsInvalid(err) && strings.Contains(err.Error(), immutableTieredStorageCacheErrMsg)
 }
 
 func IsAdmissionErrorDuringValidation(err error) bool {
