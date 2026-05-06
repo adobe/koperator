@@ -1245,9 +1245,6 @@ func (r *Reconciler) reconcileKafkaPvc(ctx context.Context, log logr.Logger, bro
 			if err := r.deleteRemovedCachePVCs(ctx, log, brokerId, pvcList, desiredMountPaths); err != nil {
 				return err
 			}
-			if err := r.cleanupOrphanedDuplicateCachePVCs(ctx, log, brokerId, pvcList, desiredMountPaths); err != nil {
-				return err
-			}
 		}
 
 		// Re-list so the disk removal count below reflects the deletions above.
@@ -1305,51 +1302,6 @@ func (r *Reconciler) deleteRemovedCachePVCs(
 			if err := r.Delete(ctx, pvc); err != nil && !apierrors.IsNotFound(err) {
 				return errorfactory.New(errorfactory.APIFailure{}, err,
 					"deleting removed tiered storage cache PVC failed", "pvc", pvc.Name)
-			}
-		}
-	}
-	return nil
-}
-
-// cleanupOrphanedDuplicateCachePVCs removes Pending cache PVCs when a Bound PVC already exists at
-// the same mount path and no resize is in flight. These are orphaned replacements left by a
-// double-staging race. Safe to call only when the broker pod is down.
-func (r *Reconciler) cleanupOrphanedDuplicateCachePVCs(
-	ctx context.Context,
-	log logr.Logger,
-	brokerId string,
-	pvcList *corev1.PersistentVolumeClaimList,
-	desiredMountPaths map[string]bool,
-) error {
-	cacheVolumeStates := r.KafkaCluster.Status.BrokersState[brokerId].CacheVolumeStates
-	boundByMountPath := make(map[string]bool)
-	for _, pvc := range pvcList.Items {
-		if pvc.DeletionTimestamp != nil || pvc.Annotations["tieredStorageCache"] != annotationTrue {
-			continue
-		}
-		mp := pvc.Annotations["mountPath"]
-		if !desiredMountPaths[mp] || cacheVolumeStates[mp] == banzaiv1beta1.CacheResizePendingDeletion {
-			continue
-		}
-		if pvc.Status.Phase == corev1.ClaimBound {
-			boundByMountPath[mp] = true
-		}
-	}
-	for i := range pvcList.Items {
-		pvc := &pvcList.Items[i]
-		if pvc.DeletionTimestamp != nil || pvc.Annotations["tieredStorageCache"] != annotationTrue {
-			continue
-		}
-		mp := pvc.Annotations["mountPath"]
-		if !desiredMountPaths[mp] || cacheVolumeStates[mp] == banzaiv1beta1.CacheResizePendingDeletion {
-			continue
-		}
-		if pvc.Status.Phase == corev1.ClaimPending && boundByMountPath[mp] {
-			log.Info("Deleting orphaned Pending cache PVC (duplicate at same mount path)",
-				"brokerId", brokerId, "mountPath", mp, "pvc", pvc.Name)
-			if err := r.Delete(ctx, pvc); err != nil && !apierrors.IsNotFound(err) {
-				return errorfactory.New(errorfactory.APIFailure{}, err,
-					"deleting orphaned Pending cache PVC failed", "pvc", pvc.Name)
 			}
 		}
 	}
@@ -1620,6 +1572,34 @@ func (r *Reconciler) reconcileDesiredPvcsForBroker(
 		}
 
 		if !alreadyCreated {
+			// During an in-flight cache resize, a prior reconcile cycle may have already created
+			// the replacement PVC server-side even if the client got a timeout, or the cached
+			// client may not yet have observed an in-flight Create. The size filter above
+			// excludes the old PVC, so alreadyCreated is false even when a replacement exists.
+			// A strongly-consistent (uncached) read picks up that replacement so we don't issue a
+			// second Create with a fresh GenerateName.
+			if r.KafkaCluster.Status.BrokersState[brokerId].CacheVolumeStates[mountPath] == banzaiv1beta1.CacheResizePendingDeletion {
+				liveList := &corev1.PersistentVolumeClaimList{}
+				if err := r.DirectClient.List(ctx, liveList, client.InNamespace(r.KafkaCluster.GetNamespace()), matchingLabels); err != nil {
+					return errorfactory.New(errorfactory.APIFailure{}, err, "uncached list of PVCs failed", "kind", desiredType)
+				}
+				desiredSize := desiredPvc.Spec.Resources.Requests.Storage().Value()
+				for i := range liveList.Items {
+					p := &liveList.Items[i]
+					if p.DeletionTimestamp != nil || p.Annotations["mountPath"] != mountPath {
+						continue
+					}
+					if p.Spec.Resources.Requests.Storage().Value() == desiredSize {
+						log.Info("Replacement cache PVC already exists from a prior partial attempt; skipping Create",
+							"brokerId", brokerId, "mountPath", mountPath, "pvc", p.Name)
+						alreadyCreated = true
+						break
+					}
+				}
+				if alreadyCreated {
+					continue
+				}
+			}
 			// Creating the 2+ PersistentVolumes for Pod
 			if err := patch.DefaultAnnotator.SetLastAppliedAnnotation(desiredPvc); err != nil {
 				return errors.WrapIf(err, "could not apply last state to annotation")
