@@ -20,6 +20,7 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"time"
 
 	"github.com/banzaicloud/koperator/api/v1beta1"
 	"github.com/banzaicloud/koperator/pkg/errorfactory"
@@ -90,7 +91,8 @@ func (exp *jmxExtractor) ExtractDockerImageAndVersion(brokerId int32, brokerConf
 		requestURL = fmt.Sprintf(serviceJMXTemplate, exp.clusterName, brokerId,
 			exp.clusterNamespace, exp.kubernetesClusterDomain, 9020)
 	}
-	rsp, err := http.Get(requestURL)
+	client := &http.Client{Timeout: 30 * time.Second}
+	rsp, err := client.Get(requestURL)
 	if err != nil {
 		exp.log.Error(err, fmt.Sprintf("error during talking to broker-%d", brokerId))
 		return nil, errorfactory.New(errorfactory.BrokersNotReady{}, err, "unable to talk to ...")
