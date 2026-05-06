@@ -11,8 +11,6 @@ metadata:
     app.kubernetes.io/managed-by: {{ .Release.Service }}
     app.kubernetes.io/version: {{ .Chart.AppVersion }}
     app.kubernetes.io/component: operator
-    app: kafka-operator
-    component: operator
   {{- with .Values.operator.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
