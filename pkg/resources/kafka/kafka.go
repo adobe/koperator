@@ -931,10 +931,8 @@ func (r *Reconciler) updateStatusWithDockerImageAndVersion(brokers map[int32]*ba
 	ch := make(chan brokerVersionResult, len(brokers))
 	for brokerID, brokerConfig := range brokers {
 		go func(id int32, cfg *banzaiv1beta1.BrokerConfig) {
-			jmxExp := jmxextractor.NewJMXExtractor(r.KafkaCluster.GetNamespace(),
-				r.KafkaCluster.Spec.GetKubernetesClusterDomain(), r.KafkaCluster.GetName(), log)
-			kv, err := jmxExp.ExtractDockerImageAndVersion(id, cfg,
-				r.KafkaCluster.Spec.GetClusterImage(), r.KafkaCluster.Spec.HeadlessServiceEnabled)
+			jmxExp := jmxextractor.NewJMXExtractor(r.KafkaCluster.GetNamespace(), r.KafkaCluster.Spec.GetKubernetesClusterDomain(), r.KafkaCluster.GetName(), log)
+			kv, err := jmxExp.ExtractDockerImageAndVersion(id, cfg, r.KafkaCluster.Spec.GetClusterImage(), r.KafkaCluster.Spec.HeadlessServiceEnabled)
 			if err != nil {
 				ch <- brokerVersionResult{brokerID: id, err: err}
 				return
