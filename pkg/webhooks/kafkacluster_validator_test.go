@@ -258,6 +258,145 @@ func TestCheckExternalListenerStartingPort(t *testing.T) {
 	}
 }
 
+func TestCheckTieredStorageCacheImmutability(t *testing.T) {
+	mp := func(path string, tc bool) v1beta1.StorageConfig {
+		return v1beta1.StorageConfig{MountPath: path, TieredStorageCache: tc}
+	}
+
+	testCases := []struct {
+		testName string
+		oldSpec  v1beta1.KafkaClusterSpec
+		newSpec  v1beta1.KafkaClusterSpec
+		expected field.ErrorList
+	}{
+		{
+			testName: "no change — empty",
+			oldSpec:  v1beta1.KafkaClusterSpec{},
+			newSpec:  v1beta1.KafkaClusterSpec{},
+			expected: nil,
+		},
+		{
+			testName: "brokerConfigGroups: flip false→true on existing mountPath rejected",
+			oldSpec: v1beta1.KafkaClusterSpec{
+				BrokerConfigGroups: map[string]v1beta1.BrokerConfig{
+					"default": {StorageConfigs: []v1beta1.StorageConfig{mp("/kafka-logs/0", false)}},
+				},
+			},
+			newSpec: v1beta1.KafkaClusterSpec{
+				BrokerConfigGroups: map[string]v1beta1.BrokerConfig{
+					"default": {StorageConfigs: []v1beta1.StorageConfig{mp("/kafka-logs/0", true)}},
+				},
+			},
+			expected: append(field.ErrorList{},
+				field.Forbidden(
+					field.NewPath("spec").Child("brokerConfigGroups").Key("default").Child("storageConfigs").Index(0).Child("tieredStorageCache"),
+					immutableTieredStorageCacheErrMsg,
+				),
+			),
+		},
+		{
+			testName: "brokerConfigGroups: flip true→false on existing mountPath rejected",
+			oldSpec: v1beta1.KafkaClusterSpec{
+				BrokerConfigGroups: map[string]v1beta1.BrokerConfig{
+					"default": {StorageConfigs: []v1beta1.StorageConfig{mp("/cache/0", true)}},
+				},
+			},
+			newSpec: v1beta1.KafkaClusterSpec{
+				BrokerConfigGroups: map[string]v1beta1.BrokerConfig{
+					"default": {StorageConfigs: []v1beta1.StorageConfig{mp("/cache/0", false)}},
+				},
+			},
+			expected: append(field.ErrorList{},
+				field.Forbidden(
+					field.NewPath("spec").Child("brokerConfigGroups").Key("default").Child("storageConfigs").Index(0).Child("tieredStorageCache"),
+					immutableTieredStorageCacheErrMsg,
+				),
+			),
+		},
+		{
+			testName: "brokerConfigGroups: new entry with tieredStorageCache=true allowed",
+			oldSpec: v1beta1.KafkaClusterSpec{
+				BrokerConfigGroups: map[string]v1beta1.BrokerConfig{
+					"default": {StorageConfigs: []v1beta1.StorageConfig{mp("/kafka-logs/0", false)}},
+				},
+			},
+			newSpec: v1beta1.KafkaClusterSpec{
+				BrokerConfigGroups: map[string]v1beta1.BrokerConfig{
+					"default": {StorageConfigs: []v1beta1.StorageConfig{
+						mp("/kafka-logs/0", false),
+						mp("/cache/0", true),
+					}},
+				},
+			},
+			expected: nil,
+		},
+		{
+			testName: "brokerConfigGroups: remove entry, then re-add with different value — allowed (no entry to match against in old at the same mountPath after removal scenario; test single-pass: removed entry simply not in new)",
+			oldSpec: v1beta1.KafkaClusterSpec{
+				BrokerConfigGroups: map[string]v1beta1.BrokerConfig{
+					"default": {StorageConfigs: []v1beta1.StorageConfig{mp("/cache/0", false)}},
+				},
+			},
+			newSpec: v1beta1.KafkaClusterSpec{
+				BrokerConfigGroups: map[string]v1beta1.BrokerConfig{
+					"default": {StorageConfigs: []v1beta1.StorageConfig{}},
+				},
+			},
+			expected: nil,
+		},
+		{
+			testName: "brokers[].brokerConfig: flip false→true rejected",
+			oldSpec: v1beta1.KafkaClusterSpec{
+				Brokers: []v1beta1.Broker{{Id: 0, BrokerConfig: &v1beta1.BrokerConfig{
+					StorageConfigs: []v1beta1.StorageConfig{mp("/kafka-logs/0", false)},
+				}}},
+			},
+			newSpec: v1beta1.KafkaClusterSpec{
+				Brokers: []v1beta1.Broker{{Id: 0, BrokerConfig: &v1beta1.BrokerConfig{
+					StorageConfigs: []v1beta1.StorageConfig{mp("/kafka-logs/0", true)},
+				}}},
+			},
+			expected: append(field.ErrorList{},
+				field.Forbidden(
+					field.NewPath("spec").Child("brokers").Index(0).Child("brokerConfig").Child("storageConfigs").Index(0).Child("tieredStorageCache"),
+					immutableTieredStorageCacheErrMsg,
+				),
+			),
+		},
+		{
+			testName: "brokers[].brokerConfig: nil old config — no error (entry didn't exist)",
+			oldSpec: v1beta1.KafkaClusterSpec{
+				Brokers: []v1beta1.Broker{{Id: 0, BrokerConfig: nil}},
+			},
+			newSpec: v1beta1.KafkaClusterSpec{
+				Brokers: []v1beta1.Broker{{Id: 0, BrokerConfig: &v1beta1.BrokerConfig{
+					StorageConfigs: []v1beta1.StorageConfig{mp("/cache/0", true)},
+				}}},
+			},
+			expected: nil,
+		},
+		{
+			testName: "brokerConfigGroup not present in old — no error (whole group is new)",
+			oldSpec: v1beta1.KafkaClusterSpec{
+				BrokerConfigGroups: map[string]v1beta1.BrokerConfig{},
+			},
+			newSpec: v1beta1.KafkaClusterSpec{
+				BrokerConfigGroups: map[string]v1beta1.BrokerConfig{
+					"new-group": {StorageConfigs: []v1beta1.StorageConfig{mp("/cache/0", true)}},
+				},
+			},
+			expected: nil,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.testName, func(t *testing.T) {
+			got := checkTieredStorageCacheImmutability(&testCase.oldSpec, &testCase.newSpec)
+			require.Equal(t, testCase.expected, got)
+		})
+	}
+}
+
 func TestCheckTargetPortsCollisionForEnvoy(t *testing.T) {
 	testCases := []struct {
 		testName         string

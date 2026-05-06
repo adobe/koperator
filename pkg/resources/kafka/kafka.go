@@ -1238,11 +1238,13 @@ func (r *Reconciler) reconcileKafkaPvc(ctx context.Context, log logr.Logger, bro
 			continue
 		}
 
-		if err := r.deleteRemovedCachePVCs(ctx, log, brokerId, pvcList, desiredMountPaths); err != nil {
-			return err
-		}
-
+		// Only delete cache PVCs when the broker pod is gone — issuing Delete against a mounted
+		// PVC sets the DeletionTimestamp and is held by the pvc-protection finalizer, but the
+		// intent is wrong and the resulting PVC state confuses subsequent reconciles.
 		if !brokerPodExists {
+			if err := r.deleteRemovedCachePVCs(ctx, log, brokerId, pvcList, desiredMountPaths); err != nil {
+				return err
+			}
 			if err := r.cleanupOrphanedDuplicateCachePVCs(ctx, log, brokerId, pvcList, desiredMountPaths); err != nil {
 				return err
 			}
@@ -1602,23 +1604,6 @@ func (r *Reconciler) reconcileDesiredPvcsForBroker(
 			currentPvc = pvc.DeepCopy()
 			alreadyCreated = true
 
-			// Backfill the tieredStorageCache annotation if the desired PVC has it but the existing
-			// PVC does not — handles PVCs created before the annotation was introduced.
-			if desiredPvc.Annotations["tieredStorageCache"] == annotationTrue &&
-				currentPvc.Annotations["tieredStorageCache"] != annotationTrue {
-				pvcCopy := currentPvc.DeepCopy()
-				if pvcCopy.Annotations == nil {
-					pvcCopy.Annotations = make(map[string]string)
-				}
-				pvcCopy.Annotations["tieredStorageCache"] = annotationTrue
-				if err := r.Update(ctx, pvcCopy); err != nil {
-					return errorfactory.New(errorfactory.APIFailure{}, err,
-						"backfilling tieredStorageCache annotation on existing PVC failed", "pvc", pvcCopy.Name)
-				}
-				log.Info("Backfilled tieredStorageCache annotation on existing PVC", "pvc", pvcCopy.Name)
-				currentPvc = pvcCopy
-			}
-
 			// Trigger a CC disk rebalance only for regular data volumes.
 			// Tiered storage cache PVCs are ephemeral — CC must not account for them.
 			if currentPvc.Annotations["tieredStorageCache"] != annotationTrue {
@@ -1659,10 +1644,11 @@ func (r *Reconciler) reconcileDesiredPvcsForBroker(
 			continue
 		}
 
-		// Check if this is a tiered storage cache volume. Fall back to the desired PVC annotation
-		// for PVCs created before the tieredStorageCache annotation was introduced.
-		isTieredCache := currentPvc.Annotations["tieredStorageCache"] == annotationTrue ||
-			desiredPvc.Annotations["tieredStorageCache"] == annotationTrue
+		// Trust only the persisted PVC annotation when classifying — never the desired-spec
+		// annotation. Reading from the desired side would let a CR-edit (flipping
+		// tieredStorageCache: false → true on an existing data volume) route a real log-dir PVC
+		// through the cache-shrink delete-and-recreate path, bypassing graceful disk drain.
+		isTieredCache := currentPvc.Annotations["tieredStorageCache"] == annotationTrue
 		desiredSize := desiredPvc.Spec.Resources.Requests.Storage().Value()
 		currentSize := currentPvc.Spec.Resources.Requests.Storage().Value()
 
