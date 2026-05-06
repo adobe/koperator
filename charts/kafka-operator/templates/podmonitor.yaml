@@ -23,8 +23,9 @@ spec:
     - {{ .Release.Namespace }}
   selector:
     matchLabels:
-      app: kafka-operator
-      component: operator
+      app.kubernetes.io/name: {{ include "kafka-operator.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: operator
   endpoints:
   - interval: {{ .Values.prometheusMetrics.podMonitor.interval }}
     port: metrics
