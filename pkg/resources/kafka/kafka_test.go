@@ -1403,8 +1403,13 @@ func TestReconcileKafkaPvcTieredCacheResize(t *testing.T) {
 	}
 
 	testCases := []struct {
-		testName                string
-		existingPvc             *corev1.PersistentVolumeClaim
+		testName              string
+		existingPvc           *corev1.PersistentVolumeClaim
+		additionalExistingPvc *corev1.PersistentVolumeClaim // optional second PVC at the same mountPath (e.g., pre-staged replacement)
+		// directClientOnlyPvc: when set, this PVC is returned only by DirectClient (uncached) reads,
+		// not by the cached Client. Simulates the cache-lag window after a Create where the watch
+		// event hasn't propagated yet — the scenario the HIGH-3 idempotency fix protects against.
+		directClientOnlyPvc     *corev1.PersistentVolumeClaim
 		desiredPvc              *corev1.PersistentVolumeClaim
 		existingPods            []corev1.Pod
 		initialCacheVolumeState v1beta1.CacheResizeState // pre-existing brokerState for mountPath, if any
@@ -1486,6 +1491,54 @@ func TestReconcileKafkaPvcTieredCacheResize(t *testing.T) {
 			expectedDeletePvc: false,
 			expectedError:     false,
 		},
+		{
+			// Crash-recovery: state was written in a prior cycle but the replacement Create
+			// failed before completing. Pod is still running, so the old PVC must NOT be
+			// deleted and state must NOT be cleared. The reconciler must re-create the
+			// replacement.
+			testName:                "pending-deletion with running pod and no replacement — replacement re-staged",
+			existingPvc:             makeTieredCachePvc("cache-pvc-1", "100Gi"),
+			desiredPvc:              makeTieredCachePvc("cache-pvc-new", "50Gi"),
+			existingPods:            []corev1.Pod{runningPod},
+			initialCacheVolumeState: v1beta1.CacheResizePendingDeletion,
+			expectedUpdatePvc:       false,
+			expectedCreatePvc:       true,
+			expectedDeletePvc:       false,
+			expectedError:           false,
+		},
+		{
+			// Idempotency (symmetric): pending-deletion state and a replacement at desired
+			// size already exists in both cached and uncached views. The inner-match loop
+			// finds the replacement; no second Create.
+			testName:                "pending-deletion with running pod and replacement present — no duplicate Create",
+			existingPvc:             makeTieredCachePvc("cache-pvc-1", "100Gi"),
+			additionalExistingPvc:   makeTieredCachePvc("cache-pvc-replacement", "50Gi"),
+			desiredPvc:              makeTieredCachePvc("cache-pvc-replacement", "50Gi"),
+			existingPods:            []corev1.Pod{runningPod},
+			initialCacheVolumeState: v1beta1.CacheResizePendingDeletion,
+			expectedUpdatePvc:       false,
+			expectedCreatePvc:       false,
+			expectedDeletePvc:       false,
+			expectedError:           false,
+		},
+		{
+			// Idempotency (asymmetric — the actual HIGH-3 cache-lag scenario): the prior
+			// Create succeeded server-side, so the replacement exists in etcd, but the cached
+			// Client hasn't yet observed the watch event. The inner match loop sees only the
+			// old PVC (size-filtered out) and would fall through to a second Create — except
+			// the idempotency check uses DirectClient (uncached) and detects the replacement.
+			// If a future refactor removes the DirectClient lookup, this test fails.
+			testName:                "pending-deletion with replacement visible only via DirectClient — no duplicate Create",
+			existingPvc:             makeTieredCachePvc("cache-pvc-1", "100Gi"),
+			directClientOnlyPvc:     makeTieredCachePvc("cache-pvc-replacement", "50Gi"),
+			desiredPvc:              makeTieredCachePvc("cache-pvc-replacement", "50Gi"),
+			existingPods:            []corev1.Pod{runningPod},
+			initialCacheVolumeState: v1beta1.CacheResizePendingDeletion,
+			expectedUpdatePvc:       false,
+			expectedCreatePvc:       false,
+			expectedDeletePvc:       false,
+			expectedError:           false,
+		},
 	}
 
 	mockCtrl := gomock.NewController(t)
@@ -1494,6 +1547,7 @@ func TestReconcileKafkaPvcTieredCacheResize(t *testing.T) {
 		test := test
 		t.Run(test.testName, func(t *testing.T) {
 			mockClient := mocks.NewMockClient(mockCtrl)
+			mockDirectClient := mocks.NewMockClient(mockCtrl) // separate so tests can simulate cache vs apiserver asymmetry
 			mockSubResourceClient := mocks.NewMockSubResourceClient(mockCtrl)
 
 			kafkaCluster := &v1beta1.KafkaCluster{
@@ -1517,11 +1571,14 @@ func TestReconcileKafkaPvcTieredCacheResize(t *testing.T) {
 			r := Reconciler{
 				Reconciler: resources.Reconciler{
 					Client:       mockClient,
+					DirectClient: mockDirectClient,
 					KafkaCluster: kafkaCluster,
 				},
 			}
 
-			// Mock PVC list — always returns the existing PVC
+			// Cached Client PVC list: returns the existing PVC plus any additional. Does NOT
+			// include directClientOnlyPvc — that simulates the cache-lag window where a Create
+			// has succeeded server-side but the watch event hasn't propagated.
 			mockClient.EXPECT().List(
 				context.TODO(),
 				gomock.AssignableToTypeOf(&corev1.PersistentVolumeClaimList{}),
@@ -1529,6 +1586,25 @@ func TestReconcileKafkaPvcTieredCacheResize(t *testing.T) {
 				gomock.Any(),
 			).Do(func(ctx context.Context, list *corev1.PersistentVolumeClaimList, opts ...client.ListOption) {
 				list.Items = []corev1.PersistentVolumeClaim{*test.existingPvc}
+				if test.additionalExistingPvc != nil {
+					list.Items = append(list.Items, *test.additionalExistingPvc)
+				}
+			}).Return(nil).AnyTimes()
+
+			// Uncached DirectClient PVC list: same as cached, plus directClientOnlyPvc when set.
+			mockDirectClient.EXPECT().List(
+				context.TODO(),
+				gomock.AssignableToTypeOf(&corev1.PersistentVolumeClaimList{}),
+				client.InNamespace(namespace),
+				gomock.Any(),
+			).Do(func(ctx context.Context, list *corev1.PersistentVolumeClaimList, opts ...client.ListOption) {
+				list.Items = []corev1.PersistentVolumeClaim{*test.existingPvc}
+				if test.additionalExistingPvc != nil {
+					list.Items = append(list.Items, *test.additionalExistingPvc)
+				}
+				if test.directClientOnlyPvc != nil {
+					list.Items = append(list.Items, *test.directClientOnlyPvc)
+				}
 			}).Return(nil).AnyTimes()
 
 			// Mock Pod list — returns the configured pods
