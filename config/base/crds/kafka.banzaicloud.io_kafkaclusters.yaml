@@ -23092,15 +23092,6 @@ spec:
                 additionalProperties:
                   description: BrokerState holds information about broker state
                   properties:
-                    cacheVolumeStates:
-                      additionalProperties:
-                        description: CacheResizeState tracks the resize lifecycle
-                          of a tiered storage cache PVC for a given mount path.
-                        type: string
-                      description: |-
-                        CacheVolumeStates tracks in-flight tiered storage cache PVC resize operations, keyed by mount path.
-                        An entry is present only while a resize is in progress; it is cleared once cleanup completes.
-                      type: object
                     configurationBackup:
                       description: Compressed data from broker configuration to restore
                         broker pod in specific cases
@@ -23181,6 +23172,18 @@ spec:
                       description: RackAwarenessState holds info about rack awareness
                         status
                       type: string
+                    tieredCacheVolumes:
+                      additionalProperties:
+                        description: TieredCacheVolumeState tracks the lifecycle state
+                          of a tiered storage cache PVC for a given mount path.
+                        type: string
+                      description: |-
+                        TieredCacheVolumes tracks tiered storage cache PVC state for this broker, keyed by mount path.
+                        "active" means the PVC is a cache volume with no resize in progress.
+                        "pending-deletion" means a resize is in flight (old PVC waiting for pod to stop).
+                        Absent entry means the mount path is not a cache volume (or the PVC was removed).
+                        Written at PVC creation and updated through the resize lifecycle.
+                      type: object
                     version:
                       description: Version holds the current version of the broker
                         in semver format
