@@ -50,6 +50,12 @@ const (
 	// IsControllerNodeKey is used to identify if the kafka pod is a controller or broker_controller
 	IsControllerNodeKey = "isControllerNode"
 
+	// TieredStorageCacheAnnotationKey marks a PVC as backing a Kafka tiered storage cache.
+	// Cache PVCs are excluded from log.dirs and Cruise Control capacity, and follow a
+	// delete-and-recreate path on shrink. Read sites must use this constant rather than the
+	// literal so a typo cannot silently misclassify a cache PVC as a regular log-dir volume.
+	TieredStorageCacheAnnotationKey = "tieredStorageCache"
+
 	// DefaultCruiseControlImage is the default CC image used when users don't specify it in CruiseControlConfig.Image
 	DefaultCruiseControlImage = "adobe/cruise-control:3.0.3-adbe-20250804" // renovate: datasource=docker depName=adobe/cruise-control
 

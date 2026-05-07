@@ -1370,8 +1370,8 @@ func TestReconcileKafkaPvcTieredCacheResize(t *testing.T) {
 					v1beta1.KafkaCRLabelKey:  clusterName,
 				},
 				Annotations: map[string]string{
-					"mountPath":          mountPath,
-					"tieredStorageCache": "true",
+					"mountPath":                             mountPath,
+					v1beta1.TieredStorageCacheAnnotationKey: "true",
 				},
 			},
 			Spec: corev1.PersistentVolumeClaimSpec{
