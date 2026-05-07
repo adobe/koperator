@@ -233,10 +233,10 @@ func testTieredStorageCachePvcResize() bool {
 			applyK8sResourceManifest(kubectlOptions, tsResizeInitialManifest)
 
 			ginkgo.By("Waiting for all broker pods to be ready")
-			// kubectl wait --for=condition=Ready fails immediately when no pods exist yet.
-			// We don't wait for ClusterRunning — the cluster may stay in ClusterReconciling
-			// because GracefulDiskRebalanceRequired for log volumes needs CC, which this minimal
-			// test cluster does not deploy. Pod readiness is sufficient to proceed with the resize.
+			// kubectl wait --for=condition=Ready fails immediately when no pods exist yet, so
+			// poll the pod list explicitly. Pod readiness is sufficient to proceed with the
+			// resize — we don't gate on ClusterRunning because Cruise Control may still be
+			// completing the post-startup rebalance when the resize is initiated.
 			gomega.Eventually(context.Background(), func() error {
 				output, err := k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &kubectlOptions,
 					"get", "pod",
@@ -295,26 +295,32 @@ func testTieredStorageCachePvcResize() bool {
 		})
 
 		ginkgo.It("Phase 1: resize state recorded in brokerState and replacement PVC created", func() {
-			ginkgo.By("Waiting until CacheVolumeStates has pending-deletion and two PVCs coexist for broker 0")
+			// Two acceptable success paths — the resize can complete in seconds, often faster
+			// than the polling interval, so insisting on the intermediate "pending-deletion"
+			// snapshot makes this phase flake-prone:
+			//   A) In-progress: cacheVolumeStates[mp]=="pending-deletion" AND ≥2 cache PVCs.
+			//   B) Already completed: state cleared AND exactly one cache PVC at the shrunk size.
+			// Either proves the resize was staged correctly; Phase 2/3 cover the remaining
+			// invariants regardless of which path we observed.
+			ginkgo.By("Waiting until the resize is observable as in-progress or completed")
 			gomega.Eventually(context.Background(), func() error {
 				state, err := getCacheResizeState(kubectlOptions, tsResizeClusterName,
 					fmt.Sprintf("%d", tsResizeBrokerID), tsResizeCacheMountPath)
 				if err != nil {
 					return err
 				}
-				if state != "pending-deletion" {
-					return fmt.Errorf("expected cacheVolumeStates[%s]=%q, got %q",
-						tsResizeCacheMountPath, "pending-deletion", state)
-				}
 				pvcs, err := listBrokerCachePVCs(kubectlOptions)
 				if err != nil {
 					return err
 				}
-				if len(pvcs) < 2 {
-					return fmt.Errorf("expected 2 cache PVCs (old + replacement) for broker %d, got %d",
-						tsResizeBrokerID, len(pvcs))
+				if state == "pending-deletion" && len(pvcs) >= 2 {
+					return nil
 				}
-				return nil
+				if state == "" && len(pvcs) == 1 && pvcs[0].StorageSize == tsResizeShrunkSize {
+					return nil
+				}
+				return fmt.Errorf("not at expected staging state: cacheVolumeStates[%s]=%q, %d cache PVC(s)",
+					tsResizeCacheMountPath, state, len(pvcs))
 			}, tsResizePhaseTimeout, tsResizePollingInterval).ShouldNot(gomega.HaveOccurred())
 		})
 

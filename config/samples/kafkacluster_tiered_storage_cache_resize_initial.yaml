@@ -10,9 +10,15 @@ spec:
   clusterImage: "ghcr.io/adobe/koperator/kafka:2.13-3.9.1"
   readOnlyConfig: |
     auto.create.topics.enable=false
+    cruise.control.metrics.topic.auto.create=true
+    cruise.control.metrics.topic.num.partitions=1
+    cruise.control.metrics.topic.replication.factor=1
   rollingUpgradeConfig:
     failureThreshold: 1
-  cruiseControlConfig: {}
+  cruiseControlConfig:
+    topicConfig:
+      partitions: 1
+      replicationFactor: 2
   brokers:
     - id: 0
       brokerConfig:
@@ -42,7 +48,30 @@ spec:
           requests:
             cpu: "200m"
             memory: 1Gi
+    # Second broker: present only to satisfy the CRD's minimum replicationFactor=2 constraint
+    # for the Cruise Control coordination topic. Carries no tiered storage cache PVC and is
+    # not the broker under test (tsResizeBrokerID=0).
     - id: 1
+      brokerConfig:
+        processRoles:
+          - broker
+        terminationGracePeriodSeconds: 10
+        storageConfigs:
+          - mountPath: "/kafka-logs"
+            pvcSpec:
+              accessModes:
+                - ReadWriteOnce
+              resources:
+                requests:
+                  storage: 2Gi
+        resourceRequirements:
+          limits:
+            cpu: "1"
+            memory: 2Gi
+          requests:
+            cpu: "200m"
+            memory: 1Gi
+    - id: 2
       brokerConfig:
         processRoles:
           - controller
