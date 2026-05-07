@@ -82,9 +82,10 @@ func New(client client.Client, cluster *v1beta1.KafkaCluster) *Reconciler {
 func (r *Reconciler) Reconcile(log logr.Logger) error {
 	log = log.WithValues("component", componentName)
 	log.V(1).Info("Reconciling")
+	desiredNames := make(map[string]struct{})
 
 	for _, eListener := range r.KafkaCluster.Spec.ListenersConfig.ExternalListeners {
-		if r.KafkaCluster.Spec.GetIngressController() == istioingress.IngressControllerName && eListener.GetAccessMethod() == corev1.ServiceTypeLoadBalancer {
+		if eListener.GetIngressController(&r.KafkaCluster.Spec) == istioingress.IngressControllerName && eListener.GetAccessMethod() == corev1.ServiceTypeLoadBalancer {
 			if r.KafkaCluster.Spec.IstioControlPlane == nil {
 				log.Error(errors.NewPlain("reference to Istio Control Plane is missing"), "skip external listener reconciliation", "external listener", eListener.Name)
 				continue
@@ -107,57 +108,58 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 					r.virtualService,
 				} {
 					o := res(log, eListener, ingressConfig, name, defaultControllerName, istioRevision)
-					err := k8sutil.Reconcile(log, r.Client, o, r.KafkaCluster)
+					metaObj, err := apimeta.Accessor(o)
+					if err != nil {
+						return errors.Wrap(err, "failed to get object meta for desired istio resources")
+					}
+					desiredNames[metaObj.GetName()] = struct{}{}
+					err = k8sutil.Reconcile(log, r.Client, o, r.KafkaCluster)
 					if err != nil {
 						return err
 					}
 				}
 			}
-		} else if r.KafkaCluster.Spec.RemoveUnusedIngressResources {
-			// Cleaning up unused istio resources when ingress controller is not istioingress or externalListener access method is not LoadBalancer
-			deletionCounter := 0
-			ctx := context.Background()
-			istioResourcesGVK := []schema.GroupVersionKind{
-				{
-					Version: istioOperatorApi.GroupVersion.Version,
-					Group:   istioOperatorApi.GroupVersion.Group,
-					Kind:    reflect.TypeOf(istioOperatorApi.IstioMeshGateway{}).Name(),
-				},
-				{
-					Version: istioclientv1beta1.SchemeGroupVersion.Version,
-					Group:   istioclientv1beta1.SchemeGroupVersion.Group,
-					Kind:    reflect.TypeOf(istioclientv1beta1.Gateway{}).Name(),
-				},
-				{
-					Version: istioclientv1beta1.SchemeGroupVersion.Version,
-					Group:   istioclientv1beta1.SchemeGroupVersion.Group,
-					Kind:    reflect.TypeOf(istioclientv1beta1.VirtualService{}).Name(),
-				},
-			}
-			var istioResources unstructured.UnstructuredList
-			for _, gvk := range istioResourcesGVK {
-				istioResources.SetGroupVersionKind(gvk)
+		}
+	}
 
-				if err := r.List(ctx, &istioResources, client.InNamespace(r.KafkaCluster.GetNamespace()),
-					client.MatchingLabels(labelsForIstioIngressWithoutEListenerName(r.KafkaCluster.Name, ""))); err != nil && !apimeta.IsNoMatchError(err) {
-					return errors.Wrap(err, "error when getting list of istio ingress resources for deletion")
-				}
+	if r.KafkaCluster.Spec.RemoveUnusedIngressResources {
+		ctx := context.Background()
+		istioResourcesGVK := []schema.GroupVersionKind{
+			{
+				Version: istioOperatorApi.GroupVersion.Version,
+				Group:   istioOperatorApi.GroupVersion.Group,
+				Kind:    reflect.TypeOf(istioOperatorApi.IstioMeshGateway{}).Name(),
+			},
+			{
+				Version: istioclientv1beta1.SchemeGroupVersion.Version,
+				Group:   istioclientv1beta1.SchemeGroupVersion.Group,
+				Kind:    reflect.TypeOf(istioclientv1beta1.Gateway{}).Name(),
+			},
+			{
+				Version: istioclientv1beta1.SchemeGroupVersion.Version,
+				Group:   istioclientv1beta1.SchemeGroupVersion.Group,
+				Kind:    reflect.TypeOf(istioclientv1beta1.VirtualService{}).Name(),
+			},
+		}
+		var istioResources unstructured.UnstructuredList
+		for _, gvk := range istioResourcesGVK {
+			istioResources.SetGroupVersionKind(gvk)
 
-				for _, removeObject := range istioResources.Items {
-					if !strings.Contains(removeObject.GetLabels()[util.ExternalListenerLabelNameKey], eListener.Name) ||
-						util.ObjectManagedByClusterRegistry(&removeObject) ||
-						!removeObject.GetDeletionTimestamp().IsZero() {
-						continue
-					}
-					if err := r.Delete(ctx, &removeObject); client.IgnoreNotFound(err) != nil {
-						return errors.Wrap(err, "error when removing istio ingress resources")
-					}
-					log.V(1).Info(fmt.Sprintf("Deleted istio ingress '%s' resource '%s' for externalListener '%s'", gvk.Kind, removeObject.GetName(), eListener.Name))
-					deletionCounter++
-				}
+			if err := r.List(ctx, &istioResources, client.InNamespace(r.KafkaCluster.GetNamespace()),
+				client.MatchingLabels(labelsForIstioIngressWithoutEListenerName(r.KafkaCluster.Name, ""))); err != nil && !apimeta.IsNoMatchError(err) {
+				return errors.Wrap(err, "error when getting list of istio ingress resources for deletion")
 			}
-			if deletionCounter > 0 {
-				log.Info(fmt.Sprintf("Removed '%d' resources for istio ingress", deletionCounter))
+
+			for _, removeObject := range istioResources.Items {
+				if _, desired := desiredNames[removeObject.GetName()]; desired ||
+					util.ObjectManagedByClusterRegistry(&removeObject) ||
+					!removeObject.GetDeletionTimestamp().IsZero() {
+					continue
+				}
+				if err := r.Delete(ctx, &removeObject); client.IgnoreNotFound(err) != nil {
+					return errors.Wrap(err, "error when removing istio ingress resources")
+				}
+				log.Info(fmt.Sprintf("Deleted istio ingress '%s' resource '%s'", gvk.Kind, removeObject.GetName()))
 			}
 		}
 	}

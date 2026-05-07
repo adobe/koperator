@@ -30,7 +30,6 @@ import (
 	"github.com/go-logr/logr"
 
 	banzaicloudv1beta1 "github.com/banzaicloud/koperator/api/v1beta1"
-	"github.com/banzaicloud/koperator/pkg/util"
 )
 
 type KafkaClusterValidator struct {
@@ -99,11 +98,45 @@ func checkInternalListeners(kafkaClusterSpec *banzaicloudv1beta1.KafkaClusterSpe
 func checkExternalListeners(kafkaClusterSpec *banzaicloudv1beta1.KafkaClusterSpec) field.ErrorList {
 	var allErrs field.ErrorList
 
+	allErrs = append(allErrs, checkExternalListenerIngressController(kafkaClusterSpec)...)
+	allErrs = append(allErrs, checkIstioControlPlaneRequiredWhenIstioIngress(kafkaClusterSpec)...)
 	allErrs = append(allErrs, checkExternalListenerStartingPort(kafkaClusterSpec)...)
-
 	allErrs = append(allErrs, checkTargetPortsCollisionForEnvoy(kafkaClusterSpec)...)
 
 	return allErrs
+}
+
+// checkExternalListenerIngressController validates that each external listener's IngressController (when non-empty) is envoy, contour, or istioingress.
+func checkExternalListenerIngressController(kafkaClusterSpec *banzaicloudv1beta1.KafkaClusterSpec) field.ErrorList {
+	var allErrs field.ErrorList
+	valid := map[string]bool{"envoy": true, "contour": true, "istioingress": true}
+	for i, extListener := range kafkaClusterSpec.ListenersConfig.ExternalListeners {
+		if extListener.IngressController != "" && !valid[extListener.IngressController] {
+			fldErr := field.Invalid(
+				field.NewPath("spec").Child("listenersConfig").Child("externalListeners").Index(i).Child("ingressController"),
+				extListener.IngressController,
+				"ingressController must be one of: envoy, contour, istioingress")
+			allErrs = append(allErrs, fldErr)
+		}
+	}
+	return allErrs
+}
+
+// checkIstioControlPlaneRequiredWhenIstioIngress ensures Spec.IstioControlPlane is set when any listener's effective controller is istioingress.
+func checkIstioControlPlaneRequiredWhenIstioIngress(kafkaClusterSpec *banzaicloudv1beta1.KafkaClusterSpec) field.ErrorList {
+	for _, extListener := range kafkaClusterSpec.ListenersConfig.ExternalListeners {
+		if extListener.GetIngressController(kafkaClusterSpec) == "istioingress" {
+			if kafkaClusterSpec.IstioControlPlane == nil {
+				return field.ErrorList{
+					field.Required(
+						field.NewPath("spec").Child("istioControlPlane"),
+						"istioControlPlane must be set when any external listener uses ingressController istioingress"),
+				}
+			}
+			return nil
+		}
+	}
+	return nil
 }
 
 // checkUniqueListenerContainerPort checks for duplicate containerPort numbers across both internal and external listeners
@@ -144,7 +177,7 @@ func checkExternalListenerStartingPort(kafkaClusterSpec *banzaicloudv1beta1.Kafk
 	for i, extListener := range kafkaClusterSpec.ListenersConfig.ExternalListeners {
 		var outOfRangeBrokerIDs, collidingPortsBrokerIDs []int32
 		for _, broker := range kafkaClusterSpec.Brokers {
-			externalPort := util.GetExternalPortForBroker(extListener.ExternalStartingPort, broker.Id)
+			externalPort := extListener.GetBrokerPort(broker.Id)
 			if externalPort < 1 || externalPort > maxPort {
 				outOfRangeBrokerIDs = append(outOfRangeBrokerIDs, broker.Id)
 			}
@@ -153,7 +186,7 @@ func checkExternalListenerStartingPort(kafkaClusterSpec *banzaicloudv1beta1.Kafk
 				collidingPortsBrokerIDs = append(collidingPortsBrokerIDs, broker.Id)
 			}
 
-			if kafkaClusterSpec.GetIngressController() == "envoy" {
+			if extListener.GetIngressController(kafkaClusterSpec) == "envoy" {
 				if externalPort == kafkaClusterSpec.EnvoyConfig.GetEnvoyAdminPort() || externalPort == kafkaClusterSpec.EnvoyConfig.GetEnvoyHealthCheckPort() {
 					collidingPortsBrokerIDs = append(collidingPortsBrokerIDs, broker.Id)
 				}
@@ -177,12 +210,8 @@ func checkExternalListenerStartingPort(kafkaClusterSpec *banzaicloudv1beta1.Kafk
 	return allErrs
 }
 
-// checkTargetPortsCollisionForEnvoy checks if the IngressControllerTargetPort collides with the other container ports for envoy deployment
+// checkTargetPortsCollisionForEnvoy checks if the IngressControllerTargetPort collides with the other container ports for envoy deployment (per listener when effective controller is envoy).
 func checkTargetPortsCollisionForEnvoy(kafkaClusterSpec *banzaicloudv1beta1.KafkaClusterSpec) field.ErrorList {
-	if kafkaClusterSpec.GetIngressController() != "envoy" {
-		return nil
-	}
-
 	var allErrs field.ErrorList
 
 	ap := kafkaClusterSpec.EnvoyConfig.GetEnvoyAdminPort()
@@ -196,6 +225,9 @@ func checkTargetPortsCollisionForEnvoy(kafkaClusterSpec *banzaicloudv1beta1.Kafk
 
 	if kafkaClusterSpec.ListenersConfig.ExternalListeners != nil {
 		for i, extListener := range kafkaClusterSpec.ListenersConfig.ExternalListeners {
+			if extListener.GetIngressController(kafkaClusterSpec) != "envoy" {
+				continue
+			}
 			// the ingress controller target port only has impact while using LoadBalancer to access the Kafka cluster
 			if extListener.GetAccessMethod() != corev1.ServiceTypeLoadBalancer {
 				continue

@@ -19,11 +19,11 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"strings"
 
 	"emperror.dev/errors"
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -68,7 +68,7 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 	var reconcileObjects []runtime.Object
 	// create ClusterIP services for discovery service and brokers
 	for _, eListener := range r.KafkaCluster.Spec.ListenersConfig.ExternalListeners {
-		if r.KafkaCluster.Spec.GetIngressController() == contourutils.IngressControllerName && eListener.GetAccessMethod() == corev1.ServiceTypeClusterIP {
+		if eListener.GetIngressController(&r.KafkaCluster.Spec) == contourutils.IngressControllerName && eListener.GetAccessMethod() == corev1.ServiceTypeClusterIP {
 			// create per ingressConfig services ClusterIP
 			ingressConfigs, defaultControllerName, err := util.GetIngressConfigs(r.KafkaCluster.Spec, eListener)
 			if err != nil {
@@ -104,46 +104,55 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 					return err
 				}
 			}
-		} else if r.KafkaCluster.Spec.RemoveUnusedIngressResources {
-			// Cleaning up unused contour resources when ingress controller is not contour or externalListener access method is not ClusterIP
-			deletionCounter := 0
-			ctx := context.Background()
-			contourResourcesGVK := []schema.GroupVersionKind{
-				{
-					Version: corev1.SchemeGroupVersion.Version,
-					Group:   corev1.SchemeGroupVersion.Group,
-					Kind:    reflect.TypeOf(corev1.Service{}).Name(),
-				},
-				{
-					Version: corev1.SchemeGroupVersion.Version,
-					Group:   corev1.SchemeGroupVersion.Group,
-					Kind:    reflect.TypeOf(contour.HTTPProxy{}).Name(),
-				},
-			}
-			var contourResources unstructured.UnstructuredList
-			for _, gvk := range contourResourcesGVK {
-				contourResources.SetGroupVersionKind(gvk)
+		}
+	}
 
-				if err := r.List(ctx, &contourResources, client.InNamespace(r.KafkaCluster.GetNamespace()),
-					client.MatchingLabels(labelsForContourIngressWithoutEListenerName(r.KafkaCluster.Name))); err != nil {
-					return errors.Wrap(err, "error when getting list of envoy ingress resources for deletion")
-				}
-
-				for _, removeObject := range contourResources.Items {
-					if !strings.Contains(removeObject.GetLabels()[util.ExternalListenerLabelNameKey], eListener.Name) ||
-						util.ObjectManagedByClusterRegistry(&removeObject) ||
-						!removeObject.GetDeletionTimestamp().IsZero() {
-						continue
-					}
-					if err := r.Delete(ctx, &removeObject); client.IgnoreNotFound(err) != nil {
-						return errors.Wrap(err, "error when removing contour ingress resources")
-					}
-					log.V(1).Info(fmt.Sprintf("Deleted contour ingress '%s' resource '%s' for externalListener '%s'", gvk.Kind, removeObject.GetName(), eListener.Name))
-					deletionCounter++
-				}
+	// Clean up contour resources that are no longer desired (outside the loop so we only remove resources not in reconcileObjects)
+	if r.KafkaCluster.Spec.RemoveUnusedIngressResources {
+		desiredNames := make(map[string]struct{})
+		for _, obj := range reconcileObjects {
+			metaObj, err := meta.Accessor(obj)
+			if err != nil {
+				return errors.Wrap(err, "failed to get object meta for desired contour resources")
 			}
-			if deletionCounter > 0 {
-				log.Info(fmt.Sprintf("Removed '%d' resources for contour ingress", deletionCounter))
+			desiredNames[metaObj.GetName()] = struct{}{}
+		}
+
+		ctx := context.Background()
+		contourResourcesGVK := []schema.GroupVersionKind{
+			{
+				Version: corev1.SchemeGroupVersion.Version,
+				Group:   corev1.SchemeGroupVersion.Group,
+				Kind:    reflect.TypeOf(corev1.Service{}).Name(),
+			},
+			{
+				Version: contour.SchemeGroupVersion.Version,
+				Group:   contour.SchemeGroupVersion.Group,
+				Kind:    reflect.TypeOf(contour.HTTPProxy{}).Name(),
+			},
+		}
+
+		var contourResources unstructured.UnstructuredList
+		for _, gvk := range contourResourcesGVK {
+			contourResources.SetGroupVersionKind(gvk)
+
+			if err := r.List(ctx, &contourResources, client.InNamespace(r.KafkaCluster.GetNamespace()),
+				client.MatchingLabels(labelsForContourIngressWithoutEListenerName(r.KafkaCluster.Name))); err != nil {
+				return errors.Wrap(err, "error when getting list of contour ingress resources for deletion")
+			}
+
+			for _, removeObject := range contourResources.Items {
+				if _, desired := desiredNames[removeObject.GetName()]; desired ||
+					util.ObjectManagedByClusterRegistry(&removeObject) ||
+					!removeObject.GetDeletionTimestamp().IsZero() {
+					log.V(2).Info(fmt.Sprintf("Skipping deletion of resource '%s' (kind: %s): either managed by cluster registry or marked for deletion",
+						removeObject.GetName(), gvk.Kind))
+					continue
+				}
+				if err := r.Delete(ctx, &removeObject); client.IgnoreNotFound(err) != nil {
+					return errors.Wrap(err, "error when removing contour ingress resources")
+				}
+				log.Info(fmt.Sprintf("Deleted contour ingress '%s' resource '%s'", gvk.Kind, removeObject.GetName()))
 			}
 		}
 	}

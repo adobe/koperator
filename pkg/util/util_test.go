@@ -22,6 +22,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/banzaicloud/koperator/api/v1beta1"
+	"github.com/banzaicloud/koperator/pkg/util/contour"
 	"github.com/banzaicloud/koperator/pkg/util/istioingress"
 
 	"gotest.tools/assert"
@@ -297,6 +298,24 @@ func TestGetIngressConfigs(t *testing.T) {
 		},
 	}
 
+	defaultKafkaClusterWithContour := &v1beta1.KafkaClusterSpec{
+		IngressController: contour.IngressControllerName,
+		ContourIngressConfig: v1beta1.ContourIngressConfig{
+			TLSSecretName:      "contour-tls",
+			BrokerFQDNTemplate: "broker-%id.contour.example.com",
+		},
+	}
+
+	// Cluster default envoy but has ContourIngressConfig for per-listener override test
+	clusterEnvoyWithContourConfig := &v1beta1.KafkaClusterSpec{
+		IngressController: "envoy",
+		EnvoyConfig:       defaultKafkaClusterWithEnvoy.EnvoyConfig,
+		ContourIngressConfig: v1beta1.ContourIngressConfig{
+			TLSSecretName:      "contour-tls",
+			BrokerFQDNTemplate: "broker-%id.contour.example.com",
+		},
+	}
+
 	testCases := []struct {
 		globalConfig                     v1beta1.KafkaClusterSpec
 		externalListenerSpecifiedConfigs v1beta1.ExternalListenerConfig
@@ -470,6 +489,41 @@ func TestGetIngressConfigs(t *testing.T) {
 						Annotations: map[string]string{"az2": "region"},
 						Replicas:    1,
 					},
+				},
+			},
+		},
+		// Per-listener ingress override: cluster default envoy, listener specifies contour -> contour config
+		{
+			*clusterEnvoyWithContourConfig,
+			v1beta1.ExternalListenerConfig{
+				CommonListenerSpec: v1beta1.CommonListenerSpec{
+					Type:          "plaintext",
+					Name:          "external",
+					ContainerPort: 9094,
+				},
+				ExternalStartingPort: 19090,
+				IngressController:    contour.IngressControllerName,
+			},
+			map[string]v1beta1.IngressConfig{
+				IngressConfigGlobalName: {
+					ContourIngressConfig: &clusterEnvoyWithContourConfig.ContourIngressConfig,
+				},
+			},
+		},
+		// Cluster default contour, listener has no override -> contour config (backward compatibility)
+		{
+			*defaultKafkaClusterWithContour,
+			v1beta1.ExternalListenerConfig{
+				CommonListenerSpec: v1beta1.CommonListenerSpec{
+					Type:          "plaintext",
+					Name:          "external",
+					ContainerPort: 9094,
+				},
+				ExternalStartingPort: 19090,
+			},
+			map[string]v1beta1.IngressConfig{
+				IngressConfigGlobalName: {
+					ContourIngressConfig: &defaultKafkaClusterWithContour.ContourIngressConfig,
 				},
 			},
 		},
@@ -818,6 +872,123 @@ func TestFilterControllerOnlyNodes(t *testing.T) {
 				t.Errorf("error should be nil, got: %v", err)
 			}
 			require.Equal(t, tc.expectedIDsAfterFiltering, filteredIDs)
+		})
+	}
+}
+
+func TestShouldIncludeBroker(t *testing.T) {
+	testCases := []struct {
+		testName                 string
+		brokerConfig             *v1beta1.BrokerConfig
+		status                   v1beta1.KafkaClusterStatus
+		brokerID                 int
+		defaultIngressConfigName string
+		ingressConfigName        string
+		expected                 bool
+	}{
+		{
+			testName:                 "global Envoy listener, empty BrokerIngressMapping",
+			brokerConfig:             &v1beta1.BrokerConfig{},
+			status:                   v1beta1.KafkaClusterStatus{},
+			brokerID:                 0,
+			defaultIngressConfigName: "",
+			ingressConfigName:        "",
+			expected:                 true,
+		},
+		{
+			testName: "global Envoy listener, BrokerIngressMapping set to Contour config names (regression)",
+			brokerConfig: &v1beta1.BrokerConfig{
+				BrokerIngressMapping: []string{"external"},
+			},
+			status: v1beta1.KafkaClusterStatus{
+				BrokersState: map[string]v1beta1.BrokerState{
+					"0": {ExternalListenerConfigNames: []string{"external"}},
+				},
+			},
+			brokerID:                 0,
+			defaultIngressConfigName: "",
+			ingressConfigName:        "",
+			expected:                 true,
+		},
+		{
+			testName: "global Envoy listener, BrokerIngressMapping set to multiple Contour config names (regression)",
+			brokerConfig: &v1beta1.BrokerConfig{
+				BrokerIngressMapping: []string{"external", "corp"},
+			},
+			status:                   v1beta1.KafkaClusterStatus{},
+			brokerID:                 1,
+			defaultIngressConfigName: "",
+			ingressConfigName:        "",
+			expected:                 true,
+		},
+		{
+			testName: "named Contour listener, BrokerIngressMapping matches",
+			brokerConfig: &v1beta1.BrokerConfig{
+				BrokerIngressMapping: []string{"external"},
+			},
+			status:                   v1beta1.KafkaClusterStatus{},
+			brokerID:                 0,
+			defaultIngressConfigName: "external",
+			ingressConfigName:        "external",
+			expected:                 true,
+		},
+		{
+			testName: "named Contour listener, BrokerIngressMapping does not match",
+			brokerConfig: &v1beta1.BrokerConfig{
+				BrokerIngressMapping: []string{"external"},
+			},
+			status:                   v1beta1.KafkaClusterStatus{},
+			brokerID:                 0,
+			defaultIngressConfigName: "external",
+			ingressConfigName:        "corp",
+			expected:                 false,
+		},
+		{
+			testName:                 "named Contour listener, empty BrokerIngressMapping uses default",
+			brokerConfig:             &v1beta1.BrokerConfig{},
+			status:                   v1beta1.KafkaClusterStatus{},
+			brokerID:                 0,
+			defaultIngressConfigName: "external",
+			ingressConfigName:        "external",
+			expected:                 true,
+		},
+		{
+			testName: "KRaft controller-only node excluded",
+			brokerConfig: &v1beta1.BrokerConfig{
+				Roles: []string{"controller"},
+			},
+			status:                   v1beta1.KafkaClusterStatus{},
+			brokerID:                 0,
+			defaultIngressConfigName: "",
+			ingressConfigName:        "",
+			expected:                 false,
+		},
+		{
+			testName: "KRaft combined broker+controller node included",
+			brokerConfig: &v1beta1.BrokerConfig{
+				Roles: []string{"broker", "controller"},
+			},
+			status:                   v1beta1.KafkaClusterStatus{},
+			brokerID:                 0,
+			defaultIngressConfigName: "",
+			ingressConfigName:        "",
+			expected:                 true,
+		},
+		{
+			testName:                 "nil brokerConfig excluded",
+			brokerConfig:             nil,
+			status:                   v1beta1.KafkaClusterStatus{},
+			brokerID:                 0,
+			defaultIngressConfigName: "",
+			ingressConfigName:        "",
+			expected:                 false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.testName, func(t *testing.T) {
+			result := ShouldIncludeBroker(tc.brokerConfig, tc.status, tc.brokerID, tc.defaultIngressConfigName, tc.ingressConfigName)
+			require.Equal(t, tc.expected, result)
 		})
 	}
 }

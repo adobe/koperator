@@ -23467,6 +23467,15 @@ spec:
                             In case of external listeners using NodePort access method the broker instead of node public IP (see "brokerConfig.nodePortExternalIP")
                             is advertised on the address having the following format: <kafka-cluster-name>-<broker-id>.<namespace><value-specified-in-hostnameOverride-field>
                           type: string
+                        ingressController:
+                          description: IngressController specifies the ingress controller
+                            type for this external listener. When empty, the cluster-level
+                            spec.ingressController is used.
+                          enum:
+                          - envoy
+                          - contour
+                          - istioingress
+                          type: string
                         ingressControllerTargetPort:
                           description: |-
                             IngressControllerTargetPort defines the container port that the ingress controller uses for handling external traffic.

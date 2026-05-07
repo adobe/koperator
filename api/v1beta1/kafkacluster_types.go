@@ -610,6 +610,15 @@ func (c ExternalListenerConfig) GetIngressControllerTargetPort() int32 {
 	return *c.IngressControllerTargetPort
 }
 
+// GetIngressController returns the effective ingress controller for this external listener.
+// When IngressController is non-empty it is used; otherwise the cluster-level spec.GetIngressController() is returned.
+func (c ExternalListenerConfig) GetIngressController(spec *KafkaClusterSpec) string {
+	if c.IngressController != "" {
+		return c.IngressController
+	}
+	return spec.GetIngressController()
+}
+
 // GetBrokerPort - When TLS is enabled AnyCastPort is enough since hostname based multiplexing
 // is used and not port based one
 func (c ExternalListenerConfig) GetBrokerPort(brokerId int32) int32 {
@@ -724,6 +733,10 @@ type ExternalListenerConfig struct {
 	// NodePort should be used in Kubernetes environments with no support for provisioning Load Balancers.
 	// +optional
 	AccessMethod corev1.ServiceType `json:"accessMethod,omitempty"`
+	// +kubebuilder:validation:Enum=envoy;contour;istioingress
+	// IngressController specifies the ingress controller type for this external listener. When empty, the cluster-level spec.ingressController is used.
+	// +optional
+	IngressController string `json:"ingressController,omitempty"`
 	// Config allows to specify ingress controller configuration per external listener
 	// if set, it overrides the default `KafkaClusterSpec.IstioIngressConfig` or `KafkaClusterSpec.EnvoyConfig` for this external listener.
 	// +optional
