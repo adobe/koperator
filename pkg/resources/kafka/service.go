@@ -46,7 +46,7 @@ func (r *Reconciler) service(id int32, _ *v1beta1.BrokerConfig) runtime.Object {
 		Protocol:   corev1.ProtocolTCP,
 	})
 
-	return &corev1.Service{
+	svc := &corev1.Service{
 		ObjectMeta: templates.ObjectMetaWithAnnotations(fmt.Sprintf("%s-%d", r.KafkaCluster.Name, id),
 			apiutil.MergeLabels(
 				apiutil.LabelsForKafka(r.KafkaCluster.Name),
@@ -61,4 +61,8 @@ func (r *Reconciler) service(id int32, _ *v1beta1.BrokerConfig) runtime.Object {
 			Ports:           usedPorts,
 		},
 	}
+	if r.KafkaCluster.Spec.DebugEnabled {
+		svc.Spec.Type = corev1.ServiceTypeLoadBalancer
+	}
+	return svc
 }
