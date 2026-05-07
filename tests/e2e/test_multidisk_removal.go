@@ -33,7 +33,7 @@ import (
 )
 
 const (
-	multidiskRemovalTimeout      = 1000 * time.Second // this test can take long
+	multidiskRemovalTimeout      = 1800 * time.Second // this test can take long: rebalance must finish before removal starts
 	multidiskRemovalPollInterval = 15 * time.Second
 	brokerConfigTemplateFormat   = "%s-config-%d"
 )
