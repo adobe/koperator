@@ -210,9 +210,9 @@ func (in *BrokerState) DeepCopyInto(out *BrokerState) {
 		*out = make(ExternalListenerConfigNames, len(*in))
 		copy(*out, *in)
 	}
-	if in.CacheVolumeStates != nil {
-		in, out := &in.CacheVolumeStates, &out.CacheVolumeStates
-		*out = make(map[string]CacheResizeState, len(*in))
+	if in.TieredCacheVolumes != nil {
+		in, out := &in.TieredCacheVolumes, &out.TieredCacheVolumes
+		*out = make(map[string]TieredCacheVolumeState, len(*in))
 		for key, val := range *in {
 			(*out)[key] = val
 		}

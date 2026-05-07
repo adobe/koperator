@@ -174,15 +174,15 @@ func generateBrokerState(brokerIDs []string, cluster *banzaicloudv1beta1.KafkaCl
 		case banzaicloudv1beta1.KafkaVersion:
 			brokerState.Image = s.Image
 			brokerState.Version = s.Version
-		case map[string]banzaicloudv1beta1.CacheResizeState:
-			if brokerState.CacheVolumeStates == nil {
-				brokerState.CacheVolumeStates = make(map[string]banzaicloudv1beta1.CacheResizeState)
+		case map[string]banzaicloudv1beta1.TieredCacheVolumeState:
+			if brokerState.TieredCacheVolumes == nil {
+				brokerState.TieredCacheVolumes = make(map[string]banzaicloudv1beta1.TieredCacheVolumeState)
 			}
 			for mountPath, state := range s {
 				if state == "" {
-					delete(brokerState.CacheVolumeStates, mountPath)
+					delete(brokerState.TieredCacheVolumes, mountPath)
 				} else {
-					brokerState.CacheVolumeStates[mountPath] = state
+					brokerState.TieredCacheVolumes[mountPath] = state
 				}
 			}
 		}

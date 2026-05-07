@@ -181,6 +181,33 @@ func testTieredStorageCachePvcResize() bool {
 		var err error
 		var broker0PodUID string // UID of the broker-0 pod before the resize, used to detect recycling
 
+		// AfterAll ensures the cluster and its PVCs are removed even when a test step fails
+		// mid-run, preventing stale resources from blocking the next test run.
+		ginkgo.AfterAll(func() {
+			opts, e := kubectlOptionsForCurrentContext()
+			if e != nil {
+				return
+			}
+			opts.Namespace = koperatorLocalHelmDescriptor.Namespace
+			_, _ = k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &opts,
+				"patch", kafkaKind, tsResizeClusterName,
+				"--type=merge", `--patch={"metadata":{"finalizers":[]}}`,
+			)
+			_, _ = k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &opts,
+				"delete", kafkaKind, tsResizeClusterName, "--ignore-not-found",
+			)
+			_, _ = k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &opts,
+				"delete", "persistentvolumeclaims",
+				"-l", fmt.Sprintf("%s=%s", kafkaCRLabelKey, tsResizeClusterName),
+				"--ignore-not-found",
+			)
+			_, _ = k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &opts,
+				"delete", "pods",
+				"-l", fmt.Sprintf("%s=%s", kafkaCRLabelKey, tsResizeClusterName),
+				"--ignore-not-found", "--grace-period=0",
+			)
+		})
+
 		ginkgo.It("Acquiring K8s config and context", func() {
 			kubectlOptions, err = kubectlOptionsForCurrentContext()
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())

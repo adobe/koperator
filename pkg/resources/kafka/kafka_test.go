@@ -1412,14 +1412,14 @@ func TestReconcileKafkaPvcTieredCacheResize(t *testing.T) {
 		directClientOnlyPvc     *corev1.PersistentVolumeClaim
 		desiredPvc              *corev1.PersistentVolumeClaim
 		existingPods            []corev1.Pod
-		initialCacheVolumeState v1beta1.CacheResizeState // pre-existing brokerState for mountPath, if any
+		initialTieredCacheState v1beta1.TieredCacheVolumeState // pre-existing brokerState for mountPath, if any
 		expectedUpdatePvc       bool
 		expectedCreatePvc       bool
 		expectedDeletePvc       bool
 		expectedError           bool
 	}{
 		{
-			// Pod is up, no prior resize state: record CacheResizePendingDeletion in brokerState,
+			// Pod is up, no prior resize state: record TieredCacheVolumePendingDeletion in brokerState,
 			// create replacement PVC, set ConfigOutOfSync to trigger rolling upgrade.
 			testName:          "size decrease with running pod — resize state recorded, replacement PVC created",
 			existingPvc:       makeTieredCachePvc("cache-pvc-1", "100Gi"),
@@ -1449,7 +1449,7 @@ func TestReconcileKafkaPvcTieredCacheResize(t *testing.T) {
 			existingPvc:             makeTieredCachePvc("cache-pvc-1", "100Gi"),
 			desiredPvc:              makeTieredCachePvc("cache-pvc-new", "50Gi"),
 			existingPods:            []corev1.Pod{terminatingPod},
-			initialCacheVolumeState: v1beta1.CacheResizePendingDeletion,
+			initialTieredCacheState: v1beta1.TieredCacheVolumePendingDeletion,
 			expectedUpdatePvc:       false,
 			expectedCreatePvc:       true,
 			expectedDeletePvc:       true,
@@ -1474,7 +1474,7 @@ func TestReconcileKafkaPvcTieredCacheResize(t *testing.T) {
 			existingPvc:             makeTieredCachePvc("cache-pvc-1", "100Gi"),
 			desiredPvc:              makeTieredCachePvc("cache-pvc-new", "50Gi"),
 			existingPods:            []corev1.Pod{},
-			initialCacheVolumeState: v1beta1.CacheResizePendingDeletion,
+			initialTieredCacheState: v1beta1.TieredCacheVolumePendingDeletion,
 			expectedUpdatePvc:       false,
 			expectedCreatePvc:       true,
 			expectedDeletePvc:       true,
@@ -1500,7 +1500,7 @@ func TestReconcileKafkaPvcTieredCacheResize(t *testing.T) {
 			existingPvc:             makeTieredCachePvc("cache-pvc-1", "100Gi"),
 			desiredPvc:              makeTieredCachePvc("cache-pvc-new", "50Gi"),
 			existingPods:            []corev1.Pod{runningPod},
-			initialCacheVolumeState: v1beta1.CacheResizePendingDeletion,
+			initialTieredCacheState: v1beta1.TieredCacheVolumePendingDeletion,
 			expectedUpdatePvc:       false,
 			expectedCreatePvc:       true,
 			expectedDeletePvc:       false,
@@ -1515,7 +1515,7 @@ func TestReconcileKafkaPvcTieredCacheResize(t *testing.T) {
 			additionalExistingPvc:   makeTieredCachePvc("cache-pvc-replacement", "50Gi"),
 			desiredPvc:              makeTieredCachePvc("cache-pvc-replacement", "50Gi"),
 			existingPods:            []corev1.Pod{runningPod},
-			initialCacheVolumeState: v1beta1.CacheResizePendingDeletion,
+			initialTieredCacheState: v1beta1.TieredCacheVolumePendingDeletion,
 			expectedUpdatePvc:       false,
 			expectedCreatePvc:       false,
 			expectedDeletePvc:       false,
@@ -1533,7 +1533,7 @@ func TestReconcileKafkaPvcTieredCacheResize(t *testing.T) {
 			directClientOnlyPvc:     makeTieredCachePvc("cache-pvc-replacement", "50Gi"),
 			desiredPvc:              makeTieredCachePvc("cache-pvc-replacement", "50Gi"),
 			existingPods:            []corev1.Pod{runningPod},
-			initialCacheVolumeState: v1beta1.CacheResizePendingDeletion,
+			initialTieredCacheState: v1beta1.TieredCacheVolumePendingDeletion,
 			expectedUpdatePvc:       false,
 			expectedCreatePvc:       false,
 			expectedDeletePvc:       false,
@@ -1559,11 +1559,11 @@ func TestReconcileKafkaPvcTieredCacheResize(t *testing.T) {
 					}},
 				},
 			}
-			if test.initialCacheVolumeState != "" {
+			if test.initialTieredCacheState != "" {
 				kafkaCluster.Status.BrokersState = map[string]v1beta1.BrokerState{
 					brokerId: {
-						CacheVolumeStates: map[string]v1beta1.CacheResizeState{
-							mountPath: test.initialCacheVolumeState,
+						TieredCacheVolumes: map[string]v1beta1.TieredCacheVolumeState{
+							mountPath: test.initialTieredCacheState,
 						},
 					},
 				}
