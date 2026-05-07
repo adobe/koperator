@@ -1293,7 +1293,7 @@ func (r *Reconciler) deleteRemovedCachePVCs(
 ) error {
 	for i := range pvcList.Items {
 		pvc := &pvcList.Items[i]
-		if pvc.DeletionTimestamp != nil || pvc.Annotations["tieredStorageCache"] != annotationTrue {
+		if pvc.DeletionTimestamp != nil || pvc.Annotations[banzaiv1beta1.TieredStorageCacheAnnotationKey] != annotationTrue {
 			continue
 		}
 		if !desiredMountPaths[pvc.Annotations["mountPath"]] {
@@ -1558,7 +1558,7 @@ func (r *Reconciler) reconcileDesiredPvcsForBroker(
 
 			// Trigger a CC disk rebalance only for regular data volumes.
 			// Tiered storage cache PVCs are ephemeral — CC must not account for them.
-			if currentPvc.Annotations["tieredStorageCache"] != annotationTrue {
+			if currentPvc.Annotations[banzaiv1beta1.TieredStorageCacheAnnotationKey] != annotationTrue {
 				// Checking pvc state, if bounded, so the broker has already restarted and the CC GracefulDiskRebalance has not happened yet,
 				// then we make it happening with status update.
 				// If disk removal was set, and the disk was added back, we also need to mark the volume for rebalance
@@ -1628,7 +1628,7 @@ func (r *Reconciler) reconcileDesiredPvcsForBroker(
 		// annotation. Reading from the desired side would let a CR-edit (flipping
 		// tieredStorageCache: false → true on an existing data volume) route a real log-dir PVC
 		// through the cache-shrink delete-and-recreate path, bypassing graceful disk drain.
-		isTieredCache := currentPvc.Annotations["tieredStorageCache"] == annotationTrue
+		isTieredCache := currentPvc.Annotations[banzaiv1beta1.TieredStorageCacheAnnotationKey] == annotationTrue
 		desiredSize := desiredPvc.Spec.Resources.Requests.Storage().Value()
 		currentSize := currentPvc.Spec.Resources.Requests.Storage().Value()
 
