@@ -329,7 +329,9 @@ func testTieredStorageCachePvcResize() bool {
 			// than the polling interval, so insisting on the intermediate "pending-deletion"
 			// snapshot makes this phase flake-prone:
 			//   A) In-progress: tieredCacheVolumes[mp]=="pending-deletion" AND ≥2 cache PVCs.
-			//   B) Already completed: state cleared AND exactly one cache PVC at the shrunk size.
+			//   B) Already completed: state is "active" (no resize in flight) AND exactly one
+			//      cache PVC at the shrunk size. "active" is the steady-state after a resize;
+			//      "" (absent) would mean the mount path was removed entirely.
 			// Either proves the resize was staged correctly; Phase 2/3 cover the remaining
 			// invariants regardless of which path we observed.
 			ginkgo.By("Waiting until the resize is observable as in-progress or completed")
@@ -346,7 +348,7 @@ func testTieredStorageCachePvcResize() bool {
 				if state == "pending-deletion" && len(pvcs) >= 2 {
 					return nil
 				}
-				if state == "" && len(pvcs) == 1 && pvcs[0].StorageSize == tsResizeShrunkSize {
+				if state == "active" && len(pvcs) == 1 && pvcs[0].StorageSize == tsResizeShrunkSize {
 					return nil
 				}
 				return fmt.Errorf("not at expected staging state: tieredCacheVolumes[%s]=%q, %d cache PVC(s)",
@@ -389,15 +391,15 @@ func testTieredStorageCachePvcResize() bool {
 					return fmt.Errorf("expected 1 active cache PVC for broker %d after pod restart, got %d",
 						tsResizeBrokerID, len(activePvcs))
 				}
-				// The resize state should be cleared once the old PVC is gone.
+				// After cleanup the resize state transitions back to "active" — no longer pending-deletion.
 				state, err := getCacheResizeState(kubectlOptions, tsResizeClusterName,
 					fmt.Sprintf("%d", tsResizeBrokerID), tsResizeCacheMountPath)
 				if err != nil {
 					return err
 				}
-				if state != "" {
-					return fmt.Errorf("expected tieredCacheVolumes[%s] to be cleared, got %q",
-						tsResizeCacheMountPath, state)
+				if state == "pending-deletion" {
+					return fmt.Errorf("tieredCacheVolumes[%s] still pending-deletion after old PVC deleted",
+						tsResizeCacheMountPath)
 				}
 				return nil
 			}, tsResizePhaseTimeout, tsResizePollingInterval).ShouldNot(gomega.HaveOccurred())
@@ -417,7 +419,7 @@ func testTieredStorageCachePvcResize() bool {
 			state, err := getCacheResizeState(kubectlOptions, tsResizeClusterName,
 				fmt.Sprintf("%d", tsResizeBrokerID), tsResizeCacheMountPath)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(state).To(gomega.BeEmpty(), "tieredCacheVolumes entry should be cleared after resize")
+			gomega.Expect(state).To(gomega.Equal("active"), "tieredCacheVolumes entry should be active after resize completes")
 		})
 
 		ginkgo.It("Verifying the surviving cache PVC has the new size "+tsResizeShrunkSize, func() {
