@@ -1417,6 +1417,9 @@ func TestReconcileKafkaPvcTieredCacheResize(t *testing.T) {
 		expectedCreatePvc       bool
 		expectedDeletePvc       bool
 		expectedError           bool
+		// expectedTieredCacheState, when non-empty, asserts the final TieredCacheVolumes[mountPath]
+		// value after reconcileKafkaPvc returns.
+		expectedTieredCacheState v1beta1.TieredCacheVolumeState
 	}{
 		{
 			// Pod is up, no prior resize state: record TieredCacheVolumePendingDeletion in brokerState,
@@ -1496,15 +1499,16 @@ func TestReconcileKafkaPvcTieredCacheResize(t *testing.T) {
 			// failed before completing. Pod is still running, so the old PVC must NOT be
 			// deleted and state must NOT be cleared. The reconciler must re-create the
 			// replacement.
-			testName:                "pending-deletion with running pod and no replacement — replacement re-staged",
-			existingPvc:             makeTieredCachePvc("cache-pvc-1", "100Gi"),
-			desiredPvc:              makeTieredCachePvc("cache-pvc-new", "50Gi"),
-			existingPods:            []corev1.Pod{runningPod},
-			initialTieredCacheState: v1beta1.TieredCacheVolumePendingDeletion,
-			expectedUpdatePvc:       false,
-			expectedCreatePvc:       true,
-			expectedDeletePvc:       false,
-			expectedError:           false,
+			testName:                 "pending-deletion with running pod and no replacement — replacement re-staged",
+			existingPvc:              makeTieredCachePvc("cache-pvc-1", "100Gi"),
+			desiredPvc:               makeTieredCachePvc("cache-pvc-new", "50Gi"),
+			existingPods:             []corev1.Pod{runningPod},
+			initialTieredCacheState:  v1beta1.TieredCacheVolumePendingDeletion,
+			expectedUpdatePvc:        false,
+			expectedCreatePvc:        true,
+			expectedDeletePvc:        false,
+			expectedError:            false,
+			expectedTieredCacheState: v1beta1.TieredCacheVolumePendingDeletion,
 		},
 		{
 			// Idempotency (symmetric): pending-deletion state and a replacement at desired
@@ -1645,6 +1649,11 @@ func TestReconcileKafkaPvcTieredCacheResize(t *testing.T) {
 				assert.NotNil(t, err, "expected an error but got nil")
 			} else {
 				assert.Nil(t, err, "expected no error but got: %v", err)
+			}
+			if test.expectedTieredCacheState != "" {
+				finalState := kafkaCluster.Status.BrokersState[brokerId].TieredCacheVolumes[mountPath]
+				assert.Equal(t, test.expectedTieredCacheState, finalState,
+					"TieredCacheVolumes[%s] after reconcile", mountPath)
 			}
 		})
 	}
