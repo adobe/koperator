@@ -1672,7 +1672,11 @@ func (r *Reconciler) reconcileDesiredPvcsForBroker(
 			if err := r.Create(ctx, desiredPvc); err != nil {
 				return errorfactory.New(errorfactory.APIFailure{}, err, "creating resource failed", "kind", desiredType)
 			}
-			if desiredPvc.Annotations[banzaiv1beta1.TieredStorageCacheAnnotationKey] == annotationTrue {
+			// Only write Active when this is a genuinely new PVC. If pending-deletion is already
+			// set (crash-recovery: prior Create timed out), preserve the in-flight state so
+			// handleBrokerCacheResizeCleanup can still delete the old PVC on the next cycle.
+			if desiredPvc.Annotations[banzaiv1beta1.TieredStorageCacheAnnotationKey] == annotationTrue &&
+				r.KafkaCluster.Status.BrokersState[brokerId].TieredCacheVolumes[mountPath] != banzaiv1beta1.TieredCacheVolumePendingDeletion {
 				if err := k8sutil.UpdateBrokerStatus(r.Client, []string{brokerId}, r.KafkaCluster,
 					map[string]banzaiv1beta1.TieredCacheVolumeState{mountPath: banzaiv1beta1.TieredCacheVolumeActive}, log); err != nil {
 					return errorfactory.New(errorfactory.StatusUpdateError{}, err,

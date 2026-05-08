@@ -45,13 +45,14 @@ const (
 
 // pvcItem is a minimal representation of a PVC for assertion helpers.
 type pvcItem struct {
-	Name        string
-	Annotations map[string]string
-	StorageSize string
-	Phase       string
+	Name          string
+	Annotations   map[string]string
+	StorageSize   string
+	Phase         string
+	IsTerminating bool
 }
 
-// getCacheResizeState returns the CacheVolumeStates entry for the given broker and mount path
+// getCacheResizeState returns the tieredCacheVolumes entry for the given broker and mount path
 // from the KafkaCluster CR status, or an empty string if not set.
 func getCacheResizeState(kubectlOptions k8s.KubectlOptions, clusterName, brokerID, mountPath string) (string, error) {
 	rawOutput, err := k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &kubectlOptions,
@@ -65,7 +66,7 @@ func getCacheResizeState(kubectlOptions k8s.KubectlOptions, clusterName, brokerI
 	var cr struct {
 		Status struct {
 			BrokersState map[string]struct {
-				CacheVolumeStates map[string]string `json:"cacheVolumeStates"`
+				TieredCacheVolumes map[string]string `json:"tieredCacheVolumes"`
 			} `json:"brokersState"`
 		} `json:"status"`
 	}
@@ -77,7 +78,7 @@ func getCacheResizeState(kubectlOptions k8s.KubectlOptions, clusterName, brokerI
 	if !ok {
 		return "", nil
 	}
-	return brokerState.CacheVolumeStates[mountPath], nil
+	return brokerState.TieredCacheVolumes[mountPath], nil
 }
 
 // listBrokerCachePVCs returns PVCs for broker tsResizeBrokerID that have the
@@ -97,8 +98,9 @@ func listBrokerCachePVCs(kubectlOptions k8s.KubectlOptions) ([]pvcItem, error) {
 	var pvcList struct {
 		Items []struct {
 			Metadata struct {
-				Name        string            `json:"name"`
-				Annotations map[string]string `json:"annotations"`
+				Name              string            `json:"name"`
+				Annotations       map[string]string `json:"annotations"`
+				DeletionTimestamp *string           `json:"deletionTimestamp"`
 			} `json:"metadata"`
 			Spec struct {
 				Resources struct {
@@ -120,10 +122,11 @@ func listBrokerCachePVCs(kubectlOptions k8s.KubectlOptions) ([]pvcItem, error) {
 	for _, item := range pvcList.Items {
 		if item.Metadata.Annotations["mountPath"] == tsResizeCacheMountPath {
 			result = append(result, pvcItem{
-				Name:        item.Metadata.Name,
-				Annotations: item.Metadata.Annotations,
-				StorageSize: item.Spec.Resources.Requests.Storage,
-				Phase:       item.Status.Phase,
+				Name:          item.Metadata.Name,
+				Annotations:   item.Metadata.Annotations,
+				StorageSize:   item.Spec.Resources.Requests.Storage,
+				Phase:         item.Status.Phase,
+				IsTerminating: item.Metadata.DeletionTimestamp != nil,
 			})
 		}
 	}
@@ -325,7 +328,7 @@ func testTieredStorageCachePvcResize() bool {
 			// Two acceptable success paths — the resize can complete in seconds, often faster
 			// than the polling interval, so insisting on the intermediate "pending-deletion"
 			// snapshot makes this phase flake-prone:
-			//   A) In-progress: cacheVolumeStates[mp]=="pending-deletion" AND ≥2 cache PVCs.
+			//   A) In-progress: tieredCacheVolumes[mp]=="pending-deletion" AND ≥2 cache PVCs.
 			//   B) Already completed: state cleared AND exactly one cache PVC at the shrunk size.
 			// Either proves the resize was staged correctly; Phase 2/3 cover the remaining
 			// invariants regardless of which path we observed.
@@ -346,7 +349,7 @@ func testTieredStorageCachePvcResize() bool {
 				if state == "" && len(pvcs) == 1 && pvcs[0].StorageSize == tsResizeShrunkSize {
 					return nil
 				}
-				return fmt.Errorf("not at expected staging state: cacheVolumeStates[%s]=%q, %d cache PVC(s)",
+				return fmt.Errorf("not at expected staging state: tieredCacheVolumes[%s]=%q, %d cache PVC(s)",
 					tsResizeCacheMountPath, state, len(pvcs))
 			}, tsResizePhaseTimeout, tsResizePollingInterval).ShouldNot(gomega.HaveOccurred())
 		})
@@ -378,7 +381,7 @@ func testTieredStorageCachePvcResize() bool {
 				activePvcs := make([]pvcItem, 0, len(pvcs))
 				for _, pvc := range pvcs {
 					// Ignore PVCs that are being deleted (DeletionTimestamp set but not yet gone).
-					if pvc.Phase != "" {
+					if !pvc.IsTerminating {
 						activePvcs = append(activePvcs, pvc)
 					}
 				}
@@ -393,7 +396,7 @@ func testTieredStorageCachePvcResize() bool {
 					return err
 				}
 				if state != "" {
-					return fmt.Errorf("expected cacheVolumeStates[%s] to be cleared, got %q",
+					return fmt.Errorf("expected tieredCacheVolumes[%s] to be cleared, got %q",
 						tsResizeCacheMountPath, state)
 				}
 				return nil
@@ -414,7 +417,7 @@ func testTieredStorageCachePvcResize() bool {
 			state, err := getCacheResizeState(kubectlOptions, tsResizeClusterName,
 				fmt.Sprintf("%d", tsResizeBrokerID), tsResizeCacheMountPath)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(state).To(gomega.BeEmpty(), "cacheVolumeStates entry should be cleared after resize")
+			gomega.Expect(state).To(gomega.BeEmpty(), "tieredCacheVolumes entry should be cleared after resize")
 		})
 
 		ginkgo.It("Verifying the surviving cache PVC has the new size "+tsResizeShrunkSize, func() {
