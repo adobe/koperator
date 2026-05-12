@@ -450,7 +450,9 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 		if err != nil {
 			return err
 		}
-		brokerStatus[broker.Id] = brokerConfig
+		if r.brokerNeedsVersionUpdate(broker.Id, brokerConfig) {
+			brokerStatus[broker.Id] = brokerConfig
+		}
 
 		// If dynamic configs can not be set then let the loop continue to the next broker,
 		// after the loop we return error. This solves that case when other brokers could get healthy,
@@ -919,6 +921,14 @@ func (r *Reconciler) reconcileKafkaPod(log logr.Logger, desiredPod *corev1.Pod, 
 		return errors.Wrap(err, "could not handle rolling upgrade")
 	}
 	return nil
+}
+
+// brokerNeedsVersionUpdate returns true when the broker's image/version status is absent,
+// incomplete, or stale relative to the desired image — i.e. a JMX fetch is warranted.
+func (r *Reconciler) brokerNeedsVersionUpdate(brokerID int32, brokerConfig *banzaiv1beta1.BrokerConfig) bool {
+	desiredImage := util.GetBrokerImage(brokerConfig, r.KafkaCluster.Spec.GetClusterImage())
+	state, ok := r.KafkaCluster.Status.BrokersState[strconv.Itoa(int(brokerID))]
+	return !ok || state.Version == "" || state.Image != desiredImage
 }
 
 type brokerVersionResult struct {
