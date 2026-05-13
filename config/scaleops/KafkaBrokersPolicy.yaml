@@ -1,0 +1,96 @@
+kind: Policy
+apiVersion: analysis.scaleops.sh/v1alpha1
+metadata:
+  name: kafka-brokers
+  namespace: scaleops-system
+spec:
+  type: Optimize
+  policyOptimize:
+    rightSizePolicy:
+      windowByResource:
+        cpu: 2h
+        ephemeral-storage: 2h
+        memory: 2h
+      requestsConfigs:
+        cpu:
+          headroomPercentage: 20
+          percentilePercentage: 97
+          minAllowed: 500m
+          maxAllowed: 0m
+          keepRequest: false
+        ephemeral-storage:
+          headroomPercentage: 5
+          percentilePercentage: 90
+          minAllowed: 0Gi
+          maxAllowed: 0Gi
+        memory:
+          headroomPercentage: 20
+          percentilePercentage: 97
+          minAllowed: 1Gi
+          maxAllowed: 0Gi
+          keepRequest: false
+      limitConfigs:
+        cpu:
+          noLimit: false
+          keepLimit: true
+          setLimit: null
+          setLimitRequestRatio: null
+          keepLimitRequestRatio: false
+          headroomPercentage: null
+          equalsToRequest: false
+        ephemeral-storage:
+          noLimit: false
+          keepLimit: true
+          setLimit: null
+          setLimitRequestRatio: null
+          keepLimitRequestRatio: false
+          headroomPercentage: null
+          equalsToRequest: false
+        memory:
+          noLimit: false
+          keepLimit: true
+          setLimit: null
+          setLimitRequestRatio: null
+          keepLimitRequestRatio: false
+          headroomPercentage: null
+          equalsToRequest: false
+      nodeCappingPolicy:
+        nodeCappingAuto: true
+      cpuInteger: false
+      histogramReplicaPercentilePerMinuteByResource:
+        memory: 100
+      jvmOptimizationEnabled: false
+      ephemeralStorageOptimizationEnabled: false
+    fastReaction:
+      enabled:
+        cpu: true
+        memory: true
+  updatePolicy:
+    updateByTypeMode:
+      deployment: OnCreate
+      statefulSet: OnCreate
+      daemonSet: OnCreate
+      job: OnCreate
+      family: OnCreate
+      argoRollout: OnCreate
+    minReplicas: 1
+    considerDeploymentStrategy: false
+    podMinReadySeconds: 5
+    requiredWindowCoveragePercentage: 3
+    allowRollingUpdate: true
+    inPlaceUpdateStrategy:
+      enableInPlaceForUponPodCreationStrategy: true
+      enableInPlaceForOngoingStrategy: true
+    binPackUnEvictablePods: true
+    skipRolloutUponAutomation: true
+    ignoreAutoscalerSafeToEvictAnnotations: false
+    activelyEnforceOptimizationByContext: true
+    initContainers:
+      enabled: true
+  autoDetectionRules: {}
+  hpa:
+    manageHPA: true
+  autoHealing:
+    enabledV2: true
+    enabledByResource:
+      ephemeral-storage: true

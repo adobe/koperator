@@ -8,7 +8,7 @@
 bin
 charts/**/charts
 charts/koperator/requirements.lock
-
+charts/kafka-operator/ingress
 # Test binary, build with `go test -c`
 *.test
 
