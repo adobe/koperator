@@ -456,6 +456,60 @@ var _ = Describe("CruiseControlTaskReconciler", func() {
 			}, taskExtendedTimeoutDuration, reconcilePollingPeriod).Should(BeTrue())
 		})
 	})
+	When("multiple brokers are removed", Serial, func() {
+		JustBeforeEach(func(ctx SpecContext) {
+			kafkaClusterCCReconciler.ScaleFactory = mocks.NewMockScaleFactory(getScaleMockCCTask1())
+			err := util.RetryOnConflict(util.DefaultBackOffForConflict, func() error {
+				if err := k8sClient.Get(ctx, types.NamespacedName{
+					Name:      kafkaCluster.Name,
+					Namespace: kafkaCluster.Namespace,
+				}, kafkaCluster); err != nil {
+					return err
+				}
+
+				for _, id := range []string{"1", "2"} {
+					brokerState := kafkaCluster.Status.BrokersState[id]
+					brokerState.GracefulActionState.CruiseControlState = v1beta1.GracefulDownscaleRequired
+					kafkaCluster.Status.BrokersState[id] = brokerState
+				}
+				return k8sClient.Status().Update(ctx, kafkaCluster)
+			})
+			Expect(err).NotTo(HaveOccurred())
+		})
+		It("should create exactly one remove_broker CruiseControlOperation for all brokers", func(ctx SpecContext) {
+			Eventually(ctx, func() bool {
+				err := k8sClient.Get(ctx, types.NamespacedName{
+					Name:      kafkaCluster.Name,
+					Namespace: kafkaCluster.Namespace,
+				}, kafkaCluster)
+				Expect(err).NotTo(HaveOccurred())
+
+				brokerState1, ok1 := kafkaCluster.Status.BrokersState["1"]
+				brokerState2, ok2 := kafkaCluster.Status.BrokersState["2"]
+				if !ok1 || !ok2 {
+					return false
+				}
+				if brokerState1.GracefulActionState.CruiseControlOperationReference == nil ||
+					brokerState2.GracefulActionState.CruiseControlOperationReference == nil {
+					return false
+				}
+
+				operationList := &v1alpha1.CruiseControlOperationList{}
+				err = k8sClient.List(ctx, operationList, client.ListOption(client.InNamespace(kafkaCluster.Namespace)))
+				Expect(err).NotTo(HaveOccurred())
+
+				if len(operationList.Items) != 1 {
+					return false
+				}
+				operation = &operationList.Items[0]
+				return operation.CurrentTaskOperation() == v1alpha1.OperationRemoveBroker &&
+					brokerState1.GracefulActionState.CruiseControlOperationReference.Name == operation.Name &&
+					brokerState2.GracefulActionState.CruiseControlOperationReference.Name == operation.Name &&
+					brokerState1.GracefulActionState.CruiseControlState == v1beta1.GracefulDownscaleScheduled &&
+					brokerState2.GracefulActionState.CruiseControlState == v1beta1.GracefulDownscaleScheduled
+			}, taskExtendedTimeoutDuration, reconcilePollingPeriod).Should(BeTrue())
+		})
+	})
 })
 
 func getScaleMockCCTask1() *mocks.MockCruiseControlScaler {
