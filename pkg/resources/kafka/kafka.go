@@ -167,22 +167,64 @@ func getCreatedPvcForBroker(
 	// 1. Always exclude terminating PVCs (DeletionTimestamp set) — they are released from pods
 	//    and should not be mounted by the new broker pod.
 	// 2. For mount paths with an in-flight cache resize (pendingDeletionMountPaths), two PVCs
-	//    temporarily coexist (old + replacement). Keep only one so the pod spec has a unique
-	//    mount path (the reconciler will use the correctly-sized one during PVC reconciliation).
-	seenMountPaths := make(map[string]bool)
+	//    temporarily coexist (old + replacement). Deterministically select the one whose storage
+	//    request matches the desired size; fall back to the lexicographically smallest name so
+	//    the pod-spec is stable across reconcile cycles regardless of API list order.
+
+	// Build desired-size map for pending-deletion mount paths.
+	desiredSizeByMountPath := make(map[string]int64)
+	for i := range storageConfigs {
+		if storageConfigs[i].PvcSpec != nil {
+			if qty := storageConfigs[i].PvcSpec.Resources.Requests.Storage(); qty != nil {
+				desiredSizeByMountPath[storageConfigs[i].MountPath] = qty.Value()
+			}
+		}
+	}
+
+	// First pass: for each pending-deletion mount path, pick the best PVC to keep.
+	// Preference order: (1) PVC whose size matches desired, (2) lexicographically smallest name.
+	bestIdx := make(map[string]int)          // mountPath -> index of selected PVC
+	bestMatchesSize := make(map[string]bool) // mountPath -> whether selected PVC matches desired size
+	for i := range foundPvcList.Items {
+		pvc := &foundPvcList.Items[i]
+		if pvc.DeletionTimestamp != nil {
+			continue
+		}
+		mp := pvc.Annotations["mountPath"]
+		if !pendingDeletionMountPaths[mp] {
+			continue
+		}
+		qty := pvc.Spec.Resources.Requests.Storage()
+		matchesDesired := qty != nil && qty.Value() == desiredSizeByMountPath[mp]
+		if _, seen := bestIdx[mp]; !seen {
+			bestIdx[mp] = i
+			bestMatchesSize[mp] = matchesDesired
+			continue
+		}
+		if matchesDesired && !bestMatchesSize[mp] {
+			// This PVC matches desired size; the current best does not — prefer this one.
+			bestIdx[mp] = i
+			bestMatchesSize[mp] = true
+		} else if matchesDesired == bestMatchesSize[mp] && pvc.Name < foundPvcList.Items[bestIdx[mp]].Name {
+			// Same category; prefer lexicographically smaller name for stability.
+			bestIdx[mp] = i
+		}
+	}
+
+	// Second pass: apply filters.
 	n := 0
-	for _, pvc := range foundPvcList.Items {
+	for i := range foundPvcList.Items {
+		pvc := &foundPvcList.Items[i]
 		if pvc.DeletionTimestamp != nil {
 			continue
 		}
 		mp := pvc.Annotations["mountPath"]
 		if pendingDeletionMountPaths[mp] {
-			if seenMountPaths[mp] {
+			if idx, ok := bestIdx[mp]; !ok || idx != i {
 				continue
 			}
-			seenMountPaths[mp] = true
 		}
-		foundPvcList.Items[n] = pvc
+		foundPvcList.Items[n] = *pvc
 		n++
 	}
 	foundPvcList.Items = foundPvcList.Items[:n]

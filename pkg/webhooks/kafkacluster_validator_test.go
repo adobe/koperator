@@ -403,6 +403,55 @@ func TestCheckTieredStorageCacheImmutability(t *testing.T) {
 			}},
 			expected: nil,
 		},
+		{
+			// Existing log-dir volume flipped to cache via inline config.
+			// The old spec has tieredStorageCache=false, the new spec flips it to true.
+			// The broker has no TieredCacheVolumes status entry (it is a log dir, not a cache),
+			// so only the spec-based check catches this.
+			testName: "false→true flip on existing log-dir volume rejected (inline)",
+			oldCluster: &v1beta1.KafkaCluster{
+				Spec: v1beta1.KafkaClusterSpec{
+					Brokers: []v1beta1.Broker{{Id: 0, BrokerConfig: &v1beta1.BrokerConfig{
+						StorageConfigs: []v1beta1.StorageConfig{sc("/data", false)},
+					}}},
+				},
+			},
+			newCluster: &v1beta1.KafkaCluster{Spec: v1beta1.KafkaClusterSpec{
+				Brokers: []v1beta1.Broker{{Id: 0, BrokerConfig: &v1beta1.BrokerConfig{
+					StorageConfigs: []v1beta1.StorageConfig{sc("/data", true)},
+				}}},
+			}},
+			expected: append(field.ErrorList{},
+				field.Forbidden(
+					field.NewPath("spec").Child("brokers").Index(0).Child("brokerConfig").Child("storageConfigs").Index(0).Child("tieredStorageCache"),
+					immutableTieredStorageCacheErrMsg,
+				),
+			),
+		},
+		{
+			// Existing log-dir volume flipped to cache via brokerConfigGroup.
+			testName: "false→true flip on existing log-dir volume rejected (group)",
+			oldCluster: &v1beta1.KafkaCluster{
+				Spec: v1beta1.KafkaClusterSpec{
+					Brokers: []v1beta1.Broker{{Id: 0, BrokerConfigGroup: "default"}},
+					BrokerConfigGroups: map[string]v1beta1.BrokerConfig{
+						"default": {StorageConfigs: []v1beta1.StorageConfig{sc("/data", false)}},
+					},
+				},
+			},
+			newCluster: &v1beta1.KafkaCluster{Spec: v1beta1.KafkaClusterSpec{
+				Brokers: []v1beta1.Broker{{Id: 0, BrokerConfigGroup: "default"}},
+				BrokerConfigGroups: map[string]v1beta1.BrokerConfig{
+					"default": {StorageConfigs: []v1beta1.StorageConfig{sc("/data", true)}},
+				},
+			}},
+			expected: append(field.ErrorList{},
+				field.Forbidden(
+					field.NewPath("spec").Child("brokerConfigGroups").Key("default").Child("storageConfigs").Index(0).Child("tieredStorageCache"),
+					immutableTieredStorageCacheErrMsg,
+				),
+			),
+		},
 	}
 
 	for _, testCase := range testCases {
