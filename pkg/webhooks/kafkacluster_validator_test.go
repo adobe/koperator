@@ -258,6 +258,161 @@ func TestCheckExternalListenerStartingPort(t *testing.T) {
 	}
 }
 
+func TestCheckTieredStorageCacheImmutability(t *testing.T) {
+	sc := func(path string, tc bool) v1beta1.StorageConfig {
+		return v1beta1.StorageConfig{MountPath: path, TieredStorageCache: tc}
+	}
+	// committed returns a KafkaCluster whose status records the given tieredCache volumes for broker 0.
+	// Only cache PVCs are tracked (TieredCacheVolumeActive or TieredCacheVolumePendingDeletion);
+	// non-cache PVCs have no entry.
+	committed := func(vols map[string]v1beta1.TieredCacheVolumeState) *v1beta1.KafkaCluster {
+		return &v1beta1.KafkaCluster{
+			Status: v1beta1.KafkaClusterStatus{
+				BrokersState: map[string]v1beta1.BrokerState{
+					"0": {TieredCacheVolumes: vols},
+				},
+			},
+		}
+	}
+
+	testCases := []struct {
+		testName   string
+		oldCluster *v1beta1.KafkaCluster
+		newCluster *v1beta1.KafkaCluster
+		expected   field.ErrorList
+	}{
+		{
+			// No committed state — new cluster, any spec is valid.
+			testName:   "no committed state — any spec change allowed",
+			oldCluster: &v1beta1.KafkaCluster{},
+			newCluster: &v1beta1.KafkaCluster{Spec: v1beta1.KafkaClusterSpec{
+				Brokers: []v1beta1.Broker{{Id: 0, BrokerConfig: &v1beta1.BrokerConfig{
+					StorageConfigs: []v1beta1.StorageConfig{sc("/data", true)},
+				}}},
+			}},
+			expected: nil,
+		},
+		{
+			// Committed status says /data IS a cache volume; inline spec now marks it as non-cache.
+			testName:   "in-place inline flip true→false rejected",
+			oldCluster: committed(map[string]v1beta1.TieredCacheVolumeState{"/data": v1beta1.TieredCacheVolumeActive}),
+			newCluster: &v1beta1.KafkaCluster{Spec: v1beta1.KafkaClusterSpec{
+				Brokers: []v1beta1.Broker{{Id: 0, BrokerConfig: &v1beta1.BrokerConfig{
+					StorageConfigs: []v1beta1.StorageConfig{sc("/data", false)},
+				}}},
+			}},
+			expected: append(field.ErrorList{},
+				field.Forbidden(
+					field.NewPath("spec").Child("brokers").Index(0).Child("brokerConfig").Child("storageConfigs").Index(0).Child("tieredStorageCache"),
+					immutableTieredStorageCacheErrMsg,
+				),
+			),
+		},
+		{
+			// Committed status says /cache IS a cache volume; group spec now marks it as non-cache.
+			testName:   "in-place group flip true→false rejected",
+			oldCluster: committed(map[string]v1beta1.TieredCacheVolumeState{"/cache": v1beta1.TieredCacheVolumeActive}),
+			newCluster: &v1beta1.KafkaCluster{Spec: v1beta1.KafkaClusterSpec{
+				Brokers: []v1beta1.Broker{{Id: 0, BrokerConfigGroup: "default"}},
+				BrokerConfigGroups: map[string]v1beta1.BrokerConfig{
+					"default": {StorageConfigs: []v1beta1.StorageConfig{sc("/cache", false)}},
+				},
+			}},
+			expected: append(field.ErrorList{},
+				field.Forbidden(
+					field.NewPath("spec").Child("brokerConfigGroups").Key("default").Child("storageConfigs").Index(0).Child("tieredStorageCache"),
+					immutableTieredStorageCacheErrMsg,
+				),
+			),
+		},
+		{
+			// Bypass attempt: broker switches from groupA (where /cache=true) to groupB (where /cache=false).
+			// The raw-spec old→new comparison would miss this since groupA is unchanged.
+			// Status-based check catches it because committed status records /cache=active for broker 0.
+			testName:   "group-switch bypass rejected",
+			oldCluster: committed(map[string]v1beta1.TieredCacheVolumeState{"/cache": v1beta1.TieredCacheVolumeActive}),
+			newCluster: &v1beta1.KafkaCluster{Spec: v1beta1.KafkaClusterSpec{
+				Brokers: []v1beta1.Broker{{Id: 0, BrokerConfigGroup: "groupB"}},
+				BrokerConfigGroups: map[string]v1beta1.BrokerConfig{
+					"groupA": {StorageConfigs: []v1beta1.StorageConfig{sc("/cache", true)}},
+					"groupB": {StorageConfigs: []v1beta1.StorageConfig{sc("/cache", false)}},
+				},
+			}},
+			expected: append(field.ErrorList{},
+				field.Forbidden(
+					field.NewPath("spec").Child("brokerConfigGroups").Key("groupB").Child("storageConfigs").Index(0).Child("tieredStorageCache"),
+					immutableTieredStorageCacheErrMsg,
+				),
+			),
+		},
+		{
+			// Bypass attempt: /cache was provisioned as a cache volume (via group); now an inline entry
+			// overrides it with TieredStorageCache=false. Inline takes priority in GetBrokerConfig so
+			// the effective value would flip — the check must reject the inline entry.
+			testName:   "inline-shadow bypass rejected",
+			oldCluster: committed(map[string]v1beta1.TieredCacheVolumeState{"/cache": v1beta1.TieredCacheVolumeActive}),
+			newCluster: &v1beta1.KafkaCluster{Spec: v1beta1.KafkaClusterSpec{
+				Brokers: []v1beta1.Broker{{
+					Id:                0,
+					BrokerConfigGroup: "default",
+					BrokerConfig: &v1beta1.BrokerConfig{
+						StorageConfigs: []v1beta1.StorageConfig{sc("/cache", false)},
+					},
+				}},
+				BrokerConfigGroups: map[string]v1beta1.BrokerConfig{
+					"default": {StorageConfigs: []v1beta1.StorageConfig{sc("/cache", true)}},
+				},
+			}},
+			expected: append(field.ErrorList{},
+				field.Forbidden(
+					field.NewPath("spec").Child("brokers").Index(0).Child("brokerConfig").Child("storageConfigs").Index(0).Child("tieredStorageCache"),
+					immutableTieredStorageCacheErrMsg,
+				),
+			),
+		},
+		{
+			// mountPath is removed from spec entirely — remove-and-re-add path is intentionally allowed.
+			testName:   "remove mountPath from spec — allowed",
+			oldCluster: committed(map[string]v1beta1.TieredCacheVolumeState{"/cache": v1beta1.TieredCacheVolumeActive}),
+			newCluster: &v1beta1.KafkaCluster{Spec: v1beta1.KafkaClusterSpec{
+				Brokers: []v1beta1.Broker{{Id: 0, BrokerConfig: &v1beta1.BrokerConfig{
+					StorageConfigs: []v1beta1.StorageConfig{sc("/data", false)},
+				}}},
+			}},
+			expected: nil,
+		},
+		{
+			// New mountPath with no committed state — any value is allowed.
+			testName:   "new mountPath not in committed state — allowed",
+			oldCluster: committed(map[string]v1beta1.TieredCacheVolumeState{"/data": v1beta1.TieredCacheVolumeActive}),
+			newCluster: &v1beta1.KafkaCluster{Spec: v1beta1.KafkaClusterSpec{
+				Brokers: []v1beta1.Broker{{Id: 0, BrokerConfig: &v1beta1.BrokerConfig{
+					StorageConfigs: []v1beta1.StorageConfig{sc("/data", true), sc("/cache", true)},
+				}}},
+			}},
+			expected: nil,
+		},
+		{
+			// Value unchanged — no error.
+			testName:   "unchanged value — no error",
+			oldCluster: committed(map[string]v1beta1.TieredCacheVolumeState{"/cache": v1beta1.TieredCacheVolumeActive}),
+			newCluster: &v1beta1.KafkaCluster{Spec: v1beta1.KafkaClusterSpec{
+				Brokers: []v1beta1.Broker{{Id: 0, BrokerConfig: &v1beta1.BrokerConfig{
+					StorageConfigs: []v1beta1.StorageConfig{sc("/cache", true)},
+				}}},
+			}},
+			expected: nil,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.testName, func(t *testing.T) {
+			got := checkTieredStorageCacheImmutability(testCase.oldCluster, testCase.newCluster)
+			require.Equal(t, testCase.expected, got)
+		})
+	}
+}
+
 func TestCheckTargetPortsCollisionForEnvoy(t *testing.T) {
 	testCases := []struct {
 		testName         string

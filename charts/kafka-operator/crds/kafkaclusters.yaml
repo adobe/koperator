@@ -5100,6 +5100,12 @@ spec:
                                   the PersistentVolume backing this claim.
                                 type: string
                             type: object
+                          tieredStorageCache:
+                            description: |-
+                              TieredStorageCache indicates this storage is used for Kafka tiered storage cache
+                              (e.g., for rsm.config.fetch.chunk.cache.path). When set to true, this storage will be
+                              excluded from Cruise Control capacity calculations and will not be used as a Kafka log.dir.
+                            type: boolean
                         required:
                         - mountPath
                         type: object
@@ -12124,6 +12130,12 @@ spec:
                                       to the PersistentVolume backing this claim.
                                     type: string
                                 type: object
+                              tieredStorageCache:
+                                description: |-
+                                  TieredStorageCache indicates this storage is used for Kafka tiered storage cache
+                                  (e.g., for rsm.config.fetch.chunk.cache.path). When set to true, this storage will be
+                                  excluded from Cruise Control capacity calculations and will not be used as a Kafka log.dir.
+                                type: boolean
                             required:
                             - mountPath
                             type: object
@@ -23893,6 +23905,18 @@ spec:
                       description: RackAwarenessState holds info about rack awareness
                         status
                       type: string
+                    tieredCacheVolumes:
+                      additionalProperties:
+                        description: TieredCacheVolumeState tracks the lifecycle state
+                          of a tiered storage cache PVC for a given mount path.
+                        type: string
+                      description: |-
+                        TieredCacheVolumes tracks tiered storage cache PVC state for this broker, keyed by mount path.
+                        "active" means the PVC is a cache volume with no resize in progress.
+                        "pending-deletion" means a resize is in flight (old PVC waiting for pod to stop).
+                        Absent entry means the mount path is not a cache volume (or the PVC was removed).
+                        Written at PVC creation and updated through the resize lifecycle.
+                      type: object
                     version:
                       description: Version holds the current version of the broker
                         in semver format

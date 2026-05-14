@@ -245,14 +245,14 @@ func configureBrokerKRaftMode(bConfig *v1beta1.BrokerConfig, brokerID int32, kaf
 // this is to support the zk to kRaft migration
 func shouldUseKRaftModeForBroker(brokerReadOnlyConfig *properties.Properties) bool {
 	migrationBrokerKRaftMode, found := brokerReadOnlyConfig.Get(kafkautils.MigrationBrokerKRaftMode)
-	return !found || migrationBrokerKRaftMode.Value() == "true"
+	return !found || migrationBrokerKRaftMode.Value() == annotationTrue
 }
 
 // Returns true by default (not in migration) OR when MigrationBrokerControllerQuorumConfigEnabled is set and 'true'.
 // this is to support the zk to kRaft migration
 func shouldConfigureControllerQuorumForBroker(brokerReadOnlyConfig *properties.Properties) bool {
 	migrationBrokerControllerQuorumConfigEnabled, found := brokerReadOnlyConfig.Get(kafkautils.MigrationBrokerControllerQuorumConfigEnabled)
-	return !found || migrationBrokerControllerQuorumConfigEnabled.Value() == "true"
+	return !found || migrationBrokerControllerQuorumConfigEnabled.Value() == annotationTrue
 }
 
 func configureBrokerZKMode(brokerID int32, kafkaCluster *v1beta1.KafkaCluster, config *properties.Properties, extListenerStatuses, intListenerStatuses,
@@ -411,6 +411,10 @@ func getMountPathsFromBrokerConfigMap(configMap *corev1.ConfigMap) ([]string, er
 func generateStorageConfig(sConfig []v1beta1.StorageConfig) []string {
 	mountPaths := make([]string, 0, len(sConfig))
 	for _, storage := range sConfig {
+		// Tiered storage cache volumes are not Kafka log dirs — exclude them from log.dirs.
+		if storage.TieredStorageCache {
+			continue
+		}
 		mountPaths = append(mountPaths, util.StorageConfigKafkaMountPath(storage.MountPath))
 	}
 	return mountPaths

@@ -1,0 +1,442 @@
+// Copyright 2025 Adobe. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package e2e
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
+	"time"
+
+	"emperror.dev/errors"
+	"github.com/gruntwork-io/terratest/modules/k8s"
+	ginkgo "github.com/onsi/ginkgo/v2"
+	gomega "github.com/onsi/gomega"
+)
+
+const (
+	tsResizeClusterName = "kafka-ts-resize"
+
+	tsResizeInitialManifest = "../../config/samples/kafkacluster_tiered_storage_cache_resize_initial.yaml"
+	tsResizeShrunkManifest  = "../../config/samples/kafkacluster_tiered_storage_cache_resize_shrunk.yaml"
+
+	tsResizeCacheMountPath = "/tiered-storage-cache"
+	tsResizeInitialSize    = "2Gi"
+	tsResizeShrunkSize     = "1Gi"
+
+	tsResizePhaseTimeout    = 10 * time.Minute
+	tsResizePollingInterval = 15 * time.Second
+
+	tsResizeBrokerID = 0
+)
+
+// pvcItem is a minimal representation of a PVC for assertion helpers.
+type pvcItem struct {
+	Name          string
+	Annotations   map[string]string
+	StorageSize   string
+	Phase         string
+	IsTerminating bool
+}
+
+// getCacheResizeState returns the tieredCacheVolumes entry for the given broker and mount path
+// from the KafkaCluster CR status, or an empty string if not set.
+func getCacheResizeState(kubectlOptions k8s.KubectlOptions, clusterName, brokerID, mountPath string) (string, error) {
+	rawOutput, err := k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &kubectlOptions,
+		"get", kafkaKind, clusterName,
+		"--output", "json",
+	)
+	if err != nil {
+		return "", errors.WrapIf(err, "getting KafkaCluster failed")
+	}
+
+	var cr struct {
+		Status struct {
+			BrokersState map[string]struct {
+				TieredCacheVolumes map[string]string `json:"tieredCacheVolumes"`
+			} `json:"brokersState"`
+		} `json:"status"`
+	}
+	if err := json.Unmarshal([]byte(rawOutput), &cr); err != nil {
+		return "", errors.WrapIf(err, "parsing KafkaCluster JSON failed")
+	}
+
+	brokerState, ok := cr.Status.BrokersState[brokerID]
+	if !ok {
+		return "", nil
+	}
+	return brokerState.TieredCacheVolumes[mountPath], nil
+}
+
+// listBrokerCachePVCs returns PVCs for broker tsResizeBrokerID that have the
+// tiered-storage-cache mount path annotation.
+func listBrokerCachePVCs(kubectlOptions k8s.KubectlOptions) ([]pvcItem, error) {
+	selector := fmt.Sprintf("%s=%s,brokerId=%d", kafkaCRLabelKey, tsResizeClusterName, tsResizeBrokerID)
+
+	rawOutput, err := k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &kubectlOptions,
+		"get", "persistentvolumeclaims",
+		"-l", selector,
+		"--output", "json",
+	)
+	if err != nil {
+		return nil, errors.WrapIf(err, "listing PVCs failed")
+	}
+
+	var pvcList struct {
+		Items []struct {
+			Metadata struct {
+				Name              string            `json:"name"`
+				Annotations       map[string]string `json:"annotations"`
+				DeletionTimestamp *string           `json:"deletionTimestamp"`
+			} `json:"metadata"`
+			Spec struct {
+				Resources struct {
+					Requests struct {
+						Storage string `json:"storage"`
+					} `json:"requests"`
+				} `json:"resources"`
+			} `json:"spec"`
+			Status struct {
+				Phase string `json:"phase"`
+			} `json:"status"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal([]byte(rawOutput), &pvcList); err != nil {
+		return nil, errors.WrapIf(err, "parsing PVC list JSON failed")
+	}
+
+	var result []pvcItem
+	for _, item := range pvcList.Items {
+		if item.Metadata.Annotations["mountPath"] == tsResizeCacheMountPath {
+			result = append(result, pvcItem{
+				Name:          item.Metadata.Name,
+				Annotations:   item.Metadata.Annotations,
+				StorageSize:   item.Spec.Resources.Requests.Storage,
+				Phase:         item.Status.Phase,
+				IsTerminating: item.Metadata.DeletionTimestamp != nil,
+			})
+		}
+	}
+	return result, nil
+}
+
+// getBrokerPodUID returns the UID of the running (non-terminating) broker pod for the
+// given broker ID, or an error if no such pod is found.
+func getBrokerPodUID(kubectlOptions k8s.KubectlOptions, clusterName string, brokerID int) (string, error) {
+	rawOutput, err := k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &kubectlOptions,
+		"get", "pod",
+		"-l", fmt.Sprintf("%s=%s,brokerId=%d,app=kafka", kafkaCRLabelKey, clusterName, brokerID),
+		"--output", "json",
+	)
+	if err != nil {
+		return "", errors.WrapIf(err, "listing broker pods failed")
+	}
+
+	var podList struct {
+		Items []struct {
+			Metadata struct {
+				UID               string  `json:"uid"`
+				DeletionTimestamp *string `json:"deletionTimestamp"`
+			} `json:"metadata"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal([]byte(rawOutput), &podList); err != nil {
+		return "", errors.WrapIf(err, "parsing pod list JSON failed")
+	}
+
+	for _, item := range podList.Items {
+		if item.Metadata.DeletionTimestamp == nil {
+			return item.Metadata.UID, nil
+		}
+	}
+	return "", fmt.Errorf("no running broker pod found for broker %d in cluster %s", brokerID, clusterName)
+}
+
+// testTieredStorageCachePvcResize tests the full multi-phase delete-and-recreate
+// flow for a tiered storage cache PVC shrink. It:
+//
+//  1. Installs a minimal KRaft cluster with a 2Gi cache PVC on broker 0.
+//  2. Applies an updated manifest that shrinks the cache to 1Gi.
+//  3. Waits for Phase 1 (staging): both the old PVC (pending-deletion) and
+//     the new PVC (replacement) exist simultaneously.
+//  4. Waits for Phase 2 (pod cycle): the pod restarts, the old PVC is deleted,
+//     and the new pod starts referencing the replacement PVC.
+//  5. Waits for Phase 3 (completion): the replacement annotation is stripped and
+//     the broker pod is running again.
+//  6. Verifies the surviving PVC carries the new 1Gi size.
+//  7. Cleans up the cluster.
+func testTieredStorageCachePvcResize() bool {
+	return ginkgo.When("Testing tiered storage cache PVC shrink (delete-and-recreate flow)", ginkgo.Ordered, func() {
+		var kubectlOptions k8s.KubectlOptions
+		var err error
+		var broker0PodUID string // UID of the broker-0 pod before the resize, used to detect recycling
+
+		// AfterAll ensures the cluster and its PVCs are removed even when a test step fails
+		// mid-run, preventing stale resources from blocking the next test run.
+		ginkgo.AfterAll(func() {
+			opts, e := kubectlOptionsForCurrentContext()
+			if e != nil {
+				return
+			}
+			opts.Namespace = koperatorLocalHelmDescriptor.Namespace
+			_, _ = k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &opts,
+				"patch", kafkaKind, tsResizeClusterName,
+				"--type=merge", `--patch={"metadata":{"finalizers":[]}}`,
+			)
+			_, _ = k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &opts,
+				"delete", kafkaKind, tsResizeClusterName, "--ignore-not-found",
+			)
+			_, _ = k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &opts,
+				"delete", "persistentvolumeclaims",
+				"-l", fmt.Sprintf("%s=%s", kafkaCRLabelKey, tsResizeClusterName),
+				"--ignore-not-found",
+			)
+			_, _ = k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &opts,
+				"delete", "pods",
+				"-l", fmt.Sprintf("%s=%s", kafkaCRLabelKey, tsResizeClusterName),
+				"--ignore-not-found", "--grace-period=0",
+			)
+		})
+
+		ginkgo.It("Acquiring K8s config and context", func() {
+			kubectlOptions, err = kubectlOptionsForCurrentContext()
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			kubectlOptions.Namespace = koperatorLocalHelmDescriptor.Namespace
+		})
+
+		// Pre-cleanup: forcibly remove any leftover cluster from a previous interrupted run
+		// so the install step always starts from a clean slate.
+		// We cannot rely on requireDeleteKafkaCluster here because a stuck finalizer (left by a
+		// mid-reconcile interruption) prevents the cascade deletion from completing in time.
+		// Instead we strip the finalizer first, delete the CR, then explicitly delete every
+		// owned resource so nothing blocks the subsequent fresh install.
+		ginkgo.It("Pre-cleanup: removing any leftover kafka-ts-resize cluster", func() {
+			// 1. Remove finalizers so the CR can be deleted regardless of operator state.
+			_, _ = k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &kubectlOptions,
+				"patch", kafkaKind, tsResizeClusterName,
+				"--type=merge", `--patch={"metadata":{"finalizers":[]}}`,
+			)
+			// 2. Delete the CR itself (ignore not-found).
+			_, _ = k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &kubectlOptions,
+				"delete", kafkaKind, tsResizeClusterName, "--ignore-not-found",
+			)
+			// 3. Explicitly delete PVCs — they carry a pvc-protection finalizer that
+			//    blocks cascade GC while pods are still bound.
+			_, _ = k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &kubectlOptions,
+				"delete", "persistentvolumeclaims",
+				"-l", fmt.Sprintf("%s=%s", kafkaCRLabelKey, tsResizeClusterName),
+				"--ignore-not-found",
+			)
+			// 4. Delete pods so they release PVC mounts promptly.
+			_, _ = k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &kubectlOptions,
+				"delete", "pods",
+				"-l", fmt.Sprintf("%s=%s", kafkaCRLabelKey, tsResizeClusterName),
+				"--ignore-not-found", "--grace-period=0",
+			)
+			// 5. Wait for the CR itself to be gone (GC will handle the rest).
+			gomega.Eventually(context.Background(), func() error {
+				out, err := k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &kubectlOptions,
+					"get", kafkaKind, tsResizeClusterName,
+				)
+				if err != nil || strings.Contains(out, "NotFound") || strings.Contains(out, "not found") {
+					return nil
+				}
+				return errors.New("KafkaCluster CR still exists")
+			}, tsResizePhaseTimeout, tsResizePollingInterval).ShouldNot(gomega.HaveOccurred())
+		})
+
+		ginkgo.It("Installing KafkaCluster with tiered storage cache PVC (2Gi)", func() {
+			ginkgo.By("Applying initial KafkaCluster manifest")
+			applyK8sResourceManifest(kubectlOptions, tsResizeInitialManifest)
+
+			ginkgo.By("Waiting for all broker pods to be ready")
+			// kubectl wait --for=condition=Ready fails immediately when no pods exist yet, so
+			// poll the pod list explicitly. Pod readiness is sufficient to proceed with the
+			// resize — we don't gate on ClusterRunning because Cruise Control may still be
+			// completing the post-startup rebalance when the resize is initiated.
+			gomega.Eventually(context.Background(), func() error {
+				output, err := k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &kubectlOptions,
+					"get", "pod",
+					"-l", fmt.Sprintf("%s=%s,app=kafka,isBrokerNode=true", kafkaCRLabelKey, tsResizeClusterName),
+					"--output", "json",
+				)
+				if err != nil {
+					return errors.WrapIf(err, "listing pods failed")
+				}
+				var podList struct {
+					Items []struct {
+						Status struct {
+							Conditions []struct {
+								Type   string `json:"type"`
+								Status string `json:"status"`
+							} `json:"conditions"`
+						} `json:"status"`
+					} `json:"items"`
+				}
+				if err := json.Unmarshal([]byte(output), &podList); err != nil {
+					return errors.WrapIf(err, "parsing pod list JSON failed")
+				}
+				if len(podList.Items) < 1 {
+					return fmt.Errorf("expected at least 1 broker pod, got %d", len(podList.Items))
+				}
+				for _, pod := range podList.Items {
+					ready := false
+					for _, cond := range pod.Status.Conditions {
+						if cond.Type == "Ready" && cond.Status == "True" {
+							ready = true
+							break
+						}
+					}
+					if !ready {
+						return errors.New("not all pods are ready yet")
+					}
+				}
+				return nil
+			}, kafkaClusterCreateTimeout, tsResizePollingInterval).ShouldNot(gomega.HaveOccurred())
+
+			ginkgo.By("Capturing broker-0 pod UID before resize")
+			broker0PodUID, err = getBrokerPodUID(kubectlOptions, tsResizeClusterName, 0)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(broker0PodUID).NotTo(gomega.BeEmpty())
+
+			ginkgo.By("Verifying initial cache PVC size is " + tsResizeInitialSize)
+			pvcs, err := listBrokerCachePVCs(kubectlOptions)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(pvcs).To(gomega.HaveLen(1), "expected exactly one cache PVC for broker 0")
+			gomega.Expect(pvcs[0].StorageSize).To(gomega.Equal(tsResizeInitialSize))
+		})
+
+		ginkgo.It("Triggering cache PVC shrink from 2Gi to 1Gi", func() {
+			ginkgo.By("Applying shrunk KafkaCluster manifest")
+			applyK8sResourceManifest(kubectlOptions, tsResizeShrunkManifest)
+		})
+
+		ginkgo.It("Phase 1: resize state recorded in brokerState and replacement PVC created", func() {
+			// Two acceptable success paths — the resize can complete in seconds, often faster
+			// than the polling interval, so insisting on the intermediate "pending-deletion"
+			// snapshot makes this phase flake-prone:
+			//   A) In-progress: tieredCacheVolumes[mp]=="pending-deletion" AND ≥2 cache PVCs.
+			//   B) Already completed: state is "active" (no resize in flight) AND exactly one
+			//      cache PVC at the shrunk size. "active" is the steady-state after a resize;
+			//      "" (absent) would mean the mount path was removed entirely.
+			// Either proves the resize was staged correctly; Phase 2/3 cover the remaining
+			// invariants regardless of which path we observed.
+			ginkgo.By("Waiting until the resize is observable as in-progress or completed")
+			gomega.Eventually(context.Background(), func() error {
+				state, err := getCacheResizeState(kubectlOptions, tsResizeClusterName,
+					fmt.Sprintf("%d", tsResizeBrokerID), tsResizeCacheMountPath)
+				if err != nil {
+					return err
+				}
+				pvcs, err := listBrokerCachePVCs(kubectlOptions)
+				if err != nil {
+					return err
+				}
+				if state == "pending-deletion" && len(pvcs) >= 2 {
+					return nil
+				}
+				if state == "active" && len(pvcs) == 1 && pvcs[0].StorageSize == tsResizeShrunkSize {
+					return nil
+				}
+				return fmt.Errorf("not at expected staging state: tieredCacheVolumes[%s]=%q, %d cache PVC(s)",
+					tsResizeCacheMountPath, state, len(pvcs))
+			}, tsResizePhaseTimeout, tsResizePollingInterval).ShouldNot(gomega.HaveOccurred())
+		})
+
+		ginkgo.It("Phase 2: broker pod restarts, old PVC is deleted, resize state is cleared", func() {
+			ginkgo.By("Waiting for broker-0 pod to be recycled (UID change indicates rolling restart)")
+			// We detect recycling by UID change rather than waiting for the pod count to hit zero.
+			// The pod may restart fast enough to be back before the next polling tick, causing a
+			// "pod count == 0" check to time out even when the restart already completed.
+			gomega.Eventually(context.Background(), func() error {
+				uid, err := getBrokerPodUID(kubectlOptions, tsResizeClusterName, 0)
+				if err != nil {
+					// Pod may be absent mid-restart; treat as not-yet-recycled.
+					return err
+				}
+				if uid == broker0PodUID {
+					return errors.New("broker-0 pod has not been recycled yet (same UID)")
+				}
+				return nil
+			}, tsResizePhaseTimeout, tsResizePollingInterval).ShouldNot(gomega.HaveOccurred())
+
+			ginkgo.By("Waiting for old PVC to be deleted and resize state to be cleared")
+			gomega.Eventually(context.Background(), func() error {
+				// The old (larger) PVC should be gone — only the replacement should remain.
+				pvcs, err := listBrokerCachePVCs(kubectlOptions)
+				if err != nil {
+					return err
+				}
+				activePvcs := make([]pvcItem, 0, len(pvcs))
+				for _, pvc := range pvcs {
+					// Ignore PVCs that are being deleted (DeletionTimestamp set but not yet gone).
+					if !pvc.IsTerminating {
+						activePvcs = append(activePvcs, pvc)
+					}
+				}
+				if len(activePvcs) != 1 {
+					return fmt.Errorf("expected 1 active cache PVC for broker %d after pod restart, got %d",
+						tsResizeBrokerID, len(activePvcs))
+				}
+				// After cleanup the resize state transitions back to "active" — no longer pending-deletion.
+				state, err := getCacheResizeState(kubectlOptions, tsResizeClusterName,
+					fmt.Sprintf("%d", tsResizeBrokerID), tsResizeCacheMountPath)
+				if err != nil {
+					return err
+				}
+				if state == "pending-deletion" {
+					return fmt.Errorf("tieredCacheVolumes[%s] still pending-deletion after old PVC deleted",
+						tsResizeCacheMountPath)
+				}
+				return nil
+			}, tsResizePhaseTimeout, tsResizePollingInterval).ShouldNot(gomega.HaveOccurred())
+		})
+
+		ginkgo.It("Phase 3: broker pod running again with the new smaller PVC", func() {
+			ginkgo.By("Waiting for the broker-0 pod to come back Ready")
+			err = waitK8sResourceCondition(kubectlOptions, "pod", "condition=Ready",
+				tsResizePhaseTimeout,
+				fmt.Sprintf("%s=%s,brokerId=0,app=kafka", kafkaCRLabelKey, tsResizeClusterName), "")
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Verifying exactly one cache PVC remains with no resize state")
+			pvcs, err := listBrokerCachePVCs(kubectlOptions)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(pvcs).To(gomega.HaveLen(1), "expected exactly one cache PVC after resize completes")
+			state, err := getCacheResizeState(kubectlOptions, tsResizeClusterName,
+				fmt.Sprintf("%d", tsResizeBrokerID), tsResizeCacheMountPath)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(state).To(gomega.Equal("active"), "tieredCacheVolumes entry should be active after resize completes")
+		})
+
+		ginkgo.It("Verifying the surviving cache PVC has the new size "+tsResizeShrunkSize, func() {
+			pvcs, err := listBrokerCachePVCs(kubectlOptions)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(pvcs).To(gomega.HaveLen(1))
+			gomega.Expect(pvcs[0].StorageSize).To(gomega.Equal(tsResizeShrunkSize),
+				"surviving PVC should carry the shrunk size")
+			gomega.Expect(strings.Contains(pvcs[0].Name, tsResizeClusterName)).To(gomega.BeTrue(),
+				"surviving PVC should belong to the test cluster")
+		})
+
+		// requireDeleteKafkaCluster receives a copy of kubectlOptions at registration
+		// time, so Namespace must be set here (not inside the It block above).
+		kubectlOptions.Namespace = koperatorLocalHelmDescriptor.Namespace
+		// requireDeleteKafkaCluster registers its own It block — must be called at
+		// the When scope, not nested inside an It.
+		requireDeleteKafkaCluster(kubectlOptions, tsResizeClusterName)
+	})
+}

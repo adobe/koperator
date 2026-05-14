@@ -33,9 +33,10 @@ import (
 )
 
 const (
-	multidiskRemovalTimeout      = 1000 * time.Second // this test can take long
-	multidiskRemovalPollInterval = 15 * time.Second
-	brokerConfigTemplateFormat   = "%s-config-%d"
+	multidiskRemovalTimeout             = 1000 * time.Second // this test can take long
+	multidiskRemovalPollInterval        = 15 * time.Second
+	multidiskRemovalBrokerReadinessWait = 360 * time.Second // rolling restart of all brokers after disk removal
+	brokerConfigTemplateFormat          = "%s-config-%d"
 )
 
 var (
@@ -75,7 +76,9 @@ func testMultiDiskRemoval() bool {
 		})
 
 		ginkgo.It("Asserting Kafka brokers remain healthy", func() {
-			err := waitK8sResourceCondition(kubectlOptions, "pod", "condition=Ready", defaultPodReadinessWaitTime,
+			// Use multidiskRemovalBrokerReadinessWait: after disk removal, CC triggers a rolling
+			// restart of all brokers, so 180s (defaultPodReadinessWaitTime) is too tight in kind.
+			err := waitK8sResourceCondition(kubectlOptions, "pod", "condition=Ready", multidiskRemovalBrokerReadinessWait,
 				v1beta1.KafkaCRLabelKey+"="+kafkaClusterName+",app=kafka", "")
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})

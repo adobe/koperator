@@ -222,6 +222,19 @@ type VolumeState struct {
 	CruiseControlOperationReference *corev1.LocalObjectReference `json:"cruiseControlOperationReference,omitempty"`
 }
 
+// TieredCacheVolumeState tracks the lifecycle state of a tiered storage cache PVC for a given mount path.
+type TieredCacheVolumeState string
+
+const (
+	// TieredCacheVolumeActive indicates the mount path is an active tiered storage cache volume
+	// with no resize operation in progress.
+	TieredCacheVolumeActive TieredCacheVolumeState = "active"
+	// TieredCacheVolumePendingDeletion indicates that the old cache PVC at this mount path is waiting
+	// to be deleted once the broker pod stops. A replacement PVC with the new desired size has
+	// already been created at the same mount path.
+	TieredCacheVolumePendingDeletion TieredCacheVolumeState = "pending-deletion"
+)
+
 // BrokerState holds information about broker state
 type BrokerState struct {
 	// RackAwarenessState holds info about rack awareness status
@@ -240,6 +253,12 @@ type BrokerState struct {
 	Image string `json:"image,omitempty"`
 	// Compressed data from broker configuration to restore broker pod in specific cases
 	ConfigurationBackup string `json:"configurationBackup,omitempty"`
+	// TieredCacheVolumes tracks tiered storage cache PVC state for this broker, keyed by mount path.
+	// "active" means the PVC is a cache volume with no resize in progress.
+	// "pending-deletion" means a resize is in flight (old PVC waiting for pod to stop).
+	// Absent entry means the mount path is not a cache volume (or the PVC was removed).
+	// Written at PVC creation and updated through the resize lifecycle.
+	TieredCacheVolumes map[string]TieredCacheVolumeState `json:"tieredCacheVolumes,omitempty"`
 }
 
 const (

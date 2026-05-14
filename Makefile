@@ -22,7 +22,7 @@ GOLANGCI_VERSION = 2.11.4 # renovate: datasource=github-releases depName=golangc
 LICENSEI_VERSION = 0.9.0 # renovate: datasource=github-releases depName=goph/licensei
 CONTROLLER_GEN_VERSION = v0.20.1 # renovate: datasource=github-releases depName=kubernetes-sigs/controller-tools
 ENVTEST_K8S_VERSION = 1.35.0 # renovate: datasource=github-releases depName=kubernetes-sigs/controller-tools extractVersion=^envtest-v(?<version>.+)$
-SETUP_ENVTEST_VERSION := latest
+SETUP_ENVTEST_VERSION := v0.0.0-20260311120938-7f576c06d187 # last commit with go 1.25 requirement; 598e330b (2026-03-31) bumped to go 1.26
 ADDLICENSE_VERSION := 1.2.0 # renovate: datasource=github-releases depName=google/addlicense
 GOTEMPLATE_VERSION := 3.12.0 # renovate: datasource=github-releases depName=cznic/gotemplate
 MOCKGEN_VERSION := 0.6.0 # renovate: datasource=github-releases depName=uber-go/mock

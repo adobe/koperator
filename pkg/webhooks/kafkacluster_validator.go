@@ -18,6 +18,7 @@ package webhooks
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -39,6 +40,7 @@ type KafkaClusterValidator struct {
 
 func (s KafkaClusterValidator) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (warnings admission.Warnings, err error) {
 	var allErrs field.ErrorList
+	kafkaClusterOld := oldObj.(*banzaicloudv1beta1.KafkaCluster)
 	kafkaClusterNew := newObj.(*banzaicloudv1beta1.KafkaCluster)
 	log := s.Log.WithValues("name", kafkaClusterNew.GetName(), "namespace", kafkaClusterNew.GetNamespace())
 
@@ -46,6 +48,8 @@ func (s KafkaClusterValidator) ValidateUpdate(ctx context.Context, oldObj, newOb
 	if listenerErrs != nil {
 		allErrs = append(allErrs, listenerErrs...)
 	}
+
+	allErrs = append(allErrs, checkTieredStorageCacheImmutability(kafkaClusterOld, kafkaClusterNew)...)
 
 	if len(allErrs) == 0 {
 		return nil, nil
@@ -79,6 +83,68 @@ func (s KafkaClusterValidator) ValidateCreate(ctx context.Context, obj runtime.O
 
 func (s KafkaClusterValidator) ValidateDelete(ctx context.Context, obj runtime.Object) (warnings admission.Warnings, err error) {
 	return nil, nil
+}
+
+// checkTieredStorageCacheImmutability rejects updates that change the tieredStorageCache
+// classification of an existing PVC. It uses status.BrokersState[brokerID].TieredCacheVolumes
+// as the authoritative source of truth — the reconciler writes this map when it creates each PVC.
+// Comparing against committed status catches all bypass paths (in-place flip, group-switch,
+// inline-shadow override) without requiring spec-level merging or effective-config resolution.
+// Removing a mountPath from the spec is allowed (delete-and-re-add path).
+func checkTieredStorageCacheImmutability(oldCluster, newCluster *banzaicloudv1beta1.KafkaCluster) field.ErrorList {
+	var allErrs field.ErrorList
+
+	for brokerIDStr, brokerState := range oldCluster.Status.BrokersState {
+		for mountPath, state := range brokerState.TieredCacheVolumes {
+			if state == "" {
+				continue // not a cache PVC
+			}
+			newValue, fieldPath, found := findTieredStorageCacheInSpec(&newCluster.Spec, brokerIDStr, mountPath)
+			if !found {
+				continue // mountPath removed from spec — remove-and-re-add is allowed
+			}
+			if !newValue {
+				allErrs = append(allErrs, field.Forbidden(fieldPath, immutableTieredStorageCacheErrMsg))
+			}
+		}
+	}
+
+	return allErrs
+}
+
+// findTieredStorageCacheInSpec resolves the intended tieredStorageCache value for a given
+// broker (by string ID, matching reconciler convention) and mountPath from the raw spec.
+// Inline storageConfigs take priority over brokerConfigGroup (matching dedupStorageConfigs order).
+// Returns (value, fieldPath, found=true) when the mountPath is present in the new spec.
+func findTieredStorageCacheInSpec(spec *banzaicloudv1beta1.KafkaClusterSpec, brokerIDStr, mountPath string) (bool, *field.Path, bool) {
+	for i, broker := range spec.Brokers {
+		if strconv.Itoa(int(broker.Id)) != brokerIDStr {
+			continue
+		}
+		// Inline config has priority (mirrors dedupStorageConfigs order in GetBrokerConfig)
+		if broker.BrokerConfig != nil {
+			for k, sc := range broker.BrokerConfig.StorageConfigs {
+				if sc.MountPath == mountPath {
+					p := field.NewPath("spec").Child("brokers").Index(i).
+						Child("brokerConfig").Child("storageConfigs").Index(k).Child("tieredStorageCache")
+					return sc.TieredStorageCache, p, true
+				}
+			}
+		}
+		if broker.BrokerConfigGroup != "" {
+			if group, ok := spec.BrokerConfigGroups[broker.BrokerConfigGroup]; ok {
+				for k, sc := range group.StorageConfigs {
+					if sc.MountPath == mountPath {
+						p := field.NewPath("spec").Child("brokerConfigGroups").
+							Key(broker.BrokerConfigGroup).Child("storageConfigs").Index(k).Child("tieredStorageCache")
+						return sc.TieredStorageCache, p, true
+					}
+				}
+			}
+		}
+		break
+	}
+	return false, nil, false
 }
 
 // checkListeners validates the spec.listenersConfig object
