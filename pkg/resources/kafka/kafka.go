@@ -1276,17 +1276,17 @@ func (r *Reconciler) reconcileKafkaPvc(ctx context.Context, log logr.Logger, bro
 	}
 
 	if waitForDiskRemovalToFinish {
-		// Don't block if any broker with pending disk removal has a missing pod.
+		// Don't block if any broker with pending disk removal/rebalance has a missing pod.
 		// Blocking prevents pod recreation, creating a deadlock where CC can't
-		// complete the disk removal because the broker isn't running.
+		// complete the disk removal or rebalance because the broker isn't running.
 		for brokerId := range brokersDesiredPvcs {
 			if _, podExists := runningBrokers[brokerId]; !podExists {
 				if brokerState, ok := r.KafkaCluster.Status.BrokersState[brokerId]; ok {
-					for _, volumeState := range brokerState.GracefulActionState.VolumeStates {
-						if volumeState.CruiseControlVolumeState.IsDiskRemoval() {
+					for mountPath, volumeState := range brokerState.GracefulActionState.VolumeStates {
+						if volumeState.CruiseControlVolumeState.IsDiskRemoval() || volumeState.CruiseControlVolumeState.IsDiskRebalance() {
 							log.Info("Disk removal pending but broker pod is missing, "+
 								"allowing reconcile to proceed for pod recreation",
-								"brokerId", brokerId)
+								"brokerId", brokerId, "mountPath", mountPath)
 							return nil
 						}
 					}

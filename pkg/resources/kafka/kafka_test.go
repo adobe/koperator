@@ -1117,6 +1117,71 @@ func TestReconcileKafkaPvcDiskRemoval(t *testing.T) {
 			},
 		},
 		{
+			testName: "Disk rebalance pending but broker pod missing - allow reconcile to proceed",
+			brokersDesiredPvcs: map[string][]*corev1.PersistentVolumeClaim{
+				"0": {
+					createPvc("test-pvc-1", "0", "/path/to/mount1"),
+				},
+			},
+			existingPvcs: []*corev1.PersistentVolumeClaim{
+				createPvc("test-pvc-1", "0", "/path/to/mount1"),
+				createPvc("test-pvc-2", "0", "/path/to/mount2"),
+			},
+			runningBrokers: map[string]struct{}{}, // broker pod is missing
+			kafkaClusterStatus: v1beta1.KafkaClusterStatus{
+				BrokersState: map[string]v1beta1.BrokerState{
+					"0": {
+						GracefulActionState: v1beta1.GracefulActionState{
+							VolumeStates: map[string]v1beta1.VolumeState{
+								"/path/to/mount2": {
+									CruiseControlVolumeState: v1beta1.GracefulDiskRebalanceScheduled,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedError:     false,
+			expectedDeletePvc: false,
+			expectedVolumeState: map[string]v1beta1.CruiseControlVolumeState{
+				"/path/to/mount2": v1beta1.GracefulDiskRebalanceScheduled,
+			},
+		},
+		{
+			testName: "Disk newly marked for removal with pod missing - allow reconcile to proceed",
+			brokersDesiredPvcs: map[string][]*corev1.PersistentVolumeClaim{
+				"0": {
+					createPvc("test-pvc-1", "0", "/path/to/mount1"),
+				},
+			},
+			existingPvcs: []*corev1.PersistentVolumeClaim{
+				createPvc("test-pvc-1", "0", "/path/to/mount1"),
+				createPvc("test-pvc-2", "0", "/path/to/mount2"),
+			},
+			runningBrokers: map[string]struct{}{}, // broker pod is missing
+			kafkaClusterStatus: v1beta1.KafkaClusterStatus{
+				BrokersState: map[string]v1beta1.BrokerState{
+					"0": {
+						GracefulActionState: v1beta1.GracefulActionState{
+							VolumeStates: map[string]v1beta1.VolumeState{
+								"/path/to/mount2": {
+									// GracefulDiskRebalanceSucceeded triggers the default case in
+									// handleDiskRemoval which marks GracefulDiskRemovalRequired.
+									// With pod missing, the override should still allow proceeding.
+									CruiseControlVolumeState: v1beta1.GracefulDiskRebalanceSucceeded,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedError:     false,
+			expectedDeletePvc: false,
+			expectedVolumeState: map[string]v1beta1.CruiseControlVolumeState{
+				"/path/to/mount2": v1beta1.GracefulDiskRemovalRequired,
+			},
+		},
+		{
 			testName: "If disk removal successful, do not return error and delete pvc and volume state",
 			brokersDesiredPvcs: map[string][]*corev1.PersistentVolumeClaim{
 				"0": {
