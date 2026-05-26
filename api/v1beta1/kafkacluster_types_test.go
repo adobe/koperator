@@ -515,7 +515,7 @@ func TestGetBrokerLabels(t *testing.T) {
 				BrokerIdLabelKey:    strconv.Itoa(expectedBrokerId),
 				KafkaCRLabelKey:     expectedKafkaCRName,
 				"test_label_key":    "test_label_value",
-				ProcessRolesKey:     "controller_broker",
+				ProcessRolesKey:     "broker_controller",
 				IsBrokerNodeKey:     "true",
 				IsControllerNodeKey: "true",
 			},
