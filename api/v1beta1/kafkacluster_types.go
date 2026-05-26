@@ -46,6 +46,9 @@ const (
 	// ProcessRolesKey is used to identify which process roles the Kafka pod has
 	ProcessRolesKey = "processRoles"
 
+	// PvcRolesKey is used to identify which process roles a PVC serves (broker, controller, or broker_controller)
+	PvcRolesKey = "pvcRoles"
+
 	// IsBrokerNodeKey is used to identify if the kafka pod is either a broker or a broker_controller
 	IsBrokerNodeKey = "isBrokerNode"
 
@@ -1212,6 +1215,16 @@ func (bConfig *BrokerConfig) IsControllerOnlyNode() bool {
 // IsCombinedNode returns true when the broker is a broker + controller node
 func (bConfig *BrokerConfig) IsCombinedNode() bool {
 	return bConfig.IsBrokerNode() && bConfig.IsControllerNode()
+}
+
+// GetPvcRolesLabelValue returns the value for the pvcRoles label on PVCs.
+// In KRaft mode the value mirrors processRoles (e.g. "broker", "controller", "broker_controller").
+// In ZooKeeper mode all nodes are brokers, so the value is always "broker".
+func (bConfig *BrokerConfig) GetPvcRolesLabelValue(kRaftMode bool) string {
+	if kRaftMode && len(bConfig.Roles) > 0 {
+		return strings.Join(bConfig.Roles, "_")
+	}
+	return BrokerNodeProcessRole
 }
 
 // GetResources returns the broker specific Kubernetes resource
