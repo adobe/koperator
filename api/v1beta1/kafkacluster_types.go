@@ -17,6 +17,7 @@ package v1beta1
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -1105,12 +1106,23 @@ func (bConfig *BrokerConfig) GetBrokerAnnotations() map[string]string {
 	return util.CloneMap(bConfig.BrokerAnnotations)
 }
 
+// processRolesValue returns the joined role string used for both the processRoles pod label
+// and the pvcRoles PVC label. In KRaft mode the roles are joined with "_"; in ZK mode always "broker".
+func (bConfig *BrokerConfig) processRolesValue(kRaftMode bool) string {
+	if kRaftMode {
+		roles := append([]string(nil), bConfig.Roles...)
+		sort.Strings(roles)
+		return strings.Join(roles, "_")
+	}
+	return BrokerNodeProcessRole
+}
+
 // GetBrokerLabels returns the labels that are applied to broker pods
 func (bConfig *BrokerConfig) GetBrokerLabels(kafkaClusterName string, brokerId int32, kRaftMode bool) map[string]string {
 	var kraftLabels map[string]string
 	if kRaftMode {
 		kraftLabels = map[string]string{
-			ProcessRolesKey:     strings.Join(bConfig.Roles, "_"),
+			ProcessRolesKey:     bConfig.processRolesValue(kRaftMode),
 			IsControllerNodeKey: fmt.Sprintf("%t", bConfig.IsControllerNode()),
 			IsBrokerNodeKey:     fmt.Sprintf("%t", bConfig.IsBrokerNode()),
 		}
@@ -1221,10 +1233,7 @@ func (bConfig *BrokerConfig) IsCombinedNode() bool {
 // In KRaft mode the value mirrors processRoles (e.g. "broker", "controller", "broker_controller").
 // In ZooKeeper mode all nodes are brokers, so the value is always "broker".
 func (bConfig *BrokerConfig) GetPvcRolesLabelValue(kRaftMode bool) string {
-	if kRaftMode && len(bConfig.Roles) > 0 {
-		return strings.Join(bConfig.Roles, "_")
-	}
-	return BrokerNodeProcessRole
+	return bConfig.processRolesValue(kRaftMode)
 }
 
 // GetResources returns the broker specific Kubernetes resource
