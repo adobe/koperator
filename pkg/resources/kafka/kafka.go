@@ -1257,9 +1257,6 @@ func (r *Reconciler) reconcileKafkaPvc(ctx context.Context, log logr.Logger, bro
 					if err := r.Update(ctx, desiredPvc); err != nil {
 						return errorfactory.New(errorfactory.APIFailure{}, err, "updating resource failed", "kind", desiredType)
 					}
-					if _, hadLabel := currentPvc.Labels[banzaiv1beta1.PvcRolesKey]; !hadLabel {
-						log.Info("backfilling pvcRoles label on existing PVC", "pvc", desiredPvc.Name, banzaiv1beta1.PvcRolesKey, desiredPvc.Labels[banzaiv1beta1.PvcRolesKey])
-					}
 					log.Info("resource updated")
 				}
 			}
