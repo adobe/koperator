@@ -941,6 +941,11 @@ func (r *Reconciler) updateStatusWithDockerImageAndVersion(brokerId int32, broke
 func syncResourceRequests(desiredPod, currentPod *corev1.Pod) {
 	syncContainerResourceRequests(desiredPod.Spec.Containers, currentPod.Spec.Containers)
 	syncContainerResourceRequests(desiredPod.Spec.InitContainers, currentPod.Spec.InitContainers)
+	syncPodAffinities(desiredPod, currentPod)
+}
+
+func syncPodAffinities(desiredPod, currentPod *corev1.Pod) {
+	panic("unimplemented")
 }
 
 func syncContainerResourceRequests(desired, current []corev1.Container) {
@@ -984,7 +989,9 @@ func (r *Reconciler) handleRollingUpgrade(log logr.Logger, desiredPod, currentPo
 		desiredPod.Spec.Tolerations = uniqueTolerations
 	}
 	// Ignore CPU/memory request diffs — changing requests does not require a pod restart.
-	syncResourceRequests(desiredPod, currentPod)
+	if r.KafkaCluster.Spec.ScaleOpsEnabled {
+		syncResourceRequests(desiredPod, currentPod)
+	}
 	// Check if the resource actually updated or if labels match TaintedBrokersSelector
 	patchResult, err := patch.DefaultPatchMaker.Calculate(currentPod, desiredPod)
 	switch {

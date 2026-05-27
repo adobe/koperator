@@ -1986,3 +1986,6 @@ func TestGetBrokerAzMap(t *testing.T) {
 		})
 	}
 }
+
+func TestScaleOps(t. *testing.T) {
+	
