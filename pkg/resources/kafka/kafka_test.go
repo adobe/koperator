@@ -1986,3 +1986,107 @@ func TestGetBrokerAzMap(t *testing.T) {
 		})
 	}
 }
+
+func TestBrokerNeedsVersionUpdate(t *testing.T) {
+	t.Parallel()
+	const clusterImage = "apache/kafka:3.4.0"
+	const updatedImage = "apache/kafka:3.5.0"
+
+	testCases := []struct {
+		testName     string
+		brokerID     int32
+		brokerConfig v1beta1.BrokerConfig
+		clusterImage string
+		brokersState map[string]v1beta1.BrokerState
+		expected     bool
+	}{
+		{
+			testName:     "no existing status entry triggers update",
+			brokerID:     0,
+			brokerConfig: v1beta1.BrokerConfig{},
+			clusterImage: clusterImage,
+			brokersState: map[string]v1beta1.BrokerState{},
+			expected:     true,
+		},
+		{
+			testName:     "status entry with empty version triggers update",
+			brokerID:     0,
+			brokerConfig: v1beta1.BrokerConfig{},
+			clusterImage: clusterImage,
+			brokersState: map[string]v1beta1.BrokerState{
+				"0": {Image: clusterImage, Version: ""},
+			},
+			expected: true,
+		},
+		{
+			testName:     "status entry with different image triggers update",
+			brokerID:     0,
+			brokerConfig: v1beta1.BrokerConfig{},
+			clusterImage: updatedImage,
+			brokersState: map[string]v1beta1.BrokerState{
+				"0": {Image: clusterImage, Version: "3.4.0"},
+			},
+			expected: true,
+		},
+		{
+			testName:     "status up to date with cluster image skips update",
+			brokerID:     0,
+			brokerConfig: v1beta1.BrokerConfig{},
+			clusterImage: clusterImage,
+			brokersState: map[string]v1beta1.BrokerState{
+				"0": {Image: clusterImage, Version: "3.4.0"},
+			},
+			expected: false,
+		},
+		{
+			testName:     "broker-level image override used instead of cluster image",
+			brokerID:     0,
+			brokerConfig: v1beta1.BrokerConfig{Image: "apache/kafka:3.4.1"},
+			clusterImage: clusterImage,
+			brokersState: map[string]v1beta1.BrokerState{
+				"0": {Image: "apache/kafka:3.4.1", Version: "3.4.1"},
+			},
+			expected: false,
+		},
+		{
+			testName:     "broker-level image override differs from recorded image triggers update",
+			brokerID:     0,
+			brokerConfig: v1beta1.BrokerConfig{Image: "apache/kafka:3.5.0"},
+			clusterImage: clusterImage,
+			brokersState: map[string]v1beta1.BrokerState{
+				"0": {Image: "apache/kafka:3.4.1", Version: "3.4.1"},
+			},
+			expected: true,
+		},
+		{
+			testName:     "correct state for one broker does not suppress update for another",
+			brokerID:     1,
+			brokerConfig: v1beta1.BrokerConfig{},
+			clusterImage: clusterImage,
+			brokersState: map[string]v1beta1.BrokerState{
+				"0": {Image: clusterImage, Version: "3.4.0"},
+			},
+			expected: true,
+		},
+	}
+
+	for _, test := range testCases {
+		test := test
+		t.Run(test.testName, func(t *testing.T) {
+			t.Parallel()
+			r := Reconciler{
+				Reconciler: resources.Reconciler{
+					KafkaCluster: &v1beta1.KafkaCluster{
+						Spec: v1beta1.KafkaClusterSpec{
+							ClusterImage: test.clusterImage,
+						},
+						Status: v1beta1.KafkaClusterStatus{
+							BrokersState: test.brokersState,
+						},
+					},
+				},
+			}
+			assert.Equal(t, test.expected, r.brokerNeedsVersionUpdate(test.brokerID, &test.brokerConfig))
+		})
+	}
+}
