@@ -25,6 +25,9 @@ const (
 	structTagDelimiter = ","
 	// Separator used for defining key/value flags in struct tags.
 	structTagSeparator = "="
+	// Supported struct tag flag keys.
+	structTagFlagOmitEmpty = "omitempty"
+	structTagFlagDefault   = "default"
 )
 
 // StructTag stores information about the struct tags which includes the name of the Key and optional flags like
@@ -120,9 +123,9 @@ func ParseStructTag(s string) (*StructTag, error) {
 			}
 			// Handle supported flags
 			switch flag.Key {
-			case "omitempty":
+			case structTagFlagOmitEmpty:
 				st.OmitEmpty = true
-			case "default":
+			case structTagFlagDefault:
 				st.Default = flag.Value
 			default:
 				return nil, errors.NewWithDetails("struct tag flag is not supported", "flag", f)

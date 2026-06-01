@@ -28,6 +28,8 @@ import (
 
 const (
 	testTopicName = "test-topic"
+	// withErrorTopicName is a mock topic name that triggers error responses.
+	withErrorTopicName = "with-error"
 )
 
 type mockClusterAdmin struct {
@@ -143,10 +145,10 @@ func (m *mockClusterAdmin) DescribeTopics(topics []string) ([]*sarama.TopicMetad
 		}, nil
 	case "not-exists":
 		return []*sarama.TopicMetadata{}, nil
-	case "with-error":
+	case withErrorTopicName:
 		return []*sarama.TopicMetadata{
 			{
-				Name:       "with-error",
+				Name:       withErrorTopicName,
 				Partitions: []*sarama.PartitionMetadata{{}},
 				Err:        sarama.ErrUnknown,
 			},
@@ -242,7 +244,7 @@ func (m *mockClusterAdmin) DeleteACL(filter sarama.AclFilter, validateOnly bool)
 	switch *filter.Principal {
 	case "test-user":
 		return []sarama.MatchingAcl{{}}, nil
-	case "with-error":
+	case withErrorTopicName:
 		return []sarama.MatchingAcl{{Err: sarama.ErrUnknown}}, nil
 	default:
 		// for mock it's enough to erase the whole map

@@ -26,16 +26,16 @@ var (
 	// certManagerHelmDescriptor describes the cert-manager Helm component.
 	certManagerHelmDescriptor = helmDescriptor{
 		Repository:   "https://charts.jetstack.io",
-		ChartName:    "cert-manager",
+		ChartName:    certManagerName,
 		ChartVersion: CertManagerVersion,
-		ReleaseName:  "cert-manager",
-		Namespace:    "cert-manager",
+		ReleaseName:  certManagerName,
+		Namespace:    certManagerName,
 		SetValues: map[string]string{
-			"installCRDs": "false",
+			"installCRDs": falseString,
 		},
 		RemoteCRDPathVersionTemplate: "https://github.com/jetstack/cert-manager/releases/download/v%s/cert-manager.crds.yaml",
 		HelmExtraArguments: map[string][]string{
-			"install": {"--timeout", "10m"},
+			installAction: {timeoutFlag, timeoutValue},
 		},
 	}
 	// contour ingress controller
@@ -43,16 +43,16 @@ var (
 	// ingress IP (which never comes on kind without MetalLB).
 	contourIngressControllerHelmDescriptor = helmDescriptor{
 		Repository:   "https://projectcontour.github.io/helm-charts",
-		ChartName:    "contour",
+		ChartName:    contourName,
 		ChartVersion: ContourVersion,
-		ReleaseName:  "contour",
+		ReleaseName:  contourName,
 		Namespace:    "projectcontour",
 		SetValues: map[string]string{
-			"contour.manageCRDs": "true",
+			"contour.manageCRDs": verboseLoggingEnabled,
 			"envoy.service.type": "NodePort",
 		},
 		HelmExtraArguments: map[string][]string{
-			"install": {"--timeout", "10m"},
+			installAction: {timeoutFlag, timeoutValue},
 		},
 	}
 
@@ -101,23 +101,23 @@ var (
 		ReleaseName:  "prometheus-operator",
 		Namespace:    "prometheus",
 		SetValues: map[string]string{
-			"crds.enabled":                  "true",
-			"defaultRules.enabled":          "false",
-			"alertmanager.enabled":          "false",
-			"grafana.enabled":               "false",
-			"kubeApiServer.enabled":         "false",
-			"kubelet.enabled":               "false",
-			"kubeControllerManager.enabled": "false",
-			"coreDNS.enabled":               "false",
-			"kubeEtcd.enabled":              "false",
-			"kubeScheduler.enabled":         "false",
-			"kubeProxy.enabled":             "false",
-			"kubeStateMetrics.enabled":      "false",
-			"nodeExporter.enabled":          "false",
-			"prometheus.enabled":            "false",
+			"crds.enabled":                  verboseLoggingEnabled,
+			"defaultRules.enabled":          falseString,
+			"alertmanager.enabled":          falseString,
+			"grafana.enabled":               falseString,
+			"kubeApiServer.enabled":         falseString,
+			"kubelet.enabled":               falseString,
+			"kubeControllerManager.enabled": falseString,
+			"coreDNS.enabled":               falseString,
+			"kubeEtcd.enabled":              falseString,
+			"kubeScheduler.enabled":         falseString,
+			"kubeProxy.enabled":             falseString,
+			"kubeStateMetrics.enabled":      falseString,
+			"nodeExporter.enabled":          falseString,
+			"prometheus.enabled":            falseString,
 		},
 		HelmExtraArguments: map[string][]string{
-			"install": {"--timeout", "10m"},
+			installAction: {timeoutFlag, timeoutValue},
 		},
 	}
 
@@ -130,13 +130,13 @@ var (
 		ReleaseName:  "zookeeper-operator",
 		Namespace:    "zookeeper",
 		SetValues: map[string]string{
-			"crd.create":       "false",
+			"crd.create":       falseString,
 			"image.repository": "ghcr.io/adobe/zookeeper-operator",
 			"image.tag":        ZookeeperOperatorVersion,
 		},
 		RemoteCRDPathVersionTemplate: "https://raw.githubusercontent.com/adobe/zookeeper-operator/%s/config/crd/bases/zookeeper.pravega.io_zookeeperclusters.yaml",
 		HelmExtraArguments: map[string][]string{
-			"install": {"--timeout", "10m"},
+			installAction: {timeoutFlag, timeoutValue},
 		},
 	}
 

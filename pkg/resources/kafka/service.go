@@ -40,7 +40,7 @@ func (r *Reconciler) service(id int32, _ *v1beta1.BrokerConfig) runtime.Object {
 		generateServicePortForAdditionalPorts(r.KafkaCluster.Spec.AdditionalPorts)...)
 
 	usedPorts = append(usedPorts, corev1.ServicePort{
-		Name:       "metrics",
+		Name:       metricsPortName,
 		Port:       MetricsPort,
 		TargetPort: intstr.FromInt(MetricsPort),
 		Protocol:   corev1.ProtocolTCP,

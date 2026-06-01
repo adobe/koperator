@@ -245,14 +245,14 @@ func configureBrokerKRaftMode(bConfig *v1beta1.BrokerConfig, brokerID int32, kaf
 // this is to support the zk to kRaft migration
 func shouldUseKRaftModeForBroker(brokerReadOnlyConfig *properties.Properties) bool {
 	migrationBrokerKRaftMode, found := brokerReadOnlyConfig.Get(kafkautils.MigrationBrokerKRaftMode)
-	return !found || migrationBrokerKRaftMode.Value() == "true"
+	return !found || migrationBrokerKRaftMode.Value() == configValueTrue
 }
 
 // Returns true by default (not in migration) OR when MigrationBrokerControllerQuorumConfigEnabled is set and 'true'.
 // this is to support the zk to kRaft migration
 func shouldConfigureControllerQuorumForBroker(brokerReadOnlyConfig *properties.Properties) bool {
 	migrationBrokerControllerQuorumConfigEnabled, found := brokerReadOnlyConfig.Get(kafkautils.MigrationBrokerControllerQuorumConfigEnabled)
-	return !found || migrationBrokerControllerQuorumConfigEnabled.Value() == "true"
+	return !found || migrationBrokerControllerQuorumConfigEnabled.Value() == configValueTrue
 }
 
 func configureBrokerZKMode(brokerID int32, kafkaCluster *v1beta1.KafkaCluster, config *properties.Properties, extListenerStatuses, intListenerStatuses,

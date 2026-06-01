@@ -38,9 +38,9 @@ func requireDeployingKafkaTopic(kubectlOptions k8s.KubectlOptions, topicName str
 		err := applyK8sResourceFromTemplate(kubectlOptions,
 			kafkaTopicTemplate,
 			map[string]interface{}{
-				"Name":      topicName,
-				"TopicName": topicName,
-				"Namespace": kubectlOptions.Namespace,
+				nameField:      topicName,
+				"TopicName":    topicName,
+				namespaceField: kubectlOptions.Namespace,
 			},
 		)
 		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
@@ -64,9 +64,9 @@ func requireDeleteKafkaUser(kubectlOptions k8s.KubectlOptions, userName string) 
 func requireDeployingKafkaUser(kubectlOptions k8s.KubectlOptions, userName string, tlsSecretName string) {
 	ginkgo.It("Deploying KafkaUser CR", func() {
 		templateParameters := map[string]interface{}{
-			"Name":        userName,
-			"Namespace":   kubectlOptions.Namespace,
-			"ClusterName": kafkaClusterName,
+			nameField:      userName,
+			namespaceField: kubectlOptions.Namespace,
+			"ClusterName":  kafkaClusterName,
 		}
 		if tlsSecretName != "" {
 			templateParameters["TLSSecretName"] = tlsSecretName

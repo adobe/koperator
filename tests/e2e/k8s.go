@@ -64,7 +64,7 @@ func isExistingK8SResource(
 	resourceName string,
 ) bool {
 	ginkgo.By(fmt.Sprintf("Checking the existence of resource %s in namespace %s (kind: %s)", resourceName, kubectlOptions.Namespace, resourceKind))
-	err := k8s.RunKubectlE(ginkgo.GinkgoT(), &kubectlOptions, "get", resourceKind, resourceName)
+	err := k8s.RunKubectlE(ginkgo.GinkgoT(), &kubectlOptions, getAction, resourceKind, resourceName)
 	if err != nil {
 		ginkgo.By(fmt.Sprintf("Received error when getting resource: %s", err))
 		return false
@@ -83,7 +83,7 @@ func createOrReplaceK8sResourcesFromManifest( //nolint:unused // Note: this migh
 	shouldBeValidated bool,
 ) {
 	ginkgo.By(fmt.Sprintf("Checking the existence of resource %s", resourceName))
-	err := k8s.RunKubectlE(ginkgo.GinkgoT(), &kubectlOptions, "get", resourceKind, resourceName)
+	err := k8s.RunKubectlE(ginkgo.GinkgoT(), &kubectlOptions, getAction, resourceKind, resourceName)
 
 	if err == nil {
 		ginkgo.By(fmt.Sprintf("Replacing k8s resources from manifest %s", resourceManifest))
@@ -160,7 +160,7 @@ func getK8sCRD(kubectlOptions k8s.KubectlOptions, crdName string) ([]byte, error
 	output, err := k8s.RunKubectlAndGetOutputE(
 		ginkgo.GinkgoT(),
 		&clusterScopedOptions,
-		[]string{"get", "crd", "--output", "json", crdName}...,
+		[]string{getAction, "crd", outputFlag, "json", crdName}...,
 	)
 	if err != nil {
 		return nil, errors.WrapIfWithDetails(err, "retrieving K8s CRD failed", "crdName", crdName)
@@ -409,7 +409,7 @@ func listK8sCRDs(kubectlOptions k8s.KubectlOptions, crdNames ...string) ([]strin
 	// CRDs are cluster-scoped, so we need to remove the namespace from kubectlOptions
 	clusterScopedOptions := kubectlOptions
 	clusterScopedOptions.Namespace = ""
-	args := append([]string{"get", "crd", "--output", "name"}, crdNames...)
+	args := append([]string{getAction, "crd", outputFlag, nameKey}, crdNames...)
 	output, err := k8s.RunKubectlAndGetOutputE(
 		ginkgo.GinkgoT(),
 		&clusterScopedOptions,
@@ -502,7 +502,7 @@ func listK8sResourceKinds(kubectlOptions k8s.KubectlOptions, apiGroupSelector st
 		ginkgo.By(fmt.Sprintf("Listing K8s resource kinds for apiGroup: '%s'", apiGroupSelector))
 	}
 
-	args := []string{"api-resources", "--verbs", "list", "--output", "name", "--sort-by", "name"}
+	args := []string{"api-resources", "--verbs", "list", outputFlag, nameKey, "--sort-by", nameKey}
 
 	if apiGroupSelector != "" {
 		args = append(args, "--api-group", apiGroupSelector)
@@ -536,12 +536,12 @@ func getK8sResources(kubectlOptions k8s.KubectlOptions, resourceKind []string, s
 	// Only log if verbose logging is enabled
 	if os.Getenv("E2E_VERBOSE_LOGGING") == verboseLoggingEnabled {
 		logMsg := fmt.Sprintf("Get K8S resources: '%s'", resourceKind)
-		args := []string{"get", strings.Join(resourceKind, ",")}
+		args := []string{getAction, strings.Join(resourceKind, ",")}
 		logMsg, _ = kubectlArgExtender(args, logMsg, selector, names, kubectlOptions.Namespace, extraArgs)
 		ginkgo.By(logMsg)
 	}
 
-	args := []string{"get", strings.Join(resourceKind, ",")}
+	args := []string{getAction, strings.Join(resourceKind, ",")}
 	_, args = kubectlArgExtender(args, "", selector, names, kubectlOptions.Namespace, extraArgs)
 
 	output, err := k8s.RunKubectlAndGetOutputE(
@@ -572,7 +572,7 @@ func getK8sResources(kubectlOptions k8s.KubectlOptions, resourceKind []string, s
 // This is similar to getK8sResources but suppresses terratest's internal logging
 // to avoid printing large JSON outputs during snapshotting operations.
 func getK8sResourcesQuiet(kubectlOptions k8s.KubectlOptions, resourceKind []string, selector string, names string, extraArgs ...string) ([]string, error) {
-	args := []string{"get", strings.Join(resourceKind, ",")}
+	args := []string{getAction, strings.Join(resourceKind, ",")}
 	_, args = kubectlArgExtender(args, "", selector, names, kubectlOptions.Namespace, extraArgs)
 
 	// Execute kubectl directly without terratest's logging to avoid JSON output pollution
@@ -770,7 +770,7 @@ func waitForKafkaClusterWithPodStatusCheck(kubectlOptions k8s.KubectlOptions, cl
 
 		// Check KafkaCluster status
 		args := []string{
-			"get", "kafkaclusters.kafka.banzaicloud.io", clusterName,
+			getAction, kafkaKind, clusterName,
 			"-o", "jsonpath={.status.state}",
 			"-n", kubectlOptions.Namespace,
 		}
@@ -810,7 +810,7 @@ func waitForKafkaClusterWithPodStatusCheck(kubectlOptions k8s.KubectlOptions, cl
 func checkAllKafkaPodsInNamespace(kubectlOptions k8s.KubectlOptions, namespace string, labelKey string, clusterName string) error {
 	// Get Kafka pods with the same label selector as the original verification
 	args := []string{
-		"get", "pods",
+		getAction, podsResource,
 		"-n", namespace,
 		"-l", fmt.Sprintf("%s=%s,app=kafka", labelKey, clusterName),
 		"-o", "jsonpath={range .items[*]}{.metadata.name}{.status.phase}{.status.containerStatuses[*].ready}{\"\\n\"}{end}",
@@ -845,7 +845,7 @@ func checkAllKafkaPodsInNamespace(kubectlOptions k8s.KubectlOptions, namespace s
 func checkAndPrintKafkaPodStatus(kubectlOptions k8s.KubectlOptions, namespace string, labelKey string, clusterName string) {
 	// Get Kafka pod status with the same label selector as the original verification
 	args := []string{
-		"get", "pods",
+		getAction, podsResource,
 		"-n", namespace,
 		"-l", fmt.Sprintf("%s=%s,app=kafka", labelKey, clusterName),
 		"-o", "wide",
@@ -865,7 +865,7 @@ func checkAndPrintKafkaPodStatus(kubectlOptions k8s.KubectlOptions, namespace st
 
 	// Get pod names to describe them individually
 	podNamesArgs := []string{
-		"get", "pods",
+		getAction, podsResource,
 		"-n", namespace,
 		"-l", fmt.Sprintf("%s=%s,app=kafka", labelKey, clusterName),
 		"-o", "jsonpath={.items[*].metadata.name}",
@@ -890,7 +890,7 @@ func checkAndPrintKafkaPodStatus(kubectlOptions k8s.KubectlOptions, namespace st
 
 		// Get only the Events section for focused debugging
 		eventsArgs := []string{
-			"get", "events",
+			getAction, "events",
 			"-n", namespace,
 			"--field-selector", fmt.Sprintf("involvedObject.name=%s", podName),
 			"--sort-by", ".lastTimestamp",

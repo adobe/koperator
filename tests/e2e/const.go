@@ -80,20 +80,40 @@ const (
 	kafkaLabelSelectorControllers = "app=kafka,isControllerNode=true"
 	kafkaLabelSelectorAll         = "app=kafka"
 	jmxExporterPort               = "9020"
+
+	// Dependency component names.
+	certManagerName = "cert-manager"
+	contourName     = "contour"
+
+	// Kubernetes resource kinds.
+	podsResource = "pods"
+
+	// Common string values and CLI flags/keys.
+	falseString   = "false"
+	timeoutFlag   = "--timeout"
+	timeoutValue  = "10m"
+	outputFlag    = "--output"
+	installAction = "install"
+	nameKey       = "name"
+	getAction     = "get"
+
+	// Template parameter keys.
+	nameField      = "Name"
+	namespaceField = "Namespace"
 )
 
 func apiGroupKoperatorDependencies() map[string]string {
 	return map[string]string{
-		"cert-manager": "cert-manager.io",
-		"zookeeper":    "zookeeper.pravega.io",
-		"prometheus":   "monitoring.coreos.com",
-		"contour":      "projectcontour.io",
+		certManagerName: "cert-manager.io",
+		"zookeeper":     "zookeeper.pravega.io",
+		"prometheus":    "monitoring.coreos.com",
+		contourName:     "projectcontour.io",
 	}
 }
 
 func basicK8sResourceKinds() []string {
 	return []string{
-		"pods",
+		podsResource,
 		"services",
 		"deployments.apps",
 		"daemonset.apps",
@@ -115,7 +135,7 @@ func basicK8sResourceKinds() []string {
 func koperatorCRDs() []string {
 	return []string{
 		"kafkatopics.kafka.banzaicloud.io",
-		"kafkaclusters.kafka.banzaicloud.io",
+		kafkaKind,
 		"kafkausers.kafka.banzaicloud.io",
 		"cruisecontroloperations.kafka.banzaicloud.io",
 	}
@@ -125,7 +145,7 @@ func koperatorRelatedResourceKinds() []string {
 	return []string{
 		"nodepoollabelsets.labels.banzaicloud.io",
 		"kafkatopics.kafka.banzaicloud.io",
-		"kafkaclusters.kafka.banzaicloud.io",
+		kafkaKind,
 		"kafkausers.kafka.banzaicloud.io",
 		"cruisecontroloperations.kafka.banzaicloud.io",
 		"istiomeshgateways.servicemesh.cisco.com",

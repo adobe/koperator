@@ -35,6 +35,12 @@ linters:
               desc: Please don't use forbiddenpackage package
     dogsled:
       max-blank-identifiers: 3
+    govet:
+      # The `inline` analyzer (bundled since golangci-lint v2.12 / Go 1.26) only emits
+      # advisory "cannot inline: type parameter inference is not yet supported" notes for
+      # generic stdlib calls (e.g. slices.Contains). These are not bugs, so disable it.
+      disable:
+        - inline
     funlen:
       lines: 323
       statements: 100

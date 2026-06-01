@@ -197,14 +197,14 @@ fi`},
 func addClusterIdEnv(r *Reconciler, pod *corev1.Pod, i int) {
 	// when cluster id env var already present from KafkaCluster, do not add it again
 	for _, envVar := range r.KafkaCluster.Spec.Envs {
-		if envVar.Name == "CLUSTER_ID" {
+		if envVar.Name == clusterIDEnvVarName {
 			return
 		}
 	}
 
 	pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env,
 		corev1.EnvVar{
-			Name:  "CLUSTER_ID",
+			Name:  clusterIDEnvVarName,
 			Value: r.KafkaCluster.Status.ClusterID,
 		},
 	)
@@ -254,7 +254,7 @@ func (r *Reconciler) generateKafkaContainerPorts(log logr.Logger) []corev1.Conta
 	kafkaContainerPorts = append(kafkaContainerPorts, corev1.ContainerPort{
 		ContainerPort: 9020,
 		Protocol:      corev1.ProtocolTCP,
-		Name:          "metrics",
+		Name:          metricsPortName,
 	})
 
 	return kafkaContainerPorts
@@ -270,7 +270,7 @@ func getInitContainers(brokerConfig *v1beta1.BrokerConfig, kafkaClusterSpec v1be
 			Image:   util.GetBrokerMetricsReporterImage(brokerConfig, kafkaClusterSpec),
 			Command: []string{"/bin/sh", "-cex", "cp -v /opt/cruise-control/cruise-control/build/dependant-libs/cruise-control-metrics-reporter.jar /opt/kafka/libs/extensions/cruise-control-metrics-reporter.jar"},
 			VolumeMounts: []corev1.VolumeMount{{
-				Name:      "extensions",
+				Name:      extensionsVolumeName,
 				MountPath: "/opt/kafka/libs/extensions",
 			}},
 			Resources: k8sutil.GetDefaultInitContainerResourceRequirements(),
@@ -314,7 +314,7 @@ func getVolumeMounts(brokerConfigVolumeMounts, dataVolumeMount []corev1.VolumeMo
 			MountPath: "/config",
 		},
 		{
-			Name:      "extensions",
+			Name:      extensionsVolumeName,
 			MountPath: "/opt/kafka/libs/extensions",
 		},
 		{
@@ -366,7 +366,7 @@ func getVolumes(brokerConfigVolumes, dataVolume []corev1.Volume, kafkaClusterSpe
 			},
 		},
 		{
-			Name: "extensions",
+			Name: extensionsVolumeName,
 			VolumeSource: corev1.VolumeSource{
 				EmptyDir: &corev1.EmptyDirVolumeSource{},
 			},
@@ -413,7 +413,7 @@ func generatePodAntiAffinity(clusterName string, hardRuleEnabled bool) *corev1.P
 					LabelSelector: &metav1.LabelSelector{
 						MatchLabels: apiutil.LabelsForKafka(clusterName),
 					},
-					TopologyKey: "kubernetes.io/hostname",
+					TopologyKey: corev1.LabelHostname,
 				},
 			},
 		}
@@ -426,7 +426,7 @@ func generatePodAntiAffinity(clusterName string, hardRuleEnabled bool) *corev1.P
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: apiutil.LabelsForKafka(clusterName),
 						},
-						TopologyKey: "kubernetes.io/hostname",
+						TopologyKey: corev1.LabelHostname,
 					},
 				},
 			},
@@ -451,7 +451,7 @@ func generateDataVolumeAndVolumeMount(pvcs []corev1.PersistentVolumeClaim, stora
 		})
 		volumeMounts = append(volumeMounts, corev1.VolumeMount{
 			Name:      fmt.Sprintf(kafkaDataVolumeMount+"-"+"%d", i),
-			MountPath: pvc.Annotations["mountPath"],
+			MountPath: pvc.Annotations[mountPathAnnotationKey],
 		})
 	}
 
