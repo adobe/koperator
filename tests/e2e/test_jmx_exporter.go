@@ -111,5 +111,5 @@ func isKRaftEnabledForKafkaCluster(kubectlOptions k8s.KubectlOptions, kafkaClust
 		return false, fmt.Errorf("failed to get KafkaCluster '%s': %w", kafkaClusterName, err)
 	}
 	fmt.Printf("Is KRaft enabled?: %s\n", kraftModeValue)
-	return strings.ToLower(kraftModeValue) == "true", nil
+	return strings.ToLower(kraftModeValue) == verboseLoggingEnabled, nil
 }

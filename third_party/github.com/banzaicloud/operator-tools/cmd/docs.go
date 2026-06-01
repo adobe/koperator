@@ -26,6 +26,8 @@ import (
 
 var logger = utils.Log
 
+const docsTypesDestPath = "docs/types"
+
 func main() {
 	crds()
 }
@@ -33,9 +35,9 @@ func main() {
 func crds() {
 	lister := docgen.NewSourceLister(
 		map[string]docgen.SourceDir{
-			"secret":    {Path: "pkg/secret", DestPath: "docs/types"},
-			"volume":    {Path: "pkg/volume", DestPath: "docs/types"},
-			"base":      {Path: "pkg/types", DestPath: "docs/types"},
+			"secret":    {Path: "pkg/secret", DestPath: docsTypesDestPath},
+			"volume":    {Path: "pkg/volume", DestPath: docsTypesDestPath},
+			"base":      {Path: "pkg/types", DestPath: docsTypesDestPath},
 			"overrides": {Path: "pkg/typeoverride", DestPath: "docs/overrides"},
 		},
 		logger.WithName("lister"))
@@ -50,7 +52,7 @@ func crds() {
 
 	lister.Index = docgen.NewDoc(docgen.DocItem{
 		Name:     "Readme",
-		DestPath: "docs/types",
+		DestPath: docsTypesDestPath,
 	}, logger.WithName("typedoc"))
 
 	lister.Header = heredoc.Doc(`

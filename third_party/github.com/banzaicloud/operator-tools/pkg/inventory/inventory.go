@@ -39,6 +39,7 @@ import (
 const (
 	CustomResourceDefinition = "CustomResourceDefinition"
 	Namespace                = "Namespace"
+	ConfigMap                = "ConfigMap"
 
 	referencesKey = "refs"
 )
@@ -101,7 +102,7 @@ func CreateObjectsInventory(namespace, name string, objects []runtime.Object) (*
 	}
 	cm := core.ConfigMap{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       "ConfigMap",
+			Kind:       ConfigMap,
 			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{

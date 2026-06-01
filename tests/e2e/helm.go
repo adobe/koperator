@@ -262,7 +262,7 @@ func (helmDescriptor *helmDescriptor) installHelmChart(kubectlOptions k8s.Kubect
 				KubectlOptions: &kubectlOptions,
 				Version:        helmDescriptor.ChartVersion,
 				ExtraArgs: map[string][]string{
-					"install": append(fixedArguments, helmDescriptor.HelmExtraArguments["install"]...),
+					installAction: append(fixedArguments, helmDescriptor.HelmExtraArguments[installAction]...),
 				},
 			},
 			helmChartNameOrLocalPath,
@@ -409,7 +409,7 @@ func listHelmReleases(kubectlOptions k8s.KubectlOptions) ([]*HelmRelease, error)
 	}
 
 	// Build command arguments
-	args := []string{"--output", "json"}
+	args := []string{outputFlag, "json"}
 
 	// Add --debug flag if verbose logging is enabled
 	if os.Getenv("E2E_VERBOSE_LOGGING") == verboseLoggingEnabled {
