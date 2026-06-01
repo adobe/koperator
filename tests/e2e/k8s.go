@@ -638,22 +638,68 @@ func waitK8sResourceCondition(kubectlOptions k8s.KubectlOptions, resourceKind, w
 		ginkgo.By(logMsg)
 	}
 
-	args := []string{
-		"wait",
-		resourceKind,
-		fmt.Sprintf("--for=%s", waitFor),
-		fmt.Sprintf("--timeout=%s", timeout),
+	// `kubectl wait` resolves the objects matching the selector once, up front, and then
+	// blocks on each of them individually. When those objects are being rolled (for example
+	// broker pods recreated during a disk removal), one can be deleted before `kubectl wait`
+	// evaluates its condition, so the command fails immediately with a transient
+	// "not found" / "no matching resources found" error instead of waiting for the
+	// replacement. Retry on those transient errors within the overall timeout budget, which
+	// makes kubectl re-resolve the selector against the current set of objects.
+	deadline := time.Now().Add(timeout)
+	var lastErr error
+	for {
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			return lastErr
+		}
+		// Round to whole seconds (1s floor) so the kubectl --timeout value reads cleanly in
+		// logs (e.g. 5m0s, not 4m59.999999449s). kubectl treats --timeout=0 specially, so
+		// never go below 1s.
+		attemptTimeout := remaining.Round(time.Second)
+		if attemptTimeout < time.Second {
+			attemptTimeout = time.Second
+		}
+
+		args := []string{
+			"wait",
+			resourceKind,
+			fmt.Sprintf("--for=%s", waitFor),
+			fmt.Sprintf("--timeout=%s", attemptTimeout),
+		}
+		_, args = kubectlArgExtender(args, "", selector, names, kubectlOptions.Namespace, extraArgs)
+
+		_, lastErr = k8s.RunKubectlAndGetOutputE(
+			ginkgo.GinkgoT(),
+			&kubectlOptions,
+			args...,
+		)
+		if lastErr == nil {
+			return nil
+		}
+
+		// Genuine failures (e.g. the condition not being met before the timeout) are
+		// returned immediately; only the transient rolling-update races are retried.
+		if !isTransientResourceWaitError(lastErr) {
+			return lastErr
+		}
+
+		time.Sleep(waitResourceConditionRetryInterval)
 	}
+}
 
-	_, args = kubectlArgExtender(args, "", selector, names, kubectlOptions.Namespace, extraArgs)
-
-	_, err := k8s.RunKubectlAndGetOutputE(
-		ginkgo.GinkgoT(),
-		&kubectlOptions,
-		args...,
-	)
-
-	return err
+// isTransientResourceWaitError reports whether a `kubectl wait` failure was caused by the
+// matched objects changing while waiting (deleted/recreated during a rolling update) rather
+// than by the wait condition genuinely not being met. Such errors are safe to retry because
+// re-running `kubectl wait` re-resolves the selector against the current set of objects.
+func isTransientResourceWaitError(err error) bool {
+	if err == nil {
+		return false
+	}
+	// "NotFound": an object that matched the selector was deleted before `kubectl wait`
+	// evaluated its condition (e.g. a pod recreated during a rolling update).
+	// "no matching resources found": the selector momentarily matched no objects.
+	return isKubectlNotFoundError(err) ||
+		strings.Contains(err.Error(), "no matching resources found")
 }
 
 // kubectlArgExtender extends the kubectl arguments and log message based on the parameters
