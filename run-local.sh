@@ -101,12 +101,12 @@ fi
 ## Run Koperator
 if $LOCAL; then
   ## Start Cloud Provider Kind in the background to enable LoadBalancer services
-  pgrep -f cloud-provider-kind &>/dev/null || sudo ~/go/bin/cloud-provider-kind > /tmp/cloudproviderkind.log 2>&1 &
+  pgrep -f cloud-provider-kind &>/dev/null || cloud-provider-kind > /tmp/cloudproviderkind.log 2>&1 &
 
   kubectl get namespace kafka &>/dev/null || kubectl create namespace kafka
   kubectl config set-context --current --namespace=kafka
   make install
-  make run > /tmp/koperator.log 2>&1 &
+
 else
   helm upgrade --install kafka-operator charts/kafka-operator \
     --set operator.image.repository=koperator_e2e_test \
@@ -122,3 +122,8 @@ kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=kafka-operator 
 sleep 5
 
 kubectl apply -f config/samples/simplekafkacluster.yaml -n kafka
+
+## Start Local Koperator
+if $LOCAL; then
+  make run 
+fi
