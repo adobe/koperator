@@ -87,3 +87,39 @@ jobs:
           # Clean any existing go.work files to avoid workspace conflicts
           rm -f go.work go.work.sum
           IMG_E2E=$REPOSITORY:$GITHUB_SHA make test-e2e
+
+      # Dump cluster diagnostics on failure so e2e failures (e.g. a dependency Helm
+      # install that times out under `--atomic`) are debuggable from the job log
+      # without needing a live tmate session.
+      - name: Dump diagnostics on failure
+        if: failure()
+        env:
+          KUBECONFIG: ${{ steps.setup-kind.outputs.kubeconfig }}
+        run: |
+          set +e
+          echo "::group::nodes"
+          kubectl get nodes -o wide
+          echo "::endgroup::"
+          echo "::group::all pods"
+          kubectl get pods -A -o wide
+          echo "::endgroup::"
+          for ns in cert-manager projectcontour zookeeper prometheus kafka; do
+            echo "::group::namespace ${ns}"
+            kubectl get pods -n "${ns}" -o wide
+            echo "----- events (${ns}) -----"
+            kubectl get events -n "${ns}" --sort-by=.lastTimestamp | tail -50
+            echo "----- describe pods (${ns}) -----"
+            kubectl describe pods -n "${ns}"
+            echo "----- container logs (${ns}) -----"
+            for pod in $(kubectl get pods -n "${ns}" -o name); do
+              echo ">>> ${pod} (current) <<<"
+              kubectl logs -n "${ns}" "${pod}" --all-containers --tail=150 --timestamps
+              echo ">>> ${pod} (previous, if the container restarted) <<<"
+              kubectl logs -n "${ns}" "${pod}" --all-containers --previous --tail=150 --timestamps
+            done
+            echo "::endgroup::"
+          done
+          echo "::group::warning events (all namespaces)"
+          kubectl get events -A --field-selector type=Warning --sort-by=.lastTimestamp | tail -80
+          echo "::endgroup::"
+          exit 0
