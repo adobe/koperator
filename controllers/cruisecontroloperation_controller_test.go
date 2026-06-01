@@ -16,14 +16,22 @@
 package controllers
 
 import (
+	"context"
 	"testing"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/banzaicloud/koperator/api/v1alpha1"
 	"github.com/banzaicloud/koperator/api/v1beta1"
+	mocks "github.com/banzaicloud/koperator/controllers/tests/mocks"
+	"github.com/banzaicloud/koperator/pkg/scale"
 )
 
 func createCCRetryExecutionOperation(createTime time.Time, id string, operation v1alpha1.CruiseControlTaskOperation) *v1alpha1.CruiseControlOperation {
@@ -105,5 +113,49 @@ func TestSortOperations(t *testing.T) {
 		sortedCCOperations := sortOperations(testCase.ccOperations)
 		sortedRetryOutput := sortedCCOperations[ccOperationRetryExecution]
 		assert.Equal(t, sortedRetryOutput, testCase.expectedOutput, "test", testCase.testName)
+	}
+}
+
+// TestGetStatusDoesNotPanicWhenStatusNil exercises the res.Status==nil branch of
+// getStatus. On that path statusOperation is always nil (it is only assigned in the
+// early-returning statusOperation!=nil branch), so the error-wraps must reference the
+// freshly-created operation, not statusOperation. With the bug present this panics with
+// a nil-pointer dereference; with the fix it returns a wrapped error.
+//
+// The scaler returns Status==nil with an empty TaskResult, so updateResult fails parsing
+// the (empty) start time and we deterministically reach the buggy error-wrap. createCCOperation
+// must succeed first, hence the registered status subresource on a plain fake client.
+func TestGetStatusDoesNotPanicWhenStatusNil(t *testing.T) {
+	ctrlMock := gomock.NewController(t)
+	defer ctrlMock.Finish()
+
+	mockScaler := mocks.NewMockCruiseControlScaler(ctrlMock)
+	mockScaler.EXPECT().Status(gomock.Any()).
+		Return(scale.StatusTaskResult{Status: nil, TaskResult: &scale.Result{}}, nil)
+
+	scheme := runtime.NewScheme()
+	if err := v1alpha1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := v1beta1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).
+		WithStatusSubresource(&v1alpha1.CruiseControlOperation{}).
+		Build()
+
+	r := &CruiseControlOperationReconciler{Client: fakeClient, Scheme: scheme, scaler: mockScaler}
+
+	kafkaCluster := &v1beta1.KafkaCluster{
+		ObjectMeta: v1.ObjectMeta{Name: "kafka", Namespace: "default"},
+	}
+	ref := client.ObjectKey{Name: "kafka", Namespace: "default"}
+
+	// With the bug this panics; with the fix it returns a wrapped error.
+	_, err := r.getStatus(context.Background(), logr.Discard(), kafkaCluster,
+		ref, v1alpha1.CruiseControlOperationList{})
+	if err == nil {
+		t.Fatal("expected an error, got nil")
 	}
 }
