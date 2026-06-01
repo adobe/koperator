@@ -56,6 +56,7 @@ const (
 	kafkaClusterResourceReadinessTimeout   = 300 * time.Second // Increased for kind environments
 	defaultDeletionTimeout                 = 60 * time.Second  // Increased for kind environments
 	defaultPodReadinessWaitTime            = 180 * time.Second // Increased for kind environments
+	waitResourceConditionRetryInterval     = 2 * time.Second   // Retry interval when kubectl wait races with rolling updates
 	defaultTopicCreationWaitTime           = 60 * time.Second  // Increased for kind environments
 	defaultUserCreationWaitTime            = 60 * time.Second  // Increased for kind environments
 	kafkaClusterCreateTimeout              = 1800 * time.Second
