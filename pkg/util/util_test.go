@@ -22,7 +22,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/banzaicloud/koperator/api/v1beta1"
-	"github.com/banzaicloud/koperator/pkg/util/istioingress"
 
 	"gotest.tools/assert"
 	corev1 "k8s.io/api/core/v1"
@@ -280,23 +279,6 @@ func TestGetIngressConfigs(t *testing.T) {
 		},
 	}
 
-	defaultKafkaClusterWithIstioIngress := &v1beta1.KafkaClusterSpec{
-		IngressController: istioingress.IngressControllerName,
-		IstioIngressConfig: v1beta1.IstioIngressConfig{
-			Resources: &corev1.ResourceRequirements{
-				Limits: corev1.ResourceList{
-					"cpu":    resource.MustParse("100m"),
-					"memory": resource.MustParse("100Mi"),
-				},
-				Requests: corev1.ResourceList{
-					"cpu":    resource.MustParse("100m"),
-					"memory": resource.MustParse("100Mi"),
-				},
-			},
-			Replicas: 1,
-		},
-	}
-
 	testCases := []struct {
 		globalConfig                     v1beta1.KafkaClusterSpec
 		externalListenerSpecifiedConfigs v1beta1.ExternalListenerConfig
@@ -315,21 +297,6 @@ func TestGetIngressConfigs(t *testing.T) {
 			},
 			map[string]v1beta1.IngressConfig{
 				IngressConfigGlobalName: {EnvoyConfig: &defaultKafkaClusterWithEnvoy.EnvoyConfig},
-			},
-		},
-		// only globalIstio ingress configuration is set
-		{
-			*defaultKafkaClusterWithIstioIngress,
-			v1beta1.ExternalListenerConfig{
-				CommonListenerSpec: v1beta1.CommonListenerSpec{
-					Type:          "plaintext",
-					Name:          "external",
-					ContainerPort: 9094,
-				},
-				ExternalStartingPort: 19090,
-			},
-			map[string]v1beta1.IngressConfig{
-				IngressConfigGlobalName: {IstioIngressConfig: &defaultKafkaClusterWithIstioIngress.IstioIngressConfig},
 			},
 		},
 		// ExternalListener Specified config is set with EnvoyIngress
@@ -401,74 +368,6 @@ func TestGetIngressConfigs(t *testing.T) {
 						Annotations:        map[string]string{"az2": "region"},
 						Replicas:           1,
 						ServiceAccountName: "default",
-					},
-				},
-			},
-		},
-		// ExternalListener Specified config is set with IstioIngress
-		{
-			*defaultKafkaClusterWithIstioIngress,
-			v1beta1.ExternalListenerConfig{
-				CommonListenerSpec: v1beta1.CommonListenerSpec{
-					Type:          "plaintext",
-					Name:          "external",
-					ContainerPort: 9094,
-				},
-				ExternalStartingPort: 19090,
-				Config: &v1beta1.Config{
-					DefaultIngressConfig: "az1",
-					IngressConfig: map[string]v1beta1.IngressConfig{
-						"az1": {
-							IngressServiceSettings: v1beta1.IngressServiceSettings{
-								HostnameOverride: "foo.bar",
-							},
-							IstioIngressConfig: &v1beta1.IstioIngressConfig{
-								Replicas:    3,
-								Annotations: map[string]string{"az1": "region"},
-							},
-						},
-						"az2": {
-							IstioIngressConfig: &v1beta1.IstioIngressConfig{
-								Annotations: map[string]string{"az2": "region"},
-							},
-						},
-					},
-				},
-			},
-			map[string]v1beta1.IngressConfig{
-				"az1": {
-					IngressServiceSettings: v1beta1.IngressServiceSettings{
-						HostnameOverride: "foo.bar",
-					},
-					IstioIngressConfig: &v1beta1.IstioIngressConfig{
-						Resources: &corev1.ResourceRequirements{
-							Limits: corev1.ResourceList{
-								"cpu":    resource.MustParse("100m"),
-								"memory": resource.MustParse("100Mi"),
-							},
-							Requests: corev1.ResourceList{
-								"cpu":    resource.MustParse("100m"),
-								"memory": resource.MustParse("100Mi"),
-							},
-						},
-						Replicas:    3,
-						Annotations: map[string]string{"az1": "region"},
-					},
-				},
-				"az2": {
-					IstioIngressConfig: &v1beta1.IstioIngressConfig{
-						Resources: &corev1.ResourceRequirements{
-							Limits: corev1.ResourceList{
-								"cpu":    resource.MustParse("100m"),
-								"memory": resource.MustParse("100Mi"),
-							},
-							Requests: corev1.ResourceList{
-								"cpu":    resource.MustParse("100m"),
-								"memory": resource.MustParse("100Mi"),
-							},
-						},
-						Annotations: map[string]string{"az2": "region"},
-						Replicas:    1,
 					},
 				},
 			},

@@ -148,9 +148,6 @@ func koperatorRelatedResourceKinds() []string {
 		kafkaKind,
 		"kafkausers.kafka.banzaicloud.io",
 		"cruisecontroloperations.kafka.banzaicloud.io",
-		"istiomeshgateways.servicemesh.cisco.com",
-		"virtualservices.networking.istio.io",
-		"gateways.networking.istio.io",
 		"clusterissuers.cert-manager.io",
 		"servicemonitors.monitoring.coreos.com",
 	}
