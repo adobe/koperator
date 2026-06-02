@@ -26,7 +26,7 @@ import (
 	"github.com/banzaicloud/k8s-objectmatcher/patch"
 	admregv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/api/autoscaling/v2beta1"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	v1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -332,13 +332,13 @@ func testMatchOnObject(testItem *TestItem, ignoreField string) error {
 				log.Printf("Failed to remove object %s %+v", existing.GetName(), err)
 			}
 		}()
-	case *v2beta1.HorizontalPodAutoscaler:
-		existing, err = testContext.Client.AutoscalingV2beta1().HorizontalPodAutoscalers(newObject.GetNamespace()).Create(context.Background(), newObject.(*v2beta1.HorizontalPodAutoscaler), metav1.CreateOptions{})
+	case *autoscalingv2.HorizontalPodAutoscaler:
+		existing, err = testContext.Client.AutoscalingV2().HorizontalPodAutoscalers(newObject.GetNamespace()).Create(context.Background(), newObject.(*autoscalingv2.HorizontalPodAutoscaler), metav1.CreateOptions{})
 		if err != nil {
 			return errors.WrapWithDetails(err, "failed to create object", "object", newObject)
 		}
 		defer func() {
-			err = testContext.Client.AutoscalingV2beta1().HorizontalPodAutoscalers(newObject.GetNamespace()).Delete(context.Background(), existing.GetName(), deleteOptions)
+			err = testContext.Client.AutoscalingV2().HorizontalPodAutoscalers(newObject.GetNamespace()).Delete(context.Background(), existing.GetName(), deleteOptions)
 			if err != nil {
 				log.Printf("Failed to remove object %s %+v", existing.GetName(), err)
 			}
