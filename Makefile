@@ -123,6 +123,13 @@ bin/licensei-${LICENSEI_VERSION}: ## Download versioned licensei.
 	curl -sfL https://raw.githubusercontent.com/goph/licensei/master/install.sh | bash -s v${LICENSEI_VERSION}
 	@mv bin/licensei $@
 
+.PHONY: license-vendor
+license-vendor: ## Vendor each module's deps so licensei resolves licenses from local files (handles vanity import paths, e.g. dario.cat/mergo).
+	@for dir in $(LICENSE_CHECK_DIRS); do \
+		echo "Vendoring dependencies in $$dir..."; \
+		(cd $$dir && go mod vendor) || exit 1; \
+	done
+
 .PHONY: license-check
 license-check: bin/licensei ## Run license check.
 	@for dir in $(LICENSE_CHECK_DIRS); do \
