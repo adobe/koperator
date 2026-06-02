@@ -16,6 +16,7 @@
 package e2e
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -70,7 +71,7 @@ func checkMetricExistsForBrokers(kubectlOptions k8s.KubectlOptions, kafkaBrokerL
 		LabelSelector: kafkaBrokerLabelSelector,
 	}
 
-	pods, err := k8s.ListPodsE(ginkgo.GinkgoT(), &kubectlOptions, listOptions)
+	pods, err := k8s.ListPodsContextE(ginkgo.GinkgoT(), context.Background(), &kubectlOptions, listOptions)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to list pods")
 
 	gomega.Expect(
@@ -89,7 +90,8 @@ func checkMetricExistsForBrokers(kubectlOptions k8s.KubectlOptions, kafkaBrokerL
 func metricExistsInPod(pod coreV1.Pod, kubectlOptions k8s.KubectlOptions, metricPrefix string) (bool, error) {
 	baseCommand := fmt.Sprintf("exec %s --container kafka -- sh -c", pod.Name)
 	curlCommand := fmt.Sprintf("curl -s http://localhost:%s/metrics|grep ^%s|head -n 1", jmxExporterPort, metricPrefix)
-	output, err := k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(),
+	output, err := k8s.RunKubectlAndGetOutputContextE(ginkgo.GinkgoT(),
+		context.Background(),
 		&kubectlOptions,
 		append(strings.Split(baseCommand, " "), curlCommand)...)
 
@@ -102,8 +104,9 @@ func metricExistsInPod(pod coreV1.Pod, kubectlOptions k8s.KubectlOptions, metric
 
 func isKRaftEnabledForKafkaCluster(kubectlOptions k8s.KubectlOptions, kafkaClusterName string) (bool, error) {
 	command := fmt.Sprintf("get %s %s -o jsonpath={.spec.kRaft}", kafkaKind, kafkaClusterName)
-	kraftModeValue, err := k8s.RunKubectlAndGetOutputE(
+	kraftModeValue, err := k8s.RunKubectlAndGetOutputContextE(
 		ginkgo.GinkgoT(),
+		context.Background(),
 		&kubectlOptions,
 		strings.Split(command, " ")...)
 

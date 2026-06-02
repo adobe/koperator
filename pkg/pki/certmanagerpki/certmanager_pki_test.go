@@ -131,7 +131,7 @@ func TestReconcilePKI(t *testing.T) {
 	}
 
 	// Testing IssuerRef case
-	cluster.Spec.ListenersConfig.SSLSecrets.IssuerRef = &cmmeta.ObjectReference{
+	cluster.Spec.ListenersConfig.SSLSecrets.IssuerRef = &cmmeta.IssuerReference{
 		Name:  "test",
 		Kind:  "testKind",
 		Group: "testGroup",

@@ -598,7 +598,7 @@ type SSLSecrets struct {
 	TLSSecretName   string                  `json:"tlsSecretName"`
 	JKSPasswordName string                  `json:"jksPasswordName,omitempty"`
 	Create          bool                    `json:"create,omitempty"`
-	IssuerRef       *cmmeta.ObjectReference `json:"issuerRef,omitempty"`
+	IssuerRef       *cmmeta.IssuerReference `json:"issuerRef,omitempty"`
 	// +kubebuilder:validation:Enum={"cert-manager"}
 	PKIBackend PKIBackend `json:"pkiBackend,omitempty"`
 }
@@ -637,7 +637,7 @@ type IngressServiceSettings struct {
 	// "Cluster" obscures the client source IP and may cause a second hop to
 	// another node, but should have good overall load-spreading.
 	// +optional
-	ExternalTrafficPolicy corev1.ServiceExternalTrafficPolicyType `json:"externalTrafficPolicy,omitempty"`
+	ExternalTrafficPolicy corev1.ServiceExternalTrafficPolicy `json:"externalTrafficPolicy,omitempty"`
 	// Service Type string describes ingress methods for a service
 	// Only "NodePort" and "LoadBalancer" is supported.
 	// Default value is LoadBalancer
@@ -797,10 +797,6 @@ type KafkaClusterList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []KafkaCluster `json:"items"`
-}
-
-func init() {
-	SchemeBuilder.Register(&KafkaCluster{}, &KafkaClusterList{})
 }
 
 // GetListenerName returns the prepared listener name

@@ -98,33 +98,16 @@ func (k *kafkaClient) createReadACLs(dn string, topic string, patternType sarama
 		return err
 	}
 
-	// READ on topic
-	if err = k.admin.CreateACL(sarama.Resource{
-		ResourceType:        sarama.AclResourceTopic,
-		ResourceName:        topic,
-		ResourcePatternType: patternType,
-	}, sarama.Acl{
-		Principal:      dn,
-		Host:           "*",
-		Operation:      sarama.AclOperationRead,
-		PermissionType: sarama.AclPermissionAllow,
-	}); err != nil {
-		return err
-	}
-
-	// READ on groups
-	err = k.admin.CreateACL(sarama.Resource{
-		ResourceType:        sarama.AclResourceGroup,
-		ResourceName:        "*",
-		ResourcePatternType: sarama.AclPatternLiteral,
-	}, sarama.Acl{
-		Principal:      dn,
-		Host:           "*",
-		Operation:      sarama.AclOperationRead,
-		PermissionType: sarama.AclPermissionAllow,
+	return k.admin.CreateACLs([]*sarama.ResourceAcls{
+		{
+			Resource: sarama.Resource{ResourceType: sarama.AclResourceTopic, ResourceName: topic, ResourcePatternType: patternType},
+			Acls:     []*sarama.Acl{{Principal: dn, Host: "*", Operation: sarama.AclOperationRead, PermissionType: sarama.AclPermissionAllow}},
+		},
+		{
+			Resource: sarama.Resource{ResourceType: sarama.AclResourceGroup, ResourceName: "*", ResourcePatternType: sarama.AclPatternLiteral},
+			Acls:     []*sarama.Acl{{Principal: dn, Host: "*", Operation: sarama.AclOperationRead, PermissionType: sarama.AclPermissionAllow}},
+		},
 	})
-
-	return err
 }
 
 func (k *kafkaClient) createWriteACLs(dn string, topic string, patternType sarama.AclResourcePatternType) (err error) {
@@ -132,62 +115,25 @@ func (k *kafkaClient) createWriteACLs(dn string, topic string, patternType saram
 		return err
 	}
 
-	// WRITE on topic
-	if err = k.admin.CreateACL(sarama.Resource{
-		ResourceType:        sarama.AclResourceTopic,
-		ResourceName:        topic,
-		ResourcePatternType: patternType,
-	}, sarama.Acl{
-		Principal:      dn,
-		Host:           "*",
-		Operation:      sarama.AclOperationWrite,
-		PermissionType: sarama.AclPermissionAllow,
-	}); err != nil {
-		return err
-	}
-
-	// CREATE on topic
-	err = k.admin.CreateACL(sarama.Resource{
-		ResourceType:        sarama.AclResourceTopic,
-		ResourceName:        topic,
-		ResourcePatternType: patternType,
-	}, sarama.Acl{
-		Principal:      dn,
-		Host:           "*",
-		Operation:      sarama.AclOperationCreate,
-		PermissionType: sarama.AclPermissionAllow,
+	return k.admin.CreateACLs([]*sarama.ResourceAcls{
+		{
+			Resource: sarama.Resource{ResourceType: sarama.AclResourceTopic, ResourceName: topic, ResourcePatternType: patternType},
+			Acls: []*sarama.Acl{
+				{Principal: dn, Host: "*", Operation: sarama.AclOperationWrite, PermissionType: sarama.AclPermissionAllow},
+				{Principal: dn, Host: "*", Operation: sarama.AclOperationCreate, PermissionType: sarama.AclPermissionAllow},
+			},
+		},
 	})
-
-	return err
 }
 
-func (k *kafkaClient) createCommonACLs(dn string, topic string, patternType sarama.AclResourcePatternType) (err error) {
-	// DESCRIBE on topic
-	if err = k.admin.CreateACL(sarama.Resource{
-		ResourceType:        sarama.AclResourceTopic,
-		ResourceName:        topic,
-		ResourcePatternType: patternType,
-	}, sarama.Acl{
-		Principal:      dn,
-		Host:           "*",
-		Operation:      sarama.AclOperationDescribe,
-		PermissionType: sarama.AclPermissionAllow,
-	}); err != nil {
-		return err
-	}
-
-	// DESCRIBE_CONFIGS on topic
-	if err = k.admin.CreateACL(sarama.Resource{
-		ResourceType:        sarama.AclResourceTopic,
-		ResourceName:        topic,
-		ResourcePatternType: patternType,
-	}, sarama.Acl{
-		Principal:      dn,
-		Host:           "*",
-		Operation:      sarama.AclOperationDescribeConfigs,
-		PermissionType: sarama.AclPermissionAllow,
-	}); err != nil {
-		return err
-	}
-	return err
+func (k *kafkaClient) createCommonACLs(dn string, topic string, patternType sarama.AclResourcePatternType) error {
+	return k.admin.CreateACLs([]*sarama.ResourceAcls{
+		{
+			Resource: sarama.Resource{ResourceType: sarama.AclResourceTopic, ResourceName: topic, ResourcePatternType: patternType},
+			Acls: []*sarama.Acl{
+				{Principal: dn, Host: "*", Operation: sarama.AclOperationDescribe, PermissionType: sarama.AclPermissionAllow},
+				{Principal: dn, Host: "*", Operation: sarama.AclOperationDescribeConfigs, PermissionType: sarama.AclPermissionAllow},
+			},
+		},
+	})
 }

@@ -21,6 +21,7 @@ import (
 
 	"go.uber.org/mock/gomock"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -121,4 +122,23 @@ func (mr *MockSubResourceClientMockRecorder) Update(arg0, arg1 interface{}, arg2
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{arg0, arg1}, arg2...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockSubResourceClient)(nil).Update), varargs...)
+}
+
+// Apply mocks base method.
+func (m *MockSubResourceClient) Apply(arg0 context.Context, arg1 runtime.ApplyConfiguration, arg2 ...client.SubResourceApplyOption) error {
+	m.ctrl.T.Helper()
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "Apply", varargs...)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Apply indicates an expected call of Apply.
+func (mr *MockSubResourceClientMockRecorder) Apply(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Apply", reflect.TypeOf((*MockSubResourceClient)(nil).Apply), varargs...)
 }
