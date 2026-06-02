@@ -320,6 +320,10 @@ define update-module-deps
 	for m in $$(go list -mod=readonly -m -f '{{ if and (not .Replace) (not .Indirect) (not .Main)}}{{.Path}}{{end}}' all); do \
 		go get -u $$m; \
 	done; \
+	if go list -m k8s.io/api >/dev/null 2>&1 && go list -m k8s.io/kubectl >/dev/null 2>&1; then \
+		api_ver="$$(go list -m -f '{{.Version}}' k8s.io/api)"; \
+		go get k8s.io/kubectl@"$$api_ver" k8s.io/cli-runtime@"$$api_ver"; \
+	fi; \
 	go mod tidy
 endef
 
@@ -342,7 +346,7 @@ update-go-deps: ## Update Go modules dependencies.
 
 tidy: ## Run go mod tidy in all Go modules.
 	@echo "Finding all directories with go.mod files..."
-	@for gomod in $$(find . -name "go.mod" | sort); do \
+	@for gomod in $$(find . -name "go.mod" -not -path './.claude/*' | sort); do \
 		dir=$$(dirname $$gomod); \
 		( \
 		echo "Running go mod tidy in $$dir"; \

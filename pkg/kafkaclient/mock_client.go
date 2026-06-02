@@ -223,6 +223,17 @@ func (m *mockClusterAdmin) CreateACL(resource sarama.Resource, acl sarama.Acl) e
 	return nil
 }
 
+func (m *mockClusterAdmin) CreateACLs(resourceACLs []*sarama.ResourceAcls) error {
+	for _, ra := range resourceACLs {
+		for _, acl := range ra.Acls {
+			if err := m.CreateACL(ra.Resource, *acl); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func (m *mockClusterAdmin) ListAcls(filter sarama.AclFilter) ([]sarama.ResourceAcls, error) {
 	m.Lock()
 	defer m.Unlock()

@@ -93,7 +93,7 @@ func TestReconcileUserCertificate(t *testing.T) {
 	// Test IssuerRef case
 	user := newMockUser()
 	user.Spec.PKIBackendSpec = &v1alpha1.PKIBackendSpec{
-		IssuerRef: &cmmeta.ObjectReference{
+		IssuerRef: &cmmeta.IssuerReference{
 			Name:  "test",
 			Kind:  "testKind",
 			Group: "testGroup",

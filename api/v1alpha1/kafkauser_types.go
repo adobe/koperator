@@ -53,7 +53,7 @@ type KafkaUserSpec struct {
 }
 
 type PKIBackendSpec struct {
-	IssuerRef *cmmeta.ObjectReference `json:"issuerRef,omitempty"`
+	IssuerRef *cmmeta.IssuerReference `json:"issuerRef,omitempty"`
 	// +kubebuilder:validation:Enum={"cert-manager","k8s-csr"}
 	PKIBackend string `json:"pkiBackend"`
 	// SignerName indicates requested signer, and is a qualified name.
@@ -96,10 +96,6 @@ type KafkaUserList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []KafkaUser `json:"items"`
-}
-
-func init() {
-	SchemeBuilder.Register(&KafkaUser{}, &KafkaUserList{})
 }
 
 func (spec *KafkaUserSpec) GetIfCertShouldBeCreated() bool {
