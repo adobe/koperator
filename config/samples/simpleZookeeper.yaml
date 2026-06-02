@@ -7,3 +7,4 @@ spec:
     replicas: 3
     persistence:
         reclaimPolicy: Delete
+        
