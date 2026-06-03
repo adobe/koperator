@@ -27,7 +27,6 @@ import (
 
 	apiutil "github.com/banzaicloud/koperator/api/util"
 	"github.com/banzaicloud/koperator/api/v1beta1"
-	banzaiv1beta1 "github.com/banzaicloud/koperator/api/v1beta1"
 	"github.com/banzaicloud/koperator/pkg/resources"
 	mocks "github.com/banzaicloud/koperator/pkg/resources/kafka/mocks"
 	"github.com/banzaicloud/koperator/pkg/util"
@@ -52,7 +51,7 @@ func TestService(t *testing.T) {
 							DebugEnabled: false,
 							KRaftMode:    false,
 							ListenersConfig: v1beta1.ListenersConfig{
-								InternalListeners: []banzaiv1beta1.InternalListenerConfig{
+								InternalListeners: []v1beta1.InternalListenerConfig{
 									{
 										CommonListenerSpec: v1beta1.CommonListenerSpec{
 											Name:                            "internal",
@@ -62,7 +61,7 @@ func TestService(t *testing.T) {
 										},
 									},
 								},
-								ExternalListeners: []banzaiv1beta1.ExternalListenerConfig{
+								ExternalListeners: []v1beta1.ExternalListenerConfig{
 									{
 										CommonListenerSpec: v1beta1.CommonListenerSpec{
 											Name:                            "plaintext",
@@ -140,7 +139,7 @@ func TestService(t *testing.T) {
 							DebugEnabled: true,
 							KRaftMode:    false,
 							ListenersConfig: v1beta1.ListenersConfig{
-								InternalListeners: []banzaiv1beta1.InternalListenerConfig{
+								InternalListeners: []v1beta1.InternalListenerConfig{
 									{
 										CommonListenerSpec: v1beta1.CommonListenerSpec{
 											Name:                            "internal",
@@ -150,7 +149,7 @@ func TestService(t *testing.T) {
 										},
 									},
 								},
-								ExternalListeners: []banzaiv1beta1.ExternalListenerConfig{
+								ExternalListeners: []v1beta1.ExternalListenerConfig{
 									{
 										CommonListenerSpec: v1beta1.CommonListenerSpec{
 											Name:                            "plaintext",
