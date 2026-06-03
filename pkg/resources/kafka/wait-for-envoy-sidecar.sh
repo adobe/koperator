@@ -54,4 +54,6 @@ if [[ -n "${CLUSTER_ID}" ]]; then
 fi
 
 /opt/kafka/bin/kafka-server-start.sh /config/broker-config
+KAFKA_EXIT=$?
 rm /var/run/wait/do-not-exit-yet
+exit $KAFKA_EXIT
