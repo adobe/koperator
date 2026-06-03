@@ -1,11 +1,10 @@
 #!/bin/bash
-set -m  # enable job control so fg works
 
 ## PREREQUISITES:
 ### 1. Install Kind: https://kind.sigs.k8s.io/docs/user/quick-start/
 ### 2. Start Docker Daemon and ensure it's running
 ### 3. If using SCALEOPS, set SCALEOPS_TOKEN env variable with your ScaleOps API token
-### 4. Cloud Provider KIND is required to enable LoadBalancer services on Kind (For Local Koperator Degugging).
+### 4. Install and Start cloud-provider-kind to enable LoadBalancer services on Kind (Required for Local Debugging). https://github.com/kubernetes-sigs/cloud-provider-kind
 
 ## Usage:
 ##   ./run-local.sh [--local] [--scaleops]
@@ -15,7 +14,7 @@ set -m  # enable job control so fg works
 ##   --scaleops  Install the ScaleOps helm chart. Requires SCALEOPS_TOKEN to be set.
 
 
-# NOTES for running koperator locally (--local flag):
+# IMPORTANT NOTES for running koperator locally (--local flag):
 #
 # Make sure to set `debugEnabled: true` in your KafkaCluster spec. This will
 # create LoadBalancer services for the Kafka and Cruise Control pods, allowing
@@ -58,9 +57,22 @@ if $SCALEOPS && [[ -z "${SCALEOPS_TOKEN}" ]]; then
   exit 1
 fi
 
+## Check if Docker daemon is running
+if ! docker ps &>/dev/null; then
+  echo "Error: Docker daemon is not running. Please start Docker and try again."
+  exit 1
+fi
+
 ## Create kind cluster
 kind delete clusters kind-kafka
 kind create cluster --config=./tests/e2e/platforms/kind/kind_config.yaml --name=kind-kafka
+
+## Validate kubectl context is set to kind
+CURRENT_CONTEXT=$(kubectl config current-context)
+if [[ ! "$CURRENT_CONTEXT" =~ kind ]]; then
+  echo "Error: kubectl context is not set to a kind cluster. Current context: $CURRENT_CONTEXT"
+  exit 1
+fi
 
 ## Build/Load images (Kafka 3.7.0)
 kind load docker-image docker-pipeline-upstream-mirror.dr-uw2.adobeitc.com/adobe/kafka:2.13-3.7.0 --name kind-kafka
@@ -100,8 +112,11 @@ fi
 
 ## Run Koperator
 if $LOCAL; then
-  ## Start Cloud Provider Kind in the background to enable LoadBalancer services
-  pgrep -f cloud-provider-kind &>/dev/null || cloud-provider-kind > /tmp/cloudproviderkind.log 2>&1 &
+  ## Check if cloud-provider-kind started successfully
+  if ! pgrep -f cloud-provider-kind &>/dev/null; then
+    echo "Warning: cloud-provider-kind failed to start. LoadBalancer services may not work properly."
+    echo "Check /tmp/cloudproviderkind.log for details."
+  fi
 
   kubectl get namespace kafka &>/dev/null || kubectl create namespace kafka
   kubectl config set-context --current --namespace=kafka
@@ -118,8 +133,10 @@ fi
 ## Initialize Zookeeper and Kafka Cluster
 kubectl apply -f config/samples/simplezookeeper.yaml -n zookeeper
 
-kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=kafka-operator -n kafka --timeout=120s
-sleep 5
+if ! $LOCAL; then
+  kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=kafka-operator -n kafka --timeout=120s
+  sleep 5
+fi
 
 kubectl apply -f config/samples/simplekafkacluster.yaml -n kafka
 
