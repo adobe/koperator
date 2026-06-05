@@ -1,28 +1,30 @@
 #!/bin/bash
 
-## PREREQUISITES:
-### 1. Install Kind: https://kind.sigs.k8s.io/docs/user/quick-start/
-### 2. Start Docker Daemon and ensure it's running
-### 3. If using SCALEOPS, set SCALEOPS_TOKEN env variable with your ScaleOps API token
-### 4. Install and Start cloud-provider-kind to enable LoadBalancer services on Kind (Required for Local Debugging). https://github.com/kubernetes-sigs/cloud-provider-kind
+## PREREQUISITES
+# 1. Install Kind: https://kind.sigs.k8s.io/docs/user/quick-start/
+# 2. Start Docker Daemon and ensure it's running
+# 3. If using SCALEOPS, set SCALEOPS_TOKEN env variable with your ScaleOps API token
+# 4. Install and Start cloud-provider-kind to enable LoadBalancer services on Kind (Required for Local Debugging). https://github.com/kubernetes-sigs/cloud-provider-kind
 
-## Usage:
-##   ./run-local.sh [--local] [--scaleops]
-##
-##   --local     Run koperator as a local process instead of as a container on Kind.
-##               Starts cloud-provider-kind and runs `make install && make run`.
-##   --scaleops  Install the ScaleOps helm chart. Requires SCALEOPS_TOKEN to be set.
+## USAGE
+# ./run-local.sh [--local] [--scaleops]
+#
+# --local     Run koperator as a local process instead of as a container on Kind.
+#             Starts cloud-provider-kind and runs `make install && make run`.
+# --scaleops  Install the ScaleOps helm chart. Requires SCALEOPS_TOKEN to be set.
 
 
-# IMPORTANT NOTES for running koperator locally (--local flag):
+## IMPORTANT NOTES (for running koperator locally with --local flag)
 #
 # Make sure to set `debugEnabled: true` in your KafkaCluster spec. This will
 # create LoadBalancer services for the Kafka and Cruise Control pods, allowing
 # your local koperator to access services running on the Kind cluster.
 #
 # Cloud Provider KIND is required to enable LoadBalancer services on Kind.
-# If you don't want to run it, you can port-forward the services instead.
-# The script does this for you if you use the --local flag.
+# If you don't want to run it, you can port-forward the services instead. If you are running in local
+# mode and notice that your kafka services don't have an external IP, it's because cloud-provider-kind
+# either isn't running or has some issue. Local koperator won't be able to communicate
+# with kafka pods without these.
 #
 # Finally, you'll need to update your /etc/hosts file to direct requests from
 # Koperator to the LoadBalancer IPs. You can find the LoadBalancer IPs by running:
@@ -34,12 +36,13 @@
 #   172.18.0.10  kafka-2.kafka.svc.cluster.local
 #   172.18.0.11  kafka-all-broker.kafka.svc.cluster.local
 #   172.18.0.8   kafka-cruisecontrol-svc.kafka.svc.cluster.local
-#
-# DEBUGGING Koperator Locally
+
+
+## ATTACHING A DEBUGGER TO LOCAL KOPERATOR
 # If you need to debug your local koperator, you can find the logs in /tmp/koperator.log.
-# Additionally, you can attach a debugger to the koperator process using VSCODE.  Instead of running `make run`, 
+# Additionally, you can attach a debugger to the koperator process using VSCODE. Instead of running `make run`,
 # start koperator as a Go application with debug enabled from VSCode, and set breakpoints as needed.
-# This can be done by opening main.go in VSCode, going to the DEBUG Tab and cliking Run and Debug.
+# This can be done by simply opening main.go in VSCode, going to the DEBUG Tab, and clicking Run and Debug.
 
 LOCAL=false
 SCALEOPS=false
@@ -52,7 +55,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if $SCALEOPS && [[ -z "${SCALEOPS_TOKEN}" ]]; then
+if $SCALEOPS && [[ -n "${SCALEOPS_TOKEN}" ]]; then
   echo "Error: --scaleops requires SCALEOPS_TOKEN to be set"
   exit 1
 fi
