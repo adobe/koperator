@@ -56,4 +56,10 @@ fi
 /opt/kafka/bin/kafka-server-start.sh /config/broker-config
 KAFKA_EXIT=$?
 rm /var/run/wait/do-not-exit-yet
+# Exit codes >= 128 mean the process was killed by a signal (128 + signal number).
+# Signal-based exits are controlled shutdowns (e.g. SIGTERM during rolling upgrades),
+# not genuine Kafka failures, so suppress them to avoid marking the pod as Failed.
+if [ $KAFKA_EXIT -ge 128 ]; then
+    exit 0
+fi
 exit $KAFKA_EXIT
