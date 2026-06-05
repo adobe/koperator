@@ -15,6 +15,13 @@
 
 package util
 
+// Well-known label keys/values applied to Kafka resources.
+const (
+	appLabelKey        = "app"
+	kafkaAppLabelValue = "kafka"
+	kafkaCRLabelKey    = "kafka_cr"
+)
+
 func CloneMap(original map[string]string) map[string]string {
 	m := make(map[string]string, len(original))
 	for k, v := range original {
@@ -38,15 +45,15 @@ func MergeLabels(l ...map[string]string) map[string]string {
 // LabelsForKafka returns the labels for selecting the resources
 // belonging to the given kafka CR name.
 func LabelsForKafka(name string) map[string]string {
-	return map[string]string{"app": "kafka", "kafka_cr": name}
+	return map[string]string{appLabelKey: kafkaAppLabelValue, kafkaCRLabelKey: name}
 }
 
 func LabelsForBroker(name string) map[string]string {
-	return map[string]string{"isBrokerNode": "true", "app": "kafka", "kafka_cr": name}
+	return map[string]string{"isBrokerNode": "true", appLabelKey: kafkaAppLabelValue, kafkaCRLabelKey: name}
 }
 
 func LabelsForController(name string) map[string]string {
-	return map[string]string{"isControllerNode": "true", "app": "kafka", "kafka_cr": name}
+	return map[string]string{"isControllerNode": "true", appLabelKey: kafkaAppLabelValue, kafkaCRLabelKey: name}
 }
 
 // StringSliceContains returns true if list contains s

@@ -47,13 +47,15 @@ const (
 	StateCreated                StaticDesiredState = "Created"
 	StateAbsent                 StaticDesiredState = "Absent"
 	StatePresent                StaticDesiredState = "Present"
+
+	appsAPIGroup = "apps"
 )
 
 var DefaultRecreateEnabledGroupKinds = []schema.GroupKind{
 	{Group: "", Kind: "Service"},
-	{Group: "apps", Kind: "StatefulSet"},
-	{Group: "apps", Kind: "DaemonSet"},
-	{Group: "apps", Kind: "Deployment"},
+	{Group: appsAPIGroup, Kind: "StatefulSet"},
+	{Group: appsAPIGroup, Kind: "DaemonSet"},
+	{Group: appsAPIGroup, Kind: "Deployment"},
 }
 
 type DesiredState interface {
