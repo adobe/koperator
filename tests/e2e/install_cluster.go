@@ -69,9 +69,9 @@ func requireCreatingZookeeperCluster(kubectlOptions k8s.KubectlOptions) {
 			err := applyK8sResourceFromTemplate(kubectlOptions,
 				zookeeperClusterTemplate,
 				map[string]interface{}{
-					"Name":      zookeeperClusterName,
-					"Namespace": kubectlOptions.Namespace,
-					"Replicas":  zookeeperClusterReplicaCount,
+					nameField:      zookeeperClusterName,
+					namespaceField: kubectlOptions.Namespace,
+					"Replicas":     zookeeperClusterReplicaCount,
 				},
 			)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())

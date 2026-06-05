@@ -59,10 +59,10 @@ const (
 	DefaultKafkaImage = "ghcr.io/adobe/koperator/kafka:2.13-3.9.1" // renovate: datasource=docker depName=ghcr.io/adobe/koperator/kafka
 
 	// DefaultMonitorImage is the default JMX monitor image used when users don't specify it in MonitoringConfig.JmxImage
-	DefaultMonitorImage = "ghcr.io/adobe/koperator/jmx-javaagent:1.4.0" // renovate: datasource=docker depName=ghcr.io/adobe/koperator/jmx-javaagent
+	DefaultMonitorImage = "ghcr.io/adobe/koperator/jmx-javaagent:1.5.0" // renovate: datasource=docker depName=ghcr.io/adobe/koperator/jmx-javaagent
 
 	// DefaultEnvoyImage is the default Envoy proxy image used when users don't specify it in EnvoyConfig.Image
-	DefaultEnvoyImage = "envoyproxy/envoy:v1.37.1" // renovate: datasource=docker depName=envoyproxy/envoy
+	DefaultEnvoyImage = "envoyproxy/envoy:v1.38.0" // renovate: datasource=docker depName=envoyproxy/envoy
 
 	// ControllerNodeProcessRole represents the node is a controller node
 	ControllerNodeProcessRole = "controller"
@@ -878,12 +878,12 @@ func (iIConfig *IstioIngressConfig) GetResources() *corev1.ResourceRequirements 
 	}
 	return &corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
-			"cpu":    resource.MustParse(defaultIstioIngressRequestResourceCpu),
-			"memory": resource.MustParse(defaultIstioIngressRequestResourceMemory),
+			corev1.ResourceCPU:    resource.MustParse(defaultIstioIngressRequestResourceCpu),
+			corev1.ResourceMemory: resource.MustParse(defaultIstioIngressRequestResourceMemory),
 		},
 		Limits: corev1.ResourceList{
-			"cpu":    resource.MustParse(defaultIstioIngressLimitResourceCpu),
-			"memory": resource.MustParse(defaultIstioIngressLimitResourceMemory),
+			corev1.ResourceCPU:    resource.MustParse(defaultIstioIngressLimitResourceCpu),
+			corev1.ResourceMemory: resource.MustParse(defaultIstioIngressLimitResourceMemory),
 		},
 	}
 }
@@ -1164,12 +1164,12 @@ func (eConfig *EnvoyConfig) GetResources() *corev1.ResourceRequirements {
 	}
 	return &corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
-			"cpu":    resource.MustParse(defaultEnvoyRequestResourceCpu),
-			"memory": resource.MustParse(defaultEnvoyRequestResourceMemory),
+			corev1.ResourceCPU:    resource.MustParse(defaultEnvoyRequestResourceCpu),
+			corev1.ResourceMemory: resource.MustParse(defaultEnvoyRequestResourceMemory),
 		},
 		Limits: corev1.ResourceList{
-			"cpu":    resource.MustParse(defaultEnvoyLimitResourceCpu),
-			"memory": resource.MustParse(defaultEnvoyLimitResourceMemory),
+			corev1.ResourceCPU:    resource.MustParse(defaultEnvoyLimitResourceCpu),
+			corev1.ResourceMemory: resource.MustParse(defaultEnvoyLimitResourceMemory),
 		},
 	}
 }
@@ -1192,12 +1192,12 @@ func (cConfig *CruiseControlConfig) GetResources() *corev1.ResourceRequirements 
 	}
 	return &corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
-			"cpu":    resource.MustParse(defaultCruiseControlRequestResourceCpu),
-			"memory": resource.MustParse(defaultCruiseControlRequestResourceMemory),
+			corev1.ResourceCPU:    resource.MustParse(defaultCruiseControlRequestResourceCpu),
+			corev1.ResourceMemory: resource.MustParse(defaultCruiseControlRequestResourceMemory),
 		},
 		Limits: corev1.ResourceList{
-			"cpu":    resource.MustParse(defaultCruiseControlLimitResourceCpu),
-			"memory": resource.MustParse(defaultCruiseControlLimitResourceMemory),
+			corev1.ResourceCPU:    resource.MustParse(defaultCruiseControlLimitResourceCpu),
+			corev1.ResourceMemory: resource.MustParse(defaultCruiseControlLimitResourceMemory),
 		},
 	}
 }
@@ -1234,12 +1234,12 @@ func (bConfig *BrokerConfig) GetResources() *corev1.ResourceRequirements {
 	}
 	return &corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
-			"cpu":    resource.MustParse(defaultBrokerRequestResourceCpu),
-			"memory": resource.MustParse(defaultBrokerRequestResourceMemory),
+			corev1.ResourceCPU:    resource.MustParse(defaultBrokerRequestResourceCpu),
+			corev1.ResourceMemory: resource.MustParse(defaultBrokerRequestResourceMemory),
 		},
 		Limits: corev1.ResourceList{
-			"cpu":    resource.MustParse(defaultBrokerLimitResourceCpu),
-			"memory": resource.MustParse(defaultBrokerLimitResourceMemory),
+			corev1.ResourceCPU:    resource.MustParse(defaultBrokerLimitResourceCpu),
+			corev1.ResourceMemory: resource.MustParse(defaultBrokerLimitResourceMemory),
 		},
 	}
 }

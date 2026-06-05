@@ -63,7 +63,7 @@ func (r *Reconciler) headlessServiceTemplate(addressTemplate string, selectorLab
 
 	// prometheus metrics port for servicemonitor
 	usedPorts = append(usedPorts, corev1.ServicePort{
-		Name:       "metrics",
+		Name:       metricsPortName,
 		Port:       MetricsPort,
 		TargetPort: intstr.FromInt(MetricsPort),
 		Protocol:   corev1.ProtocolTCP,

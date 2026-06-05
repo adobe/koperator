@@ -51,6 +51,11 @@ const (
 	UpScaleCommand = "upScale"
 	// ResizePvcCommand command name for resizePvc
 	ResizePvcCommand = "resizePvc"
+	// testingCommand command name used only for testing purposes
+	testingCommand = "testing"
+
+	// kafkaAppLabelValue is the value of the app label on Kafka resources
+	kafkaAppLabelValue = "kafka"
 )
 
 // GetCommandList returns list of supported commands
@@ -175,7 +180,7 @@ func (e *examiner) processAlert(ctx context.Context, ds disableScaling) (bool, e
 
 		return true, nil
 	// Used only for testing purposes
-	case "testing":
+	case testingCommand:
 		return true, nil
 	}
 	return false, nil
@@ -225,7 +230,7 @@ func addPvc(log logr.Logger, alertLabels model.LabelSet, alertAnnotations model.
 			StorageClassName: storageClassName,
 			Resources: corev1.VolumeResourceRequirements{
 				Requests: corev1.ResourceList{
-					"storage": resource.MustParse(string(alertAnnotations["diskSize"])),
+					corev1.ResourceStorage: resource.MustParse(string(alertAnnotations["diskSize"])),
 				},
 			},
 		}}
@@ -270,7 +275,7 @@ func resizePvc(log logr.Logger, labels model.LabelSet, annotiations model.LabelS
 					size := *modifiableConfig.PvcSpec.Resources.Requests.Storage()
 					size.Add(incrementBy)
 
-					modifiableConfig.PvcSpec.Resources.Requests["storage"] = size
+					modifiableConfig.PvcSpec.Resources.Requests[corev1.ResourceStorage] = size
 
 					// When the storage is in a brokerConfigGroup we don't resize the storage there because in that case
 					// all of the brokers that are using this brokerConfigGroup would have their storages resized.
@@ -401,7 +406,7 @@ func upScale(log logr.Logger, labels model.LabelSet, annotations model.LabelSet,
 							StorageClassName: storageClassName,
 							Resources: corev1.VolumeResourceRequirements{
 								Requests: corev1.ResourceList{
-									"storage": resource.MustParse(string(annotations["diskSize"])),
+									corev1.ResourceStorage: resource.MustParse(string(annotations["diskSize"])),
 								},
 							},
 						},
@@ -455,7 +460,7 @@ func unboundPvcOnNodeExists(c client.Client, pvc *corev1.PersistentVolumeClaim, 
 	kafkaPvcList := &corev1.PersistentVolumeClaimList{}
 
 	err := c.List(context.TODO(), kafkaPvcList, client.ListOption(client.InNamespace(pvc.Namespace)),
-		client.ListOption(client.MatchingLabels(map[string]string{v1beta1.AppLabelKey: "kafka", v1beta1.KafkaCRLabelKey: pvc.Labels[v1beta1.KafkaCRLabelKey]})))
+		client.ListOption(client.MatchingLabels(map[string]string{v1beta1.AppLabelKey: kafkaAppLabelValue, v1beta1.KafkaCRLabelKey: pvc.Labels[v1beta1.KafkaCRLabelKey]})))
 	if err != nil {
 		return false, err
 	}
