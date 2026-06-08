@@ -15,7 +15,6 @@
 package kafka
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -97,7 +96,7 @@ func TestService(t *testing.T) {
 				Spec: corev1.ServiceSpec{
 					Type:            corev1.ServiceTypeClusterIP,
 					SessionAffinity: corev1.ServiceAffinityNone,
-					Selector:        apiutil.MergeLabels(apiutil.LabelsForKafka("kafka"), map[string]string{v1beta1.BrokerIdLabelKey: fmt.Sprintf("1")}),
+					Selector:        apiutil.MergeLabels(apiutil.LabelsForKafka("kafka"), map[string]string{v1beta1.BrokerIdLabelKey: "1"}),
 					Ports: []corev1.ServicePort{
 						{
 							Name:       "tcp-internal",
@@ -185,7 +184,7 @@ func TestService(t *testing.T) {
 				Spec: corev1.ServiceSpec{
 					Type:            corev1.ServiceTypeLoadBalancer,
 					SessionAffinity: corev1.ServiceAffinityNone,
-					Selector:        apiutil.MergeLabels(apiutil.LabelsForKafka("kafka"), map[string]string{v1beta1.BrokerIdLabelKey: fmt.Sprintf("1")}),
+					Selector:        apiutil.MergeLabels(apiutil.LabelsForKafka("kafka"), map[string]string{v1beta1.BrokerIdLabelKey: "1"}),
 					Ports: []corev1.ServicePort{
 						{
 							Name:       "tcp-internal",
