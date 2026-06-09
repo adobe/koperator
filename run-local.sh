@@ -47,6 +47,9 @@
 LOCAL=false
 SCALEOPS=false
 
+KOPERATOR_IMAGE=docker.io/library/koperator_e2e_test
+CERT_DIR="/etc/webhook/certs"
+
 while [[ $# -gt 0 ]]; do
   case $1 in
     --local)    LOCAL=true;    shift ;;
@@ -81,7 +84,7 @@ fi
 kind load docker-image docker-pipeline-upstream-mirror.dr-uw2.adobeitc.com/adobe/kafka:2.13-3.7.0 --name kind-kafka
 
 if ! $LOCAL; then
-  docker build . -t koperator_e2e_test
+  docker build . -t $KOPERATOR_IMAGE
   kind load docker-image koperator_e2e_test:latest --name kind-kafka
 fi
 
@@ -127,7 +130,7 @@ if $LOCAL; then
 
 else
   helm upgrade --install kafka-operator charts/kafka-operator \
-    --set operator.image.repository=koperator_e2e_test \
+    --set operator.image.repository=$KOPERATOR_IMAGE \
     --set operator.image.tag=latest \
     --set prometheusMetrics.enabled=false \
     --namespace kafka --create-namespace
@@ -145,5 +148,20 @@ kubectl apply -f config/samples/simplekafkacluster.yaml -n kafka
 
 ## Start Local Koperator
 if $LOCAL; then
+  if [[ ! -f "$CERT_DIR/tls.crt" || ! -f "$CERT_DIR/tls.key" ]]; then
+    echo "Webhook certs not found, generating self-signed certs..."
+    mkdir -p "$CERT_DIR"
+    openssl req -x509 -newkey rsa:4096 \
+      -keyout "$CERT_DIR/tls.key" \
+      -out "$CERT_DIR/tls.crt" \
+      -days 365 -nodes \
+      -subj '/CN=localhost'
+  else
+    echo "Webhook certs already exist, skipping generation."
+  fi
+
+  ## TODO: run cloud-provider-kind in the background
+  ## TODO: print command to modify /etc/hosts for svc
+
   make run 
 fi
