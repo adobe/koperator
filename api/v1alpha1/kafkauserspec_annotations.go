@@ -22,6 +22,9 @@ import (
 	"emperror.dev/errors"
 )
 
+// certManagerRequestDurationAnnotation is the cert-manager annotation controlling the certificate request duration.
+const certManagerRequestDurationAnnotation = "experimental.cert-manager.io/request-duration"
+
 // annotationsWithValidations is a map whose keys are KafkaUserSpec annotation keys, and values are validators
 type annotationsWithValidations map[string]annotationValidator
 
@@ -52,7 +55,7 @@ type annotationValidator interface {
 func newCertManagerSignerAnnotationsWithValidators() annotationsWithValidations {
 	var c certManagerRequestDurationValidator
 	return annotationsWithValidations{
-		"experimental.cert-manager.io/request-duration": &c,
+		certManagerRequestDurationAnnotation: &c,
 	}
 }
 

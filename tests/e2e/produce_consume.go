@@ -30,8 +30,8 @@ import (
 func requireDeployingKcatPod(kubectlOptions k8s.KubectlOptions, podName string, tlsSecretName string) {
 	ginkgo.It("Deploying Kcat Pod", func() {
 		templateParameters := map[string]interface{}{
-			"Name":      podName,
-			"Namespace": kubectlOptions.Namespace,
+			nameField:      podName,
+			namespaceField: kubectlOptions.Namespace,
 		}
 		if tlsSecretName != "" {
 			templateParameters["TLSSecretName"] = tlsSecretName
@@ -43,7 +43,7 @@ func requireDeployingKcatPod(kubectlOptions k8s.KubectlOptions, podName string, 
 		)
 		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 
-		err = waitK8sResourceCondition(kubectlOptions, "pods",
+		err = waitK8sResourceCondition(kubectlOptions, podsResource,
 			"condition=Ready", defaultPodReadinessWaitTime, "", podName)
 
 		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
@@ -53,7 +53,7 @@ func requireDeployingKcatPod(kubectlOptions k8s.KubectlOptions, podName string, 
 // requireDeleteKcatPod deletes kcat pod.
 func requireDeleteKcatPod(kubectlOptions k8s.KubectlOptions, podName string) {
 	ginkgo.It("Deleting Kcat pod", func() {
-		err := deleteK8sResource(kubectlOptions, kcatDeleetionTimeout, "pods", "", podName)
+		err := deleteK8sResource(kubectlOptions, kcatDeleetionTimeout, podsResource, "", podName)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	})
 }
