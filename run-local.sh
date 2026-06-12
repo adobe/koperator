@@ -147,7 +147,7 @@ if $LOCAL; then
     echo "cloud-provider-kind is already running"
   else
     echo "Starting cloud-provider-kind in the background..."
-    sudo -b sh -c 'cloud-provider-kind 2>&1 | tee /tmp/cloudproviderkind.log' &
+    sudo -b sh -c "KUBECONFIG=$HOME/.kube/config cloud-provider-kind >> /tmp/cloudproviderkind.log 2>&1"
     sleep 2
 
     ## Check if cloud-provider-kind started successfully
