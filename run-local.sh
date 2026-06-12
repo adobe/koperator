@@ -7,11 +7,12 @@
 # 4. Install and Start cloud-provider-kind to enable LoadBalancer services on Kind (Required for Local Debugging). https://github.com/kubernetes-sigs/cloud-provider-kind
 
 ## USAGE
-# ./run-local.sh [--local] [--scaleops]
+# ./run-local.sh [--local] [--scaleops] [--cleanup]
 #
 # --local     Run koperator as a local process instead of as a container on Kind.
 #             Starts cloud-provider-kind and runs `make install && make run`.
 # --scaleops  Install the ScaleOps helm chart. Requires SCALEOPS_TOKEN to be set.
+# --cleanup   Delete the Kind cluster and stop cloud-provider-kind process.
 
 
 ## IMPORTANT NOTES (for running koperator locally with --local flag)
@@ -46,6 +47,7 @@
 
 LOCAL=false
 SCALEOPS=false
+CLEANUP=false
 
 KOPERATOR_IMAGE=docker.io/library/koperator_e2e_test
 CERT_DIR="/etc/webhook/certs"
@@ -54,6 +56,7 @@ while [[ $# -gt 0 ]]; do
   case $1 in
     --local)    LOCAL=true;    shift ;;
     --scaleops) SCALEOPS=true; shift ;;
+    --cleanup)  CLEANUP=true;  shift ;;
     *) echo "Unknown flag: $1"; exit 1 ;;
   esac
 done
@@ -61,6 +64,27 @@ done
 if $SCALEOPS && [[ -n "${SCALEOPS_TOKEN}" ]]; then
   echo "Error: --scaleops requires SCALEOPS_TOKEN to be set"
   exit 1
+fi
+
+## Handle cleanup option
+if $CLEANUP; then
+  echo "Cleaning up Kind cluster and cloud-provider-kind..."
+  
+  ## Delete Kind cluster
+  echo "Deleting Kind cluster 'kind-kafka'..."
+  kind delete cluster --name=kind-kafka || true
+  
+  ## Stop cloud-provider-kind
+  echo "Stopping cloud-provider-kind..."
+  if pgrep -f cloud-provider-kind &>/dev/null; then
+    sudo pkill -f cloud-provider-kind
+    echo "cloud-provider-kind stopped"
+  else
+    echo "cloud-provider-kind is not running"
+  fi
+  
+  echo "Cleanup completed"
+  exit 0
 fi
 
 ## Check if Docker daemon is running
@@ -118,10 +142,21 @@ fi
 
 ## Run Koperator
 if $LOCAL; then
-  ## Check if cloud-provider-kind started successfully
-  if ! pgrep -f cloud-provider-kind &>/dev/null; then
-    echo "Warning: cloud-provider-kind failed to start. LoadBalancer services may not work properly."
-    echo "Check /tmp/cloudproviderkind.log for details."
+  ## Start cloud-provider-kind in the background if not already running
+  if pgrep -f cloud-provider-kind &>/dev/null; then
+    echo "cloud-provider-kind is already running"
+  else
+    echo "Starting cloud-provider-kind in the background..."
+    sudo -b sh -c 'cloud-provider-kind 2>&1 | tee /tmp/cloudproviderkind.log' &
+    sleep 2
+
+    ## Check if cloud-provider-kind started successfully
+    if ! pgrep -f cloud-provider-kind &>/dev/null; then
+      echo "Warning: cloud-provider-kind failed to start. LoadBalancer services may not work properly."
+      echo "Check /tmp/cloudproviderkind.log for details."
+    else
+      echo "cloud-provider-kind started successfully"
+    fi
   fi
 
   kubectl get namespace kafka &>/dev/null || kubectl create namespace kafka
@@ -159,9 +194,6 @@ if $LOCAL; then
   else
     echo "Webhook certs already exist, skipping generation."
   fi
-
-  ## TODO: run cloud-provider-kind in the background
-  ## TODO: print command to modify /etc/hosts for svc
 
   make run 
 fi
