@@ -53,7 +53,7 @@ func (r *Reconciler) allBrokerService() runtime.Object {
 		},
 	}
 
-	if r.KafkaCluster.Spec.DebugEnabled {
+	if r.KafkaCluster.Spec.LocalDebugEnabled {
 		svc.Spec.Type = corev1.ServiceTypeLoadBalancer
 	}
 

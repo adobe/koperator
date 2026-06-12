@@ -17,7 +17,7 @@
 
 ## IMPORTANT NOTES (for running koperator locally with --local flag)
 #
-# Make sure to set `debugEnabled: true` in your KafkaCluster spec. This will
+# Make sure to set `lcoalDebugEnabled: true` in your KafkaCluster spec. This will
 # create LoadBalancer services for the Kafka and Cruise Control pods, allowing
 # your local koperator to access services running on the Kind cluster.
 #

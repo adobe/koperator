@@ -47,8 +47,8 @@ func TestService(t *testing.T) {
 							Namespace: "kafka",
 						},
 						Spec: v1beta1.KafkaClusterSpec{
-							DebugEnabled: false,
-							KRaftMode:    false,
+							LocalDebugEnabled: false,
+							KRaftMode:         false,
 							ListenersConfig: v1beta1.ListenersConfig{
 								InternalListeners: []v1beta1.InternalListenerConfig{
 									{
@@ -135,8 +135,8 @@ func TestService(t *testing.T) {
 							Namespace: "kafka",
 						},
 						Spec: v1beta1.KafkaClusterSpec{
-							DebugEnabled: true,
-							KRaftMode:    false,
+							LocalDebugEnabled: true,
+							KRaftMode:         false,
 							ListenersConfig: v1beta1.ListenersConfig{
 								InternalListeners: []v1beta1.InternalListenerConfig{
 									{
