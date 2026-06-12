@@ -947,11 +947,12 @@ func (r *Reconciler) updateStatusWithDockerImageAndVersion(brokerId int32, broke
 func syncResourceRequests(desiredPod, currentPod *corev1.Pod) {
 	syncContainerResourceRequests(desiredPod.Spec.Containers, currentPod.Spec.Containers)
 	syncContainerResourceRequests(desiredPod.Spec.InitContainers, currentPod.Spec.InitContainers)
-	syncPodAffinities(desiredPod, currentPod)
 }
 
+// syncPodAffinities syncs ScaleOps-related pod affinities from the current pod to the desired pod.
+// This preserves affinities created by ScaleOps to prevent unnecessary pod restarts.
 func syncPodAffinities(desiredPod, currentPod *corev1.Pod) {
-	panic("unimplemented")
+	syncScaleOpsAffinities(desiredPod, currentPod)
 }
 
 func syncContainerResourceRequests(desired, current []corev1.Container) {
@@ -997,6 +998,9 @@ func (r *Reconciler) handleRollingUpgrade(log logr.Logger, desiredPod, currentPo
 	// Ignore CPU/memory request diffs — changing requests does not require a pod restart.
 	if r.KafkaCluster.Spec.ScaleOpsEnabled {
 		syncResourceRequests(desiredPod, currentPod)
+		// If current pod had affinities created by ScaleOps, we need to sync them to desiredPod,
+		// otherwise they will be removed and cause pod restart
+		syncPodAffinities(desiredPod, currentPod)
 	}
 	// Check if the resource actually updated or if labels match TaintedBrokersSelector
 	patchResult, err := patch.DefaultPatchMaker.Calculate(currentPod, desiredPod)
