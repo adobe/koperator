@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+KAFKA_HOME=${KAFKA_HOME:-/opt/kafka}
+WAIT_DIR=${WAIT_DIR:-/var/run/wait}
+
 if [[ -n "$ENVOY_SIDECAR_STATUS" ]]; then
   COUNT=0
   MAXCOUNT=${1:-30}
@@ -27,14 +30,14 @@ if [[ -n "$ENVOY_SIDECAR_STATUS" ]]; then
     fi
   done
 fi
-touch /var/run/wait/do-not-exit-yet
+touch ${WAIT_DIR}/do-not-exit-yet
 
 # A few necessary steps if we are in KRaft mode
 if [[ -n "${CLUSTER_ID}" ]]; then
   # If the storage is already formatted (e.g. broker restarts), the kafka-storage.sh will skip formatting for that storage
   # thus we can safely run the storage format command regardless if the storage has been formatted or not
   echo "Formatting KRaft storage with cluster ID ${CLUSTER_ID}"
-  /opt/kafka/bin/kafka-storage.sh format --cluster-id "${CLUSTER_ID}" --ignore-formatted -c /config/broker-config
+  ${KAFKA_HOME}/bin/kafka-storage.sh format --cluster-id "${CLUSTER_ID}" --ignore-formatted -c /config/broker-config
 
   # Adding or removing controller nodes to the Kafka cluster would trigger cluster rolling upgrade so all the nodes in the cluster are aware of the newly added/removed controllers.
   # When this happens, Kafka's local quorum state file would be outdated since it is static and the Kafka server can't be started with conflicting controllers info (compared to info stored in ConfigMap),
@@ -53,9 +56,9 @@ if [[ -n "${CLUSTER_ID}" ]]; then
   fi
 fi
 
-/opt/kafka/bin/kafka-server-start.sh /config/broker-config
+${KAFKA_HOME}/bin/kafka-server-start.sh /config/broker-config
 KAFKA_EXIT=$?
-rm /var/run/wait/do-not-exit-yet
+rm ${WAIT_DIR}/do-not-exit-yet
 # 143 = 128 + SIGTERM: controlled shutdown by koperator; not a Kafka crash.
 if [ $KAFKA_EXIT -eq 143 ]; then
     exit 0
