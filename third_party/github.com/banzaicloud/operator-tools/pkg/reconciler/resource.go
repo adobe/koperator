@@ -704,7 +704,7 @@ func crdReadyV1(crd *v1.CustomResourceDefinition) bool {
 			if cond.Status == v1.ConditionTrue {
 				return true
 			}
-		case v1.NamesAccepted, v1.NonStructuralSchema, v1.Terminating, v1.KubernetesAPIApprovalPolicyConformant:
+		case v1.NamesAccepted, v1.NonStructuralSchema, v1.Terminating, v1.KubernetesAPIApprovalPolicyConformant, v1.StorageMigrating:
 			// These conditions are not relevant for readiness check
 		}
 	}

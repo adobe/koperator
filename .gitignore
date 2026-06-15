@@ -47,3 +47,4 @@ manager_image_patch.yaml
 # the reasoning why we decided not to commit these.
 **/go.work
 **/go.work.sum
+.claude/worktrees/**

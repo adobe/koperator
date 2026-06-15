@@ -42,10 +42,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	istioclientv1beta1 "github.com/banzaicloud/istio-client-go/pkg/networking/v1beta1"
-
-	banzaiistiov1alpha1 "github.com/banzaicloud/istio-operator/api/v2/v1alpha1"
-
 	certv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -76,10 +72,6 @@ func init() {
 	_ = banzaicloudv1alpha1.AddToScheme(scheme)
 
 	_ = banzaicloudv1beta1.AddToScheme(scheme)
-
-	_ = banzaiistiov1alpha1.AddToScheme(scheme)
-
-	_ = istioclientv1beta1.AddToScheme(scheme)
 
 	_ = contour.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
@@ -249,7 +241,7 @@ func main() {
 	}
 
 	if !webhookDisabled {
-		err = ctrl.NewWebhookManagedBy(mgr).For(&banzaicloudv1beta1.KafkaCluster{}).
+		err = ctrl.NewWebhookManagedBy(mgr, &banzaicloudv1beta1.KafkaCluster{}).
 			WithValidator(webhooks.KafkaClusterValidator{
 				Log: mgr.GetLogger().WithName("webhooks").WithName("KafkaCluster"),
 			}).
@@ -258,8 +250,8 @@ func main() {
 			setupLog.Error(err, "unable to create validating webhook", "Kind", "KafkaCluster")
 			os.Exit(1)
 		}
-		err = ctrl.NewWebhookManagedBy(mgr).For(&banzaicloudv1alpha1.KafkaTopic{}).
-			WithValidator(webhooks.KafkaTopicValidator{
+		err = ctrl.NewWebhookManagedBy(mgr, &banzaicloudv1alpha1.KafkaTopic{}).
+			WithValidator(&webhooks.KafkaTopicValidator{
 				Client:              mgr.GetClient(),
 				NewKafkaFromCluster: kafkaclient.NewFromCluster,
 				Log:                 mgr.GetLogger().WithName("webhooks").WithName("KafkaTopic"),
