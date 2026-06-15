@@ -268,6 +268,14 @@ func (m *mockClusterAdmin) DescribeConfig(resource sarama.ConfigResource) ([]sar
 	return []sarama.ConfigEntry{}, nil
 }
 
+func (m *mockClusterAdmin) DescribeConfigs(resources []*sarama.ConfigResource, _ sarama.DescribeConfigsOptions) ([]*sarama.ConfigResourceResult, error) {
+	results := make([]*sarama.ConfigResourceResult, len(resources))
+	for i := range resources {
+		results[i] = &sarama.ConfigResourceResult{}
+	}
+	return results, nil
+}
+
 func (m *mockClusterAdmin) Controller() (*sarama.Broker, error) {
 	return &sarama.Broker{}, nil
 }
