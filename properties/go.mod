@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	emperror.dev/errors v0.8.1
-	github.com/onsi/gomega v1.41.0
+	github.com/onsi/gomega v1.42.0
 )
 
 require (
@@ -13,6 +13,6 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/net v0.55.0 // indirect
-	golang.org/x/text v0.37.0 // indirect
+	golang.org/x/net v0.56.0 // indirect
+	golang.org/x/text v0.38.0 // indirect
 )
