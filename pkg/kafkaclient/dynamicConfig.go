@@ -30,7 +30,17 @@ func (k *kafkaClient) AlterClusterWideConfig(configChange map[string]*string, va
 }
 
 func (k *kafkaClient) DescribeClusterWideConfig() ([]sarama.ConfigEntry, error) {
-	return k.admin.DescribeConfig(sarama.ConfigResource{Type: sarama.BrokerResource, Name: "", ConfigNames: []string{}})
+	results, err := k.admin.DescribeConfigs([]*sarama.ConfigResource{{Type: sarama.BrokerResource, Name: "", ConfigNames: []string{}}}, sarama.DescribeConfigsOptions{})
+	if err != nil {
+		return nil, err
+	}
+	if len(results) == 0 {
+		return nil, nil
+	}
+	if results[0].ErrorCode != 0 {
+		return nil, &sarama.DescribeConfigError{Err: results[0].ErrorCode, ErrMsg: results[0].ErrorMsg}
+	}
+	return results[0].Configs, nil
 }
 
 func (k *kafkaClient) AlterPerBrokerConfig(brokerId int32, configChange map[string]*string, validateOnly bool) error {
