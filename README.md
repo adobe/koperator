@@ -39,6 +39,11 @@ Some of the main features of Koperator are:
 - advanced topic and user management via Kubernetes Custom Resources
 - Cruise Control task management via Kubernetes Custom Resources
 
+## AI Code Wiki
+
+Google indexes this repo at:
+https://codewiki.google/github.com/adobe/koperator 
+
 ## Architecture
 
 Kafka is a stateful application, and the Kafka Broker is a server that can create and form a cluster with other Brokers. Each Broker has its own unique configuration, the most important of which is the unique broker ID.
