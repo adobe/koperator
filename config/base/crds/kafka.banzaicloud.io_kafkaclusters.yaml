@@ -23074,6 +23074,7 @@ spec:
             - brokers
             - cruiseControlConfig
             - headlessServiceEnabled
+            - listenersConfig
             - oneBrokerPerNode
             - rollingUpgradeConfig
             type: object

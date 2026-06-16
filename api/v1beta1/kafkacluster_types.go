@@ -149,8 +149,8 @@ type KafkaClusterSpec struct {
 	// the KafkaCluster to the current state in the Kubernetes Cluster
 	// +kubebuilder:default=false
 	// +optional
-	ScaleOpsEnabled bool            `json:"scaleOpsEnabled"`
-	ListenersConfig ListenersConfig `json:"listenersConfig,omitempty"`
+	ScaleOpsEnabled bool            `json:"scaleOpsEnabled,omitempty"`
+	ListenersConfig ListenersConfig `json:"listenersConfig"`
 	// Custom ports to expose in the container. Example use case: a custom kafka distribution, that includes an integrated metrics api endpoint
 	AdditionalPorts []corev1.ContainerPort `json:"additionalPorts,omitempty"`
 	// ZKAddresses specifies the ZooKeeper connection string
