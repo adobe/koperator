@@ -76,6 +76,37 @@ func generateRandomClusterID() string {
 	return base64.URLEncoding.EncodeToString(randomUUID[:])
 }
 
+// syncResourceRequests overwrites CPU and memory requests in desiredPod's containers
+// with the values from currentPod so that request-only changes do not trigger a pod restart.
+func syncResourceRequests(desiredPod, currentPod *corev1.Pod) {
+	syncContainerResourceRequests(desiredPod.Spec.Containers, currentPod.Spec.Containers)
+	syncContainerResourceRequests(desiredPod.Spec.InitContainers, currentPod.Spec.InitContainers)
+}
+
+func syncContainerResourceRequests(desired, current []corev1.Container) {
+	index := make(map[string]corev1.ResourceList, len(current))
+	for _, c := range current {
+		index[c.Name] = c.Resources.Requests
+	}
+	for i := range desired {
+		c := &desired[i]
+		reqs, ok := index[c.Name]
+		if !ok {
+			continue
+		}
+		if c.Resources.Requests == nil {
+			c.Resources.Requests = make(corev1.ResourceList)
+		}
+		for _, res := range []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceMemory} {
+			if val, exists := reqs[res]; exists {
+				c.Resources.Requests[res] = val
+			} else {
+				delete(c.Resources.Requests, res)
+			}
+		}
+	}
+}
+
 // syncScaleOpsAffinities syncs all scale ops related affinities from the current pod to the desired pod.
 // This includes pod affinities with "scaleops.sh/managed-unevictable" label selector
 // and node affinities with "scaleops.sh/node-packing=true" selector.
