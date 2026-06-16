@@ -142,9 +142,15 @@ type KafkaClusterSpec struct {
 	// This is default to be true; if set to false, the Kafka cluster is in ZooKeeper mode.
 	// +kubebuilder:default=false
 	// +optional
-	KRaftMode              bool            `json:"kRaft"`
-	HeadlessServiceEnabled bool            `json:"headlessServiceEnabled"`
-	ListenersConfig        ListenersConfig `json:"listenersConfig"`
+	KRaftMode              bool `json:"kRaft"`
+	HeadlessServiceEnabled bool `json:"headlessServiceEnabled"`
+	// Allows ScaleOps to manage Memory and CPU Resource Requests for Kafka Broker Pods.
+	// This Disables CPU and Memory request reconciliation from the desired state defined in
+	// the KafkaCluster to the current state in the Kubernetes Cluster
+	// +kubebuilder:default=false
+	// +optional
+	ScaleOpsEnabled bool            `json:"scaleOpsEnabled"`
+	ListenersConfig ListenersConfig `json:"listenersConfig,omitempty"`
 	// Custom ports to expose in the container. Example use case: a custom kafka distribution, that includes an integrated metrics api endpoint
 	AdditionalPorts []corev1.ContainerPort `json:"additionalPorts,omitempty"`
 	// ZKAddresses specifies the ZooKeeper connection string

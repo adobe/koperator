@@ -23002,6 +23002,13 @@ spec:
                 required:
                 - failureThreshold
                 type: object
+              scaleOpsEnabled:
+                default: false
+                description: |-
+                  Allows ScaleOps to manage Memory and CPU Resource Requests for Kafka Broker Pods.
+                  This Disables CPU and Memory request reconciliation from the desired state defined in
+                  the KafkaCluster to the current state in the Kubernetes Cluster
+                type: boolean
               taintedBrokersSelector:
                 description: Selector for broker pods that need to be recycled/reconciled
                 properties:
@@ -23067,7 +23074,6 @@ spec:
             - brokers
             - cruiseControlConfig
             - headlessServiceEnabled
-            - listenersConfig
             - oneBrokerPerNode
             - rollingUpgradeConfig
             type: object
