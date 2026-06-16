@@ -61,7 +61,7 @@ func (r *Reconciler) service(id int32, _ *v1beta1.BrokerConfig) runtime.Object {
 			Ports:           usedPorts,
 		},
 	}
-	if r.KafkaCluster.Spec.DebugEnabled {
+	if r.KafkaCluster.Spec.LocalDebugEnabled {
 		svc.Spec.Type = corev1.ServiceTypeLoadBalancer
 	}
 	return svc

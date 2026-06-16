@@ -1,0 +1,444 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    banzaicloud.com/last-applied: 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
+    prometheus.io/port: "9020"
+    prometheus.io/scrape: "true"
+  creationTimestamp: "2026-06-05T15:43:19Z"
+  generateName: kafka-0-
+  generation: 1
+  labels:
+    app: kafka
+    brokerId: "0"
+    isBrokerNode: "true"
+    isControllerNode: "false"
+    kafka_cr: kafka
+    topology.kubernetes.io/zone: zone-b
+  name: kafka-0-vj6c5
+  namespace: kafka
+  ownerReferences:
+  - apiVersion: kafka.banzaicloud.io/v1beta1
+    blockOwnerDeletion: true
+    controller: true
+    kind: KafkaCluster
+    name: kafka
+    uid: 6217bfea-dab0-4650-87ef-166c5da5141a
+  resourceVersion: "2505"
+  uid: ef0421df-954f-46e7-88f7-032993188aba
+spec:
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              app: kafka
+              kafka_cr: kafka
+          topologyKey: kubernetes.io/hostname
+        weight: 100
+  containers:
+  - command:
+    - bash
+    - -c
+    - |
+      #
+      # Copyright © 2022 Banzai Cloud
+      #
+      # Licensed under the Apache License, Version 2.0 (the "License");
+      # you may not use this file except in compliance with the License.
+      # You may obtain a copy of the License at
+      #
+      #     http://www.apache.org/licenses/LICENSE-2.0
+      #
+      # Unless required by applicable law or agreed to in writing, software
+      # distributed under the License is distributed on an "AS IS" BASIS,
+      # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+      # See the License for the specific language governing permissions and
+      # limitations under the License.
+      #
+      if [[ -n "$ENVOY_SIDECAR_STATUS" ]]; then
+        COUNT=0
+        MAXCOUNT=${1:-30}
+        HEALTHYSTATUSCODE="200"
+        while true; do
+          COUNT=$(expr $COUNT + 1)
+          SC=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:15000/ready)
+          echo "waiting for envoy proxy to come up";
+          sleep 1;
+          if [[ "$SC" == "$HEALTHYSTATUSCODE" || "$MAXCOUNT" == "$COUNT" ]]; then
+            break
+          fi
+        done
+      fi
+      touch /var/run/wait/do-not-exit-yet
+
+      # A few necessary steps if we are in KRaft mode
+      if [[ -n "${CLUSTER_ID}" ]]; then
+        # If the storage is already formatted (e.g. broker restarts), the kafka-storage.sh will skip formatting for that storage
+        # thus we can safely run the storage format command regardless if the storage has been formatted or not
+        echo "Formatting KRaft storage with cluster ID ${CLUSTER_ID}"
+        /opt/kafka/bin/kafka-storage.sh format --cluster-id "${CLUSTER_ID}" --ignore-formatted -c /config/broker-config
+
+        # Adding or removing controller nodes to the Kafka cluster would trigger cluster rolling upgrade so all the nodes in the cluster are aware of the newly added/removed controllers.
+        # When this happens, Kafka's local quorum state file would be outdated since it is static and the Kafka server can't be started with conflicting controllers info (compared to info stored in ConfigMap),
+        # so we need to wipe out the local state files before starting the server so the information about the controller nodes is up-to-date with what is stored in ConfigMap
+        # (Note: although we don't know if the server start-up is due to scaling up/down of the controller nodes, it is not harmful to remove the quorum state file before the server start-up process
+        #  because the server will re-create the quorum state file after it starts up successfully)
+        if [[ -n "${LOG_DIRS}" ]]; then
+          IFS=',' read -ra LOGS <<< "${LOG_DIRS}"
+          for LOG in "${LOGS[@]}"; do
+            QUORUM_STATE_FILE="${LOG}/kafka/__cluster_metadata-0/quorum-state"
+            if [ -f "${QUORUM_STATE_FILE}" ]; then
+                echo "Removing quorum-state file from \"${QUORUM_STATE_FILE}\""
+                rm -f "${QUORUM_STATE_FILE}"
+            fi
+          done
+        fi
+      fi
+
+      /opt/kafka/bin/kafka-server-start.sh /config/broker-config
+      rm /var/run/wait/do-not-exit-yet
+    env:
+    - name: CLASSPATH
+      value: /opt/kafka/libs/extensions/*
+    - name: ENVOY_SIDECAR_STATUS
+      valueFrom:
+        fieldRef:
+          apiVersion: v1
+          fieldPath: metadata.annotations['sidecar.istio.io/status']
+    - name: KAFKA_HEAP_OPTS
+      value: -Xmx2G -Xms2G
+    - name: KAFKA_JVM_PERFORMANCE_OPTS
+      value: -server -XX:+UseG1GC -XX:MaxGCPauseMillis=20 -XX:InitiatingHeapOccupancyPercent=35
+        -XX:+ExplicitGCInvokesConcurrent -Djava.awt.headless=true -Dsun.net.inetaddr.ttl=60
+    - name: KAFKA_OPTS
+      value: -javaagent:/opt/jmx-exporter/jmx_prometheus.jar=9020:/etc/jmx-exporter/config.yaml
+    image: ghcr.io/adobe/koperator/kafka:2.13-3.9.1
+    imagePullPolicy: IfNotPresent
+    lifecycle:
+      preStop:
+        exec:
+          command:
+          - bash
+          - -c
+          - |2-
+
+            if [[ -n "$ENVOY_SIDECAR_STATUS" ]]; then
+              HEALTHYSTATUSCODE="200"
+              SC=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:15000/ready)
+              if [[ "$SC" == "$HEALTHYSTATUSCODE" ]]; then
+                kill -s TERM $(pidof java)
+              else
+                kill -s KILL $(pidof java)
+              fi
+            else
+              kill -s TERM $(pidof java)
+            fi
+    name: kafka
+    ports:
+    - containerPort: 29092
+      name: tcp-internal
+      protocol: TCP
+    - containerPort: 29093
+      name: tcp-controller
+      protocol: TCP
+    - containerPort: 9020
+      name: metrics
+      protocol: TCP
+    resources:
+      limits:
+        cpu: 1500m
+        memory: 3Gi
+      requests:
+        cpu: "1"
+        memory: 2Gi
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /config
+      name: broker-config
+    - mountPath: /var/run/wait
+      name: exitfile
+    - mountPath: /opt/kafka/libs/extensions
+      name: extensions
+    - mountPath: /opt/jmx-exporter/
+      name: jmx-jar-data
+    - mountPath: /kafka-logs
+      name: kafka-data-0
+    - mountPath: /etc/jmx-exporter/
+      name: kafka-kafka-jmx-exporter
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-6chcq
+      readOnly: true
+  dnsPolicy: ClusterFirst
+  enableServiceLinks: true
+  initContainers:
+  - command:
+    - /bin/sh
+    - -cex
+    - cp -v /opt/cruise-control/cruise-control/build/dependant-libs/cruise-control-metrics-reporter.jar
+      /opt/kafka/libs/extensions/cruise-control-metrics-reporter.jar
+    image: adobe/cruise-control:3.0.3-adbe-20250804
+    imagePullPolicy: IfNotPresent
+    name: cruise-control-reporter
+    resources:
+      limits:
+        cpu: 100m
+        memory: 100Mi
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /opt/kafka/libs/extensions
+      name: extensions
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-6chcq
+      readOnly: true
+  - command:
+    - cp
+    - /jmx_prometheus_javaagent.jar
+    - /opt/jmx-exporter/jmx_prometheus.jar
+    image: ghcr.io/adobe/koperator/jmx-javaagent:1.4.0
+    imagePullPolicy: IfNotPresent
+    name: jmx-exporter
+    resources:
+      limits:
+        cpu: 100m
+        memory: 100Mi
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /opt/jmx-exporter/
+      name: jmx-jar-data
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-6chcq
+      readOnly: true
+  nodeName: kind-kafka-worker2
+  preemptionPolicy: PreemptLowerPriority
+  priority: 0
+  restartPolicy: Never
+  schedulerName: default-scheduler
+  securityContext: {}
+  serviceAccount: default
+  serviceAccountName: default
+  terminationGracePeriodSeconds: 120
+  tolerations:
+  - effect: NoExecute
+    key: node.kubernetes.io/not-ready
+    operator: Exists
+    tolerationSeconds: 300
+  - effect: NoExecute
+    key: node.kubernetes.io/unreachable
+    operator: Exists
+    tolerationSeconds: 300
+  volumes:
+  - configMap:
+      defaultMode: 420
+      name: kafka-config-0
+    name: broker-config
+  - emptyDir: {}
+    name: exitfile
+  - emptyDir: {}
+    name: extensions
+  - emptyDir: {}
+    name: jmx-jar-data
+  - name: kafka-data-0
+    persistentVolumeClaim:
+      claimName: kafka-0-storage-0-gm92m
+  - configMap:
+      defaultMode: 420
+      name: kafka-kafka-jmx-exporter
+    name: kafka-kafka-jmx-exporter
+  - name: kube-api-access-6chcq
+    projected:
+      defaultMode: 420
+      sources:
+      - serviceAccountToken:
+          expirationSeconds: 3607
+          path: token
+      - configMap:
+          items:
+          - key: ca.crt
+            path: ca.crt
+          name: kube-root-ca.crt
+      - downwardAPI:
+          items:
+          - fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+            path: namespace
+status:
+  conditions:
+  - lastProbeTime: null
+    lastTransitionTime: "2026-06-05T15:43:37Z"
+    observedGeneration: 1
+    status: "True"
+    type: PodReadyToStartContainers
+  - lastProbeTime: null
+    lastTransitionTime: "2026-06-05T15:43:39Z"
+    observedGeneration: 1
+    status: "True"
+    type: Initialized
+  - lastProbeTime: null
+    lastTransitionTime: "2026-06-05T15:43:53Z"
+    observedGeneration: 1
+    status: "True"
+    type: Ready
+  - lastProbeTime: null
+    lastTransitionTime: "2026-06-05T15:43:53Z"
+    observedGeneration: 1
+    status: "True"
+    type: ContainersReady
+  - lastProbeTime: null
+    lastTransitionTime: "2026-06-05T15:43:23Z"
+    observedGeneration: 1
+    status: "True"
+    type: PodScheduled
+  containerStatuses:
+  - allocatedResources:
+      cpu: "1"
+      memory: 2Gi
+    containerID: containerd://6b55fc7526c9a12f8d261a2b0e31a267f3224d69049b753371ba68bcc5c0d46f
+    image: ghcr.io/adobe/koperator/kafka:2.13-3.9.1
+    imageID: ghcr.io/adobe/koperator/kafka@sha256:279358e7bc789aba1e3457421e251278ec993a57d0ad2b9691274f1f3ddae134
+    lastState: {}
+    name: kafka
+    ready: true
+    resources:
+      limits:
+        cpu: 1500m
+        memory: 3Gi
+      requests:
+        cpu: "1"
+        memory: 2Gi
+    restartCount: 0
+    started: true
+    state:
+      running:
+        startedAt: "2026-06-05T15:43:53Z"
+    user:
+      linux:
+        gid: 0
+        supplementalGroups:
+        - 0
+        uid: 0
+    volumeMounts:
+    - mountPath: /config
+      name: broker-config
+    - mountPath: /var/run/wait
+      name: exitfile
+    - mountPath: /opt/kafka/libs/extensions
+      name: extensions
+    - mountPath: /opt/jmx-exporter/
+      name: jmx-jar-data
+    - mountPath: /kafka-logs
+      name: kafka-data-0
+    - mountPath: /etc/jmx-exporter/
+      name: kafka-kafka-jmx-exporter
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-6chcq
+      readOnly: true
+      recursiveReadOnly: Disabled
+  hostIP: 172.18.0.2
+  hostIPs:
+  - ip: 172.18.0.2
+  initContainerStatuses:
+  - allocatedResources:
+      cpu: 100m
+      memory: 100Mi
+    containerID: containerd://b46efeaa3a728981ea8fde946a252c5b744a3001d1f31ab93184e34113c02cf0
+    image: docker.io/adobe/cruise-control:3.0.3-adbe-20250804
+    imageID: docker.io/adobe/cruise-control@sha256:a30f376d9cdd611d531bcb0d17301daf7295471b9cd5d0070532bca6f12c6513
+    lastState: {}
+    name: cruise-control-reporter
+    ready: true
+    resources:
+      limits:
+        cpu: 100m
+        memory: 100Mi
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    restartCount: 0
+    started: false
+    state:
+      terminated:
+        containerID: containerd://b46efeaa3a728981ea8fde946a252c5b744a3001d1f31ab93184e34113c02cf0
+        exitCode: 0
+        finishedAt: "2026-06-05T15:43:37Z"
+        reason: Completed
+        startedAt: "2026-06-05T15:43:37Z"
+    user:
+      linux:
+        gid: 0
+        supplementalGroups:
+        - 0
+        uid: 0
+    volumeMounts:
+    - mountPath: /opt/kafka/libs/extensions
+      name: extensions
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-6chcq
+      readOnly: true
+      recursiveReadOnly: Disabled
+  - allocatedResources:
+      cpu: 100m
+      memory: 100Mi
+    containerID: containerd://9c0848495b1a18f663da46cc1534ca8413c6d37348836f76139859213738d81c
+    image: ghcr.io/adobe/koperator/jmx-javaagent:1.4.0
+    imageID: ghcr.io/adobe/koperator/jmx-javaagent@sha256:72f4b4d48a66d423da09d72c2313a98b047d9ae3c3febeb4776d046879c7a987
+    lastState: {}
+    name: jmx-exporter
+    ready: true
+    resources:
+      limits:
+        cpu: 100m
+        memory: 100Mi
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    restartCount: 0
+    started: false
+    state:
+      terminated:
+        containerID: containerd://9c0848495b1a18f663da46cc1534ca8413c6d37348836f76139859213738d81c
+        exitCode: 0
+        finishedAt: "2026-06-05T15:43:39Z"
+        reason: Completed
+        startedAt: "2026-06-05T15:43:39Z"
+    user:
+      linux:
+        gid: 0
+        supplementalGroups:
+        - 0
+        - 1
+        - 2
+        - 3
+        - 4
+        - 6
+        - 10
+        - 11
+        - 20
+        - 26
+        - 27
+        uid: 0
+    volumeMounts:
+    - mountPath: /opt/jmx-exporter/
+      name: jmx-jar-data
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-6chcq
+      readOnly: true
+      recursiveReadOnly: Disabled
+  observedGeneration: 1
+  phase: Running
+  podIP: 10.244.3.11
+  podIPs:
+  - ip: 10.244.3.11
+  qosClass: Burstable
+  startTime: "2026-06-05T15:43:23Z"

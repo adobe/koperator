@@ -15,7 +15,6 @@
 package kafka
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -48,8 +47,8 @@ func TestService(t *testing.T) {
 							Namespace: "kafka",
 						},
 						Spec: v1beta1.KafkaClusterSpec{
-							DebugEnabled: false,
-							KRaftMode:    false,
+							LocalDebugEnabled: false,
+							KRaftMode:         false,
 							ListenersConfig: v1beta1.ListenersConfig{
 								InternalListeners: []v1beta1.InternalListenerConfig{
 									{
@@ -97,7 +96,7 @@ func TestService(t *testing.T) {
 				Spec: corev1.ServiceSpec{
 					Type:            corev1.ServiceTypeClusterIP,
 					SessionAffinity: corev1.ServiceAffinityNone,
-					Selector:        apiutil.MergeLabels(apiutil.LabelsForKafka("kafka"), map[string]string{v1beta1.BrokerIdLabelKey: fmt.Sprintf("1")}),
+					Selector:        apiutil.MergeLabels(apiutil.LabelsForKafka("kafka"), map[string]string{v1beta1.BrokerIdLabelKey: "1"}),
 					Ports: []corev1.ServicePort{
 						{
 							Name:       "tcp-internal",
@@ -136,8 +135,8 @@ func TestService(t *testing.T) {
 							Namespace: "kafka",
 						},
 						Spec: v1beta1.KafkaClusterSpec{
-							DebugEnabled: true,
-							KRaftMode:    false,
+							LocalDebugEnabled: true,
+							KRaftMode:         false,
 							ListenersConfig: v1beta1.ListenersConfig{
 								InternalListeners: []v1beta1.InternalListenerConfig{
 									{
@@ -185,7 +184,7 @@ func TestService(t *testing.T) {
 				Spec: corev1.ServiceSpec{
 					Type:            corev1.ServiceTypeLoadBalancer,
 					SessionAffinity: corev1.ServiceAffinityNone,
-					Selector:        apiutil.MergeLabels(apiutil.LabelsForKafka("kafka"), map[string]string{v1beta1.BrokerIdLabelKey: fmt.Sprintf("1")}),
+					Selector:        apiutil.MergeLabels(apiutil.LabelsForKafka("kafka"), map[string]string{v1beta1.BrokerIdLabelKey: "1"}),
 					Ports: []corev1.ServicePort{
 						{
 							Name:       "tcp-internal",
