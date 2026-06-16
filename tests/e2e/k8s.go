@@ -17,6 +17,7 @@ package e2e
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -53,7 +54,7 @@ const (
 // kubectl context and namespace.
 func applyK8sResourceManifest(kubectlOptions k8s.KubectlOptions, manifestPath string) { //nolint:unused // Note: this might come in handy for manual K8s resource operations.
 	ginkgo.By(fmt.Sprintf("Applying k8s manifest %s", manifestPath))
-	k8s.KubectlApply(ginkgo.GinkgoT(), &kubectlOptions, manifestPath)
+	k8s.KubectlApplyContext(ginkgo.GinkgoT(), context.Background(), &kubectlOptions, manifestPath)
 }
 
 // isExistingK8SResource queries a Resource by it's kind, namespace and name and
@@ -64,7 +65,7 @@ func isExistingK8SResource(
 	resourceName string,
 ) bool {
 	ginkgo.By(fmt.Sprintf("Checking the existence of resource %s in namespace %s (kind: %s)", resourceName, kubectlOptions.Namespace, resourceKind))
-	err := k8s.RunKubectlE(ginkgo.GinkgoT(), &kubectlOptions, getAction, resourceKind, resourceName)
+	err := k8s.RunKubectlContextE(ginkgo.GinkgoT(), context.Background(), &kubectlOptions, getAction, resourceKind, resourceName)
 	if err != nil {
 		ginkgo.By(fmt.Sprintf("Received error when getting resource: %s", err))
 		return false
@@ -83,12 +84,13 @@ func createOrReplaceK8sResourcesFromManifest( //nolint:unused // Note: this migh
 	shouldBeValidated bool,
 ) {
 	ginkgo.By(fmt.Sprintf("Checking the existence of resource %s", resourceName))
-	err := k8s.RunKubectlE(ginkgo.GinkgoT(), &kubectlOptions, getAction, resourceKind, resourceName)
+	err := k8s.RunKubectlContextE(ginkgo.GinkgoT(), context.Background(), &kubectlOptions, getAction, resourceKind, resourceName)
 
 	if err == nil {
 		ginkgo.By(fmt.Sprintf("Replacing k8s resources from manifest %s", resourceManifest))
-		k8s.RunKubectl(
+		k8s.RunKubectlContext(
 			ginkgo.GinkgoT(),
+			context.Background(),
 			&kubectlOptions,
 			"replace",
 			fmt.Sprintf("--validate=%t", shouldBeValidated),
@@ -96,8 +98,9 @@ func createOrReplaceK8sResourcesFromManifest( //nolint:unused // Note: this migh
 		)
 	} else {
 		ginkgo.By(fmt.Sprintf("Creating k8s resources from manifest %s", resourceManifest))
-		k8s.RunKubectl(
+		k8s.RunKubectlContext(
 			ginkgo.GinkgoT(),
+			context.Background(),
 			&kubectlOptions,
 			"create",
 			fmt.Sprintf("--validate=%t", shouldBeValidated),
@@ -157,8 +160,9 @@ func getK8sCRD(kubectlOptions k8s.KubectlOptions, crdName string) ([]byte, error
 	// CRDs are cluster-scoped, so we need to remove the namespace from kubectlOptions
 	clusterScopedOptions := kubectlOptions
 	clusterScopedOptions.Namespace = ""
-	output, err := k8s.RunKubectlAndGetOutputE(
+	output, err := k8s.RunKubectlAndGetOutputContextE(
 		ginkgo.GinkgoT(),
+		context.Background(),
 		&clusterScopedOptions,
 		[]string{getAction, "crd", outputFlag, "json", crdName}...,
 	)
@@ -410,8 +414,9 @@ func listK8sCRDs(kubectlOptions k8s.KubectlOptions, crdNames ...string) ([]strin
 	clusterScopedOptions := kubectlOptions
 	clusterScopedOptions.Namespace = ""
 	args := append([]string{getAction, "crd", outputFlag, nameKey}, crdNames...)
-	output, err := k8s.RunKubectlAndGetOutputE(
+	output, err := k8s.RunKubectlAndGetOutputContextE(
 		ginkgo.GinkgoT(),
+		context.Background(),
 		&clusterScopedOptions,
 		args...,
 	)
@@ -447,8 +452,9 @@ func deleteK8sResource(
 		_, args = kubectlArgExtender(args, "", selector, name, kubectlOptions.Namespace, extraArgs)
 	}
 
-	_, err := k8s.RunKubectlAndGetOutputE(
+	_, err := k8s.RunKubectlAndGetOutputContextE(
 		ginkgo.GinkgoT(),
+		context.Background(),
 		&kubectlOptions,
 		args...,
 	)
@@ -473,7 +479,7 @@ func deleteK8sResourceNoErrNotFound(kubectlOptions k8s.KubectlOptions, timeout t
 // kubectl context and namespace.
 func applyK8sResourceManifestFromString(kubectlOptions k8s.KubectlOptions, manifest string) error {
 	ginkgo.By(fmt.Sprintf("Applying k8s manifest\n%s", manifest))
-	return k8s.KubectlApplyFromStringE(ginkgo.GinkgoT(), &kubectlOptions, manifest)
+	return k8s.KubectlApplyFromStringContextE(ginkgo.GinkgoT(), context.Background(), &kubectlOptions, manifest)
 }
 
 // applyK8sResourceFromTemplate generates manifest from the specified go-template based on values
@@ -510,8 +516,9 @@ func listK8sResourceKinds(kubectlOptions k8s.KubectlOptions, apiGroupSelector st
 
 	args = append(args, extraArgs...)
 
-	output, err := k8s.RunKubectlAndGetOutputE(
+	output, err := k8s.RunKubectlAndGetOutputContextE(
 		ginkgo.GinkgoT(),
+		context.Background(),
 		&kubectlOptions,
 		args...,
 	)
@@ -544,8 +551,9 @@ func getK8sResources(kubectlOptions k8s.KubectlOptions, resourceKind []string, s
 	args := []string{getAction, strings.Join(resourceKind, ",")}
 	_, args = kubectlArgExtender(args, "", selector, names, kubectlOptions.Namespace, extraArgs)
 
-	output, err := k8s.RunKubectlAndGetOutputE(
+	output, err := k8s.RunKubectlAndGetOutputContextE(
 		ginkgo.GinkgoT(),
+		context.Background(),
 		&kubectlOptions,
 		args...,
 	)
@@ -668,8 +676,9 @@ func waitK8sResourceCondition(kubectlOptions k8s.KubectlOptions, resourceKind, w
 		}
 		_, args = kubectlArgExtender(args, "", selector, names, kubectlOptions.Namespace, extraArgs)
 
-		_, lastErr = k8s.RunKubectlAndGetOutputE(
+		_, lastErr = k8s.RunKubectlAndGetOutputContextE(
 			ginkgo.GinkgoT(),
+			context.Background(),
 			&kubectlOptions,
 			args...,
 		)
@@ -775,8 +784,9 @@ func waitForKafkaClusterWithPodStatusCheck(kubectlOptions k8s.KubectlOptions, cl
 			"-n", kubectlOptions.Namespace,
 		}
 
-		output, err := k8s.RunKubectlAndGetOutputE(
+		output, err := k8s.RunKubectlAndGetOutputContextE(
 			ginkgo.GinkgoT(),
+			context.Background(),
 			&kubectlOptions,
 			args...,
 		)
@@ -816,8 +826,9 @@ func checkAllKafkaPodsInNamespace(kubectlOptions k8s.KubectlOptions, namespace s
 		"-o", "jsonpath={range .items[*]}{.metadata.name}{.status.phase}{.status.containerStatuses[*].ready}{\"\\n\"}{end}",
 	}
 
-	output, err := k8s.RunKubectlAndGetOutputE(
+	output, err := k8s.RunKubectlAndGetOutputContextE(
 		ginkgo.GinkgoT(),
+		context.Background(),
 		&kubectlOptions,
 		args...,
 	)
@@ -851,8 +862,9 @@ func checkAndPrintKafkaPodStatus(kubectlOptions k8s.KubectlOptions, namespace st
 		"-o", "wide",
 	}
 
-	output, err := k8s.RunKubectlAndGetOutputE(
+	output, err := k8s.RunKubectlAndGetOutputContextE(
 		ginkgo.GinkgoT(),
+		context.Background(),
 		&kubectlOptions,
 		args...,
 	)
@@ -871,8 +883,9 @@ func checkAndPrintKafkaPodStatus(kubectlOptions k8s.KubectlOptions, namespace st
 		"-o", "jsonpath={.items[*].metadata.name}",
 	}
 
-	podNamesOutput, err := k8s.RunKubectlAndGetOutputE(
+	podNamesOutput, err := k8s.RunKubectlAndGetOutputContextE(
 		ginkgo.GinkgoT(),
+		context.Background(),
 		&kubectlOptions,
 		podNamesArgs...,
 	)
@@ -896,8 +909,9 @@ func checkAndPrintKafkaPodStatus(kubectlOptions k8s.KubectlOptions, namespace st
 			"--sort-by", ".lastTimestamp",
 		}
 
-		eventsOutput, err := k8s.RunKubectlAndGetOutputE(
+		eventsOutput, err := k8s.RunKubectlAndGetOutputContextE(
 			ginkgo.GinkgoT(),
+			context.Background(),
 			&kubectlOptions,
 			eventsArgs...,
 		)

@@ -103,10 +103,6 @@ type CruiseControlTask struct {
 	ErrorMessage string                             `json:"errorMessage,omitempty"`
 }
 
-func init() {
-	SchemeBuilder.Register(&CruiseControlOperation{}, &CruiseControlOperationList{})
-}
-
 // GetTTLSecondsAfterFinished returns Spec.TTLSecondsAfterFinished
 func (c CruiseControlOperation) GetTTLSecondsAfterFinished() *int {
 	return c.Spec.TTLSecondsAfterFinished

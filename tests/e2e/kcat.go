@@ -16,6 +16,7 @@
 package e2e
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/gruntwork-io/terratest/modules/k8s"
@@ -32,7 +33,8 @@ func consumingMessagesInternally(kubectlOptions k8s.KubectlOptions, kcatPodName 
 		kcatTLSParameters += "-X security.protocol=SSL -X ssl.key.location=/ssl/certs/tls.key -X ssl.certificate.location=/ssl/certs/tls.crt -X ssl.ca.location=/ssl/certs/ca.crt"
 	}
 
-	consumedMessages, err := k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(),
+	consumedMessages, err := k8s.RunKubectlAndGetOutputContextE(ginkgo.GinkgoT(),
+		context.Background(),
 		k8s.NewKubectlOptions(kubectlOptions.ContextName, kubectlOptions.ConfigPath, ""),
 		"exec", kcatPodName,
 		"-n", kubectlOptions.Namespace,
@@ -56,7 +58,8 @@ func producingMessagesInternally(kubectlOptions k8s.KubectlOptions, kcatPodName 
 		kcatTLSParameters += "-X security.protocol=SSL -X ssl.key.location=/ssl/certs/tls.key -X ssl.certificate.location=/ssl/certs/tls.crt -X ssl.ca.location=/ssl/certs/ca.crt"
 	}
 
-	_, err := k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(),
+	_, err := k8s.RunKubectlAndGetOutputContextE(ginkgo.GinkgoT(),
+		context.Background(),
 		k8s.NewKubectlOptions(kubectlOptions.ContextName, kubectlOptions.ConfigPath, ""),
 		"exec", kcatPodName,
 		"-n", kubectlOptions.Namespace,

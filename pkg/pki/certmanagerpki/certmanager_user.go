@@ -158,7 +158,7 @@ func (c *certManager) clusterCertificateForUser(
 			CommonName: user.GetName(),
 			URIs:       []string{fmt.Sprintf(spiffeIdTemplate, clusterDomain, user.GetNamespace(), user.GetName())},
 			Usages:     []certv1.KeyUsage{certv1.UsageClientAuth, certv1.UsageServerAuth},
-			IssuerRef: certmeta.ObjectReference{
+			IssuerRef: certmeta.IssuerReference{
 				Name:  caName,
 				Kind:  caKind,
 				Group: caGroup,
@@ -187,7 +187,7 @@ func (c *certManager) clusterCertificateForUser(
 
 // getCA returns the CA name/kind/group for the KafkaCluster
 func (c *certManager) getCA(user *v1alpha1.KafkaUser) (caName, caKind, caGroup string) {
-	var issuerRef *certmeta.ObjectReference
+	var issuerRef *certmeta.IssuerReference
 	if user.Spec.PKIBackendSpec != nil {
 		issuerRef = user.Spec.PKIBackendSpec.IssuerRef
 	} else {

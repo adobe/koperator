@@ -221,7 +221,7 @@ func caCertForCluster(cluster *v1beta1.KafkaCluster) *certv1.Certificate {
 			SecretName: fmt.Sprintf(pkicommon.BrokerCACertTemplate, cluster.Name),
 			CommonName: pkicommon.EnsureValidCommonNameLen(fmt.Sprintf(pkicommon.CAFQDNTemplate, cluster.Name, cluster.Namespace)),
 			IsCA:       true,
-			IssuerRef: certmeta.ObjectReference{
+			IssuerRef: certmeta.IssuerReference{
 				Name: fmt.Sprintf(pkicommon.BrokerSelfSignerTemplate, cluster.Name),
 				Kind: certv1.ClusterIssuerKind,
 			},

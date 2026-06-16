@@ -223,6 +223,17 @@ func (m *mockClusterAdmin) CreateACL(resource sarama.Resource, acl sarama.Acl) e
 	return nil
 }
 
+func (m *mockClusterAdmin) CreateACLs(resourceACLs []*sarama.ResourceAcls) error {
+	for _, ra := range resourceACLs {
+		for _, acl := range ra.Acls {
+			if err := m.CreateACL(ra.Resource, *acl); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func (m *mockClusterAdmin) ListAcls(filter sarama.AclFilter) ([]sarama.ResourceAcls, error) {
 	m.Lock()
 	defer m.Unlock()
@@ -255,6 +266,14 @@ func (m *mockClusterAdmin) DeleteACL(filter sarama.AclFilter, validateOnly bool)
 
 func (m *mockClusterAdmin) DescribeConfig(resource sarama.ConfigResource) ([]sarama.ConfigEntry, error) {
 	return []sarama.ConfigEntry{}, nil
+}
+
+func (m *mockClusterAdmin) DescribeConfigs(resources []*sarama.ConfigResource, _ sarama.DescribeConfigsOptions) ([]*sarama.ConfigResourceResult, error) {
+	results := make([]*sarama.ConfigResourceResult, len(resources))
+	for i := range resources {
+		results[i] = &sarama.ConfigResourceResult{}
+	}
+	return results, nil
 }
 
 func (m *mockClusterAdmin) Controller() (*sarama.Broker, error) {

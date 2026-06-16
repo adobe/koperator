@@ -25,7 +25,6 @@ import (
 	"emperror.dev/errors"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -52,20 +51,19 @@ type KafkaTopicValidator struct {
 	Log                 logr.Logger
 }
 
-func (s KafkaTopicValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (warnings admission.Warnings, err error) {
-	return s.validate(ctx, obj)
+func (s KafkaTopicValidator) ValidateCreate(ctx context.Context, kafkaTopic *banzaicloudv1alpha1.KafkaTopic) (warnings admission.Warnings, err error) {
+	return s.validate(ctx, kafkaTopic)
 }
 
-func (s KafkaTopicValidator) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (warnings admission.Warnings, err error) {
-	return s.validate(ctx, newObj)
+func (s KafkaTopicValidator) ValidateUpdate(ctx context.Context, _, kafkaTopic *banzaicloudv1alpha1.KafkaTopic) (warnings admission.Warnings, err error) {
+	return s.validate(ctx, kafkaTopic)
 }
 
-func (s KafkaTopicValidator) ValidateDelete(ctx context.Context, obj runtime.Object) (warnings admission.Warnings, err error) {
+func (s KafkaTopicValidator) ValidateDelete(_ context.Context, _ *banzaicloudv1alpha1.KafkaTopic) (warnings admission.Warnings, err error) {
 	return nil, nil
 }
 
-func (s *KafkaTopicValidator) validate(ctx context.Context, obj runtime.Object) (warnings admission.Warnings, err error) {
-	kafkaTopic := obj.(*banzaicloudv1alpha1.KafkaTopic)
+func (s *KafkaTopicValidator) validate(ctx context.Context, kafkaTopic *banzaicloudv1alpha1.KafkaTopic) (warnings admission.Warnings, err error) {
 	log := s.Log.WithValues("name", kafkaTopic.GetName(), "namespace", kafkaTopic.GetNamespace())
 
 	fieldErrs, err := s.validateKafkaTopic(ctx, log, kafkaTopic)

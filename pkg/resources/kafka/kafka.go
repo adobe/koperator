@@ -55,7 +55,6 @@ import (
 	certutil "github.com/banzaicloud/koperator/pkg/util/cert"
 	contourutils "github.com/banzaicloud/koperator/pkg/util/contour"
 	envoyutils "github.com/banzaicloud/koperator/pkg/util/envoy"
-	istioingressutils "github.com/banzaicloud/koperator/pkg/util/istioingress"
 	"github.com/banzaicloud/koperator/pkg/util/kafka"
 	pkicommon "github.com/banzaicloud/koperator/pkg/util/pki"
 )
@@ -1431,10 +1430,6 @@ func (r *Reconciler) getBrokerHost(log logr.Logger, defaultHost string, broker b
 func (r *Reconciler) createExternalListenerStatuses(log logr.Logger) (map[string]banzaiv1beta1.ListenerStatusList, error) {
 	extListenerStatuses := make(map[string]banzaiv1beta1.ListenerStatusList, len(r.KafkaCluster.Spec.ListenersConfig.ExternalListeners))
 	for _, eListener := range r.KafkaCluster.Spec.ListenersConfig.ExternalListeners {
-		// in case if external listener uses loadbalancer type of service and istioControlPlane is not specified than we skip this listener from status update. In this way this external listener will not be in the configmap.
-		if eListener.GetAccessMethod() == corev1.ServiceTypeLoadBalancer && r.KafkaCluster.Spec.GetIngressController() == istioingressutils.IngressControllerName && r.KafkaCluster.Spec.IstioControlPlane == nil {
-			continue
-		}
 		var host string
 		var foundLBService *corev1.Service
 		var err error
@@ -1631,14 +1626,6 @@ func getServiceFromExternalListener(client client.Client, cluster *banzaiv1beta1
 	foundLBService := &corev1.Service{}
 	var iControllerServiceName string
 	switch cluster.Spec.GetIngressController() {
-	case istioingressutils.IngressControllerName:
-		if ingressConfigName == util.IngressConfigGlobalName {
-			iControllerServiceName = fmt.Sprintf(istioingressutils.MeshGatewayNameTemplate, eListenerName, cluster.GetName())
-			iControllerServiceName = strings.ReplaceAll(iControllerServiceName, "_", "-")
-		} else {
-			iControllerServiceName = fmt.Sprintf(istioingressutils.MeshGatewayNameTemplateWithScope, eListenerName, ingressConfigName, cluster.GetName())
-			iControllerServiceName = strings.ReplaceAll(iControllerServiceName, "_", "-")
-		}
 	case envoyutils.IngressControllerName:
 		if ingressConfigName == util.IngressConfigGlobalName {
 			iControllerServiceName = fmt.Sprintf(envoyutils.EnvoyServiceName, eListenerName, cluster.GetName())

@@ -50,5 +50,4 @@ ignored = [
   # relying on a restored CI license cache.
   "github.com/banzaicloud/koperator/api",
   "github.com/banzaicloud/koperator/properties",
-  "github.com/banzaicloud/istio-operator/api/v2",
 ]
