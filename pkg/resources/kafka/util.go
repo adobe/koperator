@@ -27,6 +27,11 @@ import (
 	"github.com/banzaicloud/koperator/api/v1beta1"
 )
 
+const (
+	scaleOpsManagedUnevictableLabel = "scaleops.sh/managed-unevictable"
+	scaleOpsNodePackingLabel        = "scaleops.sh/node-packing"
+)
+
 // generateQuorumVoters generates the quorum voters in the format of brokerID@nodeAddress:listenerPort
 // The generated quorum voters are guaranteed in ascending order by broker IDs to ensure same quorum voters configurations are returned
 // regardless of the order of brokers and controllerListenerStatuses are passed in - this is needed to avoid triggering
@@ -108,14 +113,14 @@ func syncContainerResourceRequests(desired, current []corev1.Container) {
 }
 
 // syncScaleOpsAffinities syncs all scale ops related affinities from the current pod to the desired pod.
-// This includes pod affinities with "scaleops.sh/managed-unevictable" label selector
+// This includes pod affinities with scaleOpsManagedUnevictableLabel label selector
 // and node affinities with "scaleops.sh/node-packing=true" selector.
 func syncScaleOpsAffinities(desiredPod, currentPod *corev1.Pod) {
 	syncScaleOpsPodAffinities(desiredPod, currentPod)
 	syncScaleOpsNodeAffinities(desiredPod, currentPod)
 }
 
-// syncScaleOpsPodAffinities syncs preferred pod affinities with "scaleops.sh/managed-unevictable"
+// syncScaleOpsPodAffinities syncs preferred pod affinities with scaleOpsManagedUnevictableLabel
 // label selector from current pod to desired pod.
 func syncScaleOpsPodAffinities(desiredPod, currentPod *corev1.Pod) {
 	if currentPod.Spec.Affinity == nil || currentPod.Spec.Affinity.PodAffinity == nil {
@@ -124,7 +129,7 @@ func syncScaleOpsPodAffinities(desiredPod, currentPod *corev1.Pod) {
 
 	currentPodAffinity := currentPod.Spec.Affinity.PodAffinity
 
-	// Filter preferred pod affinities with "scaleops.sh/managed-unevictable" label selector
+	// Filter preferred pod affinities with scaleOpsManagedUnevictableLabel label selector
 	var scaleOpsPreferredAffinities []corev1.WeightedPodAffinityTerm
 	if currentPodAffinity.PreferredDuringSchedulingIgnoredDuringExecution != nil {
 		for _, term := range currentPodAffinity.PreferredDuringSchedulingIgnoredDuringExecution {
@@ -133,7 +138,7 @@ func syncScaleOpsPodAffinities(desiredPod, currentPod *corev1.Pod) {
 
 				// Check MatchExpressions
 				for _, requirement := range term.PodAffinityTerm.LabelSelector.MatchExpressions {
-					if requirement.Key == "scaleops.sh/managed-unevictable" {
+					if requirement.Key == scaleOpsManagedUnevictableLabel {
 						hasScaleOpsLabel = true
 						break
 					}
@@ -141,7 +146,7 @@ func syncScaleOpsPodAffinities(desiredPod, currentPod *corev1.Pod) {
 
 				// Check MatchLabels if not found in MatchExpressions
 				if !hasScaleOpsLabel {
-					if _, exists := term.PodAffinityTerm.LabelSelector.MatchLabels["scaleops.sh/managed-unevictable"]; exists {
+					if _, exists := term.PodAffinityTerm.LabelSelector.MatchLabels[scaleOpsManagedUnevictableLabel]; exists {
 						hasScaleOpsLabel = true
 					}
 				}
@@ -198,7 +203,7 @@ func syncScaleOpsNodeAffinities(desiredPod, currentPod *corev1.Pod) {
 
 			// Check MatchExpressions
 			for _, requirement := range term.Preference.MatchExpressions {
-				if requirement.Key == "scaleops.sh/node-packing" {
+				if requirement.Key == scaleOpsNodePackingLabel {
 					hasScaleOpsNodePacking = true
 				}
 				if hasScaleOpsNodePacking {
@@ -209,7 +214,7 @@ func syncScaleOpsNodeAffinities(desiredPod, currentPod *corev1.Pod) {
 			// Check MatchFields if not found in MatchExpressions
 			if !hasScaleOpsNodePacking {
 				for _, requirement := range term.Preference.MatchFields {
-					if requirement.Key == "scaleops.sh/node-packing" {
+					if requirement.Key == scaleOpsNodePackingLabel {
 						hasScaleOpsNodePacking = true
 					}
 					if hasScaleOpsNodePacking {

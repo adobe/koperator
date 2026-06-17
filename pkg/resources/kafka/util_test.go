@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/banzaicloud/koperator/api/v1beta1"
@@ -455,7 +456,7 @@ func TestSyncScaleOpsPodAffinities(t *testing.T) {
 									PodAffinityTerm: corev1.PodAffinityTerm{
 										LabelSelector: &metav1.LabelSelector{
 											MatchLabels: map[string]string{
-												"scaleops.sh/managed-unevictable": "true",
+												scaleOpsManagedUnevictableLabel: "true",
 											},
 										},
 										TopologyKey: "kubernetes.io/hostname",
@@ -487,7 +488,7 @@ func TestSyncScaleOpsPodAffinities(t *testing.T) {
 										LabelSelector: &metav1.LabelSelector{
 											MatchExpressions: []metav1.LabelSelectorRequirement{
 												{
-													Key:      "scaleops.sh/managed-unevictable",
+													Key:      scaleOpsManagedUnevictableLabel,
 													Operator: metav1.LabelSelectorOpIn,
 													Values:   []string{"true"},
 												},
@@ -532,7 +533,7 @@ func TestSyncScaleOpsPodAffinities(t *testing.T) {
 									PodAffinityTerm: corev1.PodAffinityTerm{
 										LabelSelector: &metav1.LabelSelector{
 											MatchLabels: map[string]string{
-												"scaleops.sh/managed-unevictable": "true",
+												scaleOpsManagedUnevictableLabel: "true",
 											},
 										},
 										TopologyKey: "kubernetes.io/hostname",
@@ -563,7 +564,7 @@ func TestSyncScaleOpsPodAffinities(t *testing.T) {
 									PodAffinityTerm: corev1.PodAffinityTerm{
 										LabelSelector: &metav1.LabelSelector{
 											MatchLabels: map[string]string{
-												"scaleops.sh/managed-unevictable": "true",
+												scaleOpsManagedUnevictableLabel: "true",
 											},
 										},
 										TopologyKey: "kubernetes.io/hostname",
@@ -622,24 +623,6 @@ func TestSyncScaleOpsPodAffinities(t *testing.T) {
 				t.Errorf("expected %d pod affinity terms, got %d", tt.expectedTermCount, gotTermCount)
 			}
 
-			// Verify all synced terms have the scaleops label
-			for _, term := range tt.desiredPod.Spec.Affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution {
-				if term.PodAffinityTerm.LabelSelector != nil {
-					hasScaleOpsLabel := false
-					for _, req := range term.PodAffinityTerm.LabelSelector.MatchExpressions {
-						if req.Key == "scaleops.sh/managed-unevictable" {
-							hasScaleOpsLabel = true
-							break
-						}
-					}
-					if !hasScaleOpsLabel {
-						if _, exists := term.PodAffinityTerm.LabelSelector.MatchLabels["scaleops.sh/managed-unevictable"]; !exists {
-							// This term should have been filtered out if it doesn't have scaleops label
-							// unless it came from the original desired pod
-						}
-					}
-				}
-			}
 		})
 	}
 }
@@ -693,7 +676,7 @@ func TestSyncScaleOpsNodeAffinities(t *testing.T) {
 									Preference: corev1.NodeSelectorTerm{
 										MatchExpressions: []corev1.NodeSelectorRequirement{
 											{
-												Key:      "scaleops.sh/node-packing",
+												Key:      scaleOpsNodePackingLabel,
 												Operator: corev1.NodeSelectorOpIn,
 												Values:   []string{"true"},
 											},
@@ -725,7 +708,7 @@ func TestSyncScaleOpsNodeAffinities(t *testing.T) {
 									Preference: corev1.NodeSelectorTerm{
 										MatchFields: []corev1.NodeSelectorRequirement{
 											{
-												Key:      "scaleops.sh/node-packing",
+												Key:      scaleOpsNodePackingLabel,
 												Operator: corev1.NodeSelectorOpIn,
 												Values:   []string{"true"},
 											},
@@ -769,7 +752,7 @@ func TestSyncScaleOpsNodeAffinities(t *testing.T) {
 									Preference: corev1.NodeSelectorTerm{
 										MatchExpressions: []corev1.NodeSelectorRequirement{
 											{
-												Key:      "scaleops.sh/node-packing",
+												Key:      scaleOpsNodePackingLabel,
 												Operator: corev1.NodeSelectorOpIn,
 												Values:   []string{"true"},
 											},
@@ -801,7 +784,7 @@ func TestSyncScaleOpsNodeAffinities(t *testing.T) {
 									Preference: corev1.NodeSelectorTerm{
 										MatchExpressions: []corev1.NodeSelectorRequirement{
 											{
-												Key:      "scaleops.sh/node-packing",
+												Key:      scaleOpsNodePackingLabel,
 												Operator: corev1.NodeSelectorOpIn,
 												Values:   []string{"true"},
 											},
@@ -865,6 +848,301 @@ func TestSyncScaleOpsNodeAffinities(t *testing.T) {
 	}
 }
 
+func TestSyncResourceRequests(t *testing.T) {
+	cpu100m := resource.MustParse("100m")
+	cpu200m := resource.MustParse("200m")
+	mem128Mi := resource.MustParse("128Mi")
+	mem256Mi := resource.MustParse("256Mi")
+	storage1Gi := resource.MustParse("1Gi")
+
+	tests := []struct {
+		name       string
+		currentPod *corev1.Pod
+		desiredPod *corev1.Pod
+		// verify is called after syncResourceRequests to assert the desired pod state
+		verify func(t *testing.T, desiredPod *corev1.Pod)
+	}{
+		{
+			name: "no containers in either pod",
+			currentPod: &corev1.Pod{
+				Spec: corev1.PodSpec{},
+			},
+			desiredPod: &corev1.Pod{
+				Spec: corev1.PodSpec{},
+			},
+			verify: func(t *testing.T, desiredPod *corev1.Pod) {
+				if len(desiredPod.Spec.Containers) != 0 {
+					t.Errorf("expected no containers")
+				}
+			},
+		},
+		{
+			name: "current cpu and memory are applied to desired container",
+			currentPod: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "kafka",
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceCPU:    cpu200m,
+									corev1.ResourceMemory: mem256Mi,
+								},
+							},
+						},
+					},
+				},
+			},
+			desiredPod: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "kafka",
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceCPU:    cpu100m,
+									corev1.ResourceMemory: mem128Mi,
+								},
+							},
+						},
+					},
+				},
+			},
+			verify: func(t *testing.T, desiredPod *corev1.Pod) {
+				reqs := desiredPod.Spec.Containers[0].Resources.Requests
+				gotCPU := reqs[corev1.ResourceCPU]
+				if !gotCPU.Equal(cpu200m) {
+					t.Errorf("expected CPU 200m, got %s", gotCPU.String())
+				}
+				gotMem := reqs[corev1.ResourceMemory]
+				if !gotMem.Equal(mem256Mi) {
+					t.Errorf("expected memory 256Mi, got %s", gotMem.String())
+				}
+			},
+		},
+		{
+			name: "desired container not in current is left unchanged",
+			currentPod: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "other"},
+					},
+				},
+			},
+			desiredPod: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "kafka",
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceCPU:    cpu100m,
+									corev1.ResourceMemory: mem128Mi,
+								},
+							},
+						},
+					},
+				},
+			},
+			verify: func(t *testing.T, desiredPod *corev1.Pod) {
+				reqs := desiredPod.Spec.Containers[0].Resources.Requests
+				gotCPU := reqs[corev1.ResourceCPU]
+				if !gotCPU.Equal(cpu100m) {
+					t.Errorf("expected CPU unchanged at 100m, got %s", gotCPU.String())
+				}
+				gotMem := reqs[corev1.ResourceMemory]
+				if !gotMem.Equal(mem128Mi) {
+					t.Errorf("expected memory unchanged at 128Mi, got %s", gotMem.String())
+				}
+			},
+		},
+		{
+			name: "current container missing cpu and memory deletes those keys from desired",
+			currentPod: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:      "kafka",
+							Resources: corev1.ResourceRequirements{},
+						},
+					},
+				},
+			},
+			desiredPod: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "kafka",
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceCPU:    cpu100m,
+									corev1.ResourceMemory: mem128Mi,
+								},
+							},
+						},
+					},
+				},
+			},
+			verify: func(t *testing.T, desiredPod *corev1.Pod) {
+				reqs := desiredPod.Spec.Containers[0].Resources.Requests
+				if _, ok := reqs[corev1.ResourceCPU]; ok {
+					t.Errorf("expected CPU to be deleted from desired, but it was present")
+				}
+				if _, ok := reqs[corev1.ResourceMemory]; ok {
+					t.Errorf("expected memory to be deleted from desired, but it was present")
+				}
+			},
+		},
+		{
+			name: "non cpu/memory resources in current are not copied to desired",
+			currentPod: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "kafka",
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceCPU:              cpu200m,
+									corev1.ResourceEphemeralStorage: storage1Gi,
+								},
+							},
+						},
+					},
+				},
+			},
+			desiredPod: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:      "kafka",
+							Resources: corev1.ResourceRequirements{},
+						},
+					},
+				},
+			},
+			verify: func(t *testing.T, desiredPod *corev1.Pod) {
+				reqs := desiredPod.Spec.Containers[0].Resources.Requests
+				gotCPU := reqs[corev1.ResourceCPU]
+				if !gotCPU.Equal(cpu200m) {
+					t.Errorf("expected CPU 200m, got %s", gotCPU.String())
+				}
+				if _, ok := reqs[corev1.ResourceEphemeralStorage]; ok {
+					t.Errorf("expected ephemeral-storage not to be copied, but it was present")
+				}
+			},
+		},
+		{
+			name: "init containers are synced independently from regular containers",
+			currentPod: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "kafka",
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceCPU: cpu200m,
+								},
+							},
+						},
+					},
+					InitContainers: []corev1.Container{
+						{
+							Name: "init-certs",
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceMemory: mem256Mi,
+								},
+							},
+						},
+					},
+				},
+			},
+			desiredPod: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:      "kafka",
+							Resources: corev1.ResourceRequirements{},
+						},
+					},
+					InitContainers: []corev1.Container{
+						{
+							Name:      "init-certs",
+							Resources: corev1.ResourceRequirements{},
+						},
+					},
+				},
+			},
+			verify: func(t *testing.T, desiredPod *corev1.Pod) {
+				containerReqs := desiredPod.Spec.Containers[0].Resources.Requests
+				gotCPU := containerReqs[corev1.ResourceCPU]
+				if !gotCPU.Equal(cpu200m) {
+					t.Errorf("expected container CPU 200m, got %s", gotCPU.String())
+				}
+				initReqs := desiredPod.Spec.InitContainers[0].Resources.Requests
+				gotMem := initReqs[corev1.ResourceMemory]
+				if !gotMem.Equal(mem256Mi) {
+					t.Errorf("expected init container memory 256Mi, got %s", gotMem.String())
+				}
+			},
+		},
+		{
+			name: "multiple containers: each is matched by name independently",
+			currentPod: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "kafka",
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceCPU:    cpu200m,
+									corev1.ResourceMemory: mem256Mi,
+								},
+							},
+						},
+						{
+							Name: "cruise-control",
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceCPU:    cpu100m,
+									corev1.ResourceMemory: mem128Mi,
+								},
+							},
+						},
+					},
+				},
+			},
+			desiredPod: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "kafka", Resources: corev1.ResourceRequirements{}},
+						{Name: "cruise-control", Resources: corev1.ResourceRequirements{}},
+					},
+				},
+			},
+			verify: func(t *testing.T, desiredPod *corev1.Pod) {
+				kafkaReqs := desiredPod.Spec.Containers[0].Resources.Requests
+				gotKafkaCPU := kafkaReqs[corev1.ResourceCPU]
+				if !gotKafkaCPU.Equal(cpu200m) {
+					t.Errorf("kafka: expected CPU 200m, got %s", gotKafkaCPU.String())
+				}
+				ccReqs := desiredPod.Spec.Containers[1].Resources.Requests
+				gotCCCPU := ccReqs[corev1.ResourceCPU]
+				if !gotCCCPU.Equal(cpu100m) {
+					t.Errorf("cruise-control: expected CPU 100m, got %s", gotCCCPU.String())
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			syncResourceRequests(tt.desiredPod, tt.currentPod)
+			tt.verify(t, tt.desiredPod)
+		})
+	}
+}
+
 func TestSyncScaleOpsAffinities(t *testing.T) {
 	tests := []struct {
 		name               string
@@ -899,7 +1177,7 @@ func TestSyncScaleOpsAffinities(t *testing.T) {
 									PodAffinityTerm: corev1.PodAffinityTerm{
 										LabelSelector: &metav1.LabelSelector{
 											MatchLabels: map[string]string{
-												"scaleops.sh/managed-unevictable": "true",
+												scaleOpsManagedUnevictableLabel: "true",
 											},
 										},
 										TopologyKey: "kubernetes.io/hostname",
@@ -914,7 +1192,7 @@ func TestSyncScaleOpsAffinities(t *testing.T) {
 									Preference: corev1.NodeSelectorTerm{
 										MatchExpressions: []corev1.NodeSelectorRequirement{
 											{
-												Key:      "scaleops.sh/node-packing",
+												Key:      scaleOpsNodePackingLabel,
 												Operator: corev1.NodeSelectorOpIn,
 												Values:   []string{"true"},
 											},
