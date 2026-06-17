@@ -622,7 +622,6 @@ func TestSyncScaleOpsPodAffinities(t *testing.T) {
 			if gotTermCount != tt.expectedTermCount {
 				t.Errorf("expected %d pod affinity terms, got %d", tt.expectedTermCount, gotTermCount)
 			}
-
 		})
 	}
 }
