@@ -1,0 +1,22 @@
+
+kind: CustomOwnerGrouping
+apiVersion: analysis.scaleops.sh/v1alpha1
+metadata:
+  name: kafkabroker
+  namespace: scaleops-system
+spec:
+  groupBy:
+    positiveRegexMatch: false
+  groupBys:
+    - labels:
+        - 'isBrokerNode: true'
+      positiveRegexMatch: false
+      topOwnerController:
+        apiVersion: kafka.banzaicloud.io/v1beta1
+        kind: KafkaCluster
+  displayOptions:
+    hideGeneratedSuffix: true
+    fields:
+      - ownerName
+  defaultPolicy: kafka-brokers
+  enabled: true

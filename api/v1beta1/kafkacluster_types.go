@@ -149,8 +149,15 @@ type KafkaClusterSpec struct {
 	// the KafkaCluster to the current state in the Kubernetes Cluster
 	// +kubebuilder:default=false
 	// +optional
-	ScaleOpsEnabled bool            `json:"scaleOpsEnabled,omitempty"`
-	ListenersConfig ListenersConfig `json:"listenersConfig"`
+	ScaleOpsEnabled bool `json:"scaleOpsEnabled,omitempty"`
+	// localDebugEnabled is used to decide whether to create a separate loadbalancer services for the
+	// Kafka and Cruise Control Pods. These services will expose the internal listener ports of the Kafka
+	// cluster with LoadBalancer type, which can be used for running Koperator on a local machine against
+	// a kafkaCluster instance on a Kind Cluster.
+	// +kubebuilder:default=false
+	// +optional
+	LocalDebugEnabled bool            `json:"localDebugEnabled,omitempty"`
+	ListenersConfig   ListenersConfig `json:"listenersConfig"`
 	// Custom ports to expose in the container. Example use case: a custom kafka distribution, that includes an integrated metrics api endpoint
 	AdditionalPorts []corev1.ContainerPort `json:"additionalPorts,omitempty"`
 	// ZKAddresses specifies the ZooKeeper connection string

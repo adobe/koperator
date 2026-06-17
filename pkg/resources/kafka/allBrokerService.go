@@ -39,7 +39,7 @@ func (r *Reconciler) allBrokerService() runtime.Object {
 	usedPorts = append(usedPorts,
 		generateServicePortForAdditionalPorts(r.KafkaCluster.Spec.AdditionalPorts)...)
 
-	return &corev1.Service{
+	svc := &corev1.Service{
 		ObjectMeta: templates.ObjectMetaWithAnnotations(
 			fmt.Sprintf(kafkautils.AllBrokerServiceTemplate, r.KafkaCluster.GetName()),
 			apiutil.LabelsForKafka(r.KafkaCluster.GetName()),
@@ -52,4 +52,10 @@ func (r *Reconciler) allBrokerService() runtime.Object {
 			Ports:           usedPorts,
 		},
 	}
+
+	if r.KafkaCluster.Spec.LocalDebugEnabled {
+		svc.Spec.Type = corev1.ServiceTypeLoadBalancer
+	}
+
+	return svc
 }
