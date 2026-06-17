@@ -55,7 +55,7 @@ type pvcItem struct {
 // getCacheResizeState returns the tieredCacheVolumes entry for the given broker and mount path
 // from the KafkaCluster CR status, or an empty string if not set.
 func getCacheResizeState(kubectlOptions k8s.KubectlOptions, clusterName, brokerID, mountPath string) (string, error) {
-	rawOutput, err := k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &kubectlOptions,
+	rawOutput, err := k8s.RunKubectlAndGetOutputContextE(ginkgo.GinkgoT(), context.Background(), &kubectlOptions,
 		"get", kafkaKind, clusterName,
 		"--output", "json",
 	)
@@ -86,7 +86,7 @@ func getCacheResizeState(kubectlOptions k8s.KubectlOptions, clusterName, brokerI
 func listBrokerCachePVCs(kubectlOptions k8s.KubectlOptions) ([]pvcItem, error) {
 	selector := fmt.Sprintf("%s=%s,brokerId=%d", kafkaCRLabelKey, tsResizeClusterName, tsResizeBrokerID)
 
-	rawOutput, err := k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &kubectlOptions,
+	rawOutput, err := k8s.RunKubectlAndGetOutputContextE(ginkgo.GinkgoT(), context.Background(), &kubectlOptions,
 		"get", "persistentvolumeclaims",
 		"-l", selector,
 		"--output", "json",
@@ -136,7 +136,7 @@ func listBrokerCachePVCs(kubectlOptions k8s.KubectlOptions) ([]pvcItem, error) {
 // getBrokerPodUID returns the UID of the running (non-terminating) broker pod for the
 // given broker ID, or an error if no such pod is found.
 func getBrokerPodUID(kubectlOptions k8s.KubectlOptions, clusterName string, brokerID int) (string, error) {
-	rawOutput, err := k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &kubectlOptions,
+	rawOutput, err := k8s.RunKubectlAndGetOutputContextE(ginkgo.GinkgoT(), context.Background(), &kubectlOptions,
 		"get", "pod",
 		"-l", fmt.Sprintf("%s=%s,brokerId=%d,app=kafka", kafkaCRLabelKey, clusterName, brokerID),
 		"--output", "json",
@@ -192,19 +192,19 @@ func testTieredStorageCachePvcResize() bool {
 				return
 			}
 			opts.Namespace = koperatorLocalHelmDescriptor.Namespace
-			_, _ = k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &opts,
+			_, _ = k8s.RunKubectlAndGetOutputContextE(ginkgo.GinkgoT(), context.Background(), &opts,
 				"patch", kafkaKind, tsResizeClusterName,
 				"--type=merge", `--patch={"metadata":{"finalizers":[]}}`,
 			)
-			_, _ = k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &opts,
+			_, _ = k8s.RunKubectlAndGetOutputContextE(ginkgo.GinkgoT(), context.Background(), &opts,
 				"delete", kafkaKind, tsResizeClusterName, "--ignore-not-found",
 			)
-			_, _ = k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &opts,
+			_, _ = k8s.RunKubectlAndGetOutputContextE(ginkgo.GinkgoT(), context.Background(), &opts,
 				"delete", "persistentvolumeclaims",
 				"-l", fmt.Sprintf("%s=%s", kafkaCRLabelKey, tsResizeClusterName),
 				"--ignore-not-found",
 			)
-			_, _ = k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &opts,
+			_, _ = k8s.RunKubectlAndGetOutputContextE(ginkgo.GinkgoT(), context.Background(), &opts,
 				"delete", "pods",
 				"-l", fmt.Sprintf("%s=%s", kafkaCRLabelKey, tsResizeClusterName),
 				"--ignore-not-found", "--grace-period=0",
@@ -225,30 +225,30 @@ func testTieredStorageCachePvcResize() bool {
 		// owned resource so nothing blocks the subsequent fresh install.
 		ginkgo.It("Pre-cleanup: removing any leftover kafka-ts-resize cluster", func() {
 			// 1. Remove finalizers so the CR can be deleted regardless of operator state.
-			_, _ = k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &kubectlOptions,
+			_, _ = k8s.RunKubectlAndGetOutputContextE(ginkgo.GinkgoT(), context.Background(), &kubectlOptions,
 				"patch", kafkaKind, tsResizeClusterName,
 				"--type=merge", `--patch={"metadata":{"finalizers":[]}}`,
 			)
 			// 2. Delete the CR itself (ignore not-found).
-			_, _ = k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &kubectlOptions,
+			_, _ = k8s.RunKubectlAndGetOutputContextE(ginkgo.GinkgoT(), context.Background(), &kubectlOptions,
 				"delete", kafkaKind, tsResizeClusterName, "--ignore-not-found",
 			)
 			// 3. Explicitly delete PVCs — they carry a pvc-protection finalizer that
 			//    blocks cascade GC while pods are still bound.
-			_, _ = k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &kubectlOptions,
+			_, _ = k8s.RunKubectlAndGetOutputContextE(ginkgo.GinkgoT(), context.Background(), &kubectlOptions,
 				"delete", "persistentvolumeclaims",
 				"-l", fmt.Sprintf("%s=%s", kafkaCRLabelKey, tsResizeClusterName),
 				"--ignore-not-found",
 			)
 			// 4. Delete pods so they release PVC mounts promptly.
-			_, _ = k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &kubectlOptions,
+			_, _ = k8s.RunKubectlAndGetOutputContextE(ginkgo.GinkgoT(), context.Background(), &kubectlOptions,
 				"delete", "pods",
 				"-l", fmt.Sprintf("%s=%s", kafkaCRLabelKey, tsResizeClusterName),
 				"--ignore-not-found", "--grace-period=0",
 			)
 			// 5. Wait for the CR itself to be gone (GC will handle the rest).
 			gomega.Eventually(context.Background(), func() error {
-				out, err := k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &kubectlOptions,
+				out, err := k8s.RunKubectlAndGetOutputContextE(ginkgo.GinkgoT(), context.Background(), &kubectlOptions,
 					"get", kafkaKind, tsResizeClusterName,
 				)
 				if err != nil || strings.Contains(out, "NotFound") || strings.Contains(out, "not found") {
@@ -268,7 +268,7 @@ func testTieredStorageCachePvcResize() bool {
 			// resize — we don't gate on ClusterRunning because Cruise Control may still be
 			// completing the post-startup rebalance when the resize is initiated.
 			gomega.Eventually(context.Background(), func() error {
-				output, err := k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &kubectlOptions,
+				output, err := k8s.RunKubectlAndGetOutputContextE(ginkgo.GinkgoT(), context.Background(), &kubectlOptions,
 					"get", "pod",
 					"-l", fmt.Sprintf("%s=%s,app=kafka,isBrokerNode=true", kafkaCRLabelKey, tsResizeClusterName),
 					"--output", "json",

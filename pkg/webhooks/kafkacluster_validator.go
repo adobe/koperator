@@ -84,15 +84,15 @@ func (s KafkaClusterValidator) ValidateDelete(_ context.Context, _ *banzaicloudv
 // checkTieredStorageCacheImmutability rejects updates that change the tieredStorageCache
 // classification of an existing PVC. Two complementary checks are applied:
 //
-// 1. Status-based (true→false): uses status.BrokersState[brokerID].TieredCacheVolumes as the
-//    authoritative source of truth for cache volumes — the reconciler writes this map when it
-//    creates each PVC. Catches all bypass paths (in-place flip, group-switch, inline-shadow).
+//  1. Status-based (true→false): uses status.BrokersState[brokerID].TieredCacheVolumes as the
+//     authoritative source of truth for cache volumes — the reconciler writes this map when it
+//     creates each PVC. Catches all bypass paths (in-place flip, group-switch, inline-shadow).
 //
-// 2. Spec-based (false→true): iterates the old spec to find non-cache mount paths and rejects
-//    any update that would flip tieredStorageCache from false to true on an already-provisioned
-//    log-dir volume. Non-cache PVCs have no status entry, so the status-based check alone
-//    would silently allow the flip — the broker would restart and drop the path from log.dirs,
-//    losing access to the existing Kafka data on that volume.
+//  2. Spec-based (false→true): iterates the old spec to find non-cache mount paths and rejects
+//     any update that would flip tieredStorageCache from false to true on an already-provisioned
+//     log-dir volume. Non-cache PVCs have no status entry, so the status-based check alone
+//     would silently allow the flip — the broker would restart and drop the path from log.dirs,
+//     losing access to the existing Kafka data on that volume.
 //
 // Removing a mountPath from the spec is allowed in both cases (delete-and-re-add path).
 func checkTieredStorageCacheImmutability(oldCluster, newCluster *banzaicloudv1beta1.KafkaCluster) field.ErrorList {

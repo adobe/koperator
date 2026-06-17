@@ -135,7 +135,7 @@ func getBrokerConfigMapLogDirs(kubectlOptions k8s.KubectlOptions, configMapName 
 		"-n", namespace,
 		"-o", fmt.Sprintf("jsonpath={.data.%s}", kafkautils.ConfigPropertyName),
 	}
-	output, err := k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &kubectlOptions, args...)
+	output, err := k8s.RunKubectlAndGetOutputContextE(ginkgo.GinkgoT(), context.Background(), &kubectlOptions, args...)
 	if err != nil {
 		return nil, fmt.Errorf("getting configmap %s: %w", configMapName, err)
 	}
