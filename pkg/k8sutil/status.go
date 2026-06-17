@@ -179,7 +179,7 @@ func generateBrokerState(brokerIDs []string, cluster *banzaicloudv1beta1.KafkaCl
 				brokerState.TieredCacheVolumes = make(map[string]banzaicloudv1beta1.TieredCacheVolumeState)
 			}
 			for mountPath, state := range s {
-				if state == "" {
+				if state == banzaicloudv1beta1.TieredCacheVolumeRemoved {
 					delete(brokerState.TieredCacheVolumes, mountPath)
 				} else {
 					brokerState.TieredCacheVolumes[mountPath] = state

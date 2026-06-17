@@ -227,6 +227,10 @@ const (
 	// to be deleted once the broker pod stops. A replacement PVC with the new desired size has
 	// already been created at the same mount path.
 	TieredCacheVolumePendingDeletion TieredCacheVolumeState = "pending-deletion"
+	// TieredCacheVolumeRemoved is the sentinel value passed to UpdateBrokerStatus to delete a
+	// TieredCacheVolumes map entry. The zero value of the type is intentionally used so that
+	// callers are explicit rather than relying on an untyped empty string.
+	TieredCacheVolumeRemoved TieredCacheVolumeState = ""
 )
 
 // BrokerState holds information about broker state

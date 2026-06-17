@@ -25,7 +25,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	"github.com/go-logr/logr"
@@ -38,10 +37,8 @@ type KafkaClusterValidator struct {
 	Log logr.Logger
 }
 
-func (s KafkaClusterValidator) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (warnings admission.Warnings, err error) {
+func (s KafkaClusterValidator) ValidateUpdate(ctx context.Context, kafkaClusterOld, kafkaClusterNew *banzaicloudv1beta1.KafkaCluster) (warnings admission.Warnings, err error) {
 	var allErrs field.ErrorList
-	kafkaClusterOld := oldObj.(*banzaicloudv1beta1.KafkaCluster)
-	kafkaClusterNew := newObj.(*banzaicloudv1beta1.KafkaCluster)
 	log := s.Log.WithValues("name", kafkaClusterNew.GetName(), "namespace", kafkaClusterNew.GetNamespace())
 
 	listenerErrs := checkInternalAndExternalListeners(&kafkaClusterNew.Spec)
@@ -104,7 +101,7 @@ func checkTieredStorageCacheImmutability(oldCluster, newCluster *banzaicloudv1be
 	// Check 1: status-based — existing cache volumes must not be reclassified as non-cache.
 	for brokerIDStr, brokerState := range oldCluster.Status.BrokersState {
 		for mountPath, state := range brokerState.TieredCacheVolumes {
-			if state == "" {
+			if state == banzaicloudv1beta1.TieredCacheVolumeRemoved {
 				continue
 			}
 			newValue, fieldPath, found := findTieredStorageCacheInSpec(&newCluster.Spec, brokerIDStr, mountPath)
