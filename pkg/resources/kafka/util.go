@@ -199,15 +199,10 @@ func syncScaleOpsNodeAffinities(desiredPod, currentPod *corev1.Pod) {
 			// Check MatchExpressions
 			for _, requirement := range term.Preference.MatchExpressions {
 				if requirement.Key == "scaleops.sh/node-packing" {
-					for _, val := range requirement.Values {
-						if val == "true" {
-							hasScaleOpsNodePacking = true
-							break
-						}
-					}
-					if hasScaleOpsNodePacking {
-						break
-					}
+					hasScaleOpsNodePacking = true
+				}
+				if hasScaleOpsNodePacking {
+					break
 				}
 			}
 
@@ -215,15 +210,10 @@ func syncScaleOpsNodeAffinities(desiredPod, currentPod *corev1.Pod) {
 			if !hasScaleOpsNodePacking {
 				for _, requirement := range term.Preference.MatchFields {
 					if requirement.Key == "scaleops.sh/node-packing" {
-						for _, val := range requirement.Values {
-							if val == "true" {
-								hasScaleOpsNodePacking = true
-								break
-							}
-						}
-						if hasScaleOpsNodePacking {
-							break
-						}
+						hasScaleOpsNodePacking = true
+					}
+					if hasScaleOpsNodePacking {
+						break
 					}
 				}
 			}

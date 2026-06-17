@@ -956,6 +956,7 @@ func (r *Reconciler) handleRollingUpgrade(log logr.Logger, desiredPod, currentPo
 		}
 		desiredPod.Spec.Tolerations = uniqueTolerations
 	}
+
 	if r.KafkaCluster.Spec.ScaleOpsEnabled {
 		// if resources requets are updated by scale ops, we need to sync them to desiredPod,
 		// otherwise they will be removed and cause pod restart
@@ -964,6 +965,7 @@ func (r *Reconciler) handleRollingUpgrade(log logr.Logger, desiredPod, currentPo
 		// otherwise they will be removed and cause pod restart
 		syncScaleOpsAffinities(desiredPod, currentPod)
 	}
+
 	// Check if the resource actually updated or if labels match TaintedBrokersSelector
 	patchResult, err := patch.DefaultPatchMaker.Calculate(currentPod, desiredPod)
 	switch {
