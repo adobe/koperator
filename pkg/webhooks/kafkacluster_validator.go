@@ -24,7 +24,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	"github.com/go-logr/logr"
@@ -37,9 +36,8 @@ type KafkaClusterValidator struct {
 	Log logr.Logger
 }
 
-func (s KafkaClusterValidator) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (warnings admission.Warnings, err error) {
+func (s KafkaClusterValidator) ValidateUpdate(ctx context.Context, _, kafkaClusterNew *banzaicloudv1beta1.KafkaCluster) (warnings admission.Warnings, err error) {
 	var allErrs field.ErrorList
-	kafkaClusterNew := newObj.(*banzaicloudv1beta1.KafkaCluster)
 	log := s.Log.WithValues("name", kafkaClusterNew.GetName(), "namespace", kafkaClusterNew.GetNamespace())
 
 	listenerErrs := checkInternalAndExternalListeners(&kafkaClusterNew.Spec)
@@ -57,9 +55,8 @@ func (s KafkaClusterValidator) ValidateUpdate(ctx context.Context, oldObj, newOb
 		kafkaClusterNew.Name, allErrs)
 }
 
-func (s KafkaClusterValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (warnings admission.Warnings, err error) {
+func (s KafkaClusterValidator) ValidateCreate(ctx context.Context, kafkaCluster *banzaicloudv1beta1.KafkaCluster) (warnings admission.Warnings, err error) {
 	var allErrs field.ErrorList
-	kafkaCluster := obj.(*banzaicloudv1beta1.KafkaCluster)
 	log := s.Log.WithValues("name", kafkaCluster.GetName(), "namespace", kafkaCluster.GetNamespace())
 
 	listenerErrs := checkInternalAndExternalListeners(&kafkaCluster.Spec)
@@ -77,7 +74,7 @@ func (s KafkaClusterValidator) ValidateCreate(ctx context.Context, obj runtime.O
 		kafkaCluster.Name, allErrs)
 }
 
-func (s KafkaClusterValidator) ValidateDelete(ctx context.Context, obj runtime.Object) (warnings admission.Warnings, err error) {
+func (s KafkaClusterValidator) ValidateDelete(_ context.Context, _ *banzaicloudv1beta1.KafkaCluster) (warnings admission.Warnings, err error) {
 	return nil, nil
 }
 

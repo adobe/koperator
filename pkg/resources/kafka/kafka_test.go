@@ -1022,7 +1022,7 @@ func TestReconcileKafkaPvcDiskRemoval(t *testing.T) {
 			},
 		},
 		{
-			testName: "If disk is rebalancing, wait for it to finish",
+			testName: "If disk is rebalancing, wait for it to finish before marking for removal",
 			brokersDesiredPvcs: map[string][]*corev1.PersistentVolumeClaim{
 				"0": {
 					createPvc("test-pvc-1", "0", "/path/to/mount1"),

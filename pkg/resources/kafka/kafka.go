@@ -55,7 +55,6 @@ import (
 	certutil "github.com/banzaicloud/koperator/pkg/util/cert"
 	contourutils "github.com/banzaicloud/koperator/pkg/util/contour"
 	envoyutils "github.com/banzaicloud/koperator/pkg/util/envoy"
-	istioingressutils "github.com/banzaicloud/koperator/pkg/util/istioingress"
 	"github.com/banzaicloud/koperator/pkg/util/kafka"
 	pkicommon "github.com/banzaicloud/koperator/pkg/util/pki"
 )
@@ -82,6 +81,12 @@ const (
 	jmxVolumeName      = "jmx-jar-data"
 	MetricsHealthCheck = "/-/healthy"
 	MetricsPort        = 9020
+
+	metricsPortName        = "metrics"
+	clusterIDEnvVarName    = "CLUSTER_ID"
+	extensionsVolumeName   = "extensions"
+	mountPathAnnotationKey = "mountPath"
+	configValueTrue        = "true"
 
 	// missingBrokerDownScaleRunningPriority the priority is used  for missing brokers where there is an incomplete downscale operation
 	missingBrokerDownScaleRunningPriority brokerReconcilePriority = iota
@@ -161,7 +166,7 @@ func getCreatedPvcForBroker(
 
 		found := false
 		for j := range foundPvcList.Items {
-			if storageConfigs[i].MountPath == foundPvcList.Items[j].GetAnnotations()["mountPath"] {
+			if storageConfigs[i].MountPath == foundPvcList.Items[j].GetAnnotations()[mountPathAnnotationKey] {
 				found = true
 				break
 			}
@@ -307,7 +312,7 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 			if storage.PvcSpec == nil && storage.EmptyDir == nil {
 				return errors.WrapIfWithDetails(err,
 					"invalid storage config, either 'pvcSpec' or 'emptyDir` has to be set",
-					banzaiv1beta1.BrokerIdLabelKey, broker.Id, "mountPath", storage.MountPath)
+					banzaiv1beta1.BrokerIdLabelKey, broker.Id, mountPathAnnotationKey, storage.MountPath)
 			}
 			if storage.PvcSpec == nil {
 				continue
@@ -367,7 +372,7 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 		if r.KafkaCluster.Status.ClusterID == "" {
 			// CLUSTER_ID can be overridden with ENV (e.g for migration from ZK to KRaft so it matches the value for ZK cluster)
 			for _, env := range r.KafkaCluster.Spec.Envs {
-				if env.Name == "CLUSTER_ID" {
+				if env.Name == clusterIDEnvVarName {
 					r.KafkaCluster.Status.ClusterID = env.Value
 					break
 				}
@@ -1203,7 +1208,7 @@ func (r *Reconciler) reconcileKafkaPvc(ctx context.Context, log logr.Logger, bro
 			}
 			// changing the controller's mount path leads to a new disk being added and the controller in an unrecoverable state
 			// due to the new disk not being initialized for kafka.  we want to avoid this situation.
-			if len(pvcList.Items) == 1 && pvcList.Items[0].Annotations["mountPath"] != desiredPvcs[0].Annotations["mountPath"] {
+			if len(pvcList.Items) == 1 && pvcList.Items[0].Annotations[mountPathAnnotationKey] != desiredPvcs[0].Annotations[mountPathAnnotationKey] {
 				return errors.New("controller broker volume mount path cannot be changed")
 			}
 		}
@@ -1226,7 +1231,7 @@ func (r *Reconciler) reconcileKafkaPvc(ctx context.Context, log logr.Logger, bro
 				return errorfactory.New(errorfactory.APIFailure{}, err, "getting resource failed", "kind", desiredType)
 			}
 
-			mountPath := currentPvc.Annotations["mountPath"]
+			mountPath := currentPvc.Annotations[mountPathAnnotationKey]
 			// Creating the first PersistentVolume For Pod
 			if len(pvcList.Items) == 0 {
 				if err := patch.DefaultAnnotator.SetLastAppliedAnnotation(desiredPvc); err != nil {
@@ -1241,7 +1246,7 @@ func (r *Reconciler) reconcileKafkaPvc(ctx context.Context, log logr.Logger, bro
 
 			alreadyCreated := false
 			for _, pvc := range pvcList.Items {
-				if mountPath == pvc.Annotations["mountPath"] {
+				if mountPath == pvc.Annotations[mountPathAnnotationKey] {
 					currentPvc = pvc.DeepCopy()
 					alreadyCreated = true
 					// Checking pvc state, if bounded, so the broker has already restarted and the CC GracefulDiskRebalance has not happened yet,
@@ -1316,10 +1321,10 @@ func handleDiskRemoval(ctx context.Context, pvcList *corev1.PersistentVolumeClai
 	waitForDiskRemovalToFinish := false
 	for _, pvc := range pvcList.Items {
 		foundInDesired := false
-		existingMountPath := pvc.Annotations["mountPath"]
+		existingMountPath := pvc.Annotations[mountPathAnnotationKey]
 
 		for _, desiredPvc := range desiredPvcs {
-			desiredMountPath := desiredPvc.Annotations["mountPath"]
+			desiredMountPath := desiredPvc.Annotations[mountPathAnnotationKey]
 
 			if existingMountPath == desiredMountPath {
 				foundInDesired = true
@@ -1336,7 +1341,7 @@ func handleDiskRemoval(ctx context.Context, pvcList *corev1.PersistentVolumeClai
 			volumeStateStatus, found := brokerState.GracefulActionState.VolumeStates[mountPathToRemove]
 			if !found {
 				// If the state is not found, it means that the disk removal was done according to the disk removal succeeded branch
-				log.Info("Disk removal was completed, waiting for Rolling Upgrade to remove PVC", "brokerId", brokerId, "mountPath", mountPathToRemove)
+				log.Info("Disk removal was completed, waiting for Rolling Upgrade to remove PVC", "brokerId", brokerId, mountPathAnnotationKey, mountPathToRemove)
 				continue
 			}
 
@@ -1350,17 +1355,17 @@ func handleDiskRemoval(ctx context.Context, pvcList *corev1.PersistentVolumeClai
 				log.Info("resource deleted")
 				err := k8sutil.DeleteVolumeStatus(r.Client, brokerId, mountPathToRemove, r.KafkaCluster, log)
 				if err != nil {
-					return false, errors.WrapIfWithDetails(err, "could not delete volume status for broker volume", "brokerId", brokerId, "mountPath", mountPathToRemove)
+					return false, errors.WrapIfWithDetails(err, "could not delete volume status for broker volume", "brokerId", brokerId, mountPathAnnotationKey, mountPathToRemove)
 				}
 			case ccVolumeState.IsDiskRemoval():
-				log.Info("Graceful disk removal is in progress", "brokerId", brokerId, "mountPath", mountPathToRemove)
+				log.Info("Graceful disk removal is in progress", "brokerId", brokerId, mountPathAnnotationKey, mountPathToRemove)
 				waitForDiskRemovalToFinish = true
 			case ccVolumeState.IsDiskRebalance():
-				log.Info("Graceful disk rebalance is in progress, waiting to mark disk for removal", "brokerId", brokerId, "mountPath", mountPathToRemove)
+				log.Info("Graceful disk rebalance is in progress, waiting for it to finish before marking disk for removal", "brokerId", brokerId, mountPathAnnotationKey, mountPathToRemove)
 				waitForDiskRemovalToFinish = true
 			default:
 				brokerVolumesState[mountPathToRemove] = banzaiv1beta1.VolumeState{CruiseControlVolumeState: banzaiv1beta1.GracefulDiskRemovalRequired}
-				log.Info("Marked the volume for removal", "brokerId", brokerId, "mountPath", mountPathToRemove)
+				log.Info("Marked the volume for removal", "brokerId", brokerId, mountPathAnnotationKey, mountPathToRemove)
 				waitForDiskRemovalToFinish = true
 			}
 		}
@@ -1454,10 +1459,6 @@ func (r *Reconciler) getBrokerHost(log logr.Logger, defaultHost string, broker b
 func (r *Reconciler) createExternalListenerStatuses(log logr.Logger) (map[string]banzaiv1beta1.ListenerStatusList, error) {
 	extListenerStatuses := make(map[string]banzaiv1beta1.ListenerStatusList, len(r.KafkaCluster.Spec.ListenersConfig.ExternalListeners))
 	for _, eListener := range r.KafkaCluster.Spec.ListenersConfig.ExternalListeners {
-		// in case if external listener uses loadbalancer type of service and istioControlPlane is not specified than we skip this listener from status update. In this way this external listener will not be in the configmap.
-		if eListener.GetAccessMethod() == corev1.ServiceTypeLoadBalancer && r.KafkaCluster.Spec.GetIngressController() == istioingressutils.IngressControllerName && r.KafkaCluster.Spec.IstioControlPlane == nil {
-			continue
-		}
 		var host string
 		var foundLBService *corev1.Service
 		var err error
@@ -1654,14 +1655,6 @@ func getServiceFromExternalListener(client client.Client, cluster *banzaiv1beta1
 	foundLBService := &corev1.Service{}
 	var iControllerServiceName string
 	switch cluster.Spec.GetIngressController() {
-	case istioingressutils.IngressControllerName:
-		if ingressConfigName == util.IngressConfigGlobalName {
-			iControllerServiceName = fmt.Sprintf(istioingressutils.MeshGatewayNameTemplate, eListenerName, cluster.GetName())
-			iControllerServiceName = strings.ReplaceAll(iControllerServiceName, "_", "-")
-		} else {
-			iControllerServiceName = fmt.Sprintf(istioingressutils.MeshGatewayNameTemplateWithScope, eListenerName, ingressConfigName, cluster.GetName())
-			iControllerServiceName = strings.ReplaceAll(iControllerServiceName, "_", "-")
-		}
 	case envoyutils.IngressControllerName:
 		if ingressConfigName == util.IngressConfigGlobalName {
 			iControllerServiceName = fmt.Sprintf(envoyutils.EnvoyServiceName, eListenerName, cluster.GetName())

@@ -43,4 +43,11 @@ ignored = [
   "github.com/envoyproxy/go-control-plane",
   "github.com/gogo/googleapis",
   "github.com/davecgh/go-spew", # ISC license
+
+  # In-tree modules (local `replace` targets); covered by this repo's own
+  # LICENSE, but their sub-dirs carry no LICENSE file so licensei cannot detect
+  # one when vendored. Ignoring lets `make license-check` pass locally without
+  # relying on a restored CI license cache.
+  "github.com/banzaicloud/koperator/api",
+  "github.com/banzaicloud/koperator/properties",
 ]

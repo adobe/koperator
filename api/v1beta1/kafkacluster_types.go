@@ -24,8 +24,6 @@ import (
 
 	"dario.cat/mergo"
 
-	"github.com/banzaicloud/istio-client-go/pkg/networking/v1beta1"
-
 	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -59,10 +57,10 @@ const (
 	DefaultKafkaImage = "ghcr.io/adobe/koperator/kafka:2.13-3.9.1" // renovate: datasource=docker depName=ghcr.io/adobe/koperator/kafka
 
 	// DefaultMonitorImage is the default JMX monitor image used when users don't specify it in MonitoringConfig.JmxImage
-	DefaultMonitorImage = "ghcr.io/adobe/koperator/jmx-javaagent:1.4.0" // renovate: datasource=docker depName=ghcr.io/adobe/koperator/jmx-javaagent
+	DefaultMonitorImage = "ghcr.io/adobe/koperator/jmx-javaagent:1.5.0" // renovate: datasource=docker depName=ghcr.io/adobe/koperator/jmx-javaagent
 
 	// DefaultEnvoyImage is the default Envoy proxy image used when users don't specify it in EnvoyConfig.Image
-	DefaultEnvoyImage = "envoyproxy/envoy:v1.37.1" // renovate: datasource=docker depName=envoyproxy/envoy
+	DefaultEnvoyImage = "envoyproxy/envoy:v1.38.0" // renovate: datasource=docker depName=envoyproxy/envoy
 
 	// ControllerNodeProcessRole represents the node is a controller node
 	ControllerNodeProcessRole = "controller"
@@ -131,19 +129,6 @@ const (
 	// KafkaBroker.spec.container["kafka"].image
 	defaultKafkaImage = "ghcr.io/adobe/koperator/kafka:2.13-3.9.1" // renovate: datasource=docker depName=ghcr.io/adobe/koperator/kafka
 
-	/* Istio Ingress Config */
-
-	// IstioMeshGateway.spec.deployment.resources
-	defaultIstioIngressRequestResourceCpu    = "100m"
-	defaultIstioIngressRequestResourceMemory = "128Mi"
-	defaultIstioIngressLimitResourceCpu      = "2000m"
-	defaultIstioIngressLimitResourceMemory   = "1024Mi"
-
-	// IstioMeshGateway.spec.deployment.replicas.count
-	// IstioMeshGateway.spec.deployment.replicas.min
-	// IstioMeshGateway.spec.deployment.replicas.max
-	defaultReplicas = 1
-
 	/* Monitor Config */
 
 	// KafkaBrokerPod.spec.initContainer["jmx-exporter"].command
@@ -157,9 +142,16 @@ type KafkaClusterSpec struct {
 	// This is default to be true; if set to false, the Kafka cluster is in ZooKeeper mode.
 	// +kubebuilder:default=false
 	// +optional
-	KRaftMode              bool            `json:"kRaft"`
-	HeadlessServiceEnabled bool            `json:"headlessServiceEnabled"`
-	ListenersConfig        ListenersConfig `json:"listenersConfig"`
+	KRaftMode              bool `json:"kRaft"`
+	HeadlessServiceEnabled bool `json:"headlessServiceEnabled"`
+	// localDebugEnabled is used to decide whether to create a separate loadbalancer services for the
+	// Kafka and Cruise Control Pods. These services will expose the internal listener ports of the Kafka
+	// cluster with LoadBalancer type, which can be used for running Koperator on a local machine against
+	// a kafkaCluster instance on a Kind Cluster.
+	// +kubebuilder:default=false
+	// +optional
+	LocalDebugEnabled bool            `json:"localDebugEnabled,omitempty"`
+	ListenersConfig   ListenersConfig `json:"listenersConfig"`
 	// Custom ports to expose in the container. Example use case: a custom kafka distribution, that includes an integrated metrics api endpoint
 	AdditionalPorts []corev1.ContainerPort `json:"additionalPorts,omitempty"`
 	// ZKAddresses specifies the ZooKeeper connection string
@@ -184,11 +176,9 @@ type KafkaClusterSpec struct {
 	RollingUpgradeConfig        RollingUpgradeConfig    `json:"rollingUpgradeConfig"`
 	// Selector for broker pods that need to be recycled/reconciled
 	TaintedBrokersSelector *metav1.LabelSelector `json:"taintedBrokersSelector,omitempty"`
-	// +kubebuilder:validation:Enum=envoy;contour;istioingress
-	// IngressController specifies the type of the ingress controller to be used for external listeners. The `istioingress` ingress controller type requires the `spec.istioControlPlane` field to be populated as well.
+	// +kubebuilder:validation:Enum=envoy;contour
+	// IngressController specifies the type of the ingress controller to be used for external listeners.
 	IngressController string `json:"ingressController,omitempty"`
-	// IstioControlPlane is a reference to the IstioControlPlane resource for envoy configuration. It must be specified if istio ingress is used.
-	IstioControlPlane *IstioControlPlaneReference `json:"istioControlPlane,omitempty"`
 	// If true OneBrokerPerNode ensures that each kafka broker will be placed on a different node unless a custom
 	// Affinity definition overrides this behavior
 	OneBrokerPerNode bool `json:"oneBrokerPerNode"`
@@ -203,7 +193,6 @@ type KafkaClusterSpec struct {
 	ContourIngressConfig         ContourIngressConfig `json:"contourIngressConfig,omitempty"`
 	MonitoringConfig             MonitoringConfig     `json:"monitoringConfig,omitempty"`
 	AlertManagerConfig           *AlertManagerConfig  `json:"alertManagerConfig,omitempty"`
-	IstioIngressConfig           IstioIngressConfig   `json:"istioIngressConfig,omitempty"`
 	// Envs defines environment variables for Kafka broker Pods.
 	// Adding the "+" prefix to the name prepends the value to that environment variable instead of overwriting it.
 	// Add the "+" suffix to append.
@@ -509,42 +498,6 @@ type EnvoyCommandLineArgs struct {
 	Concurrency int32 `json:"concurrency,omitempty"`
 }
 
-// IstioIngressConfig defines the config for the Istio Ingress Controller
-type IstioIngressConfig struct {
-	Resources *corev1.ResourceRequirements `json:"resourceRequirements,omitempty"`
-	// +kubebuilder:validation:Minimum=1
-	Replicas     int32                `json:"replicas,omitempty"`
-	NodeSelector map[string]string    `json:"nodeSelector,omitempty"`
-	Tolerations  []*corev1.Toleration `json:"tolerations,omitempty"`
-	// Annotations defines the annotations placed on the istio ingress controller deployment
-	Annotations               map[string]string   `json:"annotations,omitempty"`
-	TLSOptions                *v1beta1.TLSOptions `json:"gatewayConfig,omitempty"`
-	VirtualServiceAnnotations map[string]string   `json:"virtualServiceAnnotations,omitempty"`
-	// Envs allows to add additional env vars to the istio meshgateway resource
-	Envs []*corev1.EnvVar `json:"envs,omitempty"`
-	// If specified and supported by the platform, traffic through the
-	// cloud-provider load-balancer will be restricted to the specified client
-	// IPs. This field will be ignored if the
-	// cloud-provider does not support the feature."
-	// More info: https://kubernetes.io/docs/tasks/access-application-cluster/configure-cloud-provider-firewall/
-	// +optional
-	LoadBalancerSourceRanges []string `json:"loadBalancerSourceRanges,omitempty"`
-}
-
-func (iIConfig *IstioIngressConfig) GetAnnotations() map[string]string {
-	return util.CloneMap(iIConfig.Annotations)
-}
-
-// GetVirtualServiceAnnotations returns a copy of the VirtualServiceAnnotations field
-func (iIConfig *IstioIngressConfig) GetVirtualServiceAnnotations() map[string]string {
-	return util.CloneMap(iIConfig.VirtualServiceAnnotations)
-}
-
-// GetLoadBalancerSourceRanges returns LoadBalancerSourceRanges to use for Istio Meshagetway generated LoadBalancer
-func (iIConfig *IstioIngressConfig) GetLoadBalancerSourceRanges() []string {
-	return iIConfig.LoadBalancerSourceRanges
-}
-
 // MonitoringConfig defines the config for monitoring Kafka and Cruise Control
 type MonitoringConfig struct {
 	JmxImage               string `json:"jmxImage,omitempty"`
@@ -652,7 +605,7 @@ type SSLSecrets struct {
 	TLSSecretName   string                  `json:"tlsSecretName"`
 	JKSPasswordName string                  `json:"jksPasswordName,omitempty"`
 	Create          bool                    `json:"create,omitempty"`
-	IssuerRef       *cmmeta.ObjectReference `json:"issuerRef,omitempty"`
+	IssuerRef       *cmmeta.IssuerReference `json:"issuerRef,omitempty"`
 	// +kubebuilder:validation:Enum={"cert-manager"}
 	PKIBackend PKIBackend `json:"pkiBackend,omitempty"`
 }
@@ -691,7 +644,7 @@ type IngressServiceSettings struct {
 	// "Cluster" obscures the client source IP and may cause a second hop to
 	// another node, but should have good overall load-spreading.
 	// +optional
-	ExternalTrafficPolicy corev1.ServiceExternalTrafficPolicyType `json:"externalTrafficPolicy,omitempty"`
+	ExternalTrafficPolicy corev1.ServiceExternalTrafficPolicy `json:"externalTrafficPolicy,omitempty"`
 	// Service Type string describes ingress methods for a service
 	// Only "NodePort" and "LoadBalancer" is supported.
 	// Default value is LoadBalancer
@@ -725,7 +678,7 @@ type ExternalListenerConfig struct {
 	// +optional
 	AccessMethod corev1.ServiceType `json:"accessMethod,omitempty"`
 	// Config allows to specify ingress controller configuration per external listener
-	// if set, it overrides the default `KafkaClusterSpec.IstioIngressConfig` or `KafkaClusterSpec.EnvoyConfig` for this external listener.
+	// if set, it overrides the default `KafkaClusterSpec.EnvoyConfig` for this external listener.
 	// +optional
 	Config *Config `json:"config,omitempty"`
 	// TLS secret
@@ -740,7 +693,6 @@ type Config struct {
 
 type IngressConfig struct {
 	IngressServiceSettings `json:",inline"`
-	IstioIngressConfig     *IstioIngressConfig   `json:"istioIngressConfig,omitempty"`
 	EnvoyConfig            *EnvoyConfig          `json:"envoyConfig,omitempty"`
 	ContourIngressConfig   *ContourIngressConfig `json:"contourIngressConfig,omitempty"`
 }
@@ -854,41 +806,12 @@ type KafkaClusterList struct {
 	Items           []KafkaCluster `json:"items"`
 }
 
-func init() {
-	SchemeBuilder.Register(&KafkaCluster{}, &KafkaClusterList{})
-}
-
-// GetResources returns the IstioIngress specific Kubernetes resources
-func (iIConfig *IstioIngressConfig) GetResources() *corev1.ResourceRequirements {
-	if iIConfig.Resources != nil {
-		return iIConfig.Resources
-	}
-	return &corev1.ResourceRequirements{
-		Requests: corev1.ResourceList{
-			"cpu":    resource.MustParse(defaultIstioIngressRequestResourceCpu),
-			"memory": resource.MustParse(defaultIstioIngressRequestResourceMemory),
-		},
-		Limits: corev1.ResourceList{
-			"cpu":    resource.MustParse(defaultIstioIngressLimitResourceCpu),
-			"memory": resource.MustParse(defaultIstioIngressLimitResourceMemory),
-		},
-	}
-}
-
 // GetListenerName returns the prepared listener name
 func (lP *CommonListenerSpec) GetListenerServiceName() string {
 	if !strings.HasPrefix(lP.Name, "tcp-") {
 		return "tcp-" + lP.Name
 	}
 	return lP.Name
-}
-
-// GetReplicas returns replicas used by the Istio Ingress deployment
-func (iIConfig *IstioIngressConfig) GetReplicas() int32 {
-	if iIConfig.Replicas == 0 {
-		return defaultReplicas
-	}
-	return iIConfig.Replicas
 }
 
 // GetClientSSLCertSecretName returns the ClientSSLCertSecretName. It returns empty string if It's not specified
@@ -1151,12 +1074,12 @@ func (eConfig *EnvoyConfig) GetResources() *corev1.ResourceRequirements {
 	}
 	return &corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
-			"cpu":    resource.MustParse(defaultEnvoyRequestResourceCpu),
-			"memory": resource.MustParse(defaultEnvoyRequestResourceMemory),
+			corev1.ResourceCPU:    resource.MustParse(defaultEnvoyRequestResourceCpu),
+			corev1.ResourceMemory: resource.MustParse(defaultEnvoyRequestResourceMemory),
 		},
 		Limits: corev1.ResourceList{
-			"cpu":    resource.MustParse(defaultEnvoyLimitResourceCpu),
-			"memory": resource.MustParse(defaultEnvoyLimitResourceMemory),
+			corev1.ResourceCPU:    resource.MustParse(defaultEnvoyLimitResourceCpu),
+			corev1.ResourceMemory: resource.MustParse(defaultEnvoyLimitResourceMemory),
 		},
 	}
 }
@@ -1179,12 +1102,12 @@ func (cConfig *CruiseControlConfig) GetResources() *corev1.ResourceRequirements 
 	}
 	return &corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
-			"cpu":    resource.MustParse(defaultCruiseControlRequestResourceCpu),
-			"memory": resource.MustParse(defaultCruiseControlRequestResourceMemory),
+			corev1.ResourceCPU:    resource.MustParse(defaultCruiseControlRequestResourceCpu),
+			corev1.ResourceMemory: resource.MustParse(defaultCruiseControlRequestResourceMemory),
 		},
 		Limits: corev1.ResourceList{
-			"cpu":    resource.MustParse(defaultCruiseControlLimitResourceCpu),
-			"memory": resource.MustParse(defaultCruiseControlLimitResourceMemory),
+			corev1.ResourceCPU:    resource.MustParse(defaultCruiseControlLimitResourceCpu),
+			corev1.ResourceMemory: resource.MustParse(defaultCruiseControlLimitResourceMemory),
 		},
 	}
 }
@@ -1221,12 +1144,12 @@ func (bConfig *BrokerConfig) GetResources() *corev1.ResourceRequirements {
 	}
 	return &corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
-			"cpu":    resource.MustParse(defaultBrokerRequestResourceCpu),
-			"memory": resource.MustParse(defaultBrokerRequestResourceMemory),
+			corev1.ResourceCPU:    resource.MustParse(defaultBrokerRequestResourceCpu),
+			corev1.ResourceMemory: resource.MustParse(defaultBrokerRequestResourceMemory),
 		},
 		Limits: corev1.ResourceList{
-			"cpu":    resource.MustParse(defaultBrokerLimitResourceCpu),
-			"memory": resource.MustParse(defaultBrokerLimitResourceMemory),
+			corev1.ResourceCPU:    resource.MustParse(defaultBrokerLimitResourceCpu),
+			corev1.ResourceMemory: resource.MustParse(defaultBrokerLimitResourceMemory),
 		},
 	}
 }

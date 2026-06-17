@@ -3,6 +3,7 @@
 # topology.kubernetes.io/zone (e.g. config/samples/simplekafkacluster_affinity.yaml).
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
+name: kind-kafka
 nodes:
   - role: control-plane
     kubeadmConfigPatches:
@@ -32,9 +33,11 @@ nodes:
       nodeRegistration:
         kubeletExtraArgs:
           node-labels: "topology.kubernetes.io/zone=zone-c"
-containerdConfigPatches:
-- |-
-  [plugins."io.containerd.grpc.v1.cri".containerd]
-    snapshotter = "overlayfs"
-  [plugins."io.containerd.grpc.v1.cri".registry.mirrors."localhost:5000"]
-    endpoint = ["http://localhost:5000"]
+    extraPortMappings:
+    - containerPort: 80
+      hostPort: 80
+      listenAddress: "0.0.0.0"  
+    - containerPort: 443
+      hostPort: 443
+      listenAddress: "0.0.0.0"
+      

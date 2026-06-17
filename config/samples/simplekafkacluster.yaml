@@ -5,10 +5,11 @@ metadata:
     controller-tools.k8s.io: "1.0"
   name: kafka
 spec:
+  localDebugEnabled: true
   kRaft: false
   monitoringConfig:
     jmxImage: "ghcr.io/adobe/koperator/jmx-javaagent:1.4.0"
-  headlessServiceEnabled: true
+  headlessServiceEnabled: false
   zkAddresses:
     - "zookeeper-server-client.zookeeper:2181"
   propagateLabels: false

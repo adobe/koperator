@@ -8,7 +8,7 @@
 bin
 charts/**/charts
 charts/koperator/requirements.lock
-
+charts/kafka-operator/ingress
 # Test binary, build with `go test -c`
 *.test
 
@@ -47,3 +47,4 @@ manager_image_patch.yaml
 # the reasoning why we decided not to commit these.
 **/go.work
 **/go.work.sum
+.claude/worktrees/**

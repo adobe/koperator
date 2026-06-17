@@ -16,6 +16,7 @@
 package e2e
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -62,8 +63,9 @@ func (helmDescriptor *helmDescriptor) crdPath() (string, error) { //nolint:unuse
 		), nil
 	}
 
-	localCRDsBytes := []byte(helm.RenderTemplate(
+	localCRDsBytes := []byte(helm.RenderTemplateContext(
 		ginkgo.GinkgoT(),
+		context.Background(),
 		&helm.Options{
 			SetValues: helmDescriptor.LocalCRDTemplateRenderValues,
 		},
@@ -255,14 +257,15 @@ func (helmDescriptor *helmDescriptor) installHelmChart(kubectlOptions k8s.Kubect
 			fixedArguments = append([]string{"--repo", helmDescriptor.Repository}, fixedArguments...)
 		}
 
-		helm.Install(
+		helm.InstallContext(
 			ginkgo.GinkgoT(),
+			context.Background(),
 			&helm.Options{
 				SetValues:      helmDescriptor.SetValues,
 				KubectlOptions: &kubectlOptions,
 				Version:        helmDescriptor.ChartVersion,
 				ExtraArgs: map[string][]string{
-					"install": append(fixedArguments, helmDescriptor.HelmExtraArguments["install"]...),
+					installAction: append(fixedArguments, helmDescriptor.HelmExtraArguments[installAction]...),
 				},
 			},
 			helmChartNameOrLocalPath,
@@ -325,8 +328,9 @@ func (helmDescriptor *helmDescriptor) uninstallHelmChart(kubectlOptions k8s.Kube
 
 	purge := true
 
-	return helm.DeleteE(
+	return helm.DeleteContextE(
 		ginkgo.GinkgoT(),
+		context.Background(),
 		&helm.Options{
 			KubectlOptions: &kubectlOptions,
 			ExtraArgs: map[string][]string{
@@ -409,15 +413,16 @@ func listHelmReleases(kubectlOptions k8s.KubectlOptions) ([]*HelmRelease, error)
 	}
 
 	// Build command arguments
-	args := []string{"--output", "json"}
+	args := []string{outputFlag, "json"}
 
 	// Add --debug flag if verbose logging is enabled
 	if os.Getenv("E2E_VERBOSE_LOGGING") == verboseLoggingEnabled {
 		args = append(args, "--debug")
 	}
 
-	output, err := helm.RunHelmCommandAndGetOutputE(
+	output, err := helm.RunHelmCommandAndGetOutputContextE(
 		ginkgo.GinkgoT(),
+		context.Background(),
 		&helm.Options{
 			KubectlOptions: &kubectlOptions,
 		},

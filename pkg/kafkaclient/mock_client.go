@@ -28,6 +28,8 @@ import (
 
 const (
 	testTopicName = "test-topic"
+	// withErrorTopicName is a mock topic name that triggers error responses.
+	withErrorTopicName = "with-error"
 )
 
 type mockClusterAdmin struct {
@@ -143,10 +145,10 @@ func (m *mockClusterAdmin) DescribeTopics(topics []string) ([]*sarama.TopicMetad
 		}, nil
 	case "not-exists":
 		return []*sarama.TopicMetadata{}, nil
-	case "with-error":
+	case withErrorTopicName:
 		return []*sarama.TopicMetadata{
 			{
-				Name:       "with-error",
+				Name:       withErrorTopicName,
 				Partitions: []*sarama.PartitionMetadata{{}},
 				Err:        sarama.ErrUnknown,
 			},
@@ -221,6 +223,17 @@ func (m *mockClusterAdmin) CreateACL(resource sarama.Resource, acl sarama.Acl) e
 	return nil
 }
 
+func (m *mockClusterAdmin) CreateACLs(resourceACLs []*sarama.ResourceAcls) error {
+	for _, ra := range resourceACLs {
+		for _, acl := range ra.Acls {
+			if err := m.CreateACL(ra.Resource, *acl); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func (m *mockClusterAdmin) ListAcls(filter sarama.AclFilter) ([]sarama.ResourceAcls, error) {
 	m.Lock()
 	defer m.Unlock()
@@ -242,7 +255,7 @@ func (m *mockClusterAdmin) DeleteACL(filter sarama.AclFilter, validateOnly bool)
 	switch *filter.Principal {
 	case "test-user":
 		return []sarama.MatchingAcl{{}}, nil
-	case "with-error":
+	case withErrorTopicName:
 		return []sarama.MatchingAcl{{Err: sarama.ErrUnknown}}, nil
 	default:
 		// for mock it's enough to erase the whole map
@@ -253,6 +266,14 @@ func (m *mockClusterAdmin) DeleteACL(filter sarama.AclFilter, validateOnly bool)
 
 func (m *mockClusterAdmin) DescribeConfig(resource sarama.ConfigResource) ([]sarama.ConfigEntry, error) {
 	return []sarama.ConfigEntry{}, nil
+}
+
+func (m *mockClusterAdmin) DescribeConfigs(resources []*sarama.ConfigResource, _ sarama.DescribeConfigsOptions) ([]*sarama.ConfigResourceResult, error) {
+	results := make([]*sarama.ConfigResourceResult, len(resources))
+	for i := range resources {
+		results[i] = &sarama.ConfigResourceResult{}
+	}
+	return results, nil
 }
 
 func (m *mockClusterAdmin) Controller() (*sarama.Broker, error) {

@@ -93,24 +93,27 @@ var _ = Describe("KafkaClusterNodeportExternalAccess", Ordered, Serial, func() {
 		By("deleting Kafka cluster object " + kafkaCluster.Name + " in namespace " + namespace)
 		err := k8sClient.Delete(ctx, kafkaCluster)
 		Expect(err).NotTo(HaveOccurred())
-		// deletes all nodeports in the test namespace, to ensure a clean sheet, as garbage collection does not work in envtest
-		Expect(deleteNodePorts(ctx, kafkaCluster)).Should(Succeed())
 
-		// Wait for services to be fully deleted to prevent port conflicts
-		Eventually(func() int {
+		// Ensure all NodePort services in the test namespace are fully deleted before the
+		// next spec runs, to avoid host-port conflicts (NodePort ports are cluster-wide).
+		// Garbage collection does not run in envtest, so services owned by the KafkaCluster
+		// are never collected automatically. A single delete pass is also not enough: the
+		// test uses a cached client, and under load the cache can lag behind the API server,
+		// so one pass may miss services that have not yet propagated. Re-delete on every poll
+		// until no NodePort services remain.
+		Eventually(func(g Gomega) {
+			g.Expect(deleteNodePorts(ctx, kafkaCluster)).Should(Succeed())
+
 			var serviceList corev1.ServiceList
-			err := k8sClient.List(ctx, &serviceList, client.InNamespace(namespace))
-			if err != nil {
-				return -1
-			}
+			g.Expect(k8sClient.List(ctx, &serviceList, client.InNamespace(namespace))).Should(Succeed())
 			nodePortCount := 0
-			for _, service := range serviceList.Items {
-				if service.Spec.Type == corev1.ServiceTypeNodePort {
+			for i := range serviceList.Items {
+				if serviceList.Items[i].Spec.Type == corev1.ServiceTypeNodePort {
 					nodePortCount++
 				}
 			}
-			return nodePortCount
-		}, 60*time.Second, 100*time.Millisecond).Should(Equal(0), "NodePort services should be fully deleted")
+			g.Expect(nodePortCount).To(Equal(0), "NodePort services should be fully deleted")
+		}, 60*time.Second, 100*time.Millisecond).Should(Succeed())
 
 		kafkaCluster = nil
 	})

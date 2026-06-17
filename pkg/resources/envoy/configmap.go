@@ -55,6 +55,9 @@ import (
 	kafkautils "github.com/banzaicloud/koperator/pkg/util/kafka"
 )
 
+// bindAddressAny is the wildcard address Envoy listeners and clusters bind to.
+const bindAddressAny = "0.0.0.0"
+
 func (r *Reconciler) configMap(log logr.Logger, extListener v1beta1.ExternalListenerConfig,
 	ingressConfig v1beta1.IngressConfig, ingressConfigName, defaultIngressConfigName string) runtime.Object {
 	eListenerLabelName := util.ConstructEListenerLabelName(ingressConfigName, extListener.Name)
@@ -195,7 +198,7 @@ func generateEnvoyHealthCheckListener(ingressConfig v1beta1.IngressConfig, log l
 		Address: &envoycore.Address{
 			Address: &envoycore.Address_SocketAddress{
 				SocketAddress: &envoycore.SocketAddress{
-					Address: "0.0.0.0",
+					Address: bindAddressAny,
 					PortSpecifier: &envoycore.SocketAddress_PortValue{
 						PortValue: uint32(ingressConfig.EnvoyConfig.GetEnvoyHealthCheckPort()),
 					},
@@ -307,7 +310,7 @@ func GenerateEnvoyConfig(kc *v1beta1.KafkaCluster, elistener v1beta1.ExternalLis
 		Address: &envoycore.Address{
 			Address: &envoycore.Address_SocketAddress{
 				SocketAddress: &envoycore.SocketAddress{
-					Address: "0.0.0.0",
+					Address: bindAddressAny,
 					PortSpecifier: &envoycore.SocketAddress_PortValue{
 						PortValue: uint32(ingressConfig.EnvoyConfig.GetEnvoyAdminPort()),
 					},
@@ -469,7 +472,7 @@ func GenerateEnvoyConfig(kc *v1beta1.KafkaCluster, elistener v1beta1.ExternalLis
 			Address: &envoycore.Address{
 				Address: &envoycore.Address_SocketAddress{
 					SocketAddress: &envoycore.SocketAddress{
-						Address: "0.0.0.0",
+						Address: bindAddressAny,
 						PortSpecifier: &envoycore.SocketAddress_PortValue{
 							PortValue: uint32(p),
 						},

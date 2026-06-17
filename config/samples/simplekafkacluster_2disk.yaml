@@ -19,6 +19,8 @@ spec:
     cruise.control.metrics.topic.auto.create=true
     cruise.control.metrics.topic.num.partitions=1
     cruise.control.metrics.topic.replication.factor=2
+    # e2e: publish CruiseControl metrics every 15s (default 60s) so CC warms up quickly for the disk-removal test
+    cruise.control.metrics.reporter.metrics.reporting.interval.ms=15000
   brokerConfigGroups:
     default:
       # podSecurityContext:
@@ -96,7 +98,9 @@ spec:
       # Configuration for the metadata client.
       # =======================================
       # The maximum interval in milliseconds between two metadata refreshes.
-      #metadata.max.age.ms=300000
+      # Must be <= metric.sampling.interval.ms (CruiseControl sanityCheckSamplingPeriod);
+      # kept low here so the fast e2e sampling interval (15s) is allowed.
+      metadata.max.age.ms=10000
       # Client id for the Cruise Control. It is used for the metadata client.
       #client.id=kafka-cruise-control
       # The size of TCP send buffer bytes for the metadata client.
@@ -130,18 +134,24 @@ spec:
       # The partition assignor class for the metric samplers
       metric.sampler.partition.assignor.class=com.linkedin.kafka.cruisecontrol.monitor.sampling.DefaultMetricSamplerPartitionAssignor
       # The metric sampling interval in milliseconds
-      metric.sampling.interval.ms=120000
+      # NOTE: the metrics sampling interval and window sizes below are tuned low for fast
+      # Cruise Control warmup in e2e (tiny test data); not production-appropriate defaults.
+      metric.sampling.interval.ms=15000
+      # CruiseControl reads the reporter interval from its own config (default 60000) for its
+      # sanity check and requires it <= the sampling interval, so declare it here too
+      # (mirrors the broker-side value in readOnlyConfig).
+      cruise.control.metrics.reporter.metrics.reporting.interval.ms=15000
       metric.anomaly.detection.interval.ms=180000
       # The partition metrics window size in milliseconds
-      partition.metrics.window.ms=300000
+      partition.metrics.window.ms=30000
       # The number of partition metric windows to keep in memory
       num.partition.metrics.windows=1
       # The minimum partition metric samples required for a partition in each window
       min.samples.per.partition.metrics.window=1
       # The broker metrics window size in milliseconds
-      broker.metrics.window.ms=300000
+      broker.metrics.window.ms=30000
       # The number of broker metric windows to keep in memory
-      num.broker.metrics.windows=20
+      num.broker.metrics.windows=5
       # The minimum broker metric samples required for a partition in each window
       min.samples.per.broker.metrics.window=1
       # The configuration for the BrokerCapacityConfigFileResolver (supports JBOD and non-JBOD broker capacities)

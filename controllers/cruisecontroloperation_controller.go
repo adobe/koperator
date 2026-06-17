@@ -580,11 +580,11 @@ func (r *CruiseControlOperationReconciler) getStatus(
 			return scale.CruiseControlStatus{}, errors.WrapIfWithDetails(err, "could not create a new Status CruiseControlOperation")
 		}
 		if err = updateResult(log, res.TaskResult, operation, true); err != nil {
-			return scale.CruiseControlStatus{}, errors.WrapIfWithDetails(err, "could not update the state of Status CruiseControlOperation", "name", statusOperation.GetName(), "namespace", statusOperation.GetNamespace())
+			return scale.CruiseControlStatus{}, errors.WrapIfWithDetails(err, "could not update the state of Status CruiseControlOperation", "name", operation.GetName(), "namespace", operation.GetNamespace())
 		}
 		err = r.Status().Update(ctx, operation)
 		if err != nil {
-			return scale.CruiseControlStatus{}, errors.WrapIfWithDetails(err, "could not update the state of Status CruiseControlOperation", "name", statusOperation.GetName(), "namespace", statusOperation.GetNamespace())
+			return scale.CruiseControlStatus{}, errors.WrapIfWithDetails(err, "could not update the state of Status CruiseControlOperation", "name", operation.GetName(), "namespace", operation.GetNamespace())
 		}
 
 		return scale.CruiseControlStatus{}, errors.New("could not get Cruise Control status, the operation is still in progress")

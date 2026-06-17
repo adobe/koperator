@@ -18,10 +18,10 @@ RELEASE_MSG ?= "koperator release"
 REL_TAG = $(shell ./scripts/increment_version.sh -${RELEASE_TYPE} ${TAG})
 
 # Version constants
-GOLANGCI_VERSION = 2.11.4 # renovate: datasource=github-releases depName=golangci/golangci-lint
+GOLANGCI_VERSION = 2.12.2 # renovate: datasource=github-releases depName=golangci/golangci-lint
 LICENSEI_VERSION = 0.9.0 # renovate: datasource=github-releases depName=goph/licensei
-CONTROLLER_GEN_VERSION = v0.20.1 # renovate: datasource=github-releases depName=kubernetes-sigs/controller-tools
-ENVTEST_K8S_VERSION = 1.35.0 # renovate: datasource=github-releases depName=kubernetes-sigs/controller-tools extractVersion=^envtest-v(?<version>.+)$
+CONTROLLER_GEN_VERSION = v0.21.0 # renovate: datasource=github-releases depName=kubernetes-sigs/controller-tools
+ENVTEST_K8S_VERSION = 1.36.0 # renovate: datasource=github-releases depName=kubernetes-sigs/controller-tools extractVersion=^envtest-v(?<version>.+)$
 SETUP_ENVTEST_VERSION := latest
 ADDLICENSE_VERSION := 1.2.0 # renovate: datasource=github-releases depName=google/addlicense
 GOTEMPLATE_VERSION := 3.12.0 # renovate: datasource=github-releases depName=cznic/gotemplate
@@ -94,7 +94,7 @@ bin/golangci-lint: bin/golangci-lint-${GOLANGCI_VERSION} ## Symlink golangi-lint
 	@ln -sf golangci-lint-${GOLANGCI_VERSION} bin/golangci-lint
 bin/golangci-lint-${GOLANGCI_VERSION}: ## Download versioned golangci-lint.
 	@mkdir -p bin
-	curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | bash -s -- -b ./bin v${GOLANGCI_VERSION}
+	GOBIN=$(PWD)/bin go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v${GOLANGCI_VERSION}
 	@mv bin/golangci-lint $@
 
 .PHONY: lint
@@ -122,6 +122,13 @@ bin/licensei-${LICENSEI_VERSION}: ## Download versioned licensei.
 	@mkdir -p bin
 	curl -sfL https://raw.githubusercontent.com/goph/licensei/master/install.sh | bash -s v${LICENSEI_VERSION}
 	@mv bin/licensei $@
+
+.PHONY: license-vendor
+license-vendor: ## Vendor each module's deps so licensei resolves licenses from local files (handles vanity import paths, e.g. dario.cat/mergo).
+	@for dir in $(LICENSE_CHECK_DIRS); do \
+		echo "Vendoring dependencies in $$dir..."; \
+		(cd $$dir && go mod vendor) || exit 1; \
+	done
 
 .PHONY: license-check
 license-check: bin/licensei ## Run license check.
@@ -313,6 +320,10 @@ define update-module-deps
 	for m in $$(go list -mod=readonly -m -f '{{ if and (not .Replace) (not .Indirect) (not .Main)}}{{.Path}}{{end}}' all); do \
 		go get -u $$m; \
 	done; \
+	if go list -m k8s.io/api >/dev/null 2>&1 && go list -m k8s.io/kubectl >/dev/null 2>&1; then \
+		api_ver="$$(go list -m -f '{{.Version}}' k8s.io/api)"; \
+		go get k8s.io/kubectl@"$$api_ver" k8s.io/cli-runtime@"$$api_ver"; \
+	fi; \
 	go mod tidy
 endef
 
@@ -335,7 +346,7 @@ update-go-deps: ## Update Go modules dependencies.
 
 tidy: ## Run go mod tidy in all Go modules.
 	@echo "Finding all directories with go.mod files..."
-	@for gomod in $$(find . -name "go.mod" | sort); do \
+	@for gomod in $$(find . -name "go.mod" -not -path './.claude/*' | sort); do \
 		dir=$$(dirname $$gomod); \
 		( \
 		echo "Running go mod tidy in $$dir"; \
