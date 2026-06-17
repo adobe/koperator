@@ -1365,13 +1365,13 @@ func TestReconcileKafkaPvcTieredCacheResize(t *testing.T) {
 				Name:      name,
 				Namespace: namespace,
 				Labels: map[string]string{
-					v1beta1.BrokerIdLabelKey: brokerId,
-					v1beta1.AppLabelKey:      "kafka",
-					v1beta1.KafkaCRLabelKey:  clusterName,
+					v1beta1.BrokerIdLabelKey:           brokerId,
+					v1beta1.AppLabelKey:                "kafka",
+					v1beta1.KafkaCRLabelKey:            clusterName,
+					v1beta1.TieredStorageCacheLabelKey: "true",
 				},
 				Annotations: map[string]string{
-					"mountPath":                             mountPath,
-					v1beta1.TieredStorageCacheAnnotationKey: "true",
+					"mountPath": mountPath,
 				},
 			},
 			Spec: corev1.PersistentVolumeClaimSpec{

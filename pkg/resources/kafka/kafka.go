@@ -1335,7 +1335,7 @@ func (r *Reconciler) isBrokerPVCTieredCache(pvc *corev1.PersistentVolumeClaim, b
 	if state := r.KafkaCluster.Status.BrokersState[brokerId].TieredCacheVolumes[mountPath]; state != "" {
 		return true
 	}
-	return pvc.Annotations[banzaiv1beta1.TieredStorageCacheAnnotationKey] == configValueTrue
+	return pvc.Labels[banzaiv1beta1.TieredStorageCacheLabelKey] == configValueTrue
 }
 
 // deleteRemovedCachePVCs deletes tiered storage cache PVCs whose mount path is no longer desired
@@ -1636,7 +1636,7 @@ func (r *Reconciler) reconcileDesiredPvcsForBroker(
 				return errorfactory.New(errorfactory.APIFailure{}, err, "creating resource failed", "kind", desiredType)
 			}
 			log.Info("resource created")
-			if desiredPvc.Annotations[banzaiv1beta1.TieredStorageCacheAnnotationKey] == configValueTrue {
+			if desiredPvc.Labels[banzaiv1beta1.TieredStorageCacheLabelKey] == configValueTrue {
 				if err := k8sutil.UpdateBrokerStatus(r.Client, []string{brokerId}, r.KafkaCluster,
 					map[string]banzaiv1beta1.TieredCacheVolumeState{mountPath: banzaiv1beta1.TieredCacheVolumeActive}, log); err != nil {
 					return errorfactory.New(errorfactory.StatusUpdateError{}, err,
@@ -1729,7 +1729,7 @@ func (r *Reconciler) reconcileDesiredPvcsForBroker(
 			// Only write Active when this is a genuinely new PVC. If pending-deletion is already
 			// set (crash-recovery: prior Create timed out), preserve the in-flight state so
 			// handleBrokerCacheResizeCleanup can still delete the old PVC on the next cycle.
-			if desiredPvc.Annotations[banzaiv1beta1.TieredStorageCacheAnnotationKey] == configValueTrue &&
+			if desiredPvc.Labels[banzaiv1beta1.TieredStorageCacheLabelKey] == configValueTrue &&
 				r.KafkaCluster.Status.BrokersState[brokerId].TieredCacheVolumes[mountPath] != banzaiv1beta1.TieredCacheVolumePendingDeletion {
 				if err := k8sutil.UpdateBrokerStatus(r.Client, []string{brokerId}, r.KafkaCluster,
 					map[string]banzaiv1beta1.TieredCacheVolumeState{mountPath: banzaiv1beta1.TieredCacheVolumeActive}, log); err != nil {

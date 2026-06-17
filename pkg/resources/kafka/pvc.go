@@ -64,9 +64,9 @@ func (r *Reconciler) pvc(brokerId int32, storageIndex int, storage v1beta1.Stora
 
 	annotations := map[string]string{mountPathAnnotationKey: storage.MountPath}
 
-	// Mark tiered storage cache PVCs with annotation for special handling
+	extraLabels := map[string]string{v1beta1.BrokerIdLabelKey: fmt.Sprintf("%d", brokerId)}
 	if storage.TieredStorageCache {
-		annotations[v1beta1.TieredStorageCacheAnnotationKey] = configValueTrue
+		extraLabels[v1beta1.TieredStorageCacheLabelKey] = configValueTrue
 	}
 
 	return &corev1.PersistentVolumeClaim{
@@ -74,7 +74,7 @@ func (r *Reconciler) pvc(brokerId int32, storageIndex int, storage v1beta1.Stora
 			fmt.Sprintf(brokerStorageTemplate, r.KafkaCluster.Name, brokerId, storageIndex),
 			apiutil.MergeLabels(
 				apiutil.LabelsForKafka(r.KafkaCluster.Name),
-				map[string]string{v1beta1.BrokerIdLabelKey: fmt.Sprintf("%d", brokerId)},
+				extraLabels,
 			),
 			annotations, r.KafkaCluster),
 		Spec: pvcSpec,
