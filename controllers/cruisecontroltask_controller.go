@@ -172,10 +172,8 @@ func (r *CruiseControlTaskReconciler) Reconcile(ctx context.Context, request ctr
 		}
 	case tasksAndStates.NumActiveTasksByOp(banzaiv1alpha1.OperationRemoveBroker) > 0:
 		brokerIDs := make([]string, 0)
+		// gather brokers that are marked for removal as a result of downscale operation
 		for _, task := range tasksAndStates.GetActiveTasksByOp(banzaiv1alpha1.OperationRemoveBroker) {
-			if task == nil {
-				continue
-			}
 			brokerIDs = append(brokerIDs, task.BrokerID)
 		}
 
@@ -184,10 +182,8 @@ func (r *CruiseControlTaskReconciler) Reconcile(ctx context.Context, request ctr
 			return requeueWithError(log, fmt.Sprintf("creating CruiseControlOperation for downscale has failed, brokerIDs: %s", brokerIDs), err)
 		}
 
+		// map the CC broker removal operation with each broker status
 		for _, task := range tasksAndStates.GetActiveTasksByOp(banzaiv1alpha1.OperationRemoveBroker) {
-			if task == nil {
-				continue
-			}
 			task.SetCruiseControlOperationRef(cruiseControlOpRef)
 			task.SetStateScheduled()
 		}

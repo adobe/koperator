@@ -17,6 +17,7 @@ package util
 
 import (
 	"reflect"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -839,7 +840,7 @@ func TestShouldIncludeBroker(t *testing.T) {
 	makeStatus := func(state v1beta1.CruiseControlState) v1beta1.KafkaClusterStatus {
 		return v1beta1.KafkaClusterStatus{
 			BrokersState: map[string]v1beta1.BrokerState{
-				"5": {
+				strconv.Itoa(brokerID): {
 					GracefulActionState: v1beta1.GracefulActionState{
 						CruiseControlState: state,
 					},
@@ -884,7 +885,7 @@ func TestShouldIncludeBroker(t *testing.T) {
 	t.Run("ingress config not in ExternalListenerConfigNames", func(t *testing.T) {
 		status := v1beta1.KafkaClusterStatus{
 			BrokersState: map[string]v1beta1.BrokerState{
-				"5": {
+				strconv.Itoa(brokerID): {
 					GracefulActionState: v1beta1.GracefulActionState{
 						CruiseControlState: v1beta1.GracefulDownscaleRunning,
 					},
