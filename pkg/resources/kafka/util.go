@@ -174,9 +174,8 @@ func syncNodeAffinities(desiredPod, currentPod *corev1.Pod) {
 	// Filter preferred node affinities with "scaleops.sh/node-packing=true" selector
 	var admissionWebhookPreferredTerms []corev1.PreferredSchedulingTerm
 	if currentNodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution != nil {
-		for _, term := range currentNodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution {
-			admissionWebhookPreferredTerms = append(admissionWebhookPreferredTerms, term)
-		}
+		admissionWebhookPreferredTerms = append(admissionWebhookPreferredTerms,
+			currentNodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution...)
 	}
 
 	// If we found any scale ops node affinities, add them to the desired pod
