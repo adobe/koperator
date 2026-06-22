@@ -47,13 +47,19 @@ func TestReconciler_pvc(t *testing.T) {
 		},
 	}
 
+	brokerConfig := &v1beta1.BrokerConfig{}
+
 	testCases := []struct {
 		testName                      string
+		brokerConfig                  *v1beta1.BrokerConfig
+		kRaftMode                     bool
 		storageConfig                 v1beta1.StorageConfig
 		expectedPersistentVolumeClaim *corev1.PersistentVolumeClaim
 	}{
 		{
-			testName: "storage config with no template",
+			testName:     "storage config with no template",
+			brokerConfig: brokerConfig,
+			kRaftMode:    false,
 			storageConfig: v1beta1.StorageConfig{
 				MountPath: "/kafka-logs-1",
 				PvcSpec: &corev1.PersistentVolumeClaimSpec{
@@ -71,6 +77,7 @@ func TestReconciler_pvc(t *testing.T) {
 						v1beta1.AppLabelKey:      "kafka",
 						v1beta1.KafkaCRLabelKey:  kafkaCluster.GetName(),
 						v1beta1.BrokerIdLabelKey: "2",
+						v1beta1.PvcRolesKey:      "broker",
 					},
 					Annotations: map[string]string{
 						"mountPath": "/kafka-logs-1",
@@ -84,7 +91,9 @@ func TestReconciler_pvc(t *testing.T) {
 			},
 		},
 		{
-			testName: "storage config with template",
+			testName:     "storage config with template",
+			brokerConfig: brokerConfig,
+			kRaftMode:    false,
 			storageConfig: v1beta1.StorageConfig{
 				MountPath: "/kafka-logs-1",
 				PvcSpec: &corev1.PersistentVolumeClaimSpec{
@@ -108,6 +117,7 @@ func TestReconciler_pvc(t *testing.T) {
 						v1beta1.AppLabelKey:      "kafka",
 						v1beta1.KafkaCRLabelKey:  kafkaCluster.GetName(),
 						v1beta1.BrokerIdLabelKey: "2",
+						v1beta1.PvcRolesKey:      "broker",
 					},
 					Annotations: map[string]string{
 						"mountPath": "/kafka-logs-1",
@@ -125,7 +135,9 @@ func TestReconciler_pvc(t *testing.T) {
 			},
 		},
 		{
-			testName: "storage config with template and very long mount path",
+			testName:     "storage config with template and very long mount path",
+			brokerConfig: brokerConfig,
+			kRaftMode:    false,
 			storageConfig: v1beta1.StorageConfig{
 				MountPath: "/mountpath/that/exceeds63characters/kafka-logs-123456789123456789",
 				PvcSpec: &corev1.PersistentVolumeClaimSpec{
@@ -147,6 +159,7 @@ func TestReconciler_pvc(t *testing.T) {
 						v1beta1.AppLabelKey:      "kafka",
 						v1beta1.KafkaCRLabelKey:  kafkaCluster.GetName(),
 						v1beta1.BrokerIdLabelKey: "2",
+						v1beta1.PvcRolesKey:      "broker",
 					},
 					Annotations: map[string]string{
 						"mountPath": "/mountpath/that/exceeds63characters/kafka-logs-123456789123456789",
@@ -164,7 +177,9 @@ func TestReconciler_pvc(t *testing.T) {
 			},
 		},
 		{
-			testName: "storage config with volume name template",
+			testName:     "storage config with volume name template",
+			brokerConfig: brokerConfig,
+			kRaftMode:    false,
 			storageConfig: v1beta1.StorageConfig{
 				MountPath: "/kafka-logs-1",
 				PvcSpec: &corev1.PersistentVolumeClaimSpec{
@@ -180,6 +195,7 @@ func TestReconciler_pvc(t *testing.T) {
 						v1beta1.AppLabelKey:      "kafka",
 						v1beta1.KafkaCRLabelKey:  kafkaCluster.GetName(),
 						v1beta1.BrokerIdLabelKey: "2",
+						v1beta1.PvcRolesKey:      "broker",
 					},
 					Annotations: map[string]string{
 						"mountPath": "/kafka-logs-1",
@@ -190,6 +206,84 @@ func TestReconciler_pvc(t *testing.T) {
 				},
 			},
 		},
+		{
+			testName:     "kraft controller-only node",
+			brokerConfig: &v1beta1.BrokerConfig{Roles: []string{v1beta1.ControllerNodeProcessRole}},
+			kRaftMode:    true,
+			storageConfig: v1beta1.StorageConfig{
+				MountPath: "/kafka-logs-1",
+				PvcSpec:   &corev1.PersistentVolumeClaimSpec{},
+			},
+			expectedPersistentVolumeClaim: &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:    kafkaCluster.GetNamespace(),
+					Name:         "",
+					GenerateName: fmt.Sprintf("%s-2-storage-1-", kafkaCluster.GetName()),
+					Labels: map[string]string{
+						v1beta1.AppLabelKey:      "kafka",
+						v1beta1.KafkaCRLabelKey:  kafkaCluster.GetName(),
+						v1beta1.BrokerIdLabelKey: "2",
+						v1beta1.PvcRolesKey:      "controller",
+					},
+					Annotations: map[string]string{
+						"mountPath": "/kafka-logs-1",
+					},
+				},
+				Spec: corev1.PersistentVolumeClaimSpec{},
+			},
+		},
+		{
+			testName:     "kraft broker-only node",
+			brokerConfig: &v1beta1.BrokerConfig{Roles: []string{v1beta1.BrokerNodeProcessRole}},
+			kRaftMode:    true,
+			storageConfig: v1beta1.StorageConfig{
+				MountPath: "/kafka-logs-1",
+				PvcSpec:   &corev1.PersistentVolumeClaimSpec{},
+			},
+			expectedPersistentVolumeClaim: &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:    kafkaCluster.GetNamespace(),
+					Name:         "",
+					GenerateName: fmt.Sprintf("%s-2-storage-1-", kafkaCluster.GetName()),
+					Labels: map[string]string{
+						v1beta1.AppLabelKey:      "kafka",
+						v1beta1.KafkaCRLabelKey:  kafkaCluster.GetName(),
+						v1beta1.BrokerIdLabelKey: "2",
+						v1beta1.PvcRolesKey:      "broker",
+					},
+					Annotations: map[string]string{
+						"mountPath": "/kafka-logs-1",
+					},
+				},
+				Spec: corev1.PersistentVolumeClaimSpec{},
+			},
+		},
+		{
+			testName:     "kraft combined broker+controller node",
+			brokerConfig: &v1beta1.BrokerConfig{Roles: []string{v1beta1.BrokerNodeProcessRole, v1beta1.ControllerNodeProcessRole}},
+			kRaftMode:    true,
+			storageConfig: v1beta1.StorageConfig{
+				MountPath: "/kafka-logs-1",
+				PvcSpec:   &corev1.PersistentVolumeClaimSpec{},
+			},
+			expectedPersistentVolumeClaim: &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:    kafkaCluster.GetNamespace(),
+					Name:         "",
+					GenerateName: fmt.Sprintf("%s-2-storage-1-", kafkaCluster.GetName()),
+					Labels: map[string]string{
+						v1beta1.AppLabelKey:      "kafka",
+						v1beta1.KafkaCRLabelKey:  kafkaCluster.GetName(),
+						v1beta1.BrokerIdLabelKey: "2",
+						v1beta1.PvcRolesKey:      "broker_controller",
+					},
+					Annotations: map[string]string{
+						"mountPath": "/kafka-logs-1",
+					},
+				},
+				Spec: corev1.PersistentVolumeClaimSpec{},
+			},
+		},
 	}
 
 	t.Parallel()
@@ -198,7 +292,7 @@ func TestReconciler_pvc(t *testing.T) {
 		test := test
 
 		t.Run(test.testName, func(t *testing.T) {
-			pvc, err := r.pvc(2, 1, test.storageConfig)
+			pvc, err := r.pvc(2, 1, test.storageConfig, test.brokerConfig, test.kRaftMode)
 
 			assert.NilError(t, err, "PVC creation should succeed")
 
