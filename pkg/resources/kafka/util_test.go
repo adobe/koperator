@@ -407,7 +407,7 @@ func TestGenerateQuorumVoters(t *testing.T) {
 	}
 }
 
-func TestSyncScaleOpsPodAffinities(t *testing.T) {
+func TestSyncPodAffinities(t *testing.T) {
 	tests := []struct {
 		name                string
 		currentPod          *corev1.Pod
@@ -444,7 +444,7 @@ func TestSyncScaleOpsPodAffinities(t *testing.T) {
 			expectedTermCount:   0,
 		},
 		{
-			name: "pod affinity with scaleops managed-unevictable in MatchLabels",
+			name: "pod affinity is Current Pod, should be included in desired pod",
 			currentPod: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-pod"},
 				Spec: corev1.PodSpec{
@@ -456,84 +456,7 @@ func TestSyncScaleOpsPodAffinities(t *testing.T) {
 									PodAffinityTerm: corev1.PodAffinityTerm{
 										LabelSelector: &metav1.LabelSelector{
 											MatchLabels: map[string]string{
-												scaleOpsManagedUnevictableLabel: "true",
-											},
-										},
-										TopologyKey: "kubernetes.io/hostname",
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			desiredPod: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "test-pod"},
-				Spec:       corev1.PodSpec{},
-			},
-			expectedPodAffinity: true,
-			expectedTermCount:   1,
-		},
-		{
-			name: "pod affinity with scaleops managed-unevictable in MatchExpressions",
-			currentPod: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "test-pod"},
-				Spec: corev1.PodSpec{
-					Affinity: &corev1.Affinity{
-						PodAffinity: &corev1.PodAffinity{
-							PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
-								{
-									Weight: 50,
-									PodAffinityTerm: corev1.PodAffinityTerm{
-										LabelSelector: &metav1.LabelSelector{
-											MatchExpressions: []metav1.LabelSelectorRequirement{
-												{
-													Key:      scaleOpsManagedUnevictableLabel,
-													Operator: metav1.LabelSelectorOpIn,
-													Values:   []string{"true"},
-												},
-											},
-										},
-										TopologyKey: "kubernetes.io/hostname",
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			desiredPod: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "test-pod"},
-				Spec:       corev1.PodSpec{},
-			},
-			expectedPodAffinity: true,
-			expectedTermCount:   1,
-		},
-		{
-			name: "pod affinity with mixed terms, only scaleops managed-unevictable should be synced",
-			currentPod: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "test-pod"},
-				Spec: corev1.PodSpec{
-					Affinity: &corev1.Affinity{
-						PodAffinity: &corev1.PodAffinity{
-							PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
-								{
-									Weight: 100,
-									PodAffinityTerm: corev1.PodAffinityTerm{
-										LabelSelector: &metav1.LabelSelector{
-											MatchLabels: map[string]string{
-												"app": "other",
-											},
-										},
-										TopologyKey: "kubernetes.io/hostname",
-									},
-								},
-								{
-									Weight: 50,
-									PodAffinityTerm: corev1.PodAffinityTerm{
-										LabelSelector: &metav1.LabelSelector{
-											MatchLabels: map[string]string{
-												scaleOpsManagedUnevictableLabel: "true",
+												"app": "myapp",
 											},
 										},
 										TopologyKey: "kubernetes.io/hostname",
@@ -564,7 +487,7 @@ func TestSyncScaleOpsPodAffinities(t *testing.T) {
 									PodAffinityTerm: corev1.PodAffinityTerm{
 										LabelSelector: &metav1.LabelSelector{
 											MatchLabels: map[string]string{
-												scaleOpsManagedUnevictableLabel: "true",
+												"app": "myapp-new",
 											},
 										},
 										TopologyKey: "kubernetes.io/hostname",
@@ -604,7 +527,7 @@ func TestSyncScaleOpsPodAffinities(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			syncScaleOpsPodAffinities(tt.desiredPod, tt.currentPod)
+			syncPodAffinities(tt.desiredPod, tt.currentPod)
 
 			if !tt.expectedPodAffinity {
 				if tt.desiredPod.Spec.Affinity != nil && tt.desiredPod.Spec.Affinity.PodAffinity != nil {
@@ -626,7 +549,7 @@ func TestSyncScaleOpsPodAffinities(t *testing.T) {
 	}
 }
 
-func TestSyncScaleOpsNodeAffinities(t *testing.T) {
+func TestSyncNodeAffinities(t *testing.T) {
 	tests := []struct {
 		name                 string
 		currentPod           *corev1.Pod
@@ -663,7 +586,7 @@ func TestSyncScaleOpsNodeAffinities(t *testing.T) {
 			expectedTermCount:    0,
 		},
 		{
-			name: "node affinity with scaleops node-packing in MatchExpressions",
+			name: "node affinity with admissionWebhoooklabel in MatchExpressions",
 			currentPod: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-pod"},
 				Spec: corev1.PodSpec{
@@ -675,7 +598,7 @@ func TestSyncScaleOpsNodeAffinities(t *testing.T) {
 									Preference: corev1.NodeSelectorTerm{
 										MatchExpressions: []corev1.NodeSelectorRequirement{
 											{
-												Key:      scaleOpsNodePackingLabel,
+												Key:      "admissionWebhookLabel",
 												Operator: corev1.NodeSelectorOpIn,
 												Values:   []string{"true"},
 											},
@@ -695,7 +618,7 @@ func TestSyncScaleOpsNodeAffinities(t *testing.T) {
 			expectedTermCount:    1,
 		},
 		{
-			name: "node affinity with scaleops node-packing in MatchFields",
+			name: "node affinity with admissionWebhook label in MatchFields",
 			currentPod: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-pod"},
 				Spec: corev1.PodSpec{
@@ -707,7 +630,7 @@ func TestSyncScaleOpsNodeAffinities(t *testing.T) {
 									Preference: corev1.NodeSelectorTerm{
 										MatchFields: []corev1.NodeSelectorRequirement{
 											{
-												Key:      scaleOpsNodePackingLabel,
+												Key:      "admissionWebhookLabel",
 												Operator: corev1.NodeSelectorOpIn,
 												Values:   []string{"true"},
 											},
@@ -727,7 +650,7 @@ func TestSyncScaleOpsNodeAffinities(t *testing.T) {
 			expectedTermCount:    1,
 		},
 		{
-			name: "node affinity with mixed terms, only scaleops node-packing should be synced",
+			name: "node affinity with multiple Preferred Affinities",
 			currentPod: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-pod"},
 				Spec: corev1.PodSpec{
@@ -751,7 +674,7 @@ func TestSyncScaleOpsNodeAffinities(t *testing.T) {
 									Preference: corev1.NodeSelectorTerm{
 										MatchExpressions: []corev1.NodeSelectorRequirement{
 											{
-												Key:      scaleOpsNodePackingLabel,
+												Key:      "scaleOpsNodePackingLabel",
 												Operator: corev1.NodeSelectorOpIn,
 												Values:   []string{"true"},
 											},
@@ -768,10 +691,10 @@ func TestSyncScaleOpsNodeAffinities(t *testing.T) {
 				Spec:       corev1.PodSpec{},
 			},
 			expectedNodeAffinity: true,
-			expectedTermCount:    1,
+			expectedTermCount:    2,
 		},
 		{
-			name: "desired pod already has node affinity, scaleops affinity should be merged",
+			name: "desired pod already has node affinity, AdmissionWebhook affinity should be merged",
 			currentPod: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-pod"},
 				Spec: corev1.PodSpec{
@@ -783,7 +706,7 @@ func TestSyncScaleOpsNodeAffinities(t *testing.T) {
 									Preference: corev1.NodeSelectorTerm{
 										MatchExpressions: []corev1.NodeSelectorRequirement{
 											{
-												Key:      scaleOpsNodePackingLabel,
+												Key:      "scaleOpsNodePackingLabel",
 												Operator: corev1.NodeSelectorOpIn,
 												Values:   []string{"true"},
 											},
@@ -825,7 +748,7 @@ func TestSyncScaleOpsNodeAffinities(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			syncScaleOpsNodeAffinities(tt.desiredPod, tt.currentPod)
+			syncNodeAffinities(tt.desiredPod, tt.currentPod)
 
 			if !tt.expectedNodeAffinity {
 				if tt.desiredPod.Spec.Affinity != nil && tt.desiredPod.Spec.Affinity.NodeAffinity != nil {
@@ -1142,7 +1065,7 @@ func TestSyncResourceRequests(t *testing.T) {
 	}
 }
 
-func TestSyncScaleOpsAffinities(t *testing.T) {
+func TestSyncAffinities(t *testing.T) {
 	tests := []struct {
 		name               string
 		currentPod         *corev1.Pod
@@ -1164,7 +1087,7 @@ func TestSyncScaleOpsAffinities(t *testing.T) {
 			expectNodeAffinity: false,
 		},
 		{
-			name: "both pod and node affinities with scaleops labels",
+			name: "both pod and node affinities in current pod",
 			currentPod: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-pod"},
 				Spec: corev1.PodSpec{
@@ -1176,7 +1099,7 @@ func TestSyncScaleOpsAffinities(t *testing.T) {
 									PodAffinityTerm: corev1.PodAffinityTerm{
 										LabelSelector: &metav1.LabelSelector{
 											MatchLabels: map[string]string{
-												scaleOpsManagedUnevictableLabel: "true",
+												"scaleOpsManagedUnevictableLabel": "true",
 											},
 										},
 										TopologyKey: "kubernetes.io/hostname",
@@ -1191,7 +1114,7 @@ func TestSyncScaleOpsAffinities(t *testing.T) {
 									Preference: corev1.NodeSelectorTerm{
 										MatchExpressions: []corev1.NodeSelectorRequirement{
 											{
-												Key:      scaleOpsNodePackingLabel,
+												Key:      "scaleOpsNodePackingLabel",
 												Operator: corev1.NodeSelectorOpIn,
 												Values:   []string{"true"},
 											},
@@ -1214,7 +1137,7 @@ func TestSyncScaleOpsAffinities(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			syncScaleOpsAffinities(tt.desiredPod, tt.currentPod)
+			syncAffinities(tt.desiredPod, tt.currentPod)
 
 			if tt.expectPodAffinity {
 				if tt.desiredPod.Spec.Affinity == nil || tt.desiredPod.Spec.Affinity.PodAffinity == nil {

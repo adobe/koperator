@@ -6,6 +6,7 @@ metadata:
   name: kafka
 spec:
   localDebugEnabled: true
+  admissionHooksEnabled: true
   kRaft: false
   monitoringConfig:
     jmxImage: "ghcr.io/adobe/koperator/jmx-javaagent:1.4.0"
