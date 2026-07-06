@@ -5,7 +5,7 @@ go 1.26.0
 require (
 	dario.cat/mergo v1.0.2
 	emperror.dev/errors v0.8.1
-	github.com/cert-manager/cert-manager v1.20.2
+	github.com/cert-manager/cert-manager v1.20.3
 	k8s.io/api v0.36.2
 	k8s.io/apimachinery v0.36.2
 )
