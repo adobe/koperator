@@ -77,6 +77,12 @@ func generateRandomClusterID() string {
 	return base64.URLEncoding.EncodeToString(randomUUID[:])
 }
 
+const (
+	affinityKeyPod     = "podAffinity"
+	affinityKeyAntiPod = "podAntiAffinity"
+	affinityKeyNode    = "nodeAffinity"
+)
+
 // ignorePreferredAffinities returns a CalculateOption that strips
 // preferredDuringSchedulingIgnoredDuringExecution from podAffinity,
 // podAntiAffinity and nodeAffinity on both sides of the diff.
@@ -112,7 +118,7 @@ func deletePreferredAffinities(obj []byte) ([]byte, error) {
 	if !ok {
 		return obj, nil
 	}
-	for _, key := range []string{"podAffinity", "podAntiAffinity", "nodeAffinity"} {
+	for _, key := range []string{affinityKeyPod, affinityKeyAntiPod, affinityKeyNode} {
 		if a, ok := affinity[key].(map[string]interface{}); ok {
 			delete(a, "preferredDuringSchedulingIgnoredDuringExecution")
 		}
