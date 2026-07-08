@@ -317,7 +317,7 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 			if storage.PvcSpec == nil {
 				continue
 			}
-			o, err := r.pvc(broker.Id, index, storage)
+			o, err := r.pvc(broker.Id, index, storage, brokerConfig, r.KafkaCluster.Spec.KRaftMode)
 			if err != nil {
 				return errors.WrapIfWithDetails(err, "failed to generate resource", "resources", "PersistentVolumeClaim")
 			}
