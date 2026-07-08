@@ -148,13 +148,6 @@ type KafkaClusterSpec struct {
 	// +optional
 	KRaftMode              bool `json:"kRaft"`
 	HeadlessServiceEnabled bool `json:"headlessServiceEnabled"`
-	// AdmissionWebhooksEnabled prevents Koperator from reverting CPU/memory resource
-	// requests and preferred scheduling affinity terms that external admission controllers
-	// (e.g. ScaleOps) inject or modify on broker pods. When true, those fields are
-	// excluded from the reconcile diff so the admission controller remains authoritative.
-	// +kubebuilder:default=false
-	// +optional
-	AdmissionWebhooksEnabled bool `json:"admissionWebhooksEnabled,omitempty"`
 	// localDebugEnabled is used to decide whether to create a separate loadbalancer services for the
 	// Kafka and Cruise Control Pods. These services will expose the internal listener ports of the Kafka
 	// cluster with LoadBalancer type, which can be used for running Koperator on a local machine against

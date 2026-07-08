@@ -83,10 +83,9 @@ func generateRandomClusterID() string {
 //
 // Those lists have no patchMergeKey in the Kubernetes API types, so the
 // strategic merge patch treats them atomically: any external addition (e.g.
-// from an admission controller) is removed on every reconcile. This option
-// prevents that by making the diff blind to preferred affinities, at the cost
-// of not enforcing preferred affinities declared in the CR while
-// AdmissionWebhooksEnabled is set.
+// from an admission controller or the node lifecycle controller) would be
+// removed on every reconcile. This mirrors how tolerations are handled and
+// keeps preferred affinities from triggering unnecessary rolling restarts.
 func ignorePreferredAffinities() patch.CalculateOption {
 	return func(current, modified []byte) ([]byte, []byte, error) {
 		var err error
