@@ -783,7 +783,7 @@ func TestIgnorePreferredAffinities(t *testing.T) {
 		// ScaleOps injects preferred terms on top.
 		current.Spec.Affinity = &corev1.Affinity{
 			NodeAffinity: &corev1.NodeAffinity{
-				RequiredDuringSchedulingIgnoredDuringExecution: desired.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+				RequiredDuringSchedulingIgnoredDuringExecution:  desired.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 				PreferredDuringSchedulingIgnoredDuringExecution: scaleOpsNodePreferred().PreferredDuringSchedulingIgnoredDuringExecution,
 			},
 		}
