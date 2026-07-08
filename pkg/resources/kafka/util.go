@@ -21,6 +21,9 @@ import (
 	"sort"
 
 	"github.com/google/uuid"
+	json "github.com/json-iterator/go"
+
+	"github.com/banzaicloud/k8s-objectmatcher/patch"
 
 	"github.com/banzaicloud/koperator/api/v1beta1"
 )
@@ -72,4 +75,52 @@ func generateQuorumVoters(kafkaCluster *v1beta1.KafkaCluster, controllerListener
 func generateRandomClusterID() string {
 	randomUUID := uuid.New()
 	return base64.URLEncoding.EncodeToString(randomUUID[:])
+}
+
+// ignorePreferredAffinities returns a CalculateOption that strips
+// preferredDuringSchedulingIgnoredDuringExecution from podAffinity,
+// podAntiAffinity and nodeAffinity on both sides of the diff.
+//
+// Those lists have no patchMergeKey in the Kubernetes API types, so the
+// strategic merge patch treats them atomically: any external addition (e.g.
+// from an admission controller) is removed on every reconcile. This option
+// prevents that by making the diff blind to preferred affinities, at the cost
+// of not enforcing preferred affinities declared in the CR while
+// AdmissionWebhooksEnabled is set.
+func ignorePreferredAffinities() patch.CalculateOption {
+	return func(current, modified []byte) ([]byte, []byte, error) {
+		var err error
+		if current, err = deletePreferredAffinities(current); err != nil {
+			return nil, nil, err
+		}
+		if modified, err = deletePreferredAffinities(modified); err != nil {
+			return nil, nil, err
+		}
+		return current, modified, nil
+	}
+}
+
+func deletePreferredAffinities(obj []byte) ([]byte, error) {
+	var pod map[string]interface{}
+	if err := json.Unmarshal(obj, &pod); err != nil {
+		return nil, err
+	}
+	spec, ok := pod["spec"].(map[string]interface{})
+	if !ok {
+		return obj, nil
+	}
+	affinity, ok := spec["affinity"].(map[string]interface{})
+	if !ok {
+		return obj, nil
+	}
+	for _, key := range []string{"podAffinity", "podAntiAffinity", "nodeAffinity"} {
+		if a, ok := affinity[key].(map[string]interface{}); ok {
+			delete(a, "preferredDuringSchedulingIgnoredDuringExecution")
+		}
+	}
+	marshaled, err := json.ConfigCompatibleWithStandardLibrary.Marshal(pod)
+	if err != nil {
+		return nil, err
+	}
+	return marshaled, nil
 }
