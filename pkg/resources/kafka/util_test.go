@@ -610,10 +610,10 @@ func TestDeletePreferredAffinities(t *testing.T) {
 
 // --- ignorePreferredAffinities CalculateOption (diff-level) ---
 
-func baseKafkaPod(name string) *corev1.Pod {
+func baseKafkaPod() *corev1.Pod {
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
+			Name:      "broker-0",
 			Namespace: "default",
 		},
 		Spec: corev1.PodSpec{
@@ -672,8 +672,8 @@ func setAnnotationFromDesired(t *testing.T, desiredPod, currentPod *corev1.Pod) 
 
 func TestIgnorePreferredAffinities(t *testing.T) {
 	t.Run("ScaleOps injects preferred node affinity, CR unchanged → empty patch", func(t *testing.T) {
-		desired := baseKafkaPod("broker-0")
-		current := baseKafkaPod("broker-0")
+		desired := baseKafkaPod()
+		current := baseKafkaPod()
 		setAnnotationFromDesired(t, desired, current)
 
 		// ScaleOps injects preferred node affinity into the live pod.
@@ -689,8 +689,8 @@ func TestIgnorePreferredAffinities(t *testing.T) {
 	})
 
 	t.Run("ScaleOps injects preferred pod affinity, CR unchanged → empty patch", func(t *testing.T) {
-		desired := baseKafkaPod("broker-0")
-		current := baseKafkaPod("broker-0")
+		desired := baseKafkaPod()
+		current := baseKafkaPod()
 		setAnnotationFromDesired(t, desired, current)
 
 		current.Spec.Affinity = &corev1.Affinity{PodAffinity: scaleOpsPodPreferred()}
@@ -705,8 +705,8 @@ func TestIgnorePreferredAffinities(t *testing.T) {
 	})
 
 	t.Run("no affinities anywhere → empty patch", func(t *testing.T) {
-		desired := baseKafkaPod("broker-0")
-		current := baseKafkaPod("broker-0")
+		desired := baseKafkaPod()
+		current := baseKafkaPod()
 		setAnnotationFromDesired(t, desired, current)
 
 		result, err := patch.DefaultPatchMaker.Calculate(current, desired, ignorePreferredAffinities())
@@ -720,15 +720,15 @@ func TestIgnorePreferredAffinities(t *testing.T) {
 
 	t.Run("operator adds required node affinity to CR → non-empty patch", func(t *testing.T) {
 		// Annotation reflects the original desired pod with no affinity.
-		original := baseKafkaPod("broker-0")
-		current := baseKafkaPod("broker-0")
+		original := baseKafkaPod()
+		current := baseKafkaPod()
 		setAnnotationFromDesired(t, original, current)
 
 		// ScaleOps has injected preferred terms into the live pod.
 		current.Spec.Affinity = &corev1.Affinity{NodeAffinity: scaleOpsNodePreferred()}
 
 		// The operator now adds a required affinity to the CR.
-		desired := baseKafkaPod("broker-0")
+		desired := baseKafkaPod()
 		desired.Spec.Affinity = &corev1.Affinity{
 			NodeAffinity: &corev1.NodeAffinity{
 				RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
@@ -754,7 +754,7 @@ func TestIgnorePreferredAffinities(t *testing.T) {
 
 	t.Run("ScaleOps preferred + operator required in CR → patch contains only required", func(t *testing.T) {
 		// The operator starts with a required affinity in the CR.
-		desired := baseKafkaPod("broker-0")
+		desired := baseKafkaPod()
 		desired.Spec.Affinity = &corev1.Affinity{
 			NodeAffinity: &corev1.NodeAffinity{
 				RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
@@ -768,7 +768,7 @@ func TestIgnorePreferredAffinities(t *testing.T) {
 				},
 			},
 		}
-		current := baseKafkaPod("broker-0")
+		current := baseKafkaPod()
 		setAnnotationFromDesired(t, desired, current)
 
 		// ScaleOps injects preferred terms on top.
