@@ -895,24 +895,6 @@ func (r *Reconciler) reconcileKafkaPod(log logr.Logger, desiredPod *corev1.Pod, 
 		return nil
 	case len(podList.Items) == 1:
 		currentPod = podList.Items[0].DeepCopy()
-
-		// Backfill the last-applied annotation for pods that predate it so the
-		// three-way merge can distinguish operator-intended changes from
-		// admission-controller drift. Without this the merge degenerates to a
-		// two-way diff and reverts admission-controller resource-request adjustments.
-		if original, err := patch.DefaultAnnotator.GetOriginalConfiguration(currentPod); err == nil && original == nil {
-			if content, contentErr := patch.DefaultAnnotator.GetModifiedConfiguration(desiredPod, false); contentErr == nil {
-				annotated := currentPod.DeepCopy()
-				if setErr := patch.DefaultAnnotator.SetOriginalConfiguration(annotated, content); setErr == nil {
-					if patchErr := r.Client.Patch(context.TODO(), annotated, client.MergeFrom(currentPod)); patchErr != nil {
-						log.Error(patchErr, "could not backfill last-applied annotation on broker pod")
-					} else {
-						currentPod = annotated
-					}
-				}
-			}
-		}
-
 		brokerId := currentPod.Labels[banzaiv1beta1.BrokerIdLabelKey]
 		if _, ok := r.KafkaCluster.Status.BrokersState[brokerId]; ok {
 			if currentPod.Spec.NodeName == "" {
