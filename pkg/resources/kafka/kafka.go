@@ -956,17 +956,23 @@ func (r *Reconciler) updateStatusWithDockerImageAndVersion(brokers map[int32]*ba
 		}(brokerID, brokerConfig)
 	}
 
+	var firstErr error
 	for range brokers {
 		result := <-ch
 		if result.err != nil {
-			return result.err
+			if firstErr == nil {
+				firstErr = result.err
+			}
+			continue
 		}
-		if err := k8sutil.UpdateBrokerStatus(r.Client, []string{strconv.Itoa(int(result.brokerID))}, r.KafkaCluster, *result.kafkaVersion, log); err != nil {
-			return err
+		if firstErr == nil {
+			if err := k8sutil.UpdateBrokerStatus(r.Client, []string{strconv.Itoa(int(result.brokerID))}, r.KafkaCluster, *result.kafkaVersion, log); err != nil {
+				firstErr = err
+			}
 		}
 	}
 
-	return nil
+	return firstErr
 }
 
 //gocyclo:ignore
