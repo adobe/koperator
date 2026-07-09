@@ -17,16 +17,18 @@ package kafka
 
 import (
 	"encoding/base64"
-	"encoding/json"
 	"reflect"
 	"testing"
 
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/banzaicloud/k8s-objectmatcher/patch"
 
 	"github.com/banzaicloud/koperator/api/v1beta1"
+	"github.com/banzaicloud/koperator/pkg/resources"
 )
 
 func TestGenerateClusterID(t *testing.T) {
@@ -409,216 +411,31 @@ func TestGenerateQuorumVoters(t *testing.T) {
 	}
 }
 
-// --- deletePreferredAffinities ---
-
-func TestDeletePreferredAffinities(t *testing.T) {
-	preferred := []interface{}{
-		map[string]interface{}{
-			"weight": float64(100),
-			"preference": map[string]interface{}{
-				"matchExpressions": []interface{}{
-					map[string]interface{}{
-						"key":      "scaleops.sh/node-packing",
-						"operator": "In",
-						"values":   []interface{}{"true"},
-					},
-				},
-			},
-		},
-	}
-	required := map[string]interface{}{
-		"nodeSelectorTerms": []interface{}{
-			map[string]interface{}{
-				"matchExpressions": []interface{}{
-					map[string]interface{}{
-						"key":      "topology.kubernetes.io/zone",
-						"operator": "In",
-						"values":   []interface{}{"us-east-1a"},
-					},
-				},
-			},
-		},
-	}
-
-	makePod := func(affinity map[string]interface{}) []byte {
-		pod := map[string]interface{}{
-			"spec": map[string]interface{}{
-				"containers": []interface{}{
-					map[string]interface{}{"name": "kafka", "image": "kafka:3.6"},
-				},
-			},
-		}
-		if affinity != nil {
-			pod["spec"].(map[string]interface{})["affinity"] = affinity
-		}
-		b, _ := json.Marshal(pod)
-		return b
-	}
-
-	getAffinity := func(result []byte) map[string]interface{} {
-		var pod map[string]interface{}
-		_ = json.Unmarshal(result, &pod)
-		spec, _ := pod["spec"].(map[string]interface{})
-		if spec == nil {
-			return nil
-		}
-		aff, _ := spec["affinity"].(map[string]interface{})
-		return aff
-	}
-
-	tests := []struct {
-		name            string
-		affinity        map[string]interface{}
-		wantErr         bool
-		checkAffinityFn func(t *testing.T, aff map[string]interface{})
-	}{
-		{
-			name:     "no affinity field",
-			affinity: nil,
-			checkAffinityFn: func(t *testing.T, aff map[string]interface{}) {
-				t.Helper()
-				if aff != nil {
-					t.Errorf("expected no affinity, got %v", aff)
-				}
-			},
-		},
-		{
-			name: "only required node affinity kept",
-			affinity: map[string]interface{}{
-				"nodeAffinity": map[string]interface{}{
-					"requiredDuringSchedulingIgnoredDuringExecution": required,
-				},
-			},
-			checkAffinityFn: func(t *testing.T, aff map[string]interface{}) {
-				t.Helper()
-				na, _ := aff["nodeAffinity"].(map[string]interface{})
-				if na == nil {
-					t.Fatal("nodeAffinity missing")
-				}
-				if _, hasPreferred := na["preferredDuringSchedulingIgnoredDuringExecution"]; hasPreferred {
-					t.Error("preferred should be absent")
-				}
-				if na["requiredDuringSchedulingIgnoredDuringExecution"] == nil {
-					t.Error("required should be present")
-				}
-			},
-		},
-		{
-			name: "node affinity preferred removed",
-			affinity: map[string]interface{}{
-				"nodeAffinity": map[string]interface{}{
-					"preferredDuringSchedulingIgnoredDuringExecution": preferred,
-				},
-			},
-			checkAffinityFn: func(t *testing.T, aff map[string]interface{}) {
-				t.Helper()
-				na, _ := aff["nodeAffinity"].(map[string]interface{})
-				if _, ok := na["preferredDuringSchedulingIgnoredDuringExecution"]; ok {
-					t.Error("preferred node affinity should be removed")
-				}
-			},
-		},
-		{
-			name: "pod affinity preferred removed",
-			affinity: map[string]interface{}{
-				"podAffinity": map[string]interface{}{
-					"preferredDuringSchedulingIgnoredDuringExecution": preferred,
-				},
-			},
-			checkAffinityFn: func(t *testing.T, aff map[string]interface{}) {
-				t.Helper()
-				pa, _ := aff["podAffinity"].(map[string]interface{})
-				if _, ok := pa["preferredDuringSchedulingIgnoredDuringExecution"]; ok {
-					t.Error("preferred pod affinity should be removed")
-				}
-			},
-		},
-		{
-			name: "pod anti-affinity preferred removed",
-			affinity: map[string]interface{}{
-				"podAntiAffinity": map[string]interface{}{
-					"preferredDuringSchedulingIgnoredDuringExecution": preferred,
-				},
-			},
-			checkAffinityFn: func(t *testing.T, aff map[string]interface{}) {
-				t.Helper()
-				paa, _ := aff["podAntiAffinity"].(map[string]interface{})
-				if _, ok := paa["preferredDuringSchedulingIgnoredDuringExecution"]; ok {
-					t.Error("preferred pod anti-affinity should be removed")
-				}
-			},
-		},
-		{
-			name: "all three types: preferred removed, required kept",
-			affinity: map[string]interface{}{
-				"nodeAffinity": map[string]interface{}{
-					"requiredDuringSchedulingIgnoredDuringExecution":  required,
-					"preferredDuringSchedulingIgnoredDuringExecution": preferred,
-				},
-				"podAffinity": map[string]interface{}{
-					"preferredDuringSchedulingIgnoredDuringExecution": preferred,
-				},
-				"podAntiAffinity": map[string]interface{}{
-					"preferredDuringSchedulingIgnoredDuringExecution": preferred,
-				},
-			},
-			checkAffinityFn: func(t *testing.T, aff map[string]interface{}) {
-				t.Helper()
-				na, _ := aff["nodeAffinity"].(map[string]interface{})
-				if _, ok := na["preferredDuringSchedulingIgnoredDuringExecution"]; ok {
-					t.Error("node preferred should be removed")
-				}
-				if na["requiredDuringSchedulingIgnoredDuringExecution"] == nil {
-					t.Error("node required should be kept")
-				}
-				pa, _ := aff["podAffinity"].(map[string]interface{})
-				if _, ok := pa["preferredDuringSchedulingIgnoredDuringExecution"]; ok {
-					t.Error("pod preferred should be removed")
-				}
-				paa, _ := aff["podAntiAffinity"].(map[string]interface{})
-				if _, ok := paa["preferredDuringSchedulingIgnoredDuringExecution"]; ok {
-					t.Error("pod anti preferred should be removed")
-				}
-			},
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			input := makePod(tc.affinity)
-			result, err := deletePreferredAffinities(input)
-			if tc.wantErr {
-				if err == nil {
-					t.Fatal("expected error, got nil")
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			tc.checkAffinityFn(t, getAffinity(result))
-		})
-	}
-
-	t.Run("invalid JSON returns error", func(t *testing.T) {
-		_, err := deletePreferredAffinities([]byte(`{invalid`))
-		if err == nil {
-			t.Fatal("expected error for invalid JSON")
-		}
-	})
-}
-
-// --- ignorePreferredAffinities CalculateOption (diff-level) ---
+// --- podSpecIntentChanged & tainted-broker restart ---
 
 func baseKafkaPod() *corev1.Pod {
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "broker-0",
 			Namespace: "default",
+			Labels:    map[string]string{"brokerId": "0"},
 		},
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
-				{Name: "kafka", Image: "kafka:3.6"},
+				{
+					Name:  "kafka",
+					Image: "kafka:3.6",
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("1"),
+							corev1.ResourceMemory: resource.MustParse("4Gi"),
+						},
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("4"),
+							corev1.ResourceMemory: resource.MustParse("4Gi"),
+						},
+					},
+				},
 			},
 		},
 	}
@@ -656,8 +473,8 @@ func scaleOpsPodPreferred() *corev1.PodAffinity {
 }
 
 // setAnnotationFromDesired stamps currentPod with the last-applied annotation
-// derived from desiredPod, simulating what Koperator does at pod creation time
-// (before the admission webhook runs and mutates the live pod).
+// derived from desiredPod, simulating what koperator does at pod creation time
+// (before any admission webhook runs and mutates the live pod).
 func setAnnotationFromDesired(t *testing.T, desiredPod, currentPod *corev1.Pod) {
 	t.Helper()
 	tmp := desiredPod.DeepCopy()
@@ -670,123 +487,151 @@ func setAnnotationFromDesired(t *testing.T, desiredPod, currentPod *corev1.Pod) 
 	currentPod.Annotations[patch.LastAppliedConfig] = tmp.Annotations[patch.LastAppliedConfig]
 }
 
-func TestIgnorePreferredAffinities(t *testing.T) {
-	t.Run("ScaleOps injects preferred node affinity, CR unchanged → empty patch", func(t *testing.T) {
+// TestPodSpecIntentChanged verifies the intent-aware diff: a rolling upgrade is
+// triggered only when koperator's own desired spec differs from what it last
+// applied. Mutations made to the live pod by admission controllers must never
+// register as a change; intentional CR edits always must.
+func TestPodSpecIntentChanged(t *testing.T) {
+	// scaleOpsMutateResources simulates a VPA/admission controller rewriting the
+	// live pod's kafka request after admission.
+	scaleOpsMutateResources := func(p *corev1.Pod) {
+		p.Spec.Containers[0].Resources.Requests[corev1.ResourceCPU] = resource.MustParse("392m")
+	}
+
+	t.Run("in sync, nothing changed -> false", func(t *testing.T) {
 		desired := baseKafkaPod()
 		current := baseKafkaPod()
 		setAnnotationFromDesired(t, desired, current)
 
-		// ScaleOps injects preferred node affinity into the live pod.
-		current.Spec.Affinity = &corev1.Affinity{NodeAffinity: scaleOpsNodePreferred()}
-
-		result, err := patch.DefaultPatchMaker.Calculate(current, desired, ignorePreferredAffinities())
+		changed, _, err := podSpecIntentChanged(current, desired)
 		if err != nil {
-			t.Fatalf("Calculate: %v", err)
+			t.Fatalf("podSpecIntentChanged: %v", err)
 		}
-		if !result.IsEmpty() {
-			t.Errorf("expected empty patch, got: %s", result.Patch)
+		if changed {
+			t.Error("expected no change when current matches last-applied and the CR is unchanged")
 		}
 	})
 
-	t.Run("ScaleOps injects preferred pod affinity, CR unchanged → empty patch", func(t *testing.T) {
+	t.Run("admission controller rewrote resources, CR unchanged -> false", func(t *testing.T) {
 		desired := baseKafkaPod()
 		current := baseKafkaPod()
 		setAnnotationFromDesired(t, desired, current)
+		scaleOpsMutateResources(current)
 
-		current.Spec.Affinity = &corev1.Affinity{PodAffinity: scaleOpsPodPreferred()}
-
-		result, err := patch.DefaultPatchMaker.Calculate(current, desired, ignorePreferredAffinities())
+		changed, _, err := podSpecIntentChanged(current, desired)
 		if err != nil {
-			t.Fatalf("Calculate: %v", err)
+			t.Fatalf("podSpecIntentChanged: %v", err)
 		}
-		if !result.IsEmpty() {
-			t.Errorf("expected empty patch, got: %s", result.Patch)
+		if changed {
+			t.Error("expected no change: a resource mutation on the live pod must not trigger a restart")
 		}
 	})
 
-	t.Run("no affinities anywhere → empty patch", func(t *testing.T) {
+	t.Run("admission controller injected preferred affinity, CR unchanged -> false", func(t *testing.T) {
 		desired := baseKafkaPod()
 		current := baseKafkaPod()
 		setAnnotationFromDesired(t, desired, current)
-
-		result, err := patch.DefaultPatchMaker.Calculate(current, desired, ignorePreferredAffinities())
-		if err != nil {
-			t.Fatalf("Calculate: %v", err)
-		}
-		if !result.IsEmpty() {
-			t.Errorf("expected empty patch, got: %s", result.Patch)
-		}
-	})
-
-	t.Run("operator adds required node affinity to CR → non-empty patch", func(t *testing.T) {
-		// Annotation reflects the original desired pod with no affinity.
-		original := baseKafkaPod()
-		current := baseKafkaPod()
-		setAnnotationFromDesired(t, original, current)
-
-		// ScaleOps has injected preferred terms into the live pod.
-		current.Spec.Affinity = &corev1.Affinity{NodeAffinity: scaleOpsNodePreferred()}
-
-		// The operator now adds a required affinity to the CR.
-		desired := baseKafkaPod()
-		desired.Spec.Affinity = &corev1.Affinity{
-			NodeAffinity: &corev1.NodeAffinity{
-				RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
-					NodeSelectorTerms: []corev1.NodeSelectorTerm{
-						{
-							MatchExpressions: []corev1.NodeSelectorRequirement{
-								{Key: "topology.kubernetes.io/zone", Operator: corev1.NodeSelectorOpIn, Values: []string{"us-east-1a"}},
-							},
-						},
-					},
-				},
-			},
-		}
-
-		result, err := patch.DefaultPatchMaker.Calculate(current, desired, ignorePreferredAffinities())
-		if err != nil {
-			t.Fatalf("Calculate: %v", err)
-		}
-		if result.IsEmpty() {
-			t.Error("expected non-empty patch: operator added required affinity")
-		}
-	})
-
-	t.Run("ScaleOps preferred + operator required in CR → patch contains only required", func(t *testing.T) {
-		// The operator starts with a required affinity in the CR.
-		desired := baseKafkaPod()
-		desired.Spec.Affinity = &corev1.Affinity{
-			NodeAffinity: &corev1.NodeAffinity{
-				RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
-					NodeSelectorTerms: []corev1.NodeSelectorTerm{
-						{
-							MatchExpressions: []corev1.NodeSelectorRequirement{
-								{Key: "topology.kubernetes.io/zone", Operator: corev1.NodeSelectorOpIn, Values: []string{"us-east-1a"}},
-							},
-						},
-					},
-				},
-			},
-		}
-		current := baseKafkaPod()
-		setAnnotationFromDesired(t, desired, current)
-
-		// ScaleOps injects preferred terms on top.
 		current.Spec.Affinity = &corev1.Affinity{
-			NodeAffinity: &corev1.NodeAffinity{
-				RequiredDuringSchedulingIgnoredDuringExecution:  desired.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
-				PreferredDuringSchedulingIgnoredDuringExecution: scaleOpsNodePreferred().PreferredDuringSchedulingIgnoredDuringExecution,
-			},
+			NodeAffinity: scaleOpsNodePreferred(),
+			PodAffinity:  scaleOpsPodPreferred(),
 		}
 
-		// CR is unchanged: same required, no preferred.
-		result, err := patch.DefaultPatchMaker.Calculate(current, desired, ignorePreferredAffinities())
+		changed, _, err := podSpecIntentChanged(current, desired)
 		if err != nil {
-			t.Fatalf("Calculate: %v", err)
+			t.Fatalf("podSpecIntentChanged: %v", err)
 		}
-		// Required affinity matches → patch should be empty (only preferred differs, which is ignored).
-		if !result.IsEmpty() {
-			t.Errorf("expected empty patch (required affinity unchanged, preferred ignored), got: %s", result.Patch)
+		if changed {
+			t.Error("expected no change: webhook-injected preferred affinity must not trigger a restart")
 		}
 	})
+
+	t.Run("operator changed resources in the CR -> true", func(t *testing.T) {
+		// last-applied reflects the old CR (cpu=1); a VPA then mutated the live pod.
+		lastApplied := baseKafkaPod()
+		current := baseKafkaPod()
+		setAnnotationFromDesired(t, lastApplied, current)
+		scaleOpsMutateResources(current)
+
+		// operator bumps the request in the CR.
+		desired := baseKafkaPod()
+		desired.Spec.Containers[0].Resources.Requests[corev1.ResourceCPU] = resource.MustParse("2")
+
+		changed, _, err := podSpecIntentChanged(current, desired)
+		if err != nil {
+			t.Fatalf("podSpecIntentChanged: %v", err)
+		}
+		if !changed {
+			t.Error("expected change: the operator edited resources in the CR")
+		}
+	})
+
+	t.Run("operator changed a soft (preferred) affinity in the CR -> true", func(t *testing.T) {
+		// koperator emits a soft nodeAffinity; last-applied records it, and the
+		// live pod carries it too.
+		lastApplied := baseKafkaPod()
+		lastApplied.Spec.Affinity = &corev1.Affinity{NodeAffinity: scaleOpsNodePreferred()}
+		current := baseKafkaPod()
+		setAnnotationFromDesired(t, lastApplied, current)
+		current.Spec.Affinity = &corev1.Affinity{NodeAffinity: scaleOpsNodePreferred()}
+
+		// operator changes the preferred weight in the CR.
+		desired := baseKafkaPod()
+		np := scaleOpsNodePreferred()
+		np.PreferredDuringSchedulingIgnoredDuringExecution[0].Weight = 10
+		desired.Spec.Affinity = &corev1.Affinity{NodeAffinity: np}
+
+		changed, _, err := podSpecIntentChanged(current, desired)
+		if err != nil {
+			t.Fatalf("podSpecIntentChanged: %v", err)
+		}
+		if !changed {
+			t.Error("expected change: the operator edited a soft affinity in the CR (the old strip approach swallowed this)")
+		}
+	})
+}
+
+// TestParkedBrokerRestartsIndependentOfIntent verifies that the shredder
+// park mechanism (label on the live pod matched by TaintedBrokersSelector) still
+// triggers a restart under the intent-aware diff. The label lives only on the
+// live pod, so podSpecIntentChanged does not see it; isPodTainted does.
+func TestParkedBrokerRestartsIndependentOfIntent(t *testing.T) {
+	const parkLabel = "shredder.ethos.adobe.net/upgrade-status"
+
+	r := &Reconciler{
+		Reconciler: resources.Reconciler{
+			KafkaCluster: &v1beta1.KafkaCluster{
+				Spec: v1beta1.KafkaClusterSpec{
+					TaintedBrokersSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{parkLabel: "parked"},
+					},
+				},
+			},
+		},
+	}
+
+	desired := baseKafkaPod()
+	current := baseKafkaPod()
+	setAnnotationFromDesired(t, desired, current)
+	// Shredder parks the broker by labeling the live pod.
+	current.Labels[parkLabel] = "parked"
+
+	// The intent diff sees no change: the label is only on the live pod.
+	changed, _, err := podSpecIntentChanged(current, desired)
+	if err != nil {
+		t.Fatalf("podSpecIntentChanged: %v", err)
+	}
+	if changed {
+		t.Error("a parked label on the live pod must not register as a CR intent change")
+	}
+	// But the tainted-broker selector still selects it for restart.
+	if !r.isPodTainted(logr.Discard(), current) {
+		t.Error("expected a parked broker to be tainted and therefore restarted")
+	}
+
+	// Sanity: a non-parked broker is neither changed nor tainted.
+	cleanCur := baseKafkaPod()
+	setAnnotationFromDesired(t, baseKafkaPod(), cleanCur)
+	if r.isPodTainted(logr.Discard(), cleanCur) {
+		t.Error("expected a non-parked broker to not be tainted")
+	}
 }
