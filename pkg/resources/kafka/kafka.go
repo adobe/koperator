@@ -956,27 +956,27 @@ func (r *Reconciler) handleRollingUpgrade(log logr.Logger, desiredPod, currentPo
 		}
 		desiredPod.Spec.Tolerations = uniqueTolerations
 	}
-	// Check if the resource actually updated or if labels match TaintedBrokersSelector
-	patchResult, err := patch.DefaultPatchMaker.Calculate(currentPod, desiredPod, ignorePreferredAffinities())
+	// Decide whether a rolling upgrade is needed by comparing koperator's own
+	// desired spec against what it last applied (the last-applied annotation on
+	// the current pod) — NOT against the live pod. This keeps mutations made by
+	// admission controllers (autoscalers, webhooks) from triggering restarts,
+	// while intentional CR changes always do. Also check TaintedBrokersSelector.
+	intentChanged, patchBytes, err := podSpecIntentChanged(currentPod, desiredPod)
 	switch {
 	case err != nil:
-		log.Error(err, "could not match objects", "kind", desiredType)
+		log.Error(err, "could not compare desired pod against last-applied configuration", "kind", desiredType)
 	case r.isPodTainted(log, currentPod):
 		log.Info("pod has tainted labels, deleting it", "pod", currentPod)
-	case patchResult.IsEmpty():
+	case !intentChanged:
 		if !k8sutil.IsPodContainsTerminatedContainer(currentPod) &&
 			r.KafkaCluster.Status.BrokersState[currentPod.Labels[banzaiv1beta1.BrokerIdLabelKey]].ConfigurationState == banzaiv1beta1.ConfigInSync &&
 			!k8sutil.IsPodContainsEvictedContainer(currentPod) &&
 			!k8sutil.IsPodContainsShutdownContainer(currentPod) {
-			log.V(1).Info("resource is in sync")
+			log.V(1).Info("desired pod spec is in sync with last-applied configuration")
 			return nil
 		}
 	default:
-		log.V(1).Info("kafka pod resource diffs",
-			"patch", string(patchResult.Patch),
-			"current", string(patchResult.Current),
-			"modified", string(patchResult.Modified),
-			"original", string(patchResult.Original))
+		log.V(1).Info("kafka pod spec changed", "patch", string(patchBytes))
 	}
 
 	if err := patch.DefaultAnnotator.SetLastAppliedAnnotation(desiredPod); err != nil {
