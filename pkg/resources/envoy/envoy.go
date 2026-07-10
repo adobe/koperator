@@ -38,6 +38,13 @@ import (
 	envoyutils "github.com/banzaicloud/koperator/pkg/util/envoy"
 )
 
+const (
+	// envoyContainerName is the name of the envoy container and the "envoy" ingressController value.
+	envoyContainerName = "envoy"
+	// envoyIngressAppLabelValue is the v1beta1.AppLabelKey value for envoy ingress resources.
+	envoyIngressAppLabelValue = "envoyingress"
+)
+
 // labelsForEnvoyIngress returns the labels for selecting the resources
 // belonging to the given kafka CR name.
 func labelsForEnvoyIngress(crName, eLName string) map[string]string {
@@ -45,7 +52,7 @@ func labelsForEnvoyIngress(crName, eLName string) map[string]string {
 }
 
 func labelsForEnvoyIngressWithoutEListenerName(crName string) map[string]string {
-	return map[string]string{v1beta1.AppLabelKey: "envoyingress", v1beta1.KafkaCRLabelKey: crName}
+	return map[string]string{v1beta1.AppLabelKey: envoyIngressAppLabelValue, v1beta1.KafkaCRLabelKey: crName}
 }
 
 // Reconciler implements the Component Reconciler

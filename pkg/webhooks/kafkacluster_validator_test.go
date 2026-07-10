@@ -248,6 +248,23 @@ func TestCheckExternalListenerStartingPort(t *testing.T) {
 						"test-external2", int32(8081), int32(8080), int32(29092), []int32{11})),
 			),
 		},
+		{
+			// When TLS is enabled (externalStartingPort == -1), port validation should be skipped
+			// because GetAnyCastPort() is used instead of externalStartingPort + brokerId
+			testName: "valid config: TLS enabled with externalStartingPort -1 (should skip port validation)",
+			kafkaClusterSpec: v1beta1.KafkaClusterSpec{
+				Brokers: []v1beta1.Broker{{Id: 0}, {Id: 1}, {Id: 2}},
+				ListenersConfig: v1beta1.ListenersConfig{
+					ExternalListeners: []v1beta1.ExternalListenerConfig{
+						{
+							CommonListenerSpec:   v1beta1.CommonListenerSpec{Name: "envoygateway"},
+							ExternalStartingPort: -1, // TLS enabled
+						},
+					},
+				},
+			},
+			expected: nil,
+		},
 	}
 
 	for _, testCase := range testCases {
