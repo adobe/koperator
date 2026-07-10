@@ -172,7 +172,7 @@ else
 fi
 
 ## Initialize Zookeeper and Kafka Cluster
-kubectl apply -f config/samples/simplezookeeper.yaml -n zookeeper
+kubectl apply -f config/samples/simpleZookeeper.yaml -n zookeeper
 
 if ! $LOCAL; then
   kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=kafka-operator -n kafka --timeout=120s
