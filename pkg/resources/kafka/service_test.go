@@ -32,182 +32,164 @@ import (
 )
 
 func TestService(t *testing.T) {
+	basePorts := []corev1.ServicePort{
+		{
+			Name:       "tcp-internal",
+			Protocol:   "TCP",
+			Port:       29092,
+			TargetPort: intstr.FromInt(29092),
+			NodePort:   0,
+		},
+		{
+			Name:       "tcp-plaintext",
+			Protocol:   "TCP",
+			Port:       29094,
+			TargetPort: intstr.FromInt(29094),
+			NodePort:   0,
+		},
+		{
+			Name:       "metrics",
+			Protocol:   "TCP",
+			Port:       9020,
+			TargetPort: intstr.FromInt(9020),
+			NodePort:   0,
+		},
+	}
+
+	baseListeners := v1beta1.ListenersConfig{
+		InternalListeners: []v1beta1.InternalListenerConfig{
+			{
+				CommonListenerSpec: v1beta1.CommonListenerSpec{
+					Name:                            "internal",
+					ContainerPort:                   29092,
+					Type:                            "plaintext",
+					UsedForInnerBrokerCommunication: true,
+				},
+			},
+		},
+		ExternalListeners: []v1beta1.ExternalListenerConfig{
+			{
+				CommonListenerSpec: v1beta1.CommonListenerSpec{
+					Name:                            "plaintext",
+					ContainerPort:                   29094,
+					Type:                            "plaintext",
+					UsedForInnerBrokerCommunication: false,
+				},
+				AccessMethod: corev1.ServiceTypeLoadBalancer,
+			},
+		},
+	}
+
+	baseOwnerRef := []metav1.OwnerReference{
+		{
+			APIVersion:         "",
+			Kind:               "",
+			Name:               "kafka",
+			UID:                "",
+			Controller:         util.BoolPointer(true),
+			BlockOwnerDeletion: util.BoolPointer(true),
+		},
+	}
+
 	testCases := []struct {
 		testName        string
 		r               *Reconciler
 		expectedService *corev1.Service
 	}{
 		{
-			testName: "Basic Internal And External Service",
+			testName: "ClusterIP service with publishNotReadyAddresses disabled (default)",
 			r: &Reconciler{
 				Reconciler: resources.Reconciler{
 					KafkaCluster: &v1beta1.KafkaCluster{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      "kafka",
-							Namespace: "kafka",
-						},
+						ObjectMeta: metav1.ObjectMeta{Name: "kafka", Namespace: "kafka"},
 						Spec: v1beta1.KafkaClusterSpec{
-							LocalDebugEnabled: false,
-							KRaftMode:         false,
-							ListenersConfig: v1beta1.ListenersConfig{
-								InternalListeners: []v1beta1.InternalListenerConfig{
-									{
-										CommonListenerSpec: v1beta1.CommonListenerSpec{
-											Name:                            "internal",
-											ContainerPort:                   29092,
-											Type:                            "plaintext",
-											UsedForInnerBrokerCommunication: true,
-										},
-									},
-								},
-								ExternalListeners: []v1beta1.ExternalListenerConfig{
-									{
-										CommonListenerSpec: v1beta1.CommonListenerSpec{
-											Name:                            "plaintext",
-											ContainerPort:                   29094,
-											Type:                            "plaintext",
-											UsedForInnerBrokerCommunication: false,
-										},
-										AccessMethod: corev1.ServiceTypeLoadBalancer,
-									},
-								},
-							},
+							LocalDebugEnabled:        false,
+							KRaftMode:                false,
+							PublishNotReadyAddresses: false,
+							ListenersConfig:          baseListeners,
 						},
 					},
 				},
 			},
 			expectedService: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:        "kafka-1",
-					Namespace:   "kafka",
-					Labels:      map[string]string{"app": "kafka", "brokerId": "1", "kafka_cr": "kafka"},
-					Annotations: map[string]string{},
-					OwnerReferences: []metav1.OwnerReference{
-						{
-							APIVersion:         "",
-							Kind:               "",
-							Name:               "kafka",
-							UID:                "",
-							Controller:         util.BoolPointer(true),
-							BlockOwnerDeletion: util.BoolPointer(true),
-						},
-					},
+					Name:            "kafka-1",
+					Namespace:       "kafka",
+					Labels:          map[string]string{"app": "kafka", "brokerId": "1", "kafka_cr": "kafka"},
+					Annotations:     map[string]string{},
+					OwnerReferences: baseOwnerRef,
 				},
 				Spec: corev1.ServiceSpec{
-					Type:            corev1.ServiceTypeClusterIP,
-					SessionAffinity: corev1.ServiceAffinityNone,
-					Selector:        apiutil.MergeLabels(apiutil.LabelsForKafka("kafka"), map[string]string{v1beta1.BrokerIdLabelKey: "1"}),
-					Ports: []corev1.ServicePort{
-						{
-							Name:       "tcp-internal",
-							Protocol:   "TCP",
-							Port:       29092,
-							TargetPort: intstr.FromInt(29092),
-							NodePort:   0,
-						},
-						{
-							Name:       "tcp-plaintext",
-							Protocol:   "TCP",
-							Port:       29094,
-							TargetPort: intstr.FromInt(29094),
-							NodePort:   0,
-						},
-						{
-							Name:       "metrics",
-							Protocol:   "TCP",
-							Port:       9020,
-							TargetPort: intstr.FromInt(9020),
-							NodePort:   0,
-						},
-					},
+					Type:                     corev1.ServiceTypeClusterIP,
+					SessionAffinity:          corev1.ServiceAffinityNone,
+					Selector:                 apiutil.MergeLabels(apiutil.LabelsForKafka("kafka"), map[string]string{v1beta1.BrokerIdLabelKey: "1"}),
+					Ports:                    basePorts,
 					ClusterIP:                "",
 					PublishNotReadyAddresses: false,
 				},
 			},
 		},
 		{
-			testName: "Basic Internal And External Service",
+			testName: "ClusterIP service with publishNotReadyAddresses enabled (URP sidecar mode)",
 			r: &Reconciler{
 				Reconciler: resources.Reconciler{
 					KafkaCluster: &v1beta1.KafkaCluster{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      "kafka",
-							Namespace: "kafka",
-						},
+						ObjectMeta: metav1.ObjectMeta{Name: "kafka", Namespace: "kafka"},
 						Spec: v1beta1.KafkaClusterSpec{
-							LocalDebugEnabled: true,
-							KRaftMode:         false,
-							ListenersConfig: v1beta1.ListenersConfig{
-								InternalListeners: []v1beta1.InternalListenerConfig{
-									{
-										CommonListenerSpec: v1beta1.CommonListenerSpec{
-											Name:                            "internal",
-											ContainerPort:                   29092,
-											Type:                            "plaintext",
-											UsedForInnerBrokerCommunication: true,
-										},
-									},
-								},
-								ExternalListeners: []v1beta1.ExternalListenerConfig{
-									{
-										CommonListenerSpec: v1beta1.CommonListenerSpec{
-											Name:                            "plaintext",
-											ContainerPort:                   29094,
-											Type:                            "plaintext",
-											UsedForInnerBrokerCommunication: false,
-										},
-										AccessMethod: corev1.ServiceTypeLoadBalancer,
-									},
-								},
-							},
+							LocalDebugEnabled:        false,
+							KRaftMode:                false,
+							PublishNotReadyAddresses: true,
+							ListenersConfig:          baseListeners,
 						},
 					},
 				},
 			},
 			expectedService: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:        "kafka-1",
-					Namespace:   "kafka",
-					Labels:      map[string]string{"app": "kafka", "brokerId": "1", "kafka_cr": "kafka"},
-					Annotations: map[string]string{},
-					OwnerReferences: []metav1.OwnerReference{
-						{
-							APIVersion:         "",
-							Kind:               "",
-							Name:               "kafka",
-							UID:                "",
-							Controller:         util.BoolPointer(true),
-							BlockOwnerDeletion: util.BoolPointer(true),
+					Name:            "kafka-1",
+					Namespace:       "kafka",
+					Labels:          map[string]string{"app": "kafka", "brokerId": "1", "kafka_cr": "kafka"},
+					Annotations:     map[string]string{},
+					OwnerReferences: baseOwnerRef,
+				},
+				Spec: corev1.ServiceSpec{
+					Type:                     corev1.ServiceTypeClusterIP,
+					SessionAffinity:          corev1.ServiceAffinityNone,
+					Selector:                 apiutil.MergeLabels(apiutil.LabelsForKafka("kafka"), map[string]string{v1beta1.BrokerIdLabelKey: "1"}),
+					Ports:                    basePorts,
+					ClusterIP:                "",
+					PublishNotReadyAddresses: true,
+				},
+			},
+		},
+		{
+			testName: "LoadBalancer service when localDebugEnabled",
+			r: &Reconciler{
+				Reconciler: resources.Reconciler{
+					KafkaCluster: &v1beta1.KafkaCluster{
+						ObjectMeta: metav1.ObjectMeta{Name: "kafka", Namespace: "kafka"},
+						Spec: v1beta1.KafkaClusterSpec{
+							LocalDebugEnabled:        true,
+							KRaftMode:                false,
+							PublishNotReadyAddresses: false,
+							ListenersConfig:          baseListeners,
 						},
 					},
 				},
+			},
+			expectedService: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "kafka-1",
+					Namespace:       "kafka",
+					Labels:          map[string]string{"app": "kafka", "brokerId": "1", "kafka_cr": "kafka"},
+					Annotations:     map[string]string{},
+					OwnerReferences: baseOwnerRef,
+				},
 				Spec: corev1.ServiceSpec{
-					Type:            corev1.ServiceTypeLoadBalancer,
-					SessionAffinity: corev1.ServiceAffinityNone,
-					Selector:        apiutil.MergeLabels(apiutil.LabelsForKafka("kafka"), map[string]string{v1beta1.BrokerIdLabelKey: "1"}),
-					Ports: []corev1.ServicePort{
-						{
-							Name:       "tcp-internal",
-							Protocol:   "TCP",
-							Port:       29092,
-							TargetPort: intstr.FromInt(29092),
-							NodePort:   0,
-						},
-						{
-							Name:       "tcp-plaintext",
-							Protocol:   "TCP",
-							Port:       29094,
-							TargetPort: intstr.FromInt(29094),
-							NodePort:   0,
-						},
-						{
-							Name:       "metrics",
-							Protocol:   "TCP",
-							Port:       9020,
-							TargetPort: intstr.FromInt(9020),
-							NodePort:   0,
-						},
-					},
+					Type:                     corev1.ServiceTypeLoadBalancer,
+					SessionAffinity:          corev1.ServiceAffinityNone,
+					Selector:                 apiutil.MergeLabels(apiutil.LabelsForKafka("kafka"), map[string]string{v1beta1.BrokerIdLabelKey: "1"}),
+					Ports:                    basePorts,
 					ClusterIP:                "",
 					PublishNotReadyAddresses: false,
 				},

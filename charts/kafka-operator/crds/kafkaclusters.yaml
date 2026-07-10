@@ -22965,6 +22965,17 @@ spec:
                 type: boolean
               propagateLabels:
                 type: boolean
+              publishNotReadyAddresses:
+                default: false
+                description: |-
+                  PublishNotReadyAddresses controls whether the non-headless broker Services
+                  (kafka-{id} and kafka-all-broker) include the pod IP in their endpoints even
+                  when the pod fails its readiness probe.
+                  Enable this when using a custom readiness sidecar that checks Under-Replicated
+                  Partitions (URP) combined with a PodDisruptionBudget, so that brokers continue
+                  serving existing partition traffic while the PDB holds eviction.
+                  Headless services always publish not-ready addresses regardless of this field.
+                type: boolean
               rackAwareness:
                 description: RackAwareness defines the required fields to enable kafka's
                   rack aware feature
