@@ -55,10 +55,11 @@ func (r *Reconciler) service(id int32, _ *v1beta1.BrokerConfig) runtime.Object {
 			r.KafkaCluster.Spec.ListenersConfig.GetServiceAnnotations(),
 			r.KafkaCluster),
 		Spec: corev1.ServiceSpec{
-			Type:            corev1.ServiceTypeClusterIP,
-			SessionAffinity: corev1.ServiceAffinityNone,
-			Selector:        apiutil.MergeLabels(apiutil.LabelsForKafka(r.KafkaCluster.Name), map[string]string{v1beta1.BrokerIdLabelKey: fmt.Sprintf("%d", id)}),
-			Ports:           usedPorts,
+			Type:                     corev1.ServiceTypeClusterIP,
+			SessionAffinity:          corev1.ServiceAffinityNone,
+			Selector:                 apiutil.MergeLabels(apiutil.LabelsForKafka(r.KafkaCluster.Name), map[string]string{v1beta1.BrokerIdLabelKey: fmt.Sprintf("%d", id)}),
+			Ports:                    usedPorts,
+			PublishNotReadyAddresses: r.KafkaCluster.Spec.PublishNotReadyAddresses,
 		},
 	}
 	if r.KafkaCluster.Spec.LocalDebugEnabled {
