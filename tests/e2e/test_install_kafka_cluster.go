@@ -1,5 +1,5 @@
 // Copyright © 2023 Cisco Systems, Inc. and/or its affiliates
-// Copyright 2025 Adobe. All rights reserved.
+// Copyright 2026 Adobe. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,12 +17,12 @@ package e2e
 
 import (
 	"github.com/gruntwork-io/terratest/modules/k8s"
-	ginkgo "github.com/onsi/ginkgo/v2"
-	gomega "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
-func testUninstallZookeeperCluster() bool {
-	return ginkgo.When("Uninstalling Zookeeper cluster", func() {
+func testInstallZookeeperCluster() bool {
+	return ginkgo.When("Installing Zookeeper cluster (required for Zookeeper-based Kafka)", func() {
 		var kubectlOptions k8s.KubectlOptions
 		var err error
 
@@ -32,12 +32,12 @@ func testUninstallZookeeperCluster() bool {
 		})
 
 		kubectlOptions.Namespace = zookeeperOperatorHelmDescriptor.Namespace
-		requireDeleteZookeeperCluster(kubectlOptions, zookeeperClusterName)
+		requireCreatingZookeeperCluster(kubectlOptions)
 	})
 }
 
-func testUninstallKafkaCluster() bool { //nolint:unparam // Note: respecting Ginkgo testing interface by returning bool.
-	return ginkgo.When("Uninstalling Kafka cluster", func() {
+func testInstallNoIngressKafkaCluster(clusterDescription, kafkaClusterManifestPath string) bool { //nolint:unparam // Note: respecting Ginkgo testing interface by returning bool.
+	return ginkgo.When(clusterDescription, func() {
 		var kubectlOptions k8s.KubectlOptions
 		var err error
 
@@ -47,12 +47,12 @@ func testUninstallKafkaCluster() bool { //nolint:unparam // Note: respecting Gin
 		})
 
 		kubectlOptions.Namespace = koperatorLocalHelmDescriptor.Namespace
-		requireDeleteKafkaCluster(kubectlOptions, kafkaClusterName)
+		requireCreatingKafkaCluster(kubectlOptions, kafkaClusterManifestPath)
 	})
 }
 
-func testUninstallEnvoyGatewayKafkaCluster(manifestPath string) bool { //nolint:unparam // Note: respecting Ginkgo testing interface by returning bool.
-	return ginkgo.When("Uninstalling Envoy Gateway Kafka cluster and cert-manager resources", func() {
+func testInstallEnvoyKafkaCluster(clusterDescription, kafkaClusterManifestPath string) bool { //nolint:unparam // Note: respecting Ginkgo testing interface by returning bool.
+	return ginkgo.When(clusterDescription, func() {
 		var kubectlOptions k8s.KubectlOptions
 		var err error
 
@@ -62,19 +62,21 @@ func testUninstallEnvoyGatewayKafkaCluster(manifestPath string) bool { //nolint:
 		})
 
 		kubectlOptions.Namespace = koperatorLocalHelmDescriptor.Namespace
+		requireCreatingKafkaCluster(kubectlOptions, kafkaClusterManifestPath)
+	})
+}
 
-		// Delete KafkaCluster CR first
-		requireDeleteKafkaCluster(kubectlOptions, kafkaClusterName)
+func testInstallEnvoyGatewayKafkaCluster(clusterDescription, kafkaClusterManifestPath string) bool { //nolint:unparam // Note: respecting Ginkgo testing interface by returning bool.
+	return ginkgo.When(clusterDescription, func() {
+		var kubectlOptions k8s.KubectlOptions
+		var err error
 
-		// Delete cert-manager resources (Certificate and Issuer)
-		ginkgo.It("Deleting cert-manager Certificate", func() {
-			err := deleteK8sResourceNoErrNotFound(kubectlOptions, defaultDeletionTimeout, "certificate", "envoygateway-tls-cert")
-			gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
+		ginkgo.It("Acquiring K8s config and context", func() {
+			kubectlOptions, err = kubectlOptionsForCurrentContext()
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 
-		ginkgo.It("Deleting cert-manager Issuer", func() {
-			err := deleteK8sResourceNoErrNotFound(kubectlOptions, defaultDeletionTimeout, "issuer", "envoygateway-selfsigned-issuer")
-			gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
-		})
+		kubectlOptions.Namespace = koperatorLocalHelmDescriptor.Namespace
+		requireCreatingKafkaCluster(kubectlOptions, kafkaClusterManifestPath)
 	})
 }
