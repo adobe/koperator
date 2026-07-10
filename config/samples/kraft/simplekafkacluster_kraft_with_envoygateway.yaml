@@ -1,3 +1,29 @@
+---
+# Self-signed issuer for creating TLS certificates
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: envoygateway-selfsigned-issuer
+  namespace: kafka
+spec:
+  selfSigned: {}
+---
+# TLS certificate for Envoy Gateway
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: envoygateway-tls-cert
+  namespace: kafka
+spec:
+  secretName: envoygateway-tls-secret
+  issuerRef:
+    name: envoygateway-selfsigned-issuer
+    kind: Issuer
+  dnsNames:
+    - "*.kafka.cluster.local"
+    - "kafka.cluster.local"
+  commonName: "kafka.cluster.local"
+---
 apiVersion: kafka.banzaicloud.io/v1beta1
 kind: KafkaCluster
 metadata:
@@ -13,13 +39,34 @@ spec:
   propagateLabels: false
   oneBrokerPerNode: false
   clusterImage: "ghcr.io/adobe/koperator/kafka:2.13-3.9.1"
+  ingressController: "envoygateway"
+  envoyGatewayConfig:
+    gatewayClassName: "eg"
+    tlsSecretName: "envoygateway-tls-secret"
+    brokerHostnameTemplate: "broker-%id.kafka.cluster.local"
+  listenersConfig:
+    internalListeners:
+      - type: "plaintext"
+        name: "internal"
+        containerPort: 29092
+        usedForInnerBrokerCommunication: true
+      - type: "plaintext"
+        name: "controller"
+        containerPort: 29093
+        usedForInnerBrokerCommunication: false
+        usedForControllerCommunication: true
+    externalListeners:
+      - accessMethod: LoadBalancer
+        containerPort: 29095
+        externalStartingPort: -1
+        name: envoyg
+        type: plaintext
+        usedForInnerBrokerCommunication: false
   readOnlyConfig: |
     auto.create.topics.enable=false
     cruise.control.metrics.topic.auto.create=true
     cruise.control.metrics.topic.num.partitions=1
     cruise.control.metrics.topic.replication.factor=2
-    # e2e: publish CruiseControl metrics every 15s (default 60s) so CC warms up quickly; not production defaults
-    cruise.control.metrics.reporter.metrics.reporting.interval.ms=15000
   brokerConfigGroups:
     default:
       storageConfigs:
@@ -69,36 +116,12 @@ spec:
           - controller
   rollingUpgradeConfig:
     failureThreshold: 1
-  listenersConfig:
-    internalListeners:
-      - type: "plaintext"
-        name: "internal"
-        containerPort: 29092
-        usedForInnerBrokerCommunication: true
-      - type: "plaintext"
-        name: "controller"
-        containerPort: 29093
-        usedForInnerBrokerCommunication: false
-        usedForControllerCommunication: true
   cruiseControlConfig:
-    # podSecurityContext:
-    #  runAsNonRoot: false
-    # securityContext:
-    #  privileged: true
     cruiseControlTaskSpec:
       RetryDurationMinutes: 5
     topicConfig:
-      # e2e: fewer partitions on the __CruiseControlMetrics topic => faster CC monitoring coverage
-      partitions: 3
+      partitions: 12
       replicationFactor: 3
-#    resourceRequirements:
-#      requests:
-#        cpu: 500m
-#        memory: 1Gi
-#      limits:
-#        cpu: 500m
-#        memory: 1Gi
-#    image: "adobe/cruise-control:3.0.3-adbe-20250804"
     config: |
       # Copyright 2017 LinkedIn Corp. Licensed under the BSD 2-Clause License (the "License"). See License in the project root for license information.
       #
@@ -106,8 +129,7 @@ spec:
       # Configuration for the metadata client.
       # =======================================
       # The maximum interval in milliseconds between two metadata refreshes.
-      # e2e: must be <= metric.sampling.interval.ms (CC sanityCheckSamplingPeriod); low for the fast 15s sampling
-      metadata.max.age.ms=10000
+      #metadata.max.age.ms=300000
       # Client id for the Cruise Control. It is used for the metadata client.
       #client.id=kafka-cruise-control
       # The size of TCP send buffer bytes for the metadata client.
@@ -136,35 +158,23 @@ spec:
       broker.metric.sample.store.topic=__KafkaCruiseControlModelTrainingSamples
       # The replication factor of Kafka metric sample store topic
       sample.store.topic.replication.factor=2
-      # e2e: shrink CC's sample-store topics from their 32-partitions-each default so broker/disk removal
-      # reshuffles only a few partitions (not 64) and the CC execution completes quickly; not production defaults.
-      # NOTE: CC only ever increases these partition counts (never shrinks), so this only takes effect on a fresh cluster.
-      partition.sample.store.topic.partition.count=3
-      broker.sample.store.topic.partition.count=3
       # The config for the number of Kafka sample store consumer threads
       num.sample.loading.threads=8
       # The partition assignor class for the metric samplers
       metric.sampler.partition.assignor.class=com.linkedin.kafka.cruisecontrol.monitor.sampling.DefaultMetricSamplerPartitionAssignor
       # The metric sampling interval in milliseconds
-      # e2e: sample every 15s (default 120s) so CC accrues valid windows fast; not production defaults
-      metric.sampling.interval.ms=15000
-      # e2e: CC reads the reporter interval for a sanity check and requires it <= the sampling interval
-      cruise.control.metrics.reporter.metrics.reporting.interval.ms=15000
-      # e2e: must be >= metric.sampling.interval.ms (CC sanityCheckSamplingPeriod)
+      metric.sampling.interval.ms=120000
       metric.anomaly.detection.interval.ms=180000
       # The partition metrics window size in milliseconds
-      # e2e: shrink window to the 15s sampling interval so CC accrues a valid window fast; not production defaults
-      partition.metrics.window.ms=15000
+      partition.metrics.window.ms=300000
       # The number of partition metric windows to keep in memory
       num.partition.metrics.windows=1
       # The minimum partition metric samples required for a partition in each window
       min.samples.per.partition.metrics.window=1
       # The broker metrics window size in milliseconds
-      # e2e: shrink window to the 15s sampling interval to speed up CC warmup; not production defaults
-      broker.metrics.window.ms=15000
+      broker.metrics.window.ms=300000
       # The number of broker metric windows to keep in memory
-      # e2e: only 2 broker windows needed for warmup on a tiny static cluster (was 20); not production defaults
-      num.broker.metrics.windows=2
+      num.broker.metrics.windows=20
       # The minimum broker metric samples required for a partition in each window
       min.samples.per.broker.metrics.window=1
       # The configuration for the BrokerCapacityConfigFileResolver (supports JBOD and non-JBOD broker capacities)
@@ -179,9 +189,7 @@ spec:
       # The list of supported hard goals
       hard.goals=com.linkedin.kafka.cruisecontrol.analyzer.goals.ReplicaCapacityGoal,com.linkedin.kafka.cruisecontrol.analyzer.goals.DiskCapacityGoal,com.linkedin.kafka.cruisecontrol.analyzer.goals.NetworkInboundCapacityGoal,com.linkedin.kafka.cruisecontrol.analyzer.goals.NetworkOutboundCapacityGoal,com.linkedin.kafka.cruisecontrol.analyzer.goals.CpuCapacityGoal
       # The minimum percentage of well monitored partitions out of all the partitions
-      # e2e: lowered from CC's 0.995 default so the load model becomes valid quickly on a tiny cluster
-      # with few partitions/windows; not production defaults
-      min.valid.partition.ratio=0.5
+      min.monitored.partition.percentage=0.95
       # The balance threshold for CPU
       cpu.balance.threshold=1.1
       # The balance threshold for disk
@@ -225,8 +233,7 @@ spec:
       # The max number of partitions to move in/out on a given broker at a given time.
       num.concurrent.partition.movements.per.broker=10
       # The interval between two execution progress checks.
-      # e2e: 5s is the floor (must be >= min.execution.progress.check.interval.ms, default 5000); was 10s
-      execution.progress.check.interval.ms=5000
+      execution.progress.check.interval.ms=10000
       # Configurations for anomaly detector
       # =======================================
       # The goal violation notifier class
@@ -301,3 +308,4 @@ spec:
       {
         "min.insync.replicas": 3
       }
+

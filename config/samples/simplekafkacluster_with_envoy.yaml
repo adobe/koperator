@@ -6,69 +6,15 @@ metadata:
   name: kafka
   namespace: kafka
 spec:
-  kRaft: true
   monitoringConfig:
     jmxImage: "ghcr.io/adobe/koperator/jmx-javaagent:1.4.0"
   headlessServiceEnabled: true
+  zkAddresses:
+    - "zookeeper-server-client.zookeeper:2181"
   propagateLabels: false
   oneBrokerPerNode: false
   clusterImage: "ghcr.io/adobe/koperator/kafka:2.13-3.9.1"
-  readOnlyConfig: |
-    auto.create.topics.enable=false
-    cruise.control.metrics.topic.auto.create=true
-    cruise.control.metrics.topic.num.partitions=1
-    cruise.control.metrics.topic.replication.factor=2
-    # e2e: publish CruiseControl metrics every 15s (default 60s) so CC warms up quickly; not production defaults
-    cruise.control.metrics.reporter.metrics.reporting.interval.ms=15000
-  brokerConfigGroups:
-    default:
-      storageConfigs:
-        - mountPath: "/kafka-logs"
-          pvcSpec:
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 10Gi
-    broker:
-      processRoles:
-        - broker
-      storageConfigs:
-        - mountPath: "/kafka-logs-broker"
-          pvcSpec:
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 10Gi
-      brokerAnnotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/port: "9020"
-  brokers:
-    - id: 0
-      brokerConfigGroup: "broker"
-    - id: 1
-      brokerConfigGroup: "broker"
-    - id: 2
-      brokerConfigGroup: "broker"
-    - id: 3
-      brokerConfigGroup: "default"
-      brokerConfig:
-        processRoles:
-          - controller
-          # - broker
-    - id: 4
-      brokerConfigGroup: "default"
-      brokerConfig:
-        processRoles:
-          - controller
-    - id: 5
-      brokerConfigGroup: "default"
-      brokerConfig:
-        processRoles:
-          - controller
-  rollingUpgradeConfig:
-    failureThreshold: 1
+  ingressController: "envoy"
   listenersConfig:
     internalListeners:
       - type: "plaintext"
@@ -80,25 +26,44 @@ spec:
         containerPort: 29093
         usedForInnerBrokerCommunication: false
         usedForControllerCommunication: true
+    externalListeners:
+      - type: "plaintext"
+        name: "external"
+        externalStartingPort: 19090
+        containerPort: 9094
+  readOnlyConfig: |
+    auto.create.topics.enable=false
+    cruise.control.metrics.topic.auto.create=true
+    cruise.control.metrics.topic.num.partitions=1
+    cruise.control.metrics.topic.replication.factor=2
+  brokerConfigGroups:
+    default:
+      storageConfigs:
+        - mountPath: "/kafka-logs"
+          pvcSpec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 10Gi
+      brokerAnnotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9020"
+  brokers:
+    - id: 0
+      brokerConfigGroup: "default"
+    - id: 1
+      brokerConfigGroup: "default"
+    - id: 2
+      brokerConfigGroup: "default"
+  rollingUpgradeConfig:
+    failureThreshold: 1
   cruiseControlConfig:
-    # podSecurityContext:
-    #  runAsNonRoot: false
-    # securityContext:
-    #  privileged: true
     cruiseControlTaskSpec:
       RetryDurationMinutes: 5
     topicConfig:
-      # e2e: fewer partitions on the __CruiseControlMetrics topic => faster CC monitoring coverage
-      partitions: 3
+      partitions: 12
       replicationFactor: 3
-#    resourceRequirements:
-#      requests:
-#        cpu: 500m
-#        memory: 1Gi
-#      limits:
-#        cpu: 500m
-#        memory: 1Gi
-#    image: "adobe/cruise-control:3.0.3-adbe-20250804"
     config: |
       # Copyright 2017 LinkedIn Corp. Licensed under the BSD 2-Clause License (the "License"). See License in the project root for license information.
       #
@@ -106,8 +71,7 @@ spec:
       # Configuration for the metadata client.
       # =======================================
       # The maximum interval in milliseconds between two metadata refreshes.
-      # e2e: must be <= metric.sampling.interval.ms (CC sanityCheckSamplingPeriod); low for the fast 15s sampling
-      metadata.max.age.ms=10000
+      #metadata.max.age.ms=300000
       # Client id for the Cruise Control. It is used for the metadata client.
       #client.id=kafka-cruise-control
       # The size of TCP send buffer bytes for the metadata client.
@@ -136,35 +100,23 @@ spec:
       broker.metric.sample.store.topic=__KafkaCruiseControlModelTrainingSamples
       # The replication factor of Kafka metric sample store topic
       sample.store.topic.replication.factor=2
-      # e2e: shrink CC's sample-store topics from their 32-partitions-each default so broker/disk removal
-      # reshuffles only a few partitions (not 64) and the CC execution completes quickly; not production defaults.
-      # NOTE: CC only ever increases these partition counts (never shrinks), so this only takes effect on a fresh cluster.
-      partition.sample.store.topic.partition.count=3
-      broker.sample.store.topic.partition.count=3
       # The config for the number of Kafka sample store consumer threads
       num.sample.loading.threads=8
       # The partition assignor class for the metric samplers
       metric.sampler.partition.assignor.class=com.linkedin.kafka.cruisecontrol.monitor.sampling.DefaultMetricSamplerPartitionAssignor
       # The metric sampling interval in milliseconds
-      # e2e: sample every 15s (default 120s) so CC accrues valid windows fast; not production defaults
-      metric.sampling.interval.ms=15000
-      # e2e: CC reads the reporter interval for a sanity check and requires it <= the sampling interval
-      cruise.control.metrics.reporter.metrics.reporting.interval.ms=15000
-      # e2e: must be >= metric.sampling.interval.ms (CC sanityCheckSamplingPeriod)
+      metric.sampling.interval.ms=120000
       metric.anomaly.detection.interval.ms=180000
       # The partition metrics window size in milliseconds
-      # e2e: shrink window to the 15s sampling interval so CC accrues a valid window fast; not production defaults
-      partition.metrics.window.ms=15000
+      partition.metrics.window.ms=300000
       # The number of partition metric windows to keep in memory
       num.partition.metrics.windows=1
       # The minimum partition metric samples required for a partition in each window
       min.samples.per.partition.metrics.window=1
       # The broker metrics window size in milliseconds
-      # e2e: shrink window to the 15s sampling interval to speed up CC warmup; not production defaults
-      broker.metrics.window.ms=15000
+      broker.metrics.window.ms=300000
       # The number of broker metric windows to keep in memory
-      # e2e: only 2 broker windows needed for warmup on a tiny static cluster (was 20); not production defaults
-      num.broker.metrics.windows=2
+      num.broker.metrics.windows=20
       # The minimum broker metric samples required for a partition in each window
       min.samples.per.broker.metrics.window=1
       # The configuration for the BrokerCapacityConfigFileResolver (supports JBOD and non-JBOD broker capacities)
@@ -179,9 +131,7 @@ spec:
       # The list of supported hard goals
       hard.goals=com.linkedin.kafka.cruisecontrol.analyzer.goals.ReplicaCapacityGoal,com.linkedin.kafka.cruisecontrol.analyzer.goals.DiskCapacityGoal,com.linkedin.kafka.cruisecontrol.analyzer.goals.NetworkInboundCapacityGoal,com.linkedin.kafka.cruisecontrol.analyzer.goals.NetworkOutboundCapacityGoal,com.linkedin.kafka.cruisecontrol.analyzer.goals.CpuCapacityGoal
       # The minimum percentage of well monitored partitions out of all the partitions
-      # e2e: lowered from CC's 0.995 default so the load model becomes valid quickly on a tiny cluster
-      # with few partitions/windows; not production defaults
-      min.valid.partition.ratio=0.5
+      min.monitored.partition.percentage=0.95
       # The balance threshold for CPU
       cpu.balance.threshold=1.1
       # The balance threshold for disk
@@ -225,8 +175,7 @@ spec:
       # The max number of partitions to move in/out on a given broker at a given time.
       num.concurrent.partition.movements.per.broker=10
       # The interval between two execution progress checks.
-      # e2e: 5s is the floor (must be >= min.execution.progress.check.interval.ms, default 5000); was 10s
-      execution.progress.check.interval.ms=5000
+      execution.progress.check.interval.ms=10000
       # Configurations for anomaly detector
       # =======================================
       # The goal violation notifier class
@@ -241,6 +190,10 @@ spec:
       metric.anomaly.analyzer.metrics=BROKER_PRODUCE_LOCAL_TIME_MS_MAX,BROKER_PRODUCE_LOCAL_TIME_MS_MEAN,BROKER_CONSUMER_FETCH_LOCAL_TIME_MS_MAX,BROKER_CONSUMER_FETCH_LOCAL_TIME_MS_MEAN,BROKER_FOLLOWER_FETCH_LOCAL_TIME_MS_MAX,BROKER_FOLLOWER_FETCH_LOCAL_TIME_MS_MEAN,BROKER_LOG_FLUSH_TIME_MS_MAX,BROKER_LOG_FLUSH_TIME_MS_MEAN
       ## Adjust accordingly if your metrics reporter is an older version and does not produce these metrics.
       #metric.anomaly.analyzer.metrics=BROKER_PRODUCE_LOCAL_TIME_MS_50TH,BROKER_PRODUCE_LOCAL_TIME_MS_999TH,BROKER_CONSUMER_FETCH_LOCAL_TIME_MS_50TH,BROKER_CONSUMER_FETCH_LOCAL_TIME_MS_999TH,BROKER_FOLLOWER_FETCH_LOCAL_TIME_MS_50TH,BROKER_FOLLOWER_FETCH_LOCAL_TIME_MS_999TH,BROKER_LOG_FLUSH_TIME_MS_50TH,BROKER_LOG_FLUSH_TIME_MS_999TH
+      # The zk path to store failed broker information.
+      failed.brokers.zk.path=/CruiseControlBrokerList
+      # Topic config provider class
+      topic.config.provider.class=com.linkedin.kafka.cruisecontrol.config.KafkaTopicConfigProvider
       # The cluster configurations for the KafkaTopicConfigProvider
       cluster.configs.file=config/clusterConfigs.json
       # The maximum time in milliseconds to store the response and access details of a completed user task.
@@ -301,3 +254,5 @@ spec:
       {
         "min.insync.replicas": 3
       }
+
+
