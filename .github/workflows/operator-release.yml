@@ -184,3 +184,34 @@ jobs:
           labels: |
             release
             automated
+
+  sync-gh-pages-version:
+    # Keeps gh-pages' docs version in sync with releases. Pushes directly
+    # (gh-pages has no branch protection) using secrets.PAT, which also
+    # triggers gh-pages to build and deploy the site.
+    runs-on: ubuntu-latest
+    needs: [prepare, release-helm]
+    if: needs.prepare.outputs.is_canonical == 'true'
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout gh-pages
+        uses: actions/checkout@v7
+        with:
+          ref: gh-pages
+          token: ${{ secrets.PAT }}
+      - name: Update docs version
+        run: |
+          TAG="${{ needs.prepare.outputs.tag }}"
+          CONFIG="config/_default/config.toml"
+          sed -i "s/^  latest_version = \"[^\"]*\"/  latest_version = \"${TAG}\"/" "$CONFIG"
+          sed -i "s/^  version = \"[^\"]*\"/  version = \"${TAG}\"/" "$CONFIG"
+          if git diff --quiet -- "$CONFIG"; then
+            echo "Docs version already up to date; nothing to push."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "$CONFIG"
+          git commit -m "Update docs version to ${TAG}"
+          git push origin gh-pages

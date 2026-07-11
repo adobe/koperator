@@ -91,7 +91,7 @@ spec:
     replicas: 1
     image:
         repository: ghcr.io/adobe/zookeeper-operator/zookeeper
-        tag: 3.8.4-0.2.15-adobe-20250923
+        tag: 3.8.4-0.2.15-adobe-20260423
     persistence:
         reclaimPolicy: Delete
 EOF
@@ -124,11 +124,9 @@ kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/ma
 
 > 📦 **View available versions**: [ghcr.io/adobe/helm-charts/kafka-operator](https://github.com/adobe/koperator/pkgs/container/helm-charts%2Fkafka-operator/versions)
 
-```sh
-# Install the latest release
-helm install kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator --namespace=kafka --create-namespace --skip-crds
+OCI registries have no floating "latest" tag, so `--version` is required (replace with your desired version, see available versions above):
 
-# Or install a specific version (replace with desired version)
+```sh
 helm install kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator --version 0.28.0-adobe-20260622 --namespace=kafka --create-namespace --skip-crds
 ```
 

@@ -25,12 +25,9 @@ previous step - without it, Helm's own CRD install can conflict with the `kubect
 
 > 📦 **View available versions**: [ghcr.io/adobe/helm-charts/kafka-operator](https://github.com/adobe/koperator/pkgs/container/helm-charts%2Fkafka-operator/versions)
 
-```bash
-# Install the latest release
-helm install kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator \
-  --namespace=kafka --create-namespace --skip-crds
+OCI registries have no floating "latest" tag, so `--version` is required (see available versions above):
 
-# Or install a specific version
+```bash
 helm install kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator \
   --version 0.28.0-adobe-20260622 --namespace=kafka --create-namespace --skip-crds
 ```
@@ -38,20 +35,16 @@ helm install kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator \
 To install the operator using an already installed cert-manager:
 ```bash
 helm install kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator \
+  --version 0.28.0-adobe-20260622 \
   --set certManager.namespace=<your cert manager namespace> --namespace=kafka --create-namespace --skip-crds
 ```
 
 ## Upgrading the chart
 
 To upgrade the chart since the helm 3 limitation you have to set a value as well to keep your CRDs.
-If this value is not set your CRDs might be deleted.
+If this value is not set your CRDs might be deleted. `--version` is required, same as for install.
 
 ```bash
-# Upgrade to latest version
-helm upgrade kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator \
-  --namespace=kafka
-
-# Upgrade to specific version
 helm upgrade kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator \
   --version 0.28.0-adobe-20260622 --namespace=kafka
 ```
