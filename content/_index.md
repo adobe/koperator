@@ -15,7 +15,7 @@ title: Koperator
 {{< /blocks/cover >}}
 
 {{< blocks/section color="dark" type="row">}}
-{{% blocks/feature icon="fa-lightbulb" title="Learn more about Koperator!" url="{{< relref \"/docs/\" >}}" %}}
+{{% blocks/feature icon="fa-lightbulb" title="Learn more about Koperator!" url="/koperator/docs/" %}}
 Read the Koperator documentation.
 {{% /blocks/feature %}}
 
