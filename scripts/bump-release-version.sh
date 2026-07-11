@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Copyright 2026 Cisco Systems, Inc. and/or its affiliates
 # Copyright 2026 Adobe. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
