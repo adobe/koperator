@@ -135,15 +135,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
       - name: Update Chart.yaml version, values.yaml image tag, and README.md
-        run: |
-          sed -i "s/^version:.*/version: \"${{ needs.prepare.outputs.tag }}\"/" charts/kafka-operator/Chart.yaml
-          sed -i "s/^appVersion:.*/appVersion: \"${{ needs.prepare.outputs.tag }}\"/" charts/kafka-operator/Chart.yaml
-          # Ensure consistent space-based indentation and update tag
-          sed -i 's/\t/  /g' charts/kafka-operator/values.yaml
-          sed -i "/# -- Operator container image tag/{n;s/^[[:space:]]*tag:.*/    tag: \"${{ needs.prepare.outputs.tag }}\"/}" charts/kafka-operator/values.yaml
-          # Update README.md version references
-          sed -i "s/--version [0-9]\+\.[0-9]\+\.[0-9]\+-[a-zA-Z0-9-]\+/--version ${{ needs.prepare.outputs.tag }}/g" charts/kafka-operator/README.md
-          sed -i "s/\`\"\?[0-9]\+\.[0-9]\+\.[0-9]\+-[a-zA-Z0-9-]\+\"\?\`/\`\"${{ needs.prepare.outputs.tag }}\"\`/g" charts/kafka-operator/README.md
+        run: ./scripts/bump-release-version.sh "${{ needs.prepare.outputs.tag }}"
       - name: Push Helm Chart to GHCR
         uses: appany/helm-oci-chart-releaser@v0.5.0
         with:
@@ -174,19 +166,7 @@ jobs:
         with:
           ref: master
       - name: Update version references
-        run: |
-          TAG="${{ needs.prepare.outputs.tag }}"
-          sed -i "s/^version:.*/version: \"${TAG}\"/" charts/kafka-operator/Chart.yaml
-          sed -i "s/^appVersion:.*/appVersion: \"${TAG}\"/" charts/kafka-operator/Chart.yaml
-          sed -i 's/\t/  /g' charts/kafka-operator/values.yaml
-          sed -i "/# -- Operator container image tag/{n;s/^[[:space:]]*tag:.*/    tag: \"${TAG}\"/}" charts/kafka-operator/values.yaml
-          for f in charts/kafka-operator/README.md charts/kafka-operator/README.md.gotmpl; do
-            sed -i "s/--version [0-9]\+\.[0-9]\+\.[0-9]\+-[a-zA-Z0-9-]\+/--version ${TAG}/g" "$f"
-            sed -i "s/\`\"\?[0-9]\+\.[0-9]\+\.[0-9]\+-[a-zA-Z0-9-]\+\"\?\`/\`\"${TAG}\"\`/g" "$f"
-          done
-          sed -i "s/--version [0-9]\+\.[0-9]\+\.[0-9]\+-[a-zA-Z0-9-]\+/--version ${TAG}/g" README.md
-          sed -i "s#img.shields.io/github/go-mod/go-version/adobe/koperator/[0-9]\+\.[0-9]\+\.[0-9]\+-[a-zA-Z0-9-]\+#img.shields.io/github/go-mod/go-version/adobe/koperator/${TAG}#" README.md
-          sed -i "s/kafka-operator-[0-9]\+\.[0-9]\+\.[0-9]\+-[a-zA-Z0-9-]\+\.tgz/kafka-operator-${TAG}.tgz/g" README.md
+        run: ./scripts/bump-release-version.sh "${{ needs.prepare.outputs.tag }}"
       - name: Open PR with version bump
         uses: peter-evans/create-pull-request@v8
         with:
