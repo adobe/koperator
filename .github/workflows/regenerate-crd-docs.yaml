@@ -1,29 +1,34 @@
-name: Sync Release (gh-pages)
+name: Regenerate CRD Docs (gh-pages)
 
-# Dispatched by master's .github/workflows/operator-release.yml
-# (sync-gh-pages-version job) on every canonical dated release, via
-# `gh workflow run sync-release.yaml --ref gh-pages -f tag=...`. Everything
-# this job touches - the docs site's version banner, the CRD reference
-# content, the resulting commit - belongs to gh-pages, so it lives and runs
-# here rather than being inlined into master's release workflow; master's job
-# only needs to say "a canonical release happened, here's the tag" and let
-# this branch own the actual sync.
+# Triggers on the same push that master's operator-release.yml
+# (sync-gh-pages-version job) makes on every canonical dated release, which
+# bumps config/_default/config.toml's version fields and pushes directly to
+# this branch (no branch protection here, so no PR needed). Piggybacking on
+# that push - rather than master separately triggering this workflow by name
+# - sidesteps a real GitHub platform requirement: workflow_dispatch-by-name
+# only works for workflows present on the repo's *default* branch (confirmed
+# by testing), which would mean committing a copy of this workflow to master
+# just for registration. A path-scoped push trigger has no such restriction.
 #
-# Also runnable manually (workflow_dispatch with a tag input) to re-sync on
-# demand without cutting a new release.
+# The `paths` filter means this only fires when config.toml actually changes
+# (i.e. on a real release sync), not on every gh-pages content push.
 on:
+  push:
+    branches: [ gh-pages ]
+    paths:
+      - 'config/_default/config.toml'
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag to sync the docs site to (e.g. 0.28.0-adobe-20260622)'
-        required: true
+        description: 'Release tag to regenerate CRD docs from (defaults to config.toml''s current version if omitted)'
+        required: false
         type: string
 
 permissions:
   contents: read
 
 jobs:
-  sync:
+  regenerate:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout gh-pages
@@ -32,15 +37,22 @@ jobs:
           ref: gh-pages
           token: ${{ secrets.PAT }}
 
-      - name: Update docs version
-        # config/_default/config.toml hardcodes the docs site's "version" /
-        # "latest_version" fields; nothing else keeps them in sync with
-        # releases otherwise (seen: ~10 releases stale before this existed).
+      - name: Determine release tag
+        id: tag
         run: |
           TAG="${{ inputs.tag }}"
-          CONFIG="config/_default/config.toml"
-          sed -i "s/^  latest_version = \"[^\"]*\"/  latest_version = \"${TAG}\"/" "$CONFIG"
-          sed -i "s/^  version = \"[^\"]*\"/  version = \"${TAG}\"/" "$CONFIG"
+          if [ -z "$TAG" ]; then
+            # No explicit input (the normal case - triggered by master's
+            # version-bump push): read the version config.toml was just
+            # updated to, so this always regenerates from exactly the release
+            # that triggered it, with no separate hand-off of the tag needed.
+            TAG=$(sed -n 's/^  version = "\([^"]*\)"/\1/p' config/_default/config.toml)
+          fi
+          if [ -z "$TAG" ]; then
+            echo "::error::Could not determine a release tag (no workflow_dispatch input and no 'version' found in config/_default/config.toml)."
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Install crd-docs-generator
         run: |
@@ -60,7 +72,7 @@ jobs:
 
       - name: Generate crd-docs-generator config
         run: |
-          TAG="${{ inputs.tag }}"
+          TAG="${{ steps.tag.outputs.tag }}"
           GEN_DIR="$GITHUB_WORKSPACE/.github/crd-docs-generator"
           OUT_DIR="$GITHUB_WORKSPACE/content/docs/configurations/crd"
           # crd-docs-generator clones https://github.com/adobe/koperator at
@@ -118,21 +130,20 @@ jobs:
           done
           exit "$missing"
 
-      - name: Commit and push
+      - name: Commit and push regenerated CRD reference docs
         run: |
-          TAG="${{ inputs.tag }}"
+          TAG="${{ steps.tag.outputs.tag }}"
           # Must catch untracked files too (a brand-new CRD's page won't show
           # up in `git diff`), so this uses `git status --porcelain` rather
-          # than `git diff --quiet`, across both the config.toml version bump
-          # and the regenerated CRD docs.
-          if [ -z "$(git status --porcelain -- config/_default/config.toml content/docs/configurations/crd)" ]; then
-            echo "Docs site already up to date for ${TAG}; nothing to push."
+          # than `git diff --quiet`.
+          if [ -z "$(git status --porcelain -- content/docs/configurations/crd)" ]; then
+            echo "CRD reference docs already up to date; nothing to push."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add config/_default/config.toml content/docs/configurations/crd
-          git commit -m "Sync docs site to release ${TAG}"
+          git add content/docs/configurations/crd
+          git commit -m "Regenerate CRD reference docs for ${TAG}"
           # Must push with secrets.PAT, not the default GITHUB_TOKEN: pushes
           # authored by GITHUB_TOKEN don't trigger other workflows, which
           # would silently skip this branch's own publish-docs.yaml deploy.

@@ -2,9 +2,10 @@
   Custom output template for github.com/giantswarm/crd-docs-generator, used
   by .github/workflows/regenerate-crd-docs.yaml (this branch) to regenerate
   the CRD reference pages under content/docs/configurations/crd/ for every
-  canonical release. That workflow is dispatched by master's
-  .github/workflows/operator-release.yml (sync-gh-pages-version job) via
-  `gh workflow run`, passing the release tag as an input.
+  canonical release. That workflow triggers on the same push master's
+  .github/workflows/operator-release.yml (sync-gh-pages-version job) makes to
+  bump config/_default/config.toml's version fields, and reads the tag from
+  that same file rather than needing a separate hand-off.
 
   This is the upstream template (giantswarm/crd-docs-generator/templates/crd.template)
   with two koperator-specific additions layered on top, so regeneration stays a
