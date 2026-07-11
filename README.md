@@ -120,16 +120,16 @@ kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/ma
 kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_kafkausers.yaml
 ```
 
-2. Install Koperator into the `kafka` namespace using the OCI Helm chart from GitHub Container Registry:
+2. Install Koperator into the `kafka` namespace using the OCI Helm chart from GitHub Container Registry. Use `--skip-crds` since the CRDs were already installed in the previous step - without it, Helm's own CRD install can conflict with the `kubectl apply` above ([#265](https://github.com/adobe/koperator/issues/265)):
 
 > 📦 **View available versions**: [ghcr.io/adobe/helm-charts/kafka-operator](https://github.com/adobe/koperator/pkgs/container/helm-charts%2Fkafka-operator/versions)
 
 ```sh
 # Install the latest release
-helm install kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator --namespace=kafka --create-namespace
+helm install kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator --namespace=kafka --create-namespace --skip-crds
 
 # Or install a specific version (replace with desired version)
-helm install kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator --version 0.28.0-adobe-20260622 --namespace=kafka --create-namespace
+helm install kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator --version 0.28.0-adobe-20260622 --namespace=kafka --create-namespace --skip-crds
 ```
 
 #### Pull and inspect the chart before installation
@@ -143,7 +143,7 @@ tar -xzf kafka-operator-0.28.0-adobe-20260622.tgz
 helm template kafka-operator ./kafka-operator/
 
 # Install from local chart
-helm install kafka-operator ./kafka-operator/ --namespace=kafka --create-namespace
+helm install kafka-operator ./kafka-operator/ --namespace=kafka --create-namespace --skip-crds
 ```
 
 1. Create the Kafka cluster using the `KafkaCluster` custom resource. The quick start uses a minimal custom resource, but there are other examples in the same directory.
