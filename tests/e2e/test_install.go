@@ -16,6 +16,8 @@
 package e2e
 
 import (
+	"sync"
+
 	"github.com/gruntwork-io/terratest/modules/k8s"
 	ginkgo "github.com/onsi/ginkgo/v2"
 	gomega "github.com/onsi/gomega"
@@ -31,39 +33,71 @@ func testInstall() bool {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 
-		ginkgo.When("Installing cert-manager", func() {
-			ginkgo.It("Installing cert-manager Helm chart", func() {
-				err = certManagerHelmDescriptor.installHelmChart(kubectlOptions)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			})
+		ginkgo.It("Installing infrastructure components in parallel", func() {
+			var wg sync.WaitGroup
+			errChan := make(chan error, 2)
+
+			// Install cert-manager and Contour in parallel - independent charts, no install-order dependency
+			wg.Add(2)
+
+			go func() {
+				defer wg.Done()
+				ginkgo.By("Installing cert-manager Helm chart")
+				if installErr := certManagerHelmDescriptor.installHelmChart(kubectlOptions); installErr != nil {
+					errChan <- installErr
+				}
+			}()
+
+			go func() {
+				defer wg.Done()
+				ginkgo.By("Installing Contour Helm chart")
+				if installErr := contourIngressControllerHelmDescriptor.installHelmChart(kubectlOptions); installErr != nil {
+					errChan <- installErr
+				}
+			}()
+
+			wg.Wait()
+			close(errChan)
+
+			for installErr := range errChan {
+				gomega.Expect(installErr).NotTo(gomega.HaveOccurred())
+			}
 		})
 
-		ginkgo.When("Installing contour ingress controller", func() {
-			ginkgo.It("Installing contour Helm chart", func() {
-				err = contourIngressControllerHelmDescriptor.installHelmChart(kubectlOptions)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			})
+		ginkgo.It("Installing dependency operators in parallel", func() {
+			var wg sync.WaitGroup
+			errChan := make(chan error, 2)
+
+			// Install zookeeper-operator and prometheus-operator in parallel - independent charts, no install-order dependency
+			wg.Add(2)
+
+			go func() {
+				defer wg.Done()
+				ginkgo.By("Installing zookeeper-operator Helm chart")
+				if installErr := zookeeperOperatorHelmDescriptor.installHelmChart(kubectlOptions); installErr != nil {
+					errChan <- installErr
+				}
+			}()
+
+			go func() {
+				defer wg.Done()
+				ginkgo.By("Installing prometheus-operator Helm chart")
+				if installErr := prometheusOperatorHelmDescriptor.installHelmChart(kubectlOptions); installErr != nil {
+					errChan <- installErr
+				}
+			}()
+
+			wg.Wait()
+			close(errChan)
+
+			for installErr := range errChan {
+				gomega.Expect(installErr).NotTo(gomega.HaveOccurred())
+			}
 		})
 
-		ginkgo.When("Installing zookeeper-operator", func() {
-			ginkgo.It("Installing zookeeper-operator Helm chart", func() {
-				err = zookeeperOperatorHelmDescriptor.installHelmChart(kubectlOptions)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			})
-		})
-
-		ginkgo.When("Installing prometheus-operator", func() {
-			ginkgo.It("Installing prometheus-operator Helm chart", func() {
-				err = prometheusOperatorHelmDescriptor.installHelmChart(kubectlOptions)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			})
-		})
-
-		ginkgo.When("Installing Koperator", func() {
-			ginkgo.It("Installing Koperator Helm chart", func() {
-				err = koperatorLocalHelmDescriptor.installHelmChart(kubectlOptions)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			})
+		ginkgo.It("Installing Koperator Helm chart", func() {
+			err = koperatorLocalHelmDescriptor.installHelmChart(kubectlOptions)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 	})
 }
