@@ -158,16 +158,32 @@ h3[class*="type-"]::before {
   cursor: pointer;
   user-select: none;
   display: flex;
-  align-items: baseline;
-  gap: 0.35rem;
+  align-items: center;
+  gap: 0.5rem;
 
   &::before {
-    content: "▾";
-    color: $gray-600;
+    content: "−";
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 1.5rem;
+    height: 1.5rem;
+    border: 1px solid $gray-400;
+    border-radius: 50%;
+    background-color: $gray-100;
+    color: $primary;
+    font-size: 1.1rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  &:hover::before {
+    background-color: $gray-200;
   }
 }
 .property.collapsed > .property-header.has-children::before {
-  content: "▸";
+  content: "+";
 }
 
 .property.js-hidden {
