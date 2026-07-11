@@ -3,7 +3,7 @@
 ![Koperator](https://img.shields.io/github/v/release/adobe/koperator?label=Koperator)
 ![Released](https://img.shields.io/github/release-date/adobe/koperator?label=Released)
 ![License](https://img.shields.io/github/license/adobe/koperator?label=License)
-![Go version (latest release)](https://img.shields.io/github/go-mod/go-version/adobe/koperator/0.28.0-adobe-20250923)
+![Go version (latest release)](https://img.shields.io/github/go-mod/go-version/adobe/koperator/0.28.0-adobe-20260622)
 
 </p>
 
@@ -129,17 +129,17 @@ kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/ma
 helm install kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator --namespace=kafka --create-namespace
 
 # Or install a specific version (replace with desired version)
-helm install kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator --version 0.28.0-adobe-20250923 --namespace=kafka --create-namespace
+helm install kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator --version 0.28.0-adobe-20260622 --namespace=kafka --create-namespace
 ```
 
 #### Pull and inspect the chart before installation
 
 ```sh
 # Pull the chart locally
-helm pull oci://ghcr.io/adobe/helm-charts/kafka-operator --version 0.28.0-adobe-20250923
+helm pull oci://ghcr.io/adobe/helm-charts/kafka-operator --version 0.28.0-adobe-20260622
 
 # Extract and inspect
-tar -xzf kafka-operator-0.28.0-adobe-20250923.tgz
+tar -xzf kafka-operator-0.28.0-adobe-20260622.tgz
 helm template kafka-operator ./kafka-operator/
 
 # Install from local chart

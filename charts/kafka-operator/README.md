@@ -30,7 +30,7 @@ helm install kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator \
 
 # Or install a specific version
 helm install kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator \
-  --version 0.28.0-adobe-20250923 --namespace=kafka --create-namespace
+  --version 0.28.0-adobe-20260622 --namespace=kafka --create-namespace
 ```
 
 To install the operator using an already installed cert-manager:
@@ -51,7 +51,7 @@ helm upgrade kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator \
 
 # Upgrade to specific version
 helm upgrade kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator \
-  --version 0.28.0-adobe-20250923 --namespace=kafka
+  --version 0.28.0-adobe-20260622 --namespace=kafka
 ```
 
 ## Uninstalling the Chart
@@ -71,7 +71,7 @@ The command removes all the Kubernetes components associated with the chart and 
 | replicaCount | int | `1` | Operator replica count can be set |
 | operator.annotations | object | `{}` | Operator pod annotations can be set |
 | operator.image.repository | string | `"ghcr.io/adobe/koperator"` | Operator container image repository |
-| operator.image.tag | string | `"0.28.0-adobe-20250923"` | Operator container image tag |
+| operator.image.tag | string | `"0.28.0-adobe-20260622"` | Operator container image tag |
 | operator.image.pullPolicy | string | `"IfNotPresent"` | Operator container image pull policy |
 | operator.namespaces | string | `"kafka, cert-manager"` | List of namespaces where Operator watches for custom resources.<br><br>**Note** that the operator still requires to read the cluster-scoped `Node` labels to configure `rack awareness`. Make sure the operator ServiceAccount is granted `get` permissions on this `Node` resource when using limited RBACs. |
 | operator.verboseLogging | bool | `false` | Enable verbose logging |
