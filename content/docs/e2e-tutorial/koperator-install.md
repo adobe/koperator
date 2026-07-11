@@ -185,7 +185,7 @@ The operator is configured with the following key settings:
 - **Webhook disabled**: Simplifies the tutorial setup
 - **Namespace**: Operates in the `kafka` namespace
 - **Image**: Uses the official Adobe Koperator image
-- **Version**: 0.28.0-adobe-20250923
+- **Version**: {{< param "latest_version" >}}
 
 ## 7. Operator Capabilities
 
