@@ -13,22 +13,21 @@ This page shows you the list of supported Koperator versions, and the versions o
 
 |Image|Go version|
 |-|-|
-|ghcr.io/adobe/koperator/kafka-operator:{{< param "latest_version" >}}|1.25|
+|ghcr.io/adobe/koperator/kafka-operator:{{< param "latest_version" >}}|1.26|
 
 ## Available Apache Kafka images
 
-> **Note**: Starting from version 0.25.0, Kafka images are published to `ghcr.io/adobe/kafka` instead of `ghcr.io/banzaicloud/kafka`.
+> **Note**: Starting from version 0.25.0, Kafka images are published to `ghcr.io/adobe/koperator/kafka` instead of `ghcr.io/banzaicloud/kafka`.
 
 |Image|Java version|
 |-|-|
-|ghcr.io/adobe/kafka:2.13-3.9.1|21|
+|ghcr.io/adobe/koperator/kafka:2.13-3.9.2-jdk21.0.11|21|
 
 ## Available JMX Exporter images
 
 |Image|Java version|
 |-|-|
-
-|ghcr.io/amuraru/jmx-javaagent:0.19.1|21|
+|ghcr.io/adobe/koperator/jmx-javaagent:1.4.0|21|
 
 ## Available Cruise Control images
 
