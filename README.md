@@ -122,7 +122,7 @@ kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/ma
 
 2. Install Koperator into the `kafka` namespace using the OCI Helm chart from GitHub Container Registry:
 
-> 📦 **View available versions**: [ghcr.io/adobe/koperator/kafka-operator](https://github.com/adobe/koperator/pkgs/container/koperator%2Fkafka-operator/versions)
+> 📦 **View available versions**: [ghcr.io/adobe/helm-charts/kafka-operator](https://github.com/adobe/koperator/pkgs/container/helm-charts%2Fkafka-operator/versions)
 
 ```sh
 # Install the latest release
@@ -136,7 +136,7 @@ helm install kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator --ver
 
 ```sh
 # Pull the chart locally
-helm pull oci://ghcr.io/adobe/koperator/kafka-operator --version 0.28.0-adobe-20250923
+helm pull oci://ghcr.io/adobe/helm-charts/kafka-operator --version 0.28.0-adobe-20250923
 
 # Extract and inspect
 tar -xzf kafka-operator-0.28.0-adobe-20250923.tgz
