@@ -21,7 +21,7 @@ kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/ma
 
 To install the chart from the OCI registry:
 
-> 📦 **View available versions**: [ghcr.io/adobe/koperator/kafka-operator](https://github.com/adobe/koperator/pkgs/container/koperator%2Fkafka-operator/versions)
+> 📦 **View available versions**: [ghcr.io/adobe/helm-charts/kafka-operator](https://github.com/adobe/koperator/pkgs/container/helm-charts%2Fkafka-operator/versions)
 
 ```bash
 # Install the latest release
@@ -46,11 +46,11 @@ If this value is not set your CRDs might be deleted.
 
 ```bash
 # Upgrade to latest version
-helm upgrade kafka-operator oci://ghcr.io/adobe/koperator/kafka-operator \
+helm upgrade kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator \
   --namespace=kafka
 
 # Upgrade to specific version
-helm upgrade kafka-operator oci://ghcr.io/adobe/koperator/kafka-operator \
+helm upgrade kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator \
   --version 0.28.0-adobe-20250923 --namespace=kafka
 ```
 
