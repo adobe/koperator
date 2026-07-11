@@ -55,6 +55,9 @@ weight = 1
   project_name = "Koperator"
   product_name = "Koperator"
 
+  # latest_version/version below are auto-bumped on every canonical release
+  # by .github/workflows/operator-release.yml (master) pushing to this file;
+  # that same push also triggers regenerate-crd-docs.yaml (this branch).
   latest_version = "0.28.0-adobe-20260622" # Used in some installation commands
 
   ###############################################################################
