@@ -12,12 +12,12 @@ crd:
   technical_name: kafkaclusters.kafka.banzaicloud.io
   scope: Namespaced
   source_repository: https://github.com/adobe/koperator
-  source_repository_ref: master
+  source_repository_ref: 0.28.0-adobe-20260622
   versions:
     - v1beta1
   topics:
 layout: crd
-# This schema has ~2,143 properties, all rendered as <h3>: Hugo/Docsy's
+# This schema has 2143 properties, all rendered as <h3>: Hugo/Docsy's
 # "on this page" TOC would otherwise try to list every single one.
 notoc: true
 owner:
@@ -26,14 +26,14 @@ aliases:
   - /reference/cp-k8s-api/kafkaclusters.kafka.banzaicloud.io/
 technical_name: kafkaclusters.kafka.banzaicloud.io
 source_repository: https://github.com/adobe/koperator
-source_repository_ref: master
+source_repository_ref: 0.28.0-adobe-20260622
 ---
 
 ## KafkaCluster
 
 > 📖 **Browse this schema interactively**: [doc.crds.dev](https://doc.crds.dev/github.com/adobe/koperator/kafka.banzaicloud.io/KafkaCluster/v1beta1@0.28.0-adobe-20260622)
 
-<p class="crd-description">KafkaCluster is the Schema for the kafkaclusters API</p>
+KafkaCluster is the Schema for the kafkaclusters API
 <dl class="crd-meta">
 <dt class="fullname">Full name:</dt>
 <dd class="fullname">kafkaclusters.kafka.banzaicloud.io</dd>

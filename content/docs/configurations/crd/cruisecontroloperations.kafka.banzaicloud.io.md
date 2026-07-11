@@ -12,7 +12,7 @@ crd:
   technical_name: cruisecontroloperations.kafka.banzaicloud.io
   scope: Namespaced
   source_repository: https://github.com/adobe/koperator
-  source_repository_ref: master
+  source_repository_ref: 0.28.0-adobe-20260622
   versions:
     - v1alpha1
   topics:
@@ -23,14 +23,14 @@ aliases:
   - /reference/cp-k8s-api/cruisecontroloperations.kafka.banzaicloud.io/
 technical_name: cruisecontroloperations.kafka.banzaicloud.io
 source_repository: https://github.com/adobe/koperator
-source_repository_ref: master
+source_repository_ref: 0.28.0-adobe-20260622
 ---
 
 ## CruiseControlOperation
 
 > 📖 **Browse this schema interactively**: [doc.crds.dev](https://doc.crds.dev/github.com/adobe/koperator/kafka.banzaicloud.io/CruiseControlOperation/v1alpha1@0.28.0-adobe-20260622)
 
-<p class="crd-description">CruiseControlOperation is the Schema for the cruiseControlOperation API.</p>
+CruiseControlOperation is the Schema for the cruiseControlOperation API.
 <dl class="crd-meta">
 <dt class="fullname">Full name:</dt>
 <dd class="fullname">cruisecontroloperations.kafka.banzaicloud.io</dd>
