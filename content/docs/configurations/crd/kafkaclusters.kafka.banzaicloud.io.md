@@ -17,6 +17,9 @@ crd:
     - v1beta1
   topics:
 layout: crd
+# This schema has ~1,938 properties, all rendered as <h3>: Hugo/Docsy's
+# "on this page" TOC would otherwise try to list every single one.
+notoc: true
 owner:
   - https://github.com/banzaicloud/
 aliases:
@@ -28,6 +31,7 @@ source_repository_ref: master
 
 ## KafkaCluster
 
+> 📖 **Browse this schema interactively**: [doc.crds.dev](https://doc.crds.dev/github.com/adobe/koperator/kafka.banzaicloud.io/KafkaCluster/v1beta1@0.28.0-adobe-20260622)
 
 KafkaCluster is the Schema for the kafkaclusters API
 <dl class="crd-meta">

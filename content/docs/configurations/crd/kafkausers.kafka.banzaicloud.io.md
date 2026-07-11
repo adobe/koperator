@@ -28,6 +28,7 @@ source_repository_ref: master
 
 ## KafkaUser
 
+> 📖 **Browse this schema interactively**: [doc.crds.dev](https://doc.crds.dev/github.com/adobe/koperator/kafka.banzaicloud.io/KafkaUser/v1alpha1@0.28.0-adobe-20260622)
 
 KafkaUser is the Schema for the kafka users API
 <dl class="crd-meta">
