@@ -118,7 +118,7 @@ helm template zookeeper-operator \
   --namespace=zookeeper \
   --set crd.create=false \
   --set image.repository='adobe/zookeeper-operator' \
-  --set image.tag='0.2.15-adobe-20250914' \
+  --set image.tag='0.2.15-adobe-20260423' \
   ./charts/zookeeper-operator | kubectl create -n zookeeper -f -
 
 # Wait for operator to be ready
@@ -141,7 +141,7 @@ spec:
   replicas: 3
   image:
     repository: adobe/zookeeper
-    tag: 3.8.4-0.2.15-adobe-20250914
+    tag: 3.8.4-0.2.15-adobe-20260423
     pullPolicy: IfNotPresent
   config:
     initLimit: 10
@@ -181,7 +181,7 @@ kubectl wait --for=condition=Ready pod --all -n zookeeper --timeout=600s
 **Expected output:**
 ```
 NAME   REPLICAS   READY REPLICAS   VERSION                           DESIRED VERSION                   INTERNAL ENDPOINT    EXTERNAL ENDPOINT   AGE
-zk     3          3               3.8.4-0.2.15-adobe-20250914      3.8.4-0.2.15-adobe-20250914      zk-client:2181                           5m
+zk     3          3               3.8.4-0.2.15-adobe-20260423      3.8.4-0.2.15-adobe-20260423      zk-client:2181                           5m
 ```
 
 ## 3. Install Prometheus Operator
