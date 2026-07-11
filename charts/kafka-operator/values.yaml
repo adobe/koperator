@@ -72,6 +72,14 @@ certManager:
   # https://cert-manager.io/docs/configuration/
   namespace: "cert-manager"
 
+contour:
+  # -- Enable Project Contour ingress integration. Only enable this when the
+  # Kafka cluster uses `ingressController: contour`. When enabled, Project
+  # Contour's HTTPProxy CRD (projectcontour.io/v1) must be installed in the
+  # cluster, otherwise the operator fails to start.
+  # https://projectcontour.io
+  enabled: false
+
 certSigning:
   # -- Enable native certificate signing integration
   enabled: true

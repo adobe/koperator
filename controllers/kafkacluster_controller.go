@@ -360,7 +360,7 @@ func (r *KafkaClusterReconciler) updateAndFetchLatest(ctx context.Context, clust
 }
 
 // SetupKafkaClusterWithManager registers kafka cluster controller to the manager
-func SetupKafkaClusterWithManager(mgr ctrl.Manager) *ctrl.Builder {
+func SetupKafkaClusterWithManager(mgr ctrl.Manager, contourEnabled bool) *ctrl.Builder {
 	log := mgr.GetLogger()
 	builder := ctrl.NewControllerManagedBy(mgr).
 		For(&v1beta1.KafkaCluster{}).
@@ -369,7 +369,14 @@ func SetupKafkaClusterWithManager(mgr ctrl.Manager) *ctrl.Builder {
 
 	kafkaWatches(builder)
 	envoyWatches(builder)
-	contourWatches(builder)
+	// The Contour watch (Owns(&contour.HTTPProxy{})) is only registered when
+	// Contour ingress is enabled. Registering it unconditionally makes the
+	// manager depend on Project Contour's HTTPProxy CRD being installed: when it
+	// is absent the informer never syncs and the operator crash-loops.
+	// See https://github.com/adobe/koperator/issues/229.
+	if contourEnabled {
+		contourWatches(builder)
+	}
 	cruiseControlWatches(builder)
 
 	builder.WithEventFilter(

@@ -70,6 +70,11 @@ var (
 				"crds/kafkatopics.yaml",
 				"crds/kafkausers.yaml",
 			},
+			// Contour is installed as a dependency above (with its HTTPProxy
+			// CRD), so enable the operator's Contour integration to exercise it.
+			SetValues: map[string]string{
+				"contour.enabled": trueString,
+			},
 		}
 		// Set helm chart values for Koperator to be able to use custom image
 		koperatorImagePath := os.Getenv("IMG_E2E")
@@ -83,10 +88,8 @@ var (
 				koperatorImageTag = koperatorImagePathSplit[1]
 			}
 
-			koperatorLocalHelmDescriptor.SetValues = map[string]string{
-				"operator.image.repository": koperatorImageRepository,
-				"operator.image.tag":        koperatorImageTag,
-			}
+			koperatorLocalHelmDescriptor.SetValues["operator.image.repository"] = koperatorImageRepository
+			koperatorLocalHelmDescriptor.SetValues["operator.image.tag"] = koperatorImageTag
 		}
 
 		return koperatorLocalHelmDescriptor

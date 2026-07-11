@@ -87,6 +87,7 @@ The command removes all the Kubernetes components associated with the chart and 
 | webhook.certs.secret | string | `"kafka-operator-serving-cert"` | Helm chart will use the secret name applied here for the cert |
 | certManager.enabled | bool | `false` | Operator will integrate with the cert manager |
 | certManager.namespace | string | `"cert-manager"` | Operator will look for the cert manager in this namespace namespace field specifies the Cert-manager's Cluster Resource Namespace. https://cert-manager.io/docs/configuration/ |
+| contour.enabled | bool | `false` | Enable Project Contour ingress integration. Only enable this when the Kafka cluster uses `ingressController: contour`. When enabled, Project Contour's HTTPProxy CRD (projectcontour.io/v1) must be installed in the cluster, otherwise the operator fails to start. https://projectcontour.io |
 | certSigning.enabled | bool | `true` | Enable native certificate signing integration |
 | alertManager.enable | bool | `true` | AlertManager can be enabled |
 | alertManager.port | int | `9001` | AlertManager port |

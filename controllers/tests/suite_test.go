@@ -163,7 +163,7 @@ var _ = BeforeSuite(func(ctx SpecContext) {
 		KafkaClientProvider: kafkaclient.NewMockProvider(),
 	}
 
-	err = controllers.SetupKafkaClusterWithManager(mgr).Complete(&kafkaClusterReconciler)
+	err = controllers.SetupKafkaClusterWithManager(mgr, true).Complete(&kafkaClusterReconciler)
 	Expect(err).NotTo(HaveOccurred())
 
 	kafkaTopicReconciler := &controllers.KafkaTopicReconciler{
