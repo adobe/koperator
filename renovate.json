@@ -50,6 +50,17 @@
       ],
       "datasourceTemplate": "{{datasource}}",
       "depNameTemplate": "{{packageName}}"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/(^|/)\\.github/actions/kind-create/action\\.yaml$/"
+      ],
+      "matchStrings": [
+        "(?:default|version):\\s*'?(?<currentValue>[^\\s'#]+)'?\\s*#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<packageName>\\S+)"
+      ],
+      "datasourceTemplate": "{{datasource}}",
+      "depNameTemplate": "{{packageName}}"
     }
   ],
   "packageRules": [
