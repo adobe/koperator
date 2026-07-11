@@ -105,7 +105,7 @@ helm uninstall kafka-operator -n kafka
 helm install kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator \
   --namespace=kafka \
   --set webhook.enabled=false \
-  --version 0.28.0-adobe-20250923
+  --version {{< param "latest_version" >}}
 ```
 
 ### Issue: Kafka Brokers Not Starting

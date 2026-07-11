@@ -80,11 +80,14 @@ How to setup the environment for the Kafka Performance Test.
     kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_kafkausers.yaml
     ```
 
+    OCI registries have no floating "latest" tag, so `--version` is required:
+
     ```bash
     helm install kafka-operator \
     oci://ghcr.io/adobe/helm-charts/kafka-operator \
     --namespace=kafka \
-    --create-namespace
+    --create-namespace \
+    --version {{< param "latest_version" >}}
     ```
 
 1. Create a 3-broker Kafka Cluster using [this YAML file](https://raw.githubusercontent.com/adobe/koperator/master/docs/benchmarks/infrastructure/kafka.yaml).

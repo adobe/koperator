@@ -19,10 +19,11 @@ When upgrading your Koperator deployment to a new version, complete the followin
     kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_kafkausers.yaml
     ```
 
-1. Update your Koperator deployment by running:
+1. Update your Koperator deployment by running (OCI registries have no floating "latest" tag, so `--version` is required):
 
     ```bash
     helm upgrade kafka-operator \
     oci://ghcr.io/adobe/helm-charts/kafka-operator \
-    --namespace=kafka
+    --namespace=kafka \
+    --version {{< param "latest_version" >}}
     ```

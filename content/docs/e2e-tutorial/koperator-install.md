@@ -76,11 +76,12 @@ kafkausers.kafka.banzaicloud.io                2024-01-15T10:30:00Z
 Now install the Koperator using the OCI Helm chart:
 
 ```bash
-# Install Koperator using OCI Helm chart
+# Install Koperator using OCI Helm chart (OCI registries have no floating
+# "latest" tag, so --version is required)
 helm install kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator \
   --namespace=kafka \
   --set webhook.enabled=false \
-  --version 0.28.0-adobe-20250923
+  --version {{< param "latest_version" >}}
 
 # Wait for the operator to be ready
 kubectl wait --for=condition=Available deployment --all -n kafka --timeout=300s
@@ -257,7 +258,7 @@ helm uninstall kafka-operator -n kafka
 helm install kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator \
   --namespace=kafka \
   --set webhook.enabled=false \
-  --version 0.28.0-adobe-20250923
+  --version {{< param "latest_version" >}}
 ```
 
 ## 9. Verification Checklist

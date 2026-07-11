@@ -544,11 +544,9 @@ Koperator can be deployed using its [Helm chart](https://github.com/adobe/kopera
 
     > 📦 **View available versions**: [ghcr.io/adobe/koperator/kafka-operator](https://github.com/adobe/koperator/pkgs/container/koperator%2Fkafka-operator/versions)
 
-    ```bash
-    # Install the latest release
-    helm install kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator --namespace=kafka --create-namespace
+    OCI registries have no floating "latest" tag, so `--version` is required (see available versions above):
 
-    # Or install a specific version (replace with desired version)
+    ```bash
     helm install kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator --version {{< param "latest_version" >}} --namespace=kafka --create-namespace
     ```
 
