@@ -32,6 +32,36 @@ runs:
       node_image: kindest/node:${{ inputs.kind_k8s_version }}
       config: ${{ inputs.kind_config }}
 
+  - name: Verify all nodes are healthy, recreating the cluster otherwise
+    # The control plane occasionally never reports Ready on the runner (flaky
+    # infra), which otherwise goes unnoticed here and only surfaces 30-45
+    # minutes later as an opaque e2e test timeout. Recreate the cluster a
+    # couple of times before giving up.
+    run: |
+      max_attempts=3
+      attempt=1
+      until kubectl wait --for=condition=Ready nodes --all --timeout=120s; do
+        echo "::warning::kind cluster nodes not all Ready (attempt ${attempt}/${max_attempts})"
+        kubectl get nodes -o wide || true
+
+        if [ "${attempt}" -ge "${max_attempts}" ]; then
+          echo "::error::kind cluster nodes never became Ready after ${max_attempts} attempts"
+          kubectl describe nodes || true
+          exit 1
+        fi
+
+        attempt=$((attempt + 1))
+        echo "Recreating kind cluster '${{ inputs.kind_cluster_name }}' (attempt ${attempt}/${max_attempts})..."
+        kind delete cluster --name "${{ inputs.kind_cluster_name }}"
+        kind create cluster \
+          --name "${{ inputs.kind_cluster_name }}" \
+          --image "kindest/node:${{ inputs.kind_k8s_version }}" \
+          --config "${{ inputs.kind_config }}" \
+          --wait 120s
+      done
+      echo "All kind cluster nodes are Ready."
+    shell: bash
+
   - name: Check kind cluster and extract kubeconfig
     id: check-kind-cluster
     run: |
