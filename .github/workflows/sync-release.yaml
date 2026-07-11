@@ -1,0 +1,139 @@
+name: Sync Release (gh-pages)
+
+# Dispatched by master's .github/workflows/operator-release.yml
+# (sync-gh-pages-version job) on every canonical dated release, via
+# `gh workflow run sync-release.yaml --ref gh-pages -f tag=...`. Everything
+# this job touches - the docs site's version banner, the CRD reference
+# content, the resulting commit - belongs to gh-pages, so it lives and runs
+# here rather than being inlined into master's release workflow; master's job
+# only needs to say "a canonical release happened, here's the tag" and let
+# this branch own the actual sync.
+#
+# Also runnable manually (workflow_dispatch with a tag input) to re-sync on
+# demand without cutting a new release.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to sync the docs site to (e.g. 0.28.0-adobe-20260622)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout gh-pages
+        uses: actions/checkout@v7
+        with:
+          ref: gh-pages
+          token: ${{ secrets.PAT }}
+
+      - name: Update docs version
+        # config/_default/config.toml hardcodes the docs site's "version" /
+        # "latest_version" fields; nothing else keeps them in sync with
+        # releases otherwise (seen: ~10 releases stale before this existed).
+        run: |
+          TAG="${{ inputs.tag }}"
+          CONFIG="config/_default/config.toml"
+          sed -i "s/^  latest_version = \"[^\"]*\"/  latest_version = \"${TAG}\"/" "$CONFIG"
+          sed -i "s/^  version = \"[^\"]*\"/  version = \"${TAG}\"/" "$CONFIG"
+
+      - name: Install crd-docs-generator
+        run: |
+          # `go install github.com/giantswarm/crd-docs-generator@vX.Y.Z` does NOT
+          # work here: its go.mod carries `replace` directives, and `go install`
+          # of a remote module refuses to honor those (verified locally: fails
+          # with "must not contain directives that would cause it to be
+          # interpreted differently than if it were the main module"). Use the
+          # project's published release binary instead - no Go toolchain needed.
+          CRD_DOCS_GENERATOR_VERSION="v0.12.8"
+          mkdir -p "$RUNNER_TEMP/crd-docs-generator/bin"
+          curl -fsSL \
+            -o "$RUNNER_TEMP/crd-docs-generator/bin/crd-docs-generator" \
+            "https://github.com/giantswarm/crd-docs-generator/releases/download/${CRD_DOCS_GENERATOR_VERSION}/crd-docs-generator-linux-amd64"
+          chmod +x "$RUNNER_TEMP/crd-docs-generator/bin/crd-docs-generator"
+          echo "$RUNNER_TEMP/crd-docs-generator/bin" >> "$GITHUB_PATH"
+
+      - name: Generate crd-docs-generator config
+        run: |
+          TAG="${{ inputs.tag }}"
+          GEN_DIR="$GITHUB_WORKSPACE/.github/crd-docs-generator"
+          OUT_DIR="$GITHUB_WORKSPACE/content/docs/configurations/crd"
+          # crd-docs-generator clones https://github.com/adobe/koperator at
+          # commit_reference itself (see pkg/git/git.go) - no separate
+          # checkout of master's CRD YAML is needed here.
+          #
+          # Metadata keys are the CRD's full "<plural>.<group>" name. Any CRD
+          # under config/base/crds without a matching entry here is silently
+          # skipped by crd-docs-generator (logged as a WARN, not a failure) -
+          # if a 5th CRD is ever added, it needs an entry here too, or the
+          # "Verify all expected CRD reference pages" step below will fail.
+          cat > "$GEN_DIR/config.yaml" <<EOF
+          template_path: crd.template
+          output_path: ${OUT_DIR}
+          source_repositories:
+            - url: https://github.com/adobe/koperator
+              organization: adobe
+              short_name: koperator
+              commit_reference: ${TAG}
+              crd_paths:
+                - config/base/crds
+              metadata:
+                kafkaclusters.kafka.banzaicloud.io:
+                  owner:
+                    - https://github.com/adobe/koperator
+                kafkatopics.kafka.banzaicloud.io:
+                  owner:
+                    - https://github.com/adobe/koperator
+                kafkausers.kafka.banzaicloud.io:
+                  owner:
+                    - https://github.com/adobe/koperator
+                cruisecontroloperations.kafka.banzaicloud.io:
+                  owner:
+                    - https://github.com/adobe/koperator
+          EOF
+
+      - name: Run crd-docs-generator
+        run: |
+          GEN_DIR="$GITHUB_WORKSPACE/.github/crd-docs-generator"
+          crd-docs-generator --config "$GEN_DIR/config.yaml"
+
+      - name: Verify all expected CRD reference pages were generated
+        run: |
+          OUT_DIR="$GITHUB_WORKSPACE/content/docs/configurations/crd"
+          missing=0
+          for f in \
+            kafkaclusters.kafka.banzaicloud.io.md \
+            kafkatopics.kafka.banzaicloud.io.md \
+            kafkausers.kafka.banzaicloud.io.md \
+            cruisecontroloperations.kafka.banzaicloud.io.md; do
+            if [ ! -s "$OUT_DIR/$f" ]; then
+              echo "::error::Expected CRD reference page $f was not generated - check the crd-docs-generator log above for a 'no metadata found' warning (config.yaml metadata key vs. the CRD's <plural>.<group> name)."
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - name: Commit and push
+        run: |
+          TAG="${{ inputs.tag }}"
+          # Must catch untracked files too (a brand-new CRD's page won't show
+          # up in `git diff`), so this uses `git status --porcelain` rather
+          # than `git diff --quiet`, across both the config.toml version bump
+          # and the regenerated CRD docs.
+          if [ -z "$(git status --porcelain -- config/_default/config.toml content/docs/configurations/crd)" ]; then
+            echo "Docs site already up to date for ${TAG}; nothing to push."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add config/_default/config.toml content/docs/configurations/crd
+          git commit -m "Sync docs site to release ${TAG}"
+          # Must push with secrets.PAT, not the default GITHUB_TOKEN: pushes
+          # authored by GITHUB_TOKEN don't trigger other workflows, which
+          # would silently skip this branch's own publish-docs.yaml deploy.
+          git push origin gh-pages

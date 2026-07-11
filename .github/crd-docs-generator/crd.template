@@ -1,0 +1,206 @@
+{{- /*
+  Custom output template for github.com/giantswarm/crd-docs-generator, used
+  by .github/workflows/regenerate-crd-docs.yaml (this branch) to regenerate
+  the CRD reference pages under content/docs/configurations/crd/ for every
+  canonical release. That workflow is dispatched by master's
+  .github/workflows/operator-release.yml (sync-gh-pages-version job) via
+  `gh workflow run`, passing the release tag as an input.
+
+  This is the upstream template (giantswarm/crd-docs-generator/templates/crd.template)
+  with two koperator-specific additions layered on top, so regeneration stays a
+  single `crd-docs-generator --config ...` invocation instead of a generate-then-sed
+  post-processing pass:
+
+    1. A "Browse this schema interactively" doc.crds.dev callout link right under
+       the heading (previously added by hand after each generation run).
+    2. A `notoc: true` front-matter flag, set automatically when a CRD's total
+       property count crosses PROPERTY_COUNT_NOTOC_THRESHOLD below - not hardcoded
+       to a specific CRD name, so it keeps working if/when property counts shift.
+       As of the 0.28.x releases: kafkaclusters.kafka.banzaicloud.io has ~1,900+
+       properties (needs notoc - Hugo/Docsy's "on this page" TOC would otherwise
+       try to list every single one); kafkatopics/kafkausers/cruisecontroloperations
+       are all under 50 properties each (must NOT get notoc).
+
+  Also changes the body's top-level heading from `# {{ .Title }}` (upstream) to
+  `## {{ .Title }}` and drops the upstream `<p class="crd-description">` wrapper
+  around the description, to match the markup already committed for the 3
+  existing pages (Hugo already renders the front-matter `title` as the page's
+  H1, so a second `# ...` in the body would be a duplicate top-level heading).
+  Everything else (the <dl class="crd-meta">, per-property <div class="property
+  depth-N"> blocks, annotations) is unchanged from upstream, since assets/js/crd-schema.js
+  on gh-pages depends on that exact structure for the collapsible property tree.
+*/ -}}
+{{- $totalProps := 0 -}}
+{{- range $versionName, $versionSchema := .VersionSchemas -}}
+{{- $totalProps = add $totalProps (len $versionSchema.Properties) -}}
+{{- end -}}
+{{- $notocThreshold := 300 -}}
+---
+title: {{ .Title }} CRD schema reference (group {{ .Group }})
+linkTitle: {{ .Title }}
+description: |
+{{- if .Description }}
+{{ .Description | indent 2 }}
+{{- else }}
+  Custom resource definition (CRD) schema reference page for the {{ .Title }} resource ({{ .NamePlural }}.{{ .Group }}), as part of the Koperator documentation.
+{{- end }}
+weight: {{ .Weight }}
+crd:
+  name_camelcase: {{ .Title }}
+  name_plural: {{ .NamePlural }}
+  name_singular: {{ .NameSingular }}
+  group: {{ .Group }}
+  technical_name: {{ .NamePlural }}.{{ .Group }}
+  scope: {{ .Scope }}
+  source_repository: {{ .SourceRepository }}
+  source_repository_ref: {{ .SourceRepositoryRef }}
+  versions:
+{{- range .Versions }}
+    - {{ . -}}
+{{- end }}
+  topics:
+{{- with .Metadata.Topics }}
+{{- range . }}
+    - {{ . -}}
+{{- end }}
+{{- end }}
+{{- with .Metadata.Providers }}
+  providers:
+{{- range . }}
+    - {{ . -}}
+{{- end }}
+{{- end }}
+{{- with .Metadata.Deprecation }}
+  deprecation:
+{{- with .Info }}
+    info: {{ . }}
+{{- end }}
+{{- with .ReplacedBy }}
+    replaced_by:
+      full_name: {{ .FullName }}
+      short_name: {{ .ShortName }}
+{{- end }}
+{{- end }}
+layout: crd
+{{- if gt $totalProps $notocThreshold }}
+# This schema has {{ $totalProps }} properties, all rendered as <h3>: Hugo/Docsy's
+# "on this page" TOC would otherwise try to list every single one.
+notoc: true
+{{- end }}
+owner:
+{{- range .Metadata.Owners }}
+  - {{ . -}}
+{{- end }}
+aliases:
+  - /reference/cp-k8s-api/{{ .NamePlural }}.{{ .Group }}/
+technical_name: {{ .NamePlural }}.{{ .Group }}
+source_repository: {{ .SourceRepository }}
+source_repository_ref: {{ .SourceRepositoryRef }}
+---
+
+## {{ .Title }}
+
+{{- with .Metadata.Deprecation }}
+<p class="well disclaimer">
+<i class="fa fa-warning"></i> <b>Deprecation:</b>
+{{- with .Info }}
+{{ . }}
+{{- end }}
+{{- with .ReplacedBy }}
+This CRD is being replaced by <a href="../{{ .FullName }}/">{{ .ShortName }}</a>.
+{{- end }}
+</p>
+{{- end }}
+
+> 📖 **Browse this schema interactively**: [doc.crds.dev](https://doc.crds.dev/github.com/adobe/koperator/{{ .Group }}/{{ .Title }}/{{ last .Versions }}@{{ .SourceRepositoryRef }})
+
+{{ with .Description }}{{ . }}
+{{ end -}}
+<dl class="crd-meta">
+<dt class="fullname">Full name:</dt>
+<dd class="fullname">{{ .NamePlural }}.{{ .Group }}</dd>
+<dt class="groupname">Group:</dt>
+<dd class="groupname">{{ .Group }}</dd>
+<dt class="singularname">Singular name:</dt>
+<dd class="singularname">{{ .NameSingular }}</dd>
+<dt class="pluralname">Plural name:</dt>
+<dd class="pluralname">{{ .NamePlural }}</dd>
+<dt class="scope">Scope:</dt>
+<dd class="scope">{{ .Scope }}</dd>
+<dt class="versions">Versions:</dt>
+<dd class="versions">
+{{- range .Versions -}}
+<a class="version" href="#{{.}}" title="Show schema for version {{.}}">{{.}}</a>
+{{- end -}}
+</dd>
+</dl>
+
+{{ if .VersionSchemas }}
+{{ range $versionName, $versionSchema := .VersionSchemas }}
+<div class="crd-schema-version">
+<h2 id="{{$versionName}}">Version {{$versionName}}</h2>
+
+{{with .ExampleCR}}
+<h3 id="crd-example-{{$versionName}}">Example CR</h3>
+
+```yaml
+{{ .|raw -}}
+```
+{{end}}
+
+<h3 id="property-details-{{$versionName}}">Properties</h3>
+
+{{ range $versionSchema.Properties }}
+<div class="property depth-{{.Depth}}">
+<div class="property-header">
+<h3 class="property-path" id="{{$versionName}}-{{.Path}}">{{.Path}}</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+{{with .Type}}<span class="property-type">{{.}}</span>{{end}}
+{{ if not .Required }}
+{{ else -}}
+<span class="property-required">Required</span>
+{{ end -}}
+</div>
+{{with .Description}}
+<div class="property-description">
+{{.|markdown}}
+</div>
+{{end}}
+</div>
+</div>
+{{ end }}
+
+
+{{ if .Annotations }}
+<h3 id="annotation-details-{{$versionName}}">Annotations</h3>
+
+{{ range $versionSchema.Annotations }}
+<div class="annotation">
+<div class="annotation-header">
+<h3 class="annotation-path" id="{{.CRDVersion}}-{{.Annotation}}">{{.Annotation}}</h3>
+</div>
+<div class="annotation-body">
+<div class="annotation-meta">
+{{with .Release}}<span class="annotation-release">{{.}}</span>{{end}}
+</div>
+{{with .Documentation}}
+<div class="annotation-description">
+{{.|markdown}}
+</div>
+{{end}}
+</div>
+</div>
+{{ end }}
+{{ end }}
+
+</div>
+{{end}}
+
+{{ else }}
+<div class="crd-noversions">
+<p>We currently cannot show any schema information on this <abbr title="custom resource definition">CRD</abbr>. Sorry for the inconvenience!</p>
+<p>Please refer to the <a href="https://pkg.go.dev/github.com/adobe/koperator/api/">Godoc</a> or <a href="https://github.com/adobe/koperator/tree/master/api">source</a> for details.</p>
+</div>
+{{ end }}
