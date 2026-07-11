@@ -8,7 +8,7 @@ inputs: # adding these parameters to make this reusable later on
   kind_k8s_version:
     description: 'The k8s version to use'
     required: true
-    default: 'v1.34.0' # renovate: datasource=docker depName=kindest/node
+    default: 'v1.34.8' # renovate: datasource=docker depName=kindest/node
   kind_config:
     description: 'Path to the kind config to use'
     required: true
@@ -28,7 +28,7 @@ runs:
     uses: helm/kind-action@v1.14.0
     with:
       cluster_name: ${{ inputs.kind_cluster_name }}
-      version: v0.30.0 # renovate: datasource=github-releases depName=kubernetes-sigs/kind
+      version: v0.32.0 # renovate: datasource=github-releases depName=kubernetes-sigs/kind
       node_image: kindest/node:${{ inputs.kind_k8s_version }}
       config: ${{ inputs.kind_config }}
 

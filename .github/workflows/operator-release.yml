@@ -52,10 +52,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
-      - name: Set up Go 1.25
+      - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version: '1.26'
+          go-version-file: go.mod
         id: go
 
       - name: Clean Go module cache for reproducible builds
