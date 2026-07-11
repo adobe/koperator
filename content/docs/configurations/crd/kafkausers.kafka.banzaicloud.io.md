@@ -11,18 +11,18 @@ crd:
   group: kafka.banzaicloud.io
   technical_name: kafkausers.kafka.banzaicloud.io
   scope: Namespaced
-  source_repository: ../../
+  source_repository: https://github.com/adobe/koperator
   source_repository_ref: master
   versions:
     - v1alpha1
   topics:
 layout: crd
 owner:
-  - https://github.com/banzaicloud/
+  - https://github.com/adobe/koperator
 aliases:
   - /reference/cp-k8s-api/kafkausers.kafka.banzaicloud.io/
 technical_name: kafkausers.kafka.banzaicloud.io
-source_repository: ../../
+source_repository: https://github.com/adobe/koperator
 source_repository_ref: master
 ---
 
@@ -30,7 +30,7 @@ source_repository_ref: master
 
 > 📖 **Browse this schema interactively**: [doc.crds.dev](https://doc.crds.dev/github.com/adobe/koperator/kafka.banzaicloud.io/KafkaUser/v1alpha1@0.28.0-adobe-20260622)
 
-KafkaUser is the Schema for the kafka users API
+<p class="crd-description">KafkaUser is the Schema for the kafka users API</p>
 <dl class="crd-meta">
 <dt class="fullname">Full name:</dt>
 <dd class="fullname">kafkausers.kafka.banzaicloud.io</dd>
@@ -49,17 +49,16 @@ KafkaUser is the Schema for the kafka users API
 
 
 <div class="crd-schema-version">
-
-## Version v1alpha1 {#v1alpha1}
-
+<h2 id="v1alpha1">Version v1alpha1</h2>
 
 
-## Properties {#property-details-v1alpha1}
+
+<h3 id="property-details-v1alpha1">Properties</h3>
 
 
 <div class="property depth-0">
 <div class="property-header">
-<h3 id="v1alpha1-.apiVersion">.apiVersion</h3>
+<h3 class="property-path" id="v1alpha1-.apiVersion">.apiVersion</h3>
 </div>
 <div class="property-body">
 <div class="property-meta">
@@ -68,7 +67,10 @@ KafkaUser is the Schema for the kafka users API
 </div>
 
 <div class="property-description">
-<p>APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: <a href="https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources">https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources</a></p>
+<p>APIVersion defines the versioned schema of this representation of an object.
+Servers should convert recognized schemas to the latest internal value, and
+may reject unrecognized values.
+More info: <a href="https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources">https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources</a></p>
 
 </div>
 
@@ -77,7 +79,7 @@ KafkaUser is the Schema for the kafka users API
 
 <div class="property depth-0">
 <div class="property-header">
-<h3 id="v1alpha1-.kind">.kind</h3>
+<h3 class="property-path" id="v1alpha1-.kind">.kind</h3>
 </div>
 <div class="property-body">
 <div class="property-meta">
@@ -86,7 +88,11 @@ KafkaUser is the Schema for the kafka users API
 </div>
 
 <div class="property-description">
-<p>Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: <a href="https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds">https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds</a></p>
+<p>Kind is a string value representing the REST resource this object represents.
+Servers may infer this from the endpoint the client submits requests to.
+Cannot be updated.
+In CamelCase.
+More info: <a href="https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds">https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds</a></p>
 
 </div>
 
@@ -95,7 +101,7 @@ KafkaUser is the Schema for the kafka users API
 
 <div class="property depth-0">
 <div class="property-header">
-<h3 id="v1alpha1-.metadata">.metadata</h3>
+<h3 class="property-path" id="v1alpha1-.metadata">.metadata</h3>
 </div>
 <div class="property-body">
 <div class="property-meta">
@@ -108,7 +114,7 @@ KafkaUser is the Schema for the kafka users API
 
 <div class="property depth-0">
 <div class="property-header">
-<h3 id="v1alpha1-.spec">.spec</h3>
+<h3 class="property-path" id="v1alpha1-.spec">.spec</h3>
 </div>
 <div class="property-body">
 <div class="property-meta">
@@ -126,7 +132,7 @@ KafkaUser is the Schema for the kafka users API
 
 <div class="property depth-1">
 <div class="property-header">
-<h3 id="v1alpha1-.spec.annotations">.spec.annotations</h3>
+<h3 class="property-path" id="v1alpha1-.spec.annotations">.spec.annotations</h3>
 </div>
 <div class="property-body">
 <div class="property-meta">
@@ -144,7 +150,7 @@ KafkaUser is the Schema for the kafka users API
 
 <div class="property depth-1">
 <div class="property-header">
-<h3 id="v1alpha1-.spec.clusterRef">.spec.clusterRef</h3>
+<h3 class="property-path" id="v1alpha1-.spec.clusterRef">.spec.clusterRef</h3>
 </div>
 <div class="property-body">
 <div class="property-meta">
@@ -153,7 +159,8 @@ KafkaUser is the Schema for the kafka users API
 </div>
 
 <div class="property-description">
-<p>ClusterReference states a reference to a cluster for topic/user provisioning</p>
+<p>ClusterReference states a reference to a cluster for topic/user
+provisioning</p>
 
 </div>
 
@@ -162,7 +169,7 @@ KafkaUser is the Schema for the kafka users API
 
 <div class="property depth-2">
 <div class="property-header">
-<h3 id="v1alpha1-.spec.clusterRef.name">.spec.clusterRef.name</h3>
+<h3 class="property-path" id="v1alpha1-.spec.clusterRef.name">.spec.clusterRef.name</h3>
 </div>
 <div class="property-body">
 <div class="property-meta">
@@ -175,7 +182,7 @@ KafkaUser is the Schema for the kafka users API
 
 <div class="property depth-2">
 <div class="property-header">
-<h3 id="v1alpha1-.spec.clusterRef.namespace">.spec.clusterRef.namespace</h3>
+<h3 class="property-path" id="v1alpha1-.spec.clusterRef.namespace">.spec.clusterRef.namespace</h3>
 </div>
 <div class="property-body">
 <div class="property-meta">
@@ -188,7 +195,7 @@ KafkaUser is the Schema for the kafka users API
 
 <div class="property depth-1">
 <div class="property-header">
-<h3 id="v1alpha1-.spec.createCert">.spec.createCert</h3>
+<h3 class="property-path" id="v1alpha1-.spec.createCert">.spec.createCert</h3>
 </div>
 <div class="property-body">
 <div class="property-meta">
@@ -201,7 +208,7 @@ KafkaUser is the Schema for the kafka users API
 
 <div class="property depth-1">
 <div class="property-header">
-<h3 id="v1alpha1-.spec.dnsNames">.spec.dnsNames</h3>
+<h3 class="property-path" id="v1alpha1-.spec.dnsNames">.spec.dnsNames</h3>
 </div>
 <div class="property-body">
 <div class="property-meta">
@@ -214,7 +221,7 @@ KafkaUser is the Schema for the kafka users API
 
 <div class="property depth-2">
 <div class="property-header">
-<h3 id="v1alpha1-.spec.dnsNames[*]">.spec.dnsNames[*]</h3>
+<h3 class="property-path" id="v1alpha1-.spec.dnsNames[*]">.spec.dnsNames[*]</h3>
 </div>
 <div class="property-body">
 <div class="property-meta">
@@ -227,7 +234,27 @@ KafkaUser is the Schema for the kafka users API
 
 <div class="property depth-1">
 <div class="property-header">
-<h3 id="v1alpha1-.spec.includeJKS">.spec.includeJKS</h3>
+<h3 class="property-path" id="v1alpha1-.spec.expirationSeconds">.spec.expirationSeconds</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">integer</span>
+
+</div>
+
+<div class="property-description">
+<p>expirationSeconds is the requested duration of validity of the issued certificate.
+The minimum valid value for expirationSeconds is 3600 i.e. 1h.
+When it is not specified the default validation duration is 90 days</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-1">
+<div class="property-header">
+<h3 class="property-path" id="v1alpha1-.spec.includeJKS">.spec.includeJKS</h3>
 </div>
 <div class="property-body">
 <div class="property-meta">
@@ -240,7 +267,7 @@ KafkaUser is the Schema for the kafka users API
 
 <div class="property depth-1">
 <div class="property-header">
-<h3 id="v1alpha1-.spec.pkiBackendSpec">.spec.pkiBackendSpec</h3>
+<h3 class="property-path" id="v1alpha1-.spec.pkiBackendSpec">.spec.pkiBackendSpec</h3>
 </div>
 <div class="property-body">
 <div class="property-meta">
@@ -253,7 +280,7 @@ KafkaUser is the Schema for the kafka users API
 
 <div class="property depth-2">
 <div class="property-header">
-<h3 id="v1alpha1-.spec.pkiBackendSpec.issuerRef">.spec.pkiBackendSpec.issuerRef</h3>
+<h3 class="property-path" id="v1alpha1-.spec.pkiBackendSpec.issuerRef">.spec.pkiBackendSpec.issuerRef</h3>
 </div>
 <div class="property-body">
 <div class="property-meta">
@@ -262,7 +289,7 @@ KafkaUser is the Schema for the kafka users API
 </div>
 
 <div class="property-description">
-<p>ObjectReference is a reference to an object with a given name, kind and group.</p>
+<p>IssuerReference is a reference to a certificate issuer object with a given name, kind and group.</p>
 
 </div>
 
@@ -271,7 +298,7 @@ KafkaUser is the Schema for the kafka users API
 
 <div class="property depth-3">
 <div class="property-header">
-<h3 id="v1alpha1-.spec.pkiBackendSpec.issuerRef.group">.spec.pkiBackendSpec.issuerRef.group</h3>
+<h3 class="property-path" id="v1alpha1-.spec.pkiBackendSpec.issuerRef.group">.spec.pkiBackendSpec.issuerRef.group</h3>
 </div>
 <div class="property-body">
 <div class="property-meta">
@@ -280,7 +307,8 @@ KafkaUser is the Schema for the kafka users API
 </div>
 
 <div class="property-description">
-<p>Group of the resource being referred to.</p>
+<p>Group of the issuer being referred to.
+Defaults to &lsquo;cert-manager.io&rsquo;.</p>
 
 </div>
 
@@ -289,7 +317,7 @@ KafkaUser is the Schema for the kafka users API
 
 <div class="property depth-3">
 <div class="property-header">
-<h3 id="v1alpha1-.spec.pkiBackendSpec.issuerRef.kind">.spec.pkiBackendSpec.issuerRef.kind</h3>
+<h3 class="property-path" id="v1alpha1-.spec.pkiBackendSpec.issuerRef.kind">.spec.pkiBackendSpec.issuerRef.kind</h3>
 </div>
 <div class="property-body">
 <div class="property-meta">
@@ -298,7 +326,8 @@ KafkaUser is the Schema for the kafka users API
 </div>
 
 <div class="property-description">
-<p>Kind of the resource being referred to.</p>
+<p>Kind of the issuer being referred to.
+Defaults to &lsquo;Issuer&rsquo;.</p>
 
 </div>
 
@@ -307,7 +336,7 @@ KafkaUser is the Schema for the kafka users API
 
 <div class="property depth-3">
 <div class="property-header">
-<h3 id="v1alpha1-.spec.pkiBackendSpec.issuerRef.name">.spec.pkiBackendSpec.issuerRef.name</h3>
+<h3 class="property-path" id="v1alpha1-.spec.pkiBackendSpec.issuerRef.name">.spec.pkiBackendSpec.issuerRef.name</h3>
 </div>
 <div class="property-body">
 <div class="property-meta">
@@ -316,7 +345,7 @@ KafkaUser is the Schema for the kafka users API
 </div>
 
 <div class="property-description">
-<p>Name of the resource being referred to.</p>
+<p>Name of the issuer being referred to.</p>
 
 </div>
 
@@ -325,7 +354,7 @@ KafkaUser is the Schema for the kafka users API
 
 <div class="property depth-2">
 <div class="property-header">
-<h3 id="v1alpha1-.spec.pkiBackendSpec.pkiBackend">.spec.pkiBackendSpec.pkiBackend</h3>
+<h3 class="property-path" id="v1alpha1-.spec.pkiBackendSpec.pkiBackend">.spec.pkiBackendSpec.pkiBackend</h3>
 </div>
 <div class="property-body">
 <div class="property-meta">
@@ -338,7 +367,7 @@ KafkaUser is the Schema for the kafka users API
 
 <div class="property depth-2">
 <div class="property-header">
-<h3 id="v1alpha1-.spec.pkiBackendSpec.signerName">.spec.pkiBackendSpec.signerName</h3>
+<h3 class="property-path" id="v1alpha1-.spec.pkiBackendSpec.signerName">.spec.pkiBackendSpec.signerName</h3>
 </div>
 <div class="property-body">
 <div class="property-meta">
@@ -356,7 +385,7 @@ KafkaUser is the Schema for the kafka users API
 
 <div class="property depth-1">
 <div class="property-header">
-<h3 id="v1alpha1-.spec.secretName">.spec.secretName</h3>
+<h3 class="property-path" id="v1alpha1-.spec.secretName">.spec.secretName</h3>
 </div>
 <div class="property-body">
 <div class="property-meta">
@@ -364,12 +393,17 @@ KafkaUser is the Schema for the kafka users API
 <span class="property-required">Required</span>
 </div>
 
+<div class="property-description">
+<p>secretName is used as the name of the K8S secret that contains the certificate of the KafkaUser. SecretName should be unique inside the namespace where KafkaUser is located.</p>
+
+</div>
+
 </div>
 </div>
 
 <div class="property depth-1">
 <div class="property-header">
-<h3 id="v1alpha1-.spec.topicGrants">.spec.topicGrants</h3>
+<h3 class="property-path" id="v1alpha1-.spec.topicGrants">.spec.topicGrants</h3>
 </div>
 <div class="property-body">
 <div class="property-meta">
@@ -382,7 +416,7 @@ KafkaUser is the Schema for the kafka users API
 
 <div class="property depth-2">
 <div class="property-header">
-<h3 id="v1alpha1-.spec.topicGrants[*]">.spec.topicGrants[*]</h3>
+<h3 class="property-path" id="v1alpha1-.spec.topicGrants[*]">.spec.topicGrants[*]</h3>
 </div>
 <div class="property-body">
 <div class="property-meta">
@@ -400,7 +434,7 @@ KafkaUser is the Schema for the kafka users API
 
 <div class="property depth-3">
 <div class="property-header">
-<h3 id="v1alpha1-.spec.topicGrants[*].accessType">.spec.topicGrants[*].accessType</h3>
+<h3 class="property-path" id="v1alpha1-.spec.topicGrants[*].accessType">.spec.topicGrants[*].accessType</h3>
 </div>
 <div class="property-body">
 <div class="property-meta">
@@ -418,7 +452,7 @@ KafkaUser is the Schema for the kafka users API
 
 <div class="property depth-3">
 <div class="property-header">
-<h3 id="v1alpha1-.spec.topicGrants[*].patternType">.spec.topicGrants[*].patternType</h3>
+<h3 class="property-path" id="v1alpha1-.spec.topicGrants[*].patternType">.spec.topicGrants[*].patternType</h3>
 </div>
 <div class="property-body">
 <div class="property-meta">
@@ -436,7 +470,7 @@ KafkaUser is the Schema for the kafka users API
 
 <div class="property depth-3">
 <div class="property-header">
-<h3 id="v1alpha1-.spec.topicGrants[*].topicName">.spec.topicGrants[*].topicName</h3>
+<h3 class="property-path" id="v1alpha1-.spec.topicGrants[*].topicName">.spec.topicGrants[*].topicName</h3>
 </div>
 <div class="property-body">
 <div class="property-meta">
@@ -449,7 +483,7 @@ KafkaUser is the Schema for the kafka users API
 
 <div class="property depth-0">
 <div class="property-header">
-<h3 id="v1alpha1-.status">.status</h3>
+<h3 class="property-path" id="v1alpha1-.status">.status</h3>
 </div>
 <div class="property-body">
 <div class="property-meta">
@@ -467,7 +501,7 @@ KafkaUser is the Schema for the kafka users API
 
 <div class="property depth-1">
 <div class="property-header">
-<h3 id="v1alpha1-.status.acls">.status.acls</h3>
+<h3 class="property-path" id="v1alpha1-.status.acls">.status.acls</h3>
 </div>
 <div class="property-body">
 <div class="property-meta">
@@ -480,7 +514,7 @@ KafkaUser is the Schema for the kafka users API
 
 <div class="property depth-2">
 <div class="property-header">
-<h3 id="v1alpha1-.status.acls[*]">.status.acls[*]</h3>
+<h3 class="property-path" id="v1alpha1-.status.acls[*]">.status.acls[*]</h3>
 </div>
 <div class="property-body">
 <div class="property-meta">
@@ -493,7 +527,7 @@ KafkaUser is the Schema for the kafka users API
 
 <div class="property depth-1">
 <div class="property-header">
-<h3 id="v1alpha1-.status.state">.status.state</h3>
+<h3 class="property-path" id="v1alpha1-.status.state">.status.state</h3>
 </div>
 <div class="property-body">
 <div class="property-meta">
