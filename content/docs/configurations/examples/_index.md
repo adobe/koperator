@@ -52,12 +52,6 @@ You can create a broker-ingress mapping to eliminate traffic across availability
 
 - [Load balancers and brokers in same availability zone](https://github.com/adobe/koperator/blob/master/config/samples/simplekafkacluster-with-brokerbindings.yaml)
 
-## Kafka cluster with Istio
-
-You can use Istio as the ingress controller for your external listeners. Koperator now uses standard Istio resources (Gateway, VirtualService) instead of the deprecated banzaicloud istio-operator, providing better compatibility and working with any Istio installation.
-
-- [Kafka cluster with Istio as ingress controller](https://github.com/adobe/koperator/blob/master/config/samples/kafkacluster-with-istio.yaml)
-
 ## Kafka cluster with custom advertised address for external listeners and brokers
 
 You can set custom advertised IP address for brokers.  
