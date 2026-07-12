@@ -104,3 +104,7 @@ spec:
   - port: metrics
     interval: 10s
 ```
+
+## Grafana Dashboards
+
+Once metrics are flowing into Prometheus, see [Grafana Dashboards]({{< relref "grafana-dashboards" >}}) for a set of ready-to-import Grafana dashboards covering cluster health, per-topic detail, and consumer-group lag.
