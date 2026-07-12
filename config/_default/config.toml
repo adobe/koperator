@@ -166,8 +166,15 @@ enableGitInfo = true
 # Image processing configuration.
 [imaging]
 resampleFilter = "CatmullRom"
-quality = 75
 anchor = "smart"
+# Per-format quality replaces the deprecated top-level imaging.quality
+# (deprecated in Hugo v0.163.0, removed in a future release).
+[imaging.jpeg]
+quality = 75
+[imaging.webp]
+quality = 75
+[imaging.avif]
+quality = 75
 
 [minify]
   minifyOutput = true
