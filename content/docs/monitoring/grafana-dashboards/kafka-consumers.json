@@ -3,7 +3,10 @@
     "list": [
       {
         "builtIn": 1,
-        "datasource": "-- Grafana --",
+        "datasource": {
+          "type": "datasource",
+          "uid": "grafana"
+        },
         "enable": true,
         "hide": true,
         "iconColor": "rgba(0, 211, 255, 1)",
@@ -22,7 +25,6 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "iteration": 1650298791936,
   "links": [
     {
       "asDropdown": true,
@@ -42,6 +44,7 @@
     {
       "collapsed": false,
       "datasource": {
+        "type": "prometheus",
         "uid": "$data_source"
       },
       "gridPos": {
@@ -56,57 +59,68 @@
       "type": "row"
     },
     {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
       "datasource": {
+        "type": "prometheus",
         "uid": "$data_source"
       },
       "description": "Message count is only the difference between all partitions' high and low watermarks. Therefore this count is only an approximation on compact topics",
       "fieldConfig": {
         "defaults": {
-          "links": []
+          "unit": "short",
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "spanNulls": false,
+            "showPoints": "never",
+            "pointSize": 2,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "axisPlacement": "auto",
+            "axisLabel": "",
+            "lineInterpolation": "linear",
+            "barAlignment": 0,
+            "insertNulls": false,
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
         },
         "overrides": []
       },
-      "fill": 1,
-      "fillGradient": 0,
       "gridPos": {
         "h": 8,
         "w": 8,
         "x": 0,
         "y": 1
       },
-      "hiddenSeries": false,
       "id": 15,
-      "legend": {
-        "avg": false,
-        "current": false,
-        "max": false,
-        "min": false,
-        "show": true,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "links": [],
-      "nullPointMode": "null",
       "options": {
-        "alertThreshold": true
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
       },
-      "percentage": false,
-      "pluginVersion": "8.4.1",
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$data_source"
+          },
           "expr": "avg by (topic_name) (kminion_kafka_topic_high_water_mark_sum{namespace=\"$kubernetes_namespace\", topic_name=\"$kafka_topic\"} - kminion_kafka_topic_low_water_mark_sum{namespace=\"$kubernetes_namespace\", topic_name=\"$kafka_topic\"})",
           "format": "time_series",
           "interval": "",
@@ -115,39 +129,12 @@
           "refId": "A"
         }
       ],
-      "thresholds": [],
-      "timeRegions": [],
       "title": "Message Count $kafka_topic",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "mode": "time",
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "format": "short",
-          "logBase": 1,
-          "min": "0",
-          "show": true
-        },
-        {
-          "format": "short",
-          "logBase": 1,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false
-      }
+      "type": "timeseries"
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "$data_source"
       },
       "fieldConfig": {
@@ -205,7 +192,6 @@
         "text": {},
         "textMode": "value_and_name"
       },
-      "pluginVersion": "8.4.1",
       "targets": [
         {
           "exemplar": true,
@@ -232,6 +218,7 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "$data_source"
       },
       "description": "Display the total number of consumers in a consumer group.\nFor multi-topic consumer groups, it also displays the topic_consumers count for the selected topic\nIf there are consumers not assigned to any partition in the consumer group. the count is also displayed",
@@ -294,7 +281,6 @@
         "text": {},
         "textMode": "auto"
       },
-      "pluginVersion": "8.4.1",
       "targets": [
         {
           "exemplar": true,
@@ -426,7 +412,6 @@
         "showHeader": true,
         "sortBy": []
       },
-      "pluginVersion": "8.4.1",
       "targets": [
         {
           "exemplar": true,
@@ -613,7 +598,6 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "8.1.5",
       "targets": [
         {
           "exemplar": false,
@@ -631,6 +615,7 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "$data_source"
       },
       "fieldConfig": {
@@ -688,7 +673,6 @@
         "text": {},
         "textMode": "auto"
       },
-      "pluginVersion": "8.4.1",
       "targets": [
         {
           "expr": "kminion_kafka_topic_info{namespace=\"$kubernetes_namespace\", topic_name=\"$kafka_topic\"}",
@@ -705,6 +689,7 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "$data_source"
       },
       "fieldConfig": {
@@ -766,7 +751,6 @@
         "text": {},
         "textMode": "auto"
       },
-      "pluginVersion": "8.4.1",
       "targets": [
         {
           "expr": "kminion_kafka_topic_info{namespace=\"$kubernetes_namespace\", topic_name=\"$kafka_topic\"}",
@@ -783,6 +767,7 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "$data_source"
       },
       "fieldConfig": {
@@ -858,7 +843,6 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "8.1.5",
       "targets": [
         {
           "exemplar": true,
@@ -943,12 +927,11 @@
         "text": {},
         "textMode": "value"
       },
-      "pluginVersion": "8.4.1",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "$data_source"
           },
           "exemplar": false,
           "expr": "max(kminion_kafka_consumer_group_topic_lag{namespace=\"$kubernetes_namespace\", group_id=\"$consumer_group\", topic_name=\"$kafka_topic\"})",
@@ -965,6 +948,7 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "$data_source"
       },
       "fieldConfig": {
@@ -1022,7 +1006,6 @@
         "text": {},
         "textMode": "auto"
       },
-      "pluginVersion": "8.4.1",
       "targets": [
         {
           "exemplar": false,
@@ -1040,6 +1023,7 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "$data_source"
       },
       "fieldConfig": {
@@ -1133,7 +1117,6 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "8.1.5",
       "targets": [
         {
           "exemplar": true,
@@ -1160,65 +1143,72 @@
       "type": "timeseries"
     },
     {
-      "aliasColors": {},
-      "bars": true,
-      "dashLength": 10,
-      "dashes": false,
       "datasource": {
+        "type": "prometheus",
         "uid": "$data_source"
       },
       "description": "",
       "fieldConfig": {
         "defaults": {
-          "links": [],
-          "unit": "short"
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "spanNulls": false,
+            "showPoints": "never",
+            "pointSize": 2,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "axisPlacement": "auto",
+            "axisLabel": "",
+            "lineInterpolation": "linear",
+            "barAlignment": 0,
+            "insertNulls": false,
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
         },
         "overrides": []
       },
-      "fill": 0,
-      "fillGradient": 0,
       "gridPos": {
         "h": 9,
         "w": 24,
         "x": 0,
         "y": 17
       },
-      "hiddenSeries": false,
       "id": 45,
-      "interval": "",
-      "legend": {
-        "alignAsTable": true,
-        "avg": false,
-        "current": true,
-        "hideEmpty": false,
-        "hideZero": true,
-        "max": false,
-        "min": false,
-        "rightSide": true,
-        "show": true,
-        "sort": "current",
-        "sortDesc": true,
-        "total": false,
-        "values": true
-      },
-      "lines": false,
-      "linewidth": 1,
-      "links": [],
-      "nullPointMode": "null",
       "options": {
-        "alertThreshold": false
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "calcs": [
+            "last"
+          ],
+          "sortBy": "last",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
       },
-      "percentage": false,
-      "pluginVersion": "8.4.1",
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$data_source"
+          },
           "expr": "avg by (group_id,topic_name,partition_id) (kminion_kafka_consumer_group_topic_partition_lag{namespace=\"$kubernetes_namespace\", group_id=\"$consumer_group\", topic_name=\"$kafka_topic\"})",
           "format": "time_series",
           "interval": "",
@@ -1227,40 +1217,12 @@
           "refId": "A"
         }
       ],
-      "thresholds": [],
-      "timeRegions": [],
       "title": "Lag per Partition: $consumer_group => $kafka_topic",
-      "tooltip": {
-        "shared": true,
-        "sort": 2,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "mode": "time",
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "$$hashKey": "object:394",
-          "format": "short",
-          "logBase": 1,
-          "show": true
-        },
-        {
-          "$$hashKey": "object:395",
-          "format": "short",
-          "logBase": 1,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false
-      }
+      "type": "timeseries"
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "$data_source"
       },
       "fieldConfig": {
@@ -1306,7 +1268,6 @@
         "showHeader": true,
         "sortBy": []
       },
-      "pluginVersion": "8.4.1",
       "targets": [
         {
           "expr": "avg by (partition) (kafka_log_log_logstartoffset{namespace=\"$kubernetes_namespace\", topic=\"$kafka_topic\"})",
@@ -1400,6 +1361,7 @@
     {
       "collapsed": false,
       "datasource": {
+        "type": "prometheus",
         "uid": "$data_source"
       },
       "gridPos": {
@@ -1415,6 +1377,7 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "$data_source"
       },
       "description": "A consumer group which has at least one non expired consumer group offset for any partition is considered a \"subscriber\" for this topic. This metric can be used to identify topics which may not be consumed by anyone (anymore).",
@@ -1494,7 +1457,6 @@
           }
         ]
       },
-      "pluginVersion": "8.4.1",
       "targets": [
         {
           "expr": "count by (topic_name) (kminion_kafka_consumer_group_topic_lag{namespace=\"$kubernetes_namespace\"})>0",
@@ -1529,6 +1491,7 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "$data_source"
       },
       "fieldConfig": {
@@ -1593,7 +1556,6 @@
         },
         "showHeader": true
       },
-      "pluginVersion": "8.4.1",
       "targets": [
         {
           "expr": "topk(10, max_over_time(sum by (kubernetes_pod_name, topic_name, group_id) (irate(kminion_kafka_consumer_group_topic_offset_sum{namespace=\"$kubernetes_namespace\"}[3m]))[5m:]) > 0)",
@@ -1622,6 +1584,7 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "$data_source"
       },
       "description": "Topics by their total size in bytes",
@@ -1693,7 +1656,6 @@
           }
         ]
       },
-      "pluginVersion": "8.4.1",
       "targets": [
         {
           "expr": "avg by (topic_name) (kminion_kafka_topic_log_dir_size_total_bytes{namespace=\"$kubernetes_namespace\"})",
@@ -1723,6 +1685,7 @@
     {
       "collapsed": true,
       "datasource": {
+        "type": "prometheus",
         "uid": "$data_source"
       },
       "gridPos": {
@@ -1734,88 +1697,74 @@
       "id": 32,
       "panels": [
         {
-          "aliasColors": {},
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
           "datasource": {
+            "type": "prometheus",
             "uid": "$data_source"
           },
           "fieldConfig": {
             "defaults": {
-              "custom": {},
-              "links": []
+              "unit": "short",
+              "custom": {
+                "drawStyle": "line",
+                "lineWidth": 1,
+                "fillOpacity": 10,
+                "gradientMode": "none",
+                "spanNulls": false,
+                "showPoints": "never",
+                "pointSize": 2,
+                "stacking": {
+                  "mode": "none",
+                  "group": "A"
+                },
+                "axisPlacement": "auto",
+                "axisLabel": "",
+                "lineInterpolation": "linear",
+                "barAlignment": 0,
+                "insertNulls": false,
+                "hideFrom": {
+                  "tooltip": false,
+                  "viz": false,
+                  "legend": false
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              }
             },
             "overrides": []
           },
-          "fill": 1,
-          "fillGradient": 0,
           "gridPos": {
             "h": 8,
             "w": 24,
             "x": 0,
             "y": 47
           },
-          "hiddenSeries": false,
           "id": 34,
-          "legend": {
-            "avg": false,
-            "current": false,
-            "max": false,
-            "min": false,
-            "show": true,
-            "total": false,
-            "values": false
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
           },
-          "lines": true,
-          "linewidth": 1,
-          "nullPointMode": "null",
-          "percentage": false,
-          "pluginVersion": "7.1.5",
-          "pointradius": 2,
-          "points": false,
-          "renderer": "flot",
-          "seriesOverrides": [],
-          "spaceLength": 10,
-          "stack": false,
-          "steppedLine": false,
           "targets": [
             {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$data_source"
+              },
               "expr": "rate(kafka_server_fetchsessioncache_incrementalfetchsessionevictions_total{namespace=\"$kubernetes_namespace\"}[1m])",
               "interval": "",
               "legendFormat": "broker-{{brokerId}}",
               "refId": "A"
             }
           ],
-          "thresholds": [],
-          "timeRegions": [],
           "title": "Broker Consumer Incremental Fetch Sessions Evictions",
-          "tooltip": {
-            "shared": true,
-            "sort": 0,
-            "value_type": "individual"
-          },
-          "type": "graph",
-          "xaxis": {
-            "mode": "time",
-            "show": true,
-            "values": []
-          },
-          "yaxes": [
-            {
-              "format": "short",
-              "logBase": 1,
-              "show": true
-            },
-            {
-              "format": "short",
-              "logBase": 1,
-              "show": true
-            }
-          ],
-          "yaxis": {
-            "align": false
-          }
+          "type": "timeseries"
         }
       ],
       "title": "Broker Consumers Metrics",
@@ -1823,7 +1772,7 @@
     }
   ],
   "refresh": "30s",
-  "schemaVersion": 35,
+  "schemaVersion": 41,
   "style": "dark",
   "tags": [
     "kafka",
