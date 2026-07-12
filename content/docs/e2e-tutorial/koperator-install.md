@@ -89,7 +89,7 @@ kubectl wait --for=condition=Available deployment --all -n kafka --timeout=300s
 
 **Expected output:**
 ```
-Pulled: ghcr.io/adobe/helm-charts/kafka-operator:0.28.0-adobe-20250923
+Pulled: ghcr.io/adobe/helm-charts/kafka-operator:0.28.0-adobe-20260622
 Digest: sha256:...
 NAME: kafka-operator
 LAST DEPLOYED: Mon Jan 15 10:35:00 2024

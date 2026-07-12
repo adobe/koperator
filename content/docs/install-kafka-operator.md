@@ -4,7 +4,7 @@ shorttitle: Install
 weight: 10
 ---
 
-The operator installs version 3.9.1 of Apache Kafka, and can run on:
+The operator installs version 3.9.2 of Apache Kafka, and can run on:
 
 - Minikube v0.33.1+,
 - Kubernetes 1.21+, and

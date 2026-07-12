@@ -195,7 +195,7 @@ kubectl get ingress -A
 
 # Test external connectivity
 kubectl run external-test --rm -i --tty=true \
-  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.1 \
+  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.2 \
   --restart=Never \
   -- /opt/kafka/bin/kafka-broker-api-versions.sh \
   --bootstrap-server <EXTERNAL_IP>:<EXTERNAL_PORT>
@@ -517,7 +517,7 @@ kubectl cp zookeeper/zk-0:/tmp/zk-backup.tar.gz ./zk-backup-$(date +%Y%m%d).tar.
 
 # Backup Kafka topic metadata
 kubectl run kafka-backup --rm -i --tty=true \
-  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.1 \
+  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.2 \
   --restart=Never \
   -- /opt/kafka/bin/kafka-topics.sh \
   --bootstrap-server kafka-headless:29092 \

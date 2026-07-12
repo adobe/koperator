@@ -64,13 +64,13 @@ To change this behavior, modify the following lines at the end of the CR.
 
 ```yaml
 monitoringConfig:
-   jmxImage describes the used prometheus jmx exporter agent container
-    jmxImage: "ghcr.io/amuraru/jmx-javaagent:0.19.1"
-   pathToJar describes the path to the jar file in the given image
-    pathToJar: "/opt/jmx_exporter/jmx_prometheus_javaagent-0.19.1.jar"
-   kafkaJMXExporterConfig describes jmx exporter config for Kafka
-    kafkaJMXExporterConfig: |
-     lowercaseOutputName: true
+  # jmxImage describes the used prometheus jmx exporter agent container
+  jmxImage: "ghcr.io/adobe/koperator/jmx-javaagent:1.4.0"
+  # pathToJar describes the path to the jar file in the given image
+  pathToJar: "/jmx_prometheus_javaagent.jar"
+  # kafkaJMXExporterConfig describes jmx exporter config for Kafka
+  kafkaJMXExporterConfig: |
+    lowercaseOutputName: true
 ```
 
 ## Using the ServiceMonitors

@@ -79,8 +79,8 @@ To configure an external listener that uses the LoadBalancer access method, comp
 
 1. Set the ingress controller. The ingress controllers that are currently supported for load balancing are:
 
-    - `envoy`: uses Envoy proxy as an ingress.
-    - `istioingress`: uses Istio proxy gateway as an ingress.
+    - `envoy`: uses an Envoy proxy as an ingress.
+    - `contour`: uses [Contour](https://projectcontour.io/) (an Envoy-based ingress controller) as an ingress.
 
     Configure the ingress controller you want to use:
 
@@ -107,19 +107,29 @@ To configure an external listener that uses the LoadBalancer access method, comp
         ingressController: "envoy"
       ```
 
-    - To use Istio ingress controller set the `ingressController` field to `istioingress`. Koperator now uses standard Istio resources (Gateway, VirtualService) instead of the deprecated banzaicloud istio-operator. This provides better compatibility and works with any Istio installation. The `istioControlPlane` configuration is no longer required.
+    - To use Contour, set the `ingressController` field to `contour`. Contour is an Envoy-based ingress controller that exposes brokers through Contour resources and uses the `ClusterIP` access method. Per-listener Contour settings (such as the TLS secret and broker hostname template) are configured through the `contourIngressConfig` field.
 
       ```yaml
       spec:
-        ingressController: "istioingress"
-        istioIngressConfig:
-          gatewayConfig:
-            mode: ISTIO_MUTUAL  # or SIMPLE for non-mTLS
+        ingressController: "contour"
+        listenersConfig:
+          externalListeners:
+            - name: contour
+              type: plaintext
+              accessMethod: ClusterIP
+              anyCastPort: 8443
+              config:
+                defaultIngressConfig: ""
+                ingressConfig:
+                  contour:
+                    hostnameOverride: kafka.cluster.local
+                    contourIngressConfig:
+                      tlsSecretName: heptio-contour/cluster-ssl
       ```
 
-      For detailed Istio integration configuration and advanced features, see the [Istio Integration Guide]({{< relref "../istio-integration.md" >}}).
+      For a complete example, see the [Contour sample](https://github.com/adobe/koperator/blob/master/config/samples/simplekafkacluster_with_contour.yaml).
 
-1. Configure additional parameters for the ingress controller as needed for your environment, for example, number of replicas, resource requirements and resource limits. You can be configure such parameters using the *envoyConfig* and *istioIngressConfig* fields, respectively.
+1. Configure additional parameters for the ingress controller as needed for your environment, for example, number of replicas, resource requirements and resource limits. You can configure such parameters using the *envoyConfig* and *contourIngressConfig* fields, respectively.
 1. (Optional) For external access through a static URL instead of the load balancer's public IP, specify the URL in the `hostnameOverride` field of the external listener that resolves to the public IP of the load balancer. The broker address will be advertised as, `advertised.listeners=EXTERNAL1://kafka-1.dev.my.domain:<broker port number>`.
 
     ```yaml
@@ -251,18 +261,10 @@ To enable sasl_plaintext authentication on the external listener, modify the **e
 ```yaml
   listenersConfig:
     externalListeners:
-    - config:
-        defaultIngressConfig: ingress-sasl
-        ingressConfig:
-          ingress-sasl:
-            istioIngressConfig:
-              gatewayConfig:
-                credentialName: istio://sds
-                mode: SIMPLE
-      containerPort: 9094
-      externalStartingPort: 19090
+    - type: sasl_plaintext
       name: external
-      type: sasl_plaintext
+      externalStartingPort: 19090
+      containerPort: 9094
 ```
 
 To connect to this listener using the Kafka 3.1.0 (and above) console producer, complete the following steps:

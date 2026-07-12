@@ -133,20 +133,9 @@ Koperator supports Apache Kafka's KRaft mode, which eliminates the dependency on
 - **Better Scalability**: Improved metadata handling for large-scale deployments
 - **Future-Ready**: KRaft is the future of Kafka and the recommended approach for new deployments
 - **Flexible Node Roles**: Support for dedicated controller nodes, broker nodes, or combined roles
-- **Production Ready**: Full support for SSL, monitoring, and all Koperator features in KRaft mode with Kafka 3.9.1
+- **Production Ready**: Full support for SSL, monitoring, and all Koperator features in KRaft mode with Kafka 3.9.2
 
 For detailed KRaft configuration and deployment guides, see the [KRaft Mode Documentation]({{< relref "kraft.md" >}}).
-
-### Seamless Istio mesh support
-
-- **Standard Istio Integration**: Koperator now uses standard Istio resources (Gateway, VirtualService) instead of deprecated banzaicloud istio-operator
-- **Flexible Deployment**: Works with any Istio installation method (operator, Helm, or manual)
-- **Service Mesh Ready**: Operator allows to use ClusterIP services instead of Headless, which works better with Service meshes
-- **Sidecar Compatibility**: To avoid too early Kafka initialization, the operator uses a small script to mitigate sidecar container readiness issues
-- **Istio Ingress Gateways**: Operator supports creating Istio ingress gateways for external access to Kafka clusters running inside the mesh
-- **No Control Plane Dependency**: Works with any Istio installation without requiring specific control plane configuration
-
-For detailed Istio integration configuration, troubleshooting, and migration guides, see the [Istio Integration Guide]({{< relref "istio-integration.md" >}}).
 
 ## Getting Started
 

@@ -29,7 +29,7 @@ kubectl get pods -n kafka -l kafka_cr=kafka
 
 # Create a test topic with data
 kubectl run kafka-producer-dr --rm -i --tty=true \
-  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.1 \
+  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.2 \
   --restart=Never \
   -- /opt/kafka/bin/kafka-console-producer.sh \
   --bootstrap-server kafka-headless:29092 \
@@ -112,7 +112,7 @@ kubectl describe pod -n kafka $BROKER_POD | grep -A 5 "Volumes:"
 
 # Test data persistence
 kubectl run kafka-consumer-dr --rm -i --tty=true \
-  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.1 \
+  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.2 \
   --restart=Never \
   -- /opt/kafka/bin/kafka-console-consumer.sh \
   --bootstrap-server kafka-headless:29092 \
@@ -159,7 +159,7 @@ diff /tmp/pvc-before-deletion.yaml /tmp/pvc-after-deletion.yaml || echo "PVCs ar
 
 # Test cluster functionality
 kubectl run kafka-test-after-deletion --rm -i --tty=true \
-  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.1 \
+  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.2 \
   --restart=Never \
   -- /opt/kafka/bin/kafka-topics.sh \
   --bootstrap-server kafka-headless:29092 \
@@ -238,7 +238,7 @@ done
 ```bash
 # Create test data
 kubectl run kafka-persistence-test --rm -i --tty=true \
-  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.1 \
+  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.2 \
   --restart=Never \
   -- /opt/kafka/bin/kafka-console-producer.sh \
   --bootstrap-server kafka-headless:29092 \
@@ -256,7 +256,7 @@ kubectl wait --for=condition=Ready pod -l kafka_cr=kafka -n kafka --timeout=300s
 
 # Verify data survived
 kubectl run kafka-persistence-verify --rm -i --tty=true \
-  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.1 \
+  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.2 \
   --restart=Never \
   -- /opt/kafka/bin/kafka-console-consumer.sh \
   --bootstrap-server kafka-headless:29092 \
@@ -296,7 +296,7 @@ EOF
 ```bash
 # Check cluster state during network partition
 kubectl run kafka-network-test --rm -i --tty=true \
-  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.1 \
+  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.2 \
   --restart=Never \
   -- /opt/kafka/bin/kafka-topics.sh \
   --bootstrap-server kafka-headless:29092 \
@@ -316,7 +316,7 @@ kubectl delete networkpolicy isolate-broker -n kafka
 # Verify cluster recovery
 sleep 30
 kubectl run kafka-recovery-test --rm -i --tty=true \
-  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.1 \
+  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.2 \
   --restart=Never \
   -- /opt/kafka/bin/kafka-topics.sh \
   --bootstrap-server kafka-headless:29092 \
@@ -346,7 +346,7 @@ kubectl logs -n kafka kafka-101 | grep -i zookeeper | tail -10
 ```bash
 # Try to create a topic (should fail or be delayed)
 timeout 30 kubectl run kafka-zk-test --rm -i --tty=true \
-  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.1 \
+  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.2 \
   --restart=Never \
   -- /opt/kafka/bin/kafka-topics.sh \
   --bootstrap-server kafka-headless:29092 \
@@ -355,7 +355,7 @@ timeout 30 kubectl run kafka-zk-test --rm -i --tty=true \
 
 # Test existing topic access (should still work)
 kubectl run kafka-existing-test --rm -i --tty=true \
-  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.1 \
+  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.2 \
   --restart=Never \
   -- /opt/kafka/bin/kafka-console-producer.sh \
   --bootstrap-server kafka-headless:29092 \
@@ -375,7 +375,7 @@ kubectl wait --for=condition=Ready pod -l app=zookeeper -n zookeeper --timeout=3
 
 # Verify Kafka functionality restored
 kubectl run kafka-zk-recovery --rm -i --tty=true \
-  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.1 \
+  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.2 \
   --restart=Never \
   -- /opt/kafka/bin/kafka-topics.sh \
   --bootstrap-server kafka-headless:29092 \
@@ -451,14 +451,14 @@ Based on the tests, typical recovery times are:
 ```bash
 # Clean up test topics
 kubectl run kafka-cleanup --rm -i --tty=true \
-  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.1 \
+  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.2 \
   --restart=Never \
   -- /opt/kafka/bin/kafka-topics.sh \
   --bootstrap-server kafka-headless:29092 \
   --delete --topic disaster-recovery-test
 
 kubectl run kafka-cleanup-2 --rm -i --tty=true \
-  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.1 \
+  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.2 \
   --restart=Never \
   -- /opt/kafka/bin/kafka-topics.sh \
   --bootstrap-server kafka-headless:29092 \

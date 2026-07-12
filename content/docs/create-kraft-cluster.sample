@@ -6,7 +6,7 @@ metadata:
 spec:
   kRaft: true
   headlessServiceEnabled: true
-  clusterImage: "ghcr.io/adobe/koperator/kafka:2.13-3.9.1"
+  clusterImage: "ghcr.io/adobe/koperator/kafka:2.13-3.9.2"
   
   brokerConfigGroups:
     default:

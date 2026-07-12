@@ -13,7 +13,7 @@ This page shows you the list of supported Koperator versions, and the versions o
 
 |Image|Go version|
 |-|-|
-|ghcr.io/adobe/koperator/kafka-operator:{{< param "latest_version" >}}|1.26|
+|ghcr.io/adobe/koperator:{{< param "latest_version" >}}|1.26|
 
 ## Available Apache Kafka images
 
@@ -21,7 +21,7 @@ This page shows you the list of supported Koperator versions, and the versions o
 
 |Image|Java version|
 |-|-|
-|ghcr.io/adobe/koperator/kafka:2.13-3.9.2-jdk21.0.11|21|
+|ghcr.io/adobe/koperator/kafka:2.13-3.9.2|21|
 
 ## Available JMX Exporter images
 

@@ -27,7 +27,7 @@ First, verify that you can connect to the Kafka cluster:
 ```bash
 # List topics using kubectl run
 kubectl run kafka-topics --rm -i --tty=true \
-  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.1 \
+  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.2 \
   --restart=Never \
   -- /opt/kafka/bin/kafka-topics.sh \
   --bootstrap-server kafka-headless:29092 \
@@ -46,7 +46,7 @@ __consumer_offsets
 ```bash
 # Get cluster metadata
 kubectl run kafka-metadata --rm -i --tty=true \
-  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.1 \
+  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.2 \
   --restart=Never \
   -- /opt/kafka/bin/kafka-broker-api-versions.sh \
   --bootstrap-server kafka-headless:29092
@@ -61,7 +61,7 @@ Create a topic with multiple partitions and replicas:
 ```bash
 # Create a test topic with 12 partitions distributed across brokers
 kubectl run kafka-topics --rm -i --tty=true \
-  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.1 \
+  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.2 \
   --restart=Never \
   -- /opt/kafka/bin/kafka-topics.sh \
   --bootstrap-server kafka-headless:29092 \
@@ -75,7 +75,7 @@ kubectl run kafka-topics --rm -i --tty=true \
 ```bash
 # Describe the topic to verify configuration
 kubectl run kafka-topics --rm -i --tty=true \
-  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.1 \
+  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.2 \
   --restart=Never \
   -- /opt/kafka/bin/kafka-topics.sh \
   --bootstrap-server kafka-headless:29092 \
@@ -96,7 +96,7 @@ Topic: perf_topic	TopicId: xyz-123-abc	PartitionCount: 12	ReplicationFactor: 3
 ```bash
 # Set custom retention period (12 minutes for testing)
 kubectl run kafka-configs --rm -i --tty=true \
-  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.1 \
+  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.2 \
   --restart=Never \
   -- /opt/kafka/bin/kafka-configs.sh \
   --zookeeper zk-client.zookeeper:2181/kafka \
@@ -114,7 +114,7 @@ kubectl run kafka-configs --rm -i --tty=true \
 ```bash
 # Start a simple producer (run in one terminal)
 kubectl run kafka-producer \
-  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.1 \
+  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.2 \
   --restart=Never \
   -- /opt/kafka/bin/kafka-console-producer.sh \
   --bootstrap-server kafka-headless:29092 \
@@ -133,7 +133,7 @@ Testing multi-AZ deployment
 ```bash
 # Start a consumer (run in another terminal)
 kubectl run kafka-consumer \
-  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.1 \
+  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.2 \
   --restart=Never \
   -- /opt/kafka/bin/kafka-console-consumer.sh \
   --bootstrap-server kafka-headless:29092 \
@@ -160,7 +160,7 @@ Run a high-throughput producer test:
 ```bash
 # Start producer performance test
 kubectl run kafka-producer-perf \
-  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.1 \
+  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.2 \
   --restart=Never \
   -- /opt/kafka/bin/kafka-producer-perf-test.sh \
   --producer-props bootstrap.servers=kafka-headless:29092 acks=all \
@@ -184,7 +184,7 @@ In another terminal, run a consumer performance test:
 ```bash
 # Start consumer performance test
 kubectl run kafka-consumer-perf \
-  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.1 \
+  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.2 \
   --restart=Never \
   -- /opt/kafka/bin/kafka-consumer-perf-test.sh \
   --broker-list kafka-headless:29092 \
@@ -263,7 +263,7 @@ kubectl get nodes \
 ```bash
 # Check if rack awareness is working by examining topic partition distribution
 kubectl run kafka-topics --rm -i --tty=true \
-  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.1 \
+  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.2 \
   --restart=Never \
   -- /opt/kafka/bin/kafka-topics.sh \
   --bootstrap-server kafka-headless:29092 \
@@ -307,7 +307,7 @@ kubectl get kafkatopic -n kafka
 
 # Verify topic exists in Kafka
 kubectl run kafka-topics --rm -i --tty=true \
-  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.1 \
+  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.2 \
   --restart=Never \
   -- /opt/kafka/bin/kafka-topics.sh \
   --bootstrap-server kafka-headless:29092 \
@@ -320,7 +320,7 @@ kubectl run kafka-topics --rm -i --tty=true \
 # Create multiple consumers in the same group
 for i in {1..3}; do
   kubectl run kafka-consumer-group-$i \
-    --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.1 \
+    --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.2 \
     --restart=Never \
     -- /opt/kafka/bin/kafka-console-consumer.sh \
     --bootstrap-server kafka-headless:29092 \
@@ -330,7 +330,7 @@ done
 
 # Check consumer group status
 kubectl run kafka-consumer-groups --rm -i --tty=true \
-  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.1 \
+  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.2 \
   --restart=Never \
   -- /opt/kafka/bin/kafka-consumer-groups.sh \
   --bootstrap-server kafka-headless:29092 \
@@ -379,7 +379,7 @@ kubectl delete kafkatopic test-topic-crd -n kafka
 ```bash
 # Check broker connectivity
 kubectl run kafka-test --rm -i --tty=true \
-  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.1 \
+  --image=ghcr.io/adobe/koperator/kafka:2.13-3.9.2 \
   --restart=Never \
   -- /bin/bash
 

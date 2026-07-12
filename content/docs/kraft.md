@@ -15,15 +15,15 @@ KRaft mode offers several advantages over traditional ZooKeeper-based deployment
 - **Faster Recovery**: Quicker cluster startup and recovery times
 - **Reduced Operational Complexity**: Fewer moving parts to monitor and maintain
 - **Future-Ready**: KRaft is the future of Kafka and will eventually replace ZooKeeper
-- **Production Stability**: Kafka 3.9.1 includes significant KRaft improvements and bug fixes
+- **Production Stability**: Kafka 3.9.2 includes significant KRaft improvements and bug fixes
 
 ## Prerequisites
 
 - Koperator version 0.26.0 or later
-- Kafka version 3.9.1 or later (minimum: 3.3.0, but 3.9.1+ recommended for stability and features)
+- Kafka version 3.9.2 or later (minimum: 3.3.0, but 3.9.2+ recommended for stability and features)
 - Kubernetes cluster with sufficient resources
 
-> **Note**: While KRaft mode is available starting from Kafka 3.3.0, version 3.9.1 includes significant stability improvements, bug fixes, and performance enhancements for KRaft deployments. For production environments, always use Kafka 3.9.1 or later.
+> **Note**: While KRaft mode is available starting from Kafka 3.3.0, version 3.9.2 includes significant stability improvements, bug fixes, and performance enhancements for KRaft deployments. For production environments, always use Kafka 3.9.2 or later.
 
 ## KRaft Architecture in Koperator
 
@@ -118,7 +118,7 @@ metadata:
 spec:
   kRaft: true
   headlessServiceEnabled: true
-  clusterImage: "ghcr.io/adobe/koperator/kafka:2.13-3.9.1"
+  clusterImage: "ghcr.io/adobe/koperator/kafka:2.13-3.9.2"
   
   brokerConfigGroups:
     default:
@@ -190,9 +190,9 @@ spec:
 
 ## Kafka Version Recommendations
 
-### Why Kafka 3.9.1 is Recommended
+### Why Kafka 3.9.2 is Recommended
 
-Kafka 3.9.1 includes several important improvements for KRaft mode:
+Kafka 3.9.2 includes several important improvements for KRaft mode:
 
 - **Enhanced Stability**: Critical bug fixes for controller failover and metadata consistency
 - **Improved Performance**: Better handling of large metadata operations and faster startup times
@@ -264,7 +264,7 @@ kubectl logs kafka-controller-3-xxx -f
 ## Limitations
 
 - **No ZooKeeper migration**: Automatic migration from ZooKeeper is not supported
-- **Kafka version**: Requires Kafka 3.3.0 minimum, but 3.9.1 or later is strongly recommended
+- **Kafka version**: Requires Kafka 3.3.0 minimum, but 3.9.2 or later is strongly recommended
 - **Feature parity**: Some advanced ZooKeeper features may not be available in early KRaft versions
 
 ## Resources

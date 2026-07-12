@@ -95,7 +95,7 @@ spec:
     id: 0
   - brokerConfigGroup: default
     id: 1
-  clusterImage: ghcr.io/adobe/kafka:2.13-3.9.1
+  clusterImage: ghcr.io/adobe/koperator/kafka:2.13-3.9.2
   cruiseControlConfig:
     clusterConfig: |
       {
@@ -108,7 +108,6 @@ spec:
   disruptionBudget: {}
   envoyConfig: {}
   headlessServiceEnabled: true
-  istioIngressConfig: {}
   listenersConfig:
     externalListeners:
     - containerPort: 9094
@@ -149,7 +148,7 @@ status:
             cruiseControlOperationReference:
               name: kafka-rebalance-bhs7n
             cruiseControlVolumeState: GracefulDiskRebalanceSucceeded
-      image: ghcr.io/adobe/kafka:2.13-3.9.1
+      image: ghcr.io/adobe/koperator/kafka:2.13-3.9.2
       perBrokerConfigurationState: PerBrokerConfigInSync
       rackAwarenessState: ""
       version: 3.1.0
@@ -163,7 +162,7 @@ status:
             cruiseControlOperationReference:
               name: kafka-rebalance-bhs7n
             cruiseControlVolumeState: GracefulDiskRebalanceSucceeded
-      image: ghcr.io/adobe/kafka:2.13-3.9.1
+      image: ghcr.io/adobe/koperator/kafka:2.13-3.9.2
       perBrokerConfigurationState: PerBrokerConfigInSync
       rackAwarenessState: ""
       version: 3.1.0
