@@ -80,16 +80,16 @@ weight = 1
   url_latest_version = "https://opensource.adobe.com/koperator/"
 
   # Repository configuration (URLs for in-page links to opening issues and suggesting changes)
-  github_repo = "https://github.com/adobe/koperator/tree/gh-pages"
+  github_repo = "https://github.com/adobe/koperator"
   # An optional link to a related project repo. For example, the sibling repository where your product code lives.
   github_project_repo = "https://github.com/adobe/koperator"
 
   # Specify a value here if your content directory is not in your repo's root directory
   # github_subdir = ""
 
-  # Uncomment this if your GitHub repo does not have "main" as the default branch,
-  # or specify a new value if you want to reference another branch in your GitHub links
-  github_branch= "main"
+  # The docs source (content/, layouts/, config/) only exists on the gh-pages
+  # branch of this repo (main/master has no content/ dir), so links must point there.
+  github_branch = "gh-pages"
 
 
   # Enable Lunr.js offline search
