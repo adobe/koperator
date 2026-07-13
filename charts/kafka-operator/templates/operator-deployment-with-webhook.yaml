@@ -173,6 +173,7 @@ spec:
             - --enable-leader-election
             - --cert-manager-namespace={{ .Values.certManager.namespace }}
             - --cert-manager-enabled={{ .Values.certManager.enabled }}
+            - --contour-enabled={{ .Values.contour.enabled }}
           {{- if not .Values.certSigning.enabled }}
             - --disable-cert-signing-support
           {{- end }}

@@ -94,6 +94,7 @@ func main() {
 		verboseLogging                    bool
 		certSigningDisabled               bool
 		certManagerEnabled                bool
+		contourEnabled                    bool
 		maxKafkaTopicConcurrentReconciles int
 		healthProbesAddr                  string
 	)
@@ -108,6 +109,7 @@ func main() {
 	flag.BoolVar(&developmentLogging, "development", false, "Enable development logging")
 	flag.BoolVar(&verboseLogging, "verbose", false, "Enable verbose logging")
 	flag.BoolVar(&certManagerEnabled, "cert-manager-enabled", false, "Enable cert-manager integration")
+	flag.BoolVar(&contourEnabled, "contour-enabled", false, "Enable Project Contour ingress integration. Requires Contour's HTTPProxy CRD to be installed in the cluster.")
 	flag.BoolVar(&certSigningDisabled, "disable-cert-signing-support", false, "Disable native certificate signing integration")
 	flag.IntVar(&maxKafkaTopicConcurrentReconciles, "max-kafka-topic-concurrent-reconciles", 10, "Define max amount of concurrent KafkaTopic reconciles")
 	flag.StringVar(&healthProbesAddr, "health-probes-addr", ":8081", "The address the probe endpoint binds to.")
@@ -185,7 +187,7 @@ func main() {
 		KafkaClientProvider: kafkaclient.NewDefaultProvider(),
 	}
 
-	if err = controllers.SetupKafkaClusterWithManager(mgr).Complete(kafkaClusterReconciler); err != nil {
+	if err = controllers.SetupKafkaClusterWithManager(mgr, contourEnabled).Complete(kafkaClusterReconciler); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "KafkaCluster")
 		os.Exit(1)
 	}

@@ -18,7 +18,7 @@ operator:
     # -- Operator container image repository
     repository: ghcr.io/adobe/koperator
     # -- Operator container image tag
-    tag: 0.28.0-adobe-20250923
+    tag: "0.28.0-adobe-20260622"
     # -- Operator container image pull policy
     pullPolicy: IfNotPresent
   # In constrained environments where operator cannot
@@ -72,6 +72,14 @@ certManager:
   # https://cert-manager.io/docs/configuration/
   namespace: "cert-manager"
 
+contour:
+  # -- Enable Project Contour ingress integration. Only enable this when the
+  # Kafka cluster uses `ingressController: contour`. When enabled, Project
+  # Contour's HTTPProxy CRD (projectcontour.io/v1) must be installed in the
+  # cluster, otherwise the operator fails to start.
+  # https://projectcontour.io
+  enabled: false
+
 certSigning:
   # -- Enable native certificate signing integration
   enabled: true
@@ -95,7 +103,7 @@ prometheusMetrics:
       # -- Auth proxy container image repository
       repository: quay.io/brancz/kube-rbac-proxy
       # -- Auth proxy container image tag
-      tag: v0.22.0
+      tag: v0.22.1
       # -- Auth proxy container image pull policy
       pullPolicy: IfNotPresent
     serviceAccount:

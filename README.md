@@ -3,7 +3,7 @@
 ![Koperator](https://img.shields.io/github/v/release/adobe/koperator?label=Koperator)
 ![Released](https://img.shields.io/github/release-date/adobe/koperator?label=Released)
 ![License](https://img.shields.io/github/license/adobe/koperator?label=License)
-![Go version (latest release)](https://img.shields.io/github/go-mod/go-version/adobe/koperator/0.28.0-adobe-20250923)
+![Go version (latest release)](https://img.shields.io/github/go-mod/go-version/adobe/koperator/0.28.0-adobe-20260622)
 
 </p>
 
@@ -91,7 +91,7 @@ spec:
     replicas: 1
     image:
         repository: ghcr.io/adobe/zookeeper-operator/zookeeper
-        tag: 3.8.4-0.2.15-adobe-20250923
+        tag: 3.8.4-0.2.15-adobe-20260423
     persistence:
         reclaimPolicy: Delete
 EOF
@@ -120,30 +120,28 @@ kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/ma
 kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_kafkausers.yaml
 ```
 
-2. Install Koperator into the `kafka` namespace using the OCI Helm chart from GitHub Container Registry:
+2. Install Koperator into the `kafka` namespace using the OCI Helm chart from GitHub Container Registry. Use `--skip-crds` since the CRDs were already installed in the previous step - without it, Helm's own CRD install can conflict with the `kubectl apply` above ([#265](https://github.com/adobe/koperator/issues/265)):
 
-> 📦 **View available versions**: [ghcr.io/adobe/koperator/kafka-operator](https://github.com/adobe/koperator/pkgs/container/koperator%2Fkafka-operator/versions)
+> 📦 **View available versions**: [ghcr.io/adobe/helm-charts/kafka-operator](https://github.com/adobe/koperator/pkgs/container/helm-charts%2Fkafka-operator/versions)
+
+OCI registries have no floating "latest" tag, so `--version` is required (replace with your desired version, see available versions above):
 
 ```sh
-# Install the latest release
-helm install kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator --namespace=kafka --create-namespace
-
-# Or install a specific version (replace with desired version)
-helm install kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator --version 0.28.0-adobe-20250923 --namespace=kafka --create-namespace
+helm install kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator --version 0.28.0-adobe-20260622 --namespace=kafka --create-namespace --skip-crds
 ```
 
 #### Pull and inspect the chart before installation
 
 ```sh
 # Pull the chart locally
-helm pull oci://ghcr.io/adobe/koperator/kafka-operator --version 0.28.0-adobe-20250923
+helm pull oci://ghcr.io/adobe/helm-charts/kafka-operator --version 0.28.0-adobe-20260622
 
 # Extract and inspect
-tar -xzf kafka-operator-0.28.0-adobe-20250923.tgz
+tar -xzf kafka-operator-0.28.0-adobe-20260622.tgz
 helm template kafka-operator ./kafka-operator/
 
 # Install from local chart
-helm install kafka-operator ./kafka-operator/ --namespace=kafka --create-namespace
+helm install kafka-operator ./kafka-operator/ --namespace=kafka --create-namespace --skip-crds
 ```
 
 1. Create the Kafka cluster using the `KafkaCluster` custom resource. The quick start uses a minimal custom resource, but there are other examples in the same directory.

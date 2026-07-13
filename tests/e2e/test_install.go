@@ -88,7 +88,7 @@ spec:
 			var wg sync.WaitGroup
 			errChan := make(chan error, 2)
 
-			// Install zookeeper-operator and prometheus-operator in parallel
+			// Install zookeeper-operator and prometheus-operator in parallel - independent charts, no install-order dependency
 			wg.Add(2)
 
 			go func() {
@@ -110,7 +110,6 @@ spec:
 			wg.Wait()
 			close(errChan)
 
-			// Check for errors
 			for installErr := range errChan {
 				gomega.Expect(installErr).NotTo(gomega.HaveOccurred())
 			}

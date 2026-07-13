@@ -19,39 +19,34 @@ kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/ma
 kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_kafkausers.yaml
 ```
 
-To install the chart from the OCI registry:
+To install the chart from the OCI registry. Use `--skip-crds` since the CRDs were already installed in the
+previous step - without it, Helm's own CRD install can conflict with the `kubectl apply` above
+([#265](https://github.com/adobe/koperator/issues/265)):
 
-> 📦 **View available versions**: [ghcr.io/adobe/koperator/kafka-operator](https://github.com/adobe/koperator/pkgs/container/koperator%2Fkafka-operator/versions)
+> 📦 **View available versions**: [ghcr.io/adobe/helm-charts/kafka-operator](https://github.com/adobe/koperator/pkgs/container/helm-charts%2Fkafka-operator/versions)
+
+OCI registries have no floating "latest" tag, so `--version` is required (see available versions above):
 
 ```bash
-# Install the latest release
 helm install kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator \
-  --namespace=kafka --create-namespace
-
-# Or install a specific version
-helm install kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator \
-  --version 0.28.0-adobe-20250923 --namespace=kafka --create-namespace
+  --version 0.28.0-adobe-20260622 --namespace=kafka --create-namespace --skip-crds
 ```
 
 To install the operator using an already installed cert-manager:
 ```bash
 helm install kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator \
-  --set certManager.namespace=<your cert manager namespace> --namespace=kafka --create-namespace
+  --version 0.28.0-adobe-20260622 \
+  --set certManager.namespace=<your cert manager namespace> --namespace=kafka --create-namespace --skip-crds
 ```
 
 ## Upgrading the chart
 
 To upgrade the chart since the helm 3 limitation you have to set a value as well to keep your CRDs.
-If this value is not set your CRDs might be deleted.
+If this value is not set your CRDs might be deleted. `--version` is required, same as for install.
 
 ```bash
-# Upgrade to latest version
-helm upgrade kafka-operator oci://ghcr.io/adobe/koperator/kafka-operator \
-  --namespace=kafka
-
-# Upgrade to specific version
-helm upgrade kafka-operator oci://ghcr.io/adobe/koperator/kafka-operator \
-  --version 0.28.0-adobe-20250923 --namespace=kafka
+helm upgrade kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator \
+  --version 0.28.0-adobe-20260622 --namespace=kafka
 ```
 
 ## Uninstalling the Chart
@@ -71,7 +66,7 @@ The command removes all the Kubernetes components associated with the chart and 
 | replicaCount | int | `1` | Operator replica count can be set |
 | operator.annotations | object | `{}` | Operator pod annotations can be set |
 | operator.image.repository | string | `"ghcr.io/adobe/koperator"` | Operator container image repository |
-| operator.image.tag | string | `"0.28.0-adobe-20250923"` | Operator container image tag |
+| operator.image.tag | string | `"0.28.0-adobe-20260622"` | Operator container image tag |
 | operator.image.pullPolicy | string | `"IfNotPresent"` | Operator container image pull policy |
 | operator.namespaces | string | `"kafka, cert-manager"` | List of namespaces where Operator watches for custom resources.<br><br>**Note** that the operator still requires to read the cluster-scoped `Node` labels to configure `rack awareness`. Make sure the operator ServiceAccount is granted `get` permissions on this `Node` resource when using limited RBACs. |
 | operator.verboseLogging | bool | `false` | Enable verbose logging |
@@ -85,6 +80,7 @@ The command removes all the Kubernetes components associated with the chart and 
 | webhook.certs.secret | string | `"kafka-operator-serving-cert"` | Helm chart will use the secret name applied here for the cert |
 | certManager.enabled | bool | `false` | Operator will integrate with the cert manager |
 | certManager.namespace | string | `"cert-manager"` | Operator will look for the cert manager in this namespace namespace field specifies the Cert-manager's Cluster Resource Namespace. https://cert-manager.io/docs/configuration/ |
+| contour.enabled | bool | `false` | Enable Project Contour ingress integration. Only enable this when the Kafka cluster uses `ingressController: contour`. When enabled, Project Contour's HTTPProxy CRD (projectcontour.io/v1) must be installed in the cluster, otherwise the operator fails to start. https://projectcontour.io |
 | certSigning.enabled | bool | `true` | Enable native certificate signing integration |
 | alertManager.enable | bool | `true` | AlertManager can be enabled |
 | alertManager.port | int | `9001` | AlertManager port |
