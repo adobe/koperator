@@ -468,6 +468,19 @@ kubectl get crd kafkaclusters.kafka.banzaicloud.io
 7. **Run `make check` before committing**
 8. **Keep commit messages descriptive and reference issues**
 
+## License Headers
+
+- Brand-new files (no prior Cisco/banzaicloud authorship) get an Adobe-only copyright header:
+  ```
+  # Copyright 2026 Adobe. All rights reserved.
+  ```
+  Don't add the "Cisco Systems, Inc. and/or its affiliates" line to new files - that copyright belongs on
+  files that originated in the upstream banzaicloud/Cisco codebase, not on code Adobe wrote from scratch.
+- `make license-header-check` (addlicense) only validates the Apache-2.0 license body text, not the exact
+  copyright owner lines, so an Adobe-only header still passes CI.
+- Existing files that already carry the dual Cisco+Adobe header (generated via `make gen-license-header` /
+  `hack/boilerplate`) keep it as-is when merely editing them - only new files get the Adobe-only header.
+
 ## Contributing
 
 1. Fork and create a branch
