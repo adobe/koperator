@@ -31,7 +31,7 @@ import (
 	"github.com/Masterminds/sprig/v3"
 )
 
-func (r *Reconciler) pvc(brokerId int32, storageIndex int, storage v1beta1.StorageConfig) (*corev1.PersistentVolumeClaim, error) {
+func (r *Reconciler) pvc(brokerId int32, storageIndex int, storage v1beta1.StorageConfig, brokerConfig *v1beta1.BrokerConfig, kRaftMode bool) (*corev1.PersistentVolumeClaim, error) {
 	errCtx := []interface{}{v1beta1.BrokerIdLabelKey, brokerId, mountPathAnnotationKey, storage.MountPath}
 
 	pvcSpecYaml, err := yaml.Marshal(storage.PvcSpec)
@@ -67,7 +67,10 @@ func (r *Reconciler) pvc(brokerId int32, storageIndex int, storage v1beta1.Stora
 			fmt.Sprintf(brokerStorageTemplate, r.KafkaCluster.Name, brokerId, storageIndex),
 			apiutil.MergeLabels(
 				apiutil.LabelsForKafka(r.KafkaCluster.Name),
-				map[string]string{v1beta1.BrokerIdLabelKey: fmt.Sprintf("%d", brokerId)},
+				map[string]string{
+					v1beta1.BrokerIdLabelKey: fmt.Sprintf("%d", brokerId),
+					v1beta1.PvcRolesKey:      brokerConfig.GetPvcRolesLabelValue(kRaftMode),
+				},
 			),
 			map[string]string{mountPathAnnotationKey: storage.MountPath}, r.KafkaCluster),
 		Spec: pvcSpec,

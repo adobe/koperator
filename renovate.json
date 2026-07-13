@@ -1,6 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "forkProcessing": "enabled",
+  "baseBranchPatterns": ["master", "gh-pages"],
   "extends": [
     ":dependencyDashboard",
     ":ignoreUnstable",
@@ -19,7 +20,8 @@
       "customType": "regex",
       "managerFilePatterns": [
         "/(^|/)Makefile$/",
-        "/(^|/)Dockerfile$/"
+        "/(^|/)Dockerfile$/",
+        "/(^|/)\\.github/workflows/regenerate-crd-docs\\.yaml$/"
       ],
       "matchStrings": [
         "(?<depName>[A-Z][A-Z0-9_]*)_VERSION\\s*=\\s*(?<currentValue>[^\\s]+)\\s*#\\s*renovate:\\s*datasource=(?<datasource>[^\\s]+)\\s*depName=(?<packageName>[^\\s]+)(?:\\s*extractVersion=(?<extractVersion>[^\\s]+))?"
@@ -50,6 +52,17 @@
       ],
       "datasourceTemplate": "{{datasource}}",
       "depNameTemplate": "{{packageName}}"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/(^|/)\\.github/actions/kind-create/action\\.yaml$/"
+      ],
+      "matchStrings": [
+        "(?:default|version):\\s*'?(?<currentValue>[^\\s'#]+)'?\\s*#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<packageName>\\S+)"
+      ],
+      "datasourceTemplate": "{{datasource}}",
+      "depNameTemplate": "{{packageName}}"
     }
   ],
   "packageRules": [
@@ -57,8 +70,9 @@
       "matchManagers": [
         "gomod"
       ],
+      "matchBaseBranches": ["master"],
       "enabled": false,
-      "description": "Disable Go module updates - handled by automated workflow: .github/workflows/update-go-deps.yml"
+      "description": "Disable Go module updates on master - handled by automated workflow: .github/workflows/update-go-deps.yml. gh-pages' go.mod is Hugo Modules (theme deps like docsy), not app code, so it stays enabled there."
     },
     {
       "matchCategories": [

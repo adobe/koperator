@@ -4,13 +4,13 @@ go 1.25.0
 
 require (
 	github.com/banzaicloud/go-cruise-control v0.6.0
-	github.com/compose-spec/compose-go/v2 v2.11.0
-	github.com/docker/cli v29.5.3+incompatible
+	github.com/compose-spec/compose-go/v2 v2.13.0
+	github.com/docker/cli v29.6.1+incompatible
 	github.com/docker/compose/v2 v2.40.3
 	github.com/go-logr/logr v1.4.3
 	github.com/go-logr/zapr v1.3.0
-	github.com/onsi/ginkgo/v2 v2.31.0
-	github.com/onsi/gomega v1.42.0
+	github.com/onsi/ginkgo/v2 v2.32.0
+	github.com/onsi/gomega v1.42.1
 	github.com/pkg/errors v0.9.1
 	go.uber.org/zap v1.28.0
 )
@@ -166,7 +166,7 @@ require (
 	golang.org/x/term v0.44.0 // indirect
 	golang.org/x/text v0.38.0 // indirect
 	golang.org/x/time v0.11.0 // indirect
-	golang.org/x/tools v0.46.0 // indirect
+	golang.org/x/tools v0.47.0 // indirect
 	google.golang.org/genproto v0.0.0-20230410155749-daa745c078e1 // indirect
 	google.golang.org/grpc v1.74.2 // indirect
 	google.golang.org/protobuf v1.36.9 // indirect
