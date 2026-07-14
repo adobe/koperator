@@ -98,6 +98,13 @@
       ]
     },
     {
+      "matchPackageNames": [
+        "apache/kafka"
+      ],
+      "allowedVersions": "<4.0.0",
+      "description": "Kafka 4.x drops ZooKeeper support (KRaft-only) and needs an operator-side migration. Keep Renovate on the 3.x line until docker/kafka/Dockerfile is ready for that jump, then remove this rule."
+    },
+    {
       "groupName": "kafka docker images (major)",
       "groupSlug": "kafka-docker-major",
       "matchFileNames": [
