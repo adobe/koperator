@@ -202,6 +202,6 @@ This CRD is being replaced by <a href="../{{ .FullName }}/">{{ .ShortName }}</a>
 {{ else }}
 <div class="crd-noversions">
 <p>We currently cannot show any schema information on this <abbr title="custom resource definition">CRD</abbr>. Sorry for the inconvenience!</p>
-<p>Please refer to the <a href="https://pkg.go.dev/github.com/adobe/koperator/api/">Godoc</a> or <a href="https://github.com/adobe/koperator/tree/master/api">source</a> for details.</p>
+<p>Please refer to the <a href="https://pkg.go.dev/github.com/adobe/koperator/api/">Godoc</a> or <a href="https://github.com/adobe/koperator/tree/main/api">source</a> for details.</p>
 </div>
 {{ end }}
