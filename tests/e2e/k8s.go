@@ -516,13 +516,9 @@ func listK8sResourceKinds(kubectlOptions k8s.KubectlOptions, apiGroupSelector st
 
 	args = append(args, extraArgs...)
 
-	output, err := k8s.RunKubectlAndGetOutputContextE(
-		ginkgo.GinkgoT(),
-		context.Background(),
-		&kubectlOptions,
-		args...,
-	)
-
+	// Execute kubectl directly without terratest's logging: api-resources returns
+	// one line per resource kind (100+ lines), which otherwise floods the test output.
+	output, err := runKubectlSilent(kubectlOptions, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -744,20 +740,6 @@ func kubectlRemoveWarnings(outputSlice []string) []string {
 
 func isKubectlNotFoundError(err error) bool {
 	return err != nil && strings.Contains(err.Error(), kubectlNotFoundErrorMsg)
-}
-
-// setupReducedLogging configures reduced logging for terratest operations
-func setupReducedLogging() {
-	// Set environment variables to reduce terratest logging verbosity
-	if os.Getenv("E2E_VERBOSE_LOGGING") != verboseLoggingEnabled {
-		// Reduce terratest internal logging
-		os.Setenv("TEST_LOG_LEVEL", "-5")
-		// Reduce kubectl verbosity
-		os.Setenv("KUBECTL_VERBOSITY", "0")
-		// Additional environment variables to reduce terratest kubectl command logging
-		os.Setenv("TERRATEST_LOG_LEVEL", "INFO")
-		os.Setenv("KUBECTL_LOG_LEVEL", "0")
-	}
 }
 
 // waitForKafkaClusterWithPodStatusCheck waits for KafkaCluster to be ready and checks pod status every 10 seconds
