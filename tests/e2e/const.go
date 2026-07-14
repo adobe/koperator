@@ -90,6 +90,7 @@ const (
 
 	// Common string values and CLI flags/keys.
 	falseString   = "false"
+	trueString    = "true"
 	timeoutFlag   = "--timeout"
 	timeoutValue  = "10m"
 	outputFlag    = "--output"

@@ -145,7 +145,7 @@ var _ = BeforeSuite(func() {
 	Expect(mgr).ToNot(BeNil())
 
 	kafkaClusterReconciler = NewTestReconciler()
-	err = controllers.SetupKafkaClusterWithManager(mgr).Named("KafkaCluster").Complete(kafkaClusterReconciler)
+	err = controllers.SetupKafkaClusterWithManager(mgr, true).Named("KafkaCluster").Complete(kafkaClusterReconciler)
 	Expect(err).NotTo(HaveOccurred())
 
 	kafkaTopicReconciler = NewTestReconciler()
