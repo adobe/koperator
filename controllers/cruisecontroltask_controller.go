@@ -109,7 +109,7 @@ func (r *CruiseControlTaskReconciler) Reconcile(ctx context.Context, request ctr
 	}
 
 	// Update task states with information from Cruise Control
-	updateActiveTasks(tasksAndStates, ccOperations)
+	updateActiveTasks(log, tasksAndStates, ccOperations)
 
 	if err = r.UpdateStatus(ctx, instance, tasksAndStates); err != nil {
 		return requeueWithError(log, "failed to update Kafka Cluster status", err)
@@ -658,7 +658,7 @@ func getActiveTasksFromCluster(instance *banzaiv1beta1.KafkaCluster) *CruiseCont
 
 // updateActiveTasks updates the state of the tasks from the CruiseControlTasksAndStates instance by getting their
 // status from CruiseControlOperation
-func updateActiveTasks(tasksAndStates *CruiseControlTasksAndStates, ccOperations []*banzaiv1alpha1.CruiseControlOperation) {
+func updateActiveTasks(log logr.Logger, tasksAndStates *CruiseControlTasksAndStates, ccOperations []*banzaiv1alpha1.CruiseControlOperation) {
 	ccOperationMap := make(map[string]*banzaiv1alpha1.CruiseControlOperation)
 	for i := range ccOperations {
 		ccOperationMap[ccOperations[i].Name] = ccOperations[i]
@@ -669,6 +669,16 @@ func updateActiveTasks(tasksAndStates *CruiseControlTasksAndStates, ccOperations
 			continue
 		}
 
+		prev := task.BrokerState
 		task.FromResult(ccOperationMap[task.CruiseControlOperationReference.Name])
+		if !prev.IsDownscaleStalled() && task.BrokerState.IsDownscaleStalled() {
+			if task.BrokerState == banzaiv1beta1.GracefulDownscalePaused {
+				log.Info("broker downscale paused; manual resume required, broker retained in external listener config",
+					"brokerID", task.BrokerID, "state", task.BrokerState)
+			} else {
+				log.Info("broker downscale not progressing; broker retained in external listener config",
+					"brokerID", task.BrokerID, "state", task.BrokerState)
+			}
+		}
 	}
 }

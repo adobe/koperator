@@ -1,4 +1,3 @@
-// Copyright © 2025 Cisco Systems, Inc. and/or its affiliates
 // Copyright 2025 Adobe. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,6 +24,7 @@ import (
 	ginkgo "github.com/onsi/ginkgo/v2"
 	gomega "github.com/onsi/gomega"
 
+	"github.com/banzaicloud/koperator/api/v1alpha1"
 	"github.com/banzaicloud/koperator/api/v1beta1"
 )
 
@@ -95,7 +95,7 @@ func hasExactlyOneRemoveBrokerOperation(kubectlOptions k8s.KubectlOptions) (bool
 
 	count := 0
 	for _, op := range ops {
-		if op == "removeBroker" {
+		if op == string(v1alpha1.OperationRemoveBroker) {
 			count++
 		}
 	}
@@ -109,14 +109,10 @@ func hasExactlyNBrokerPods(kubectlOptions k8s.KubectlOptions, n int) (bool, erro
 		v1beta1.KafkaCRLabelKey+"="+kafkaClusterName+","+kafkaLabelSelectorBrokers,
 		"",
 		"--field-selector=status.phase=Running",
+		"-o", "name",
 	)
 	if err != nil {
 		return false, err
 	}
-	// subtract 1 for the header line
-	actual := len(pods) - 1
-	if actual < 0 {
-		actual = 0
-	}
-	return actual == n, nil
+	return len(pods) == n, nil
 }

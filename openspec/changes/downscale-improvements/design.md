@@ -6,7 +6,7 @@ The koperator manages Kafka cluster lifecycle via a set of reconcilers. Downscal
 
 2. **CruiseControlTask reconciler** (`controllers/cruisecontroltask_controller.go`): Picks up brokers in `GracefulDownscaleRequired` state and submits CC operations. The `add_broker` path already batches all pending brokers into one CC operation. The `remove_broker` path does not — it picks only the first task and breaks.
 
-3. **External listener reconcilers** (`pkg/resources/envoy/`, `pkg/resources/istioingress/`): Gate broker inclusion in envoy/istio/contour config on `ShouldIncludeBroker()`. This function returns `false` when `brokerConfig == nil` (broker not in spec), causing draining brokers to vanish from external listener config immediately upon spec removal.
+3. **External listener reconcilers** (`pkg/resources/envoy/`): Gate broker inclusion in envoy config on `ShouldIncludeBroker()`. This function returns `false` when `brokerConfig == nil` (broker not in spec), causing draining brokers to vanish from envoy listener config immediately upon spec removal. Note: `pkg/resources/contouringress` and `pkg/resources/nodeportexternalaccess` iterate `Spec.Brokers` directly and are not affected by this fix (see Non-Goals).
 
 **Key invariant:** `GetActiveTasksByOp(OperationRemoveBroker)` only returns brokers in `GracefulDownscaleRequired` state (via `IsRequired()` → `IsRequiredState()`). Brokers already `Scheduled` or `Running` are not returned. Because the KafkaCluster reconciler transitions all removed brokers atomically, all brokers from a single manifest apply are guaranteed to be in `Required` state simultaneously when the CC task reconciler fires.
 
@@ -32,9 +32,11 @@ The `addBrokers` helper (lines 366-368) already accepts `[]string` and submits o
 
 **Why not a separate aggregation layer?** The batching boundary is already correct — `GetActiveTasksByOp` returns exactly the set to batch. No new abstraction needed.
 
-### D2: Fix `ShouldIncludeBroker` as the single gatekeeper
+### D2: Fix `ShouldIncludeBroker` for envoy callers that enumerate status∪spec
 
-`ShouldIncludeBroker` is called by all external listener reconcilers (envoy configmap, service, deployment; istio gateway, virtualservice, meshgateway; contour). When `brokerConfig == nil`, the function currently falls through to `return false`.
+`ShouldIncludeBroker` is called by the envoy external listener reconcilers (configmap, service, deployment). When `brokerConfig == nil`, the function currently falls through to `return false`.
+
+**Real precondition for the fix:** The fallback only fires for reconcilers that enumerate brokers via `GetBrokerIdsFromStatusAndSpec` (status∪spec union), which means removed brokers are still visited after spec removal. Reconcilers that iterate `Spec.Brokers` directly (Contour, NodePort) never pass a removed broker to `ShouldIncludeBroker` in the first place — the fix is invisible to them. Any future listener reconciler must use `GetBrokerIdsFromStatusAndSpec` to benefit automatically; iterating `Spec.Brokers` silently bypasses this protection.
 
 **Decision:** Add a fallback block for `brokerConfig == nil`: check the broker's `CruiseControlState` in status. If `IsDownscale() && !IsSucceeded()` and the broker has the requested `ingressConfigName` in its `ExternalListenerConfigNames`, return `true`.
 
@@ -44,8 +46,8 @@ The `addBrokers` helper (lines 366-368) already accepts `[]string` and submits o
 `IsDownscale()` covers all 6 downscale states. Excluding `IsSucceeded()` retains the broker in all non-terminal states, including `CompletedWithError` and `Paused`, which is the desired behavior for manual investigation. If new downscale states are added to the enum in future, they're covered automatically.
 
 **Alternatives rejected:**
-- Fix each caller individually: more code, same logic duplicated.
-- Add a new function: unnecessary indirection; `ShouldIncludeBroker` is the right seam.
+- Fix each envoy caller individually: more code, same logic duplicated.
+- Add a new function: unnecessary indirection; `ShouldIncludeBroker` is the right seam for envoy callers.
 
 ### D3: Task order to satisfy CI (green at every commit)
 
