@@ -271,4 +271,4 @@ kubectl logs kafka-controller-3-xxx -f
 
 - [Apache Kafka KRaft Documentation](https://kafka.apache.org/documentation/#kraft)
 - [KIP-500: Replace ZooKeeper with a Self-Managed Metadata Quorum](https://cwiki.apache.org/confluence/display/KAFKA/KIP-500%3A+Replace+ZooKeeper+with+a+Self-Managed+Metadata+Quorum)
-- [Koperator KRaft Sample Configuration](https://github.com/adobe/koperator/blob/master/config/samples/kraft/simplekafkacluster_kraft.yaml)
+- [Koperator KRaft Sample Configuration](https://github.com/adobe/koperator/blob/main/config/samples/kraft/simplekafkacluster_kraft.yaml)
