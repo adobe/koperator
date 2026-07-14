@@ -424,7 +424,15 @@ func listK8sCRDs(kubectlOptions k8s.KubectlOptions, crdNames ...string) ([]strin
 		return nil, errors.WrapIfWithDetails(err, "listing K8s CRDs failed failed", "crdNames", crdNames)
 	}
 
-	return strings.Split(output, "\n"), nil
+	// Trim the trailing newline before splitting so a trailing empty-string
+	// element never leaks into the result (see listK8sResourceKinds), and drop
+	// any warning lines - consistent with the other list helpers.
+	output = strings.TrimRight(output, "\n")
+	if output == "" {
+		return nil, nil
+	}
+
+	return kubectlRemoveWarnings(strings.Split(output, "\n")), nil
 }
 
 // deleteK8sResourceOpts deletes K8s resources based on the kind and name or kind and selector.
