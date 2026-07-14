@@ -127,7 +127,7 @@ To configure an external listener that uses the LoadBalancer access method, comp
                       tlsSecretName: heptio-contour/cluster-ssl
       ```
 
-      For a complete example, see the [Contour sample](https://github.com/adobe/koperator/blob/master/config/samples/simplekafkacluster_with_contour.yaml).
+      For a complete example, see the [Contour sample](https://github.com/adobe/koperator/blob/main/config/samples/simplekafkacluster_with_contour.yaml).
 
 1. Configure additional parameters for the ingress controller as needed for your environment, for example, number of replicas, resource requirements and resource limits. You can configure such parameters using the *envoyConfig* and *contourIngressConfig* fields, respectively.
 1. (Optional) For external access through a static URL instead of the load balancer's public IP, specify the URL in the `hostnameOverride` field of the external listener that resolves to the public IP of the load balancer. The broker address will be advertised as, `advertised.listeners=EXTERNAL1://kafka-1.dev.my.domain:<broker port number>`.
