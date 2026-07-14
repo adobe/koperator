@@ -1,7 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "forkProcessing": "enabled",
-  "baseBranchPatterns": ["master", "gh-pages"],
+  "baseBranchPatterns": ["main", "gh-pages"],
   "extends": [
     ":dependencyDashboard",
     ":ignoreUnstable",
@@ -70,9 +70,9 @@
       "matchManagers": [
         "gomod"
       ],
-      "matchBaseBranches": ["master"],
+      "matchBaseBranches": ["main"],
       "enabled": false,
-      "description": "Disable Go module updates on master - handled by automated workflow: .github/workflows/update-go-deps.yml. gh-pages' go.mod is Hugo Modules (theme deps like docsy), not app code, so it stays enabled there."
+      "description": "Disable Go module updates on main - handled by automated workflow: .github/workflows/update-go-deps.yml. gh-pages' go.mod is Hugo Modules (theme deps like docsy), not app code, so it stays enabled there."
     },
     {
       "matchCategories": [
