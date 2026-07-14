@@ -36,11 +36,23 @@
         "/tests/e2e/versions\\.go$/"
       ],
       "matchStrings": [
-        "\\s*(?<depName>\\w+)\\s*=\\s*\"(?<currentValue>[^\"]+)\"\\s*//\\s*renovate:\\s*datasource=(?<datasource>[^\\s]+)\\s*depName=(?<packageName>[^\\s]+)(?:\\s*registryUrl=(?<registryUrl>\\S+))?"
+        "\\s*(?<depName>\\w+)\\s*=\\s*\"(?<currentValue>[^\"]+)\"\\s*//\\s*renovate:\\s*datasource=(?<datasource>[^\\s]+)\\s*depName=(?<packageName>[^\\s]+)\\s*registryUrl=(?<registryUrl>\\S+)"
       ],
       "datasourceTemplate": "{{datasource}}",
       "depNameTemplate": "{{packageName}}",
-      "registryUrlTemplate": "{{#if registryUrl}}{{{registryUrl}}}{{/if}}"
+      "registryUrlTemplate": "{{registryUrl}}"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/tests/e2e/versions\\.go$/"
+      ],
+      "description": "Same file as above, but for datasource=docker entries, which have no notion of a Helm repo registryUrl and so never carry one. Kept as a separate manager (RE2 has no lookaround, so the split is done by requiring the literal 'docker' datasource rather than a negative match on registryUrl) so registryUrlTemplate is never evaluated for these - a templated empty string is still a defined (invalid) registryUrl to Renovate, not the same as omitting it.",
+      "matchStrings": [
+        "\\s*(?<depName>\\w+)\\s*=\\s*\"(?<currentValue>[^\"]+)\"\\s*//\\s*renovate:\\s*datasource=(?<datasource>docker)\\s*depName=(?<packageName>[^\\s]+)"
+      ],
+      "datasourceTemplate": "{{datasource}}",
+      "depNameTemplate": "{{packageName}}"
     },
     {
       "customType": "regex",
