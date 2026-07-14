@@ -36,11 +36,11 @@
         "/tests/e2e/versions\\.go$/"
       ],
       "matchStrings": [
-        "\\s*(?<depName>\\w+)\\s*=\\s*\"(?<currentValue>[^\"]+)\"\\s*//\\s*renovate:\\s*datasource=(?<datasource>[^\\s]+)\\s*depName=(?<packageName>[^\\s]+)\\s*registryUrl=(?<registryUrl>\\S+)"
+        "\\s*(?<depName>\\w+)\\s*=\\s*\"(?<currentValue>[^\"]+)\"\\s*//\\s*renovate:\\s*datasource=(?<datasource>[^\\s]+)\\s*depName=(?<packageName>[^\\s]+)(?:\\s*registryUrl=(?<registryUrl>\\S+))?"
       ],
       "datasourceTemplate": "{{datasource}}",
       "depNameTemplate": "{{packageName}}",
-      "registryUrlTemplate": "{{registryUrl}}"
+      "registryUrlTemplate": "{{#if registryUrl}}{{{registryUrl}}}{{/if}}"
     },
     {
       "customType": "regex",
