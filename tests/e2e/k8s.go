@@ -529,6 +529,12 @@ func listK8sResourceKinds(kubectlOptions k8s.KubectlOptions, apiGroupSelector st
 		return nil, nil
 	}
 
+	// Trim the trailing newline before splitting: runKubectlSilent preserves
+	// kubectl's trailing "\n" (unlike terratest's runner), which would otherwise
+	// yield an empty-string element and break callers that join the kinds for
+	// `kubectl get` (error: the server doesn't have a resource type "").
+	output = strings.TrimRight(output, "\n")
+
 	return kubectlRemoveWarnings(strings.Split(output, "\n")), nil
 }
 
