@@ -32,9 +32,6 @@ func TestKoperator(t *testing.T) {
 }
 
 var _ = ginkgo.BeforeSuite(func() {
-	// Setup reduced logging for terratest operations
-	setupReducedLogging()
-
 	ginkgo.By("Acquiring K8s cluster")
 	var kubeconfigPath string
 	var kubecontextName string
