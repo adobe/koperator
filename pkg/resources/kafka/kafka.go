@@ -956,6 +956,24 @@ func (r *Reconciler) handleRollingUpgrade(log logr.Logger, desiredPod, currentPo
 		}
 		desiredPod.Spec.Tolerations = uniqueTolerations
 	}
+
+	// Capture the pure CR-derived pod spec before any external-resource sync below mutates it,
+	// so the baseline we record further down always reflects Koperator's own intent, never
+	// drift merged in from currentPod.
+	pureDesired := desiredPod.DeepCopy()
+
+	if r.KafkaCluster.Spec.ExternalResourceManagementEnabled {
+		baseline, err := getExternalResourceBaseline(currentPod)
+		if err != nil {
+			log.Error(err, "could not read external resource baseline annotation, skipping external resource/affinity sync")
+		} else {
+			// If resource requests or affinities were changed by an external controller (e.g.
+			// ScaleOps), sync them into desiredPod so they aren't discarded as drift below.
+			syncResourceRequests(desiredPod, currentPod, baseline)
+			syncAffinities(desiredPod, currentPod, baseline)
+		}
+	}
+
 	// Check if the resource actually updated or if labels match TaintedBrokersSelector
 	patchResult, err := patch.DefaultPatchMaker.Calculate(currentPod, desiredPod)
 	switch {
@@ -981,6 +999,12 @@ func (r *Reconciler) handleRollingUpgrade(log logr.Logger, desiredPod, currentPo
 
 	if err := patch.DefaultAnnotator.SetLastAppliedAnnotation(desiredPod); err != nil {
 		return errors.WrapIf(err, "could not apply last state to annotation")
+	}
+
+	if r.KafkaCluster.Spec.ExternalResourceManagementEnabled {
+		if err := setExternalResourceBaseline(desiredPod, buildExternalResourceBaseline(pureDesired)); err != nil {
+			return errors.WrapIf(err, "could not apply external resource baseline annotation")
+		}
 	}
 
 	if !k8sutil.IsPodContainsTerminatedContainer(currentPod) {
