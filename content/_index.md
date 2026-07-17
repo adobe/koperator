@@ -1,27 +1,38 @@
 ---
 title: Koperator
+layout: hextra-home
 ---
 
-{{< blocks/cover title="Welcome to Koperator!" image_anchor="top" avatar_image="/icons/logo-no-black.svg" width="min" color="gray" >}}
-<div class="mx-auto">
-	<a class="btn btn-lg btn-primary mr-3 mb-4" href="{{< relref "/docs/" >}}" title="Read the documentation">
-		Documentation <i class="fa-solid fa-circle-right ml-2"></i>
-	</a>
-	<a class="btn btn-lg btn-secondary mr-3 mb-4" href="{{< relref "/docs/install-kafka-operator/" >}}" title="Install Koperator">
-		Install <i class="fa-brands fa-github ml-2 "></i>
-	</a>
-	<p class="lead mt-5">The Koperator (formerly called Banzai Cloud Kafka Operator) is a Kubernetes operator to automate provisioning, management, autoscaling and operations of Apache Kafka clusters deployed to Kubernetes.</p>
+<div class="hx:mt-6 hx:mb-6">
+{{< hextra/hero-headline >}}
+  Welcome to Koperator!
+{{< /hextra/hero-headline >}}
 </div>
-{{< /blocks/cover >}}
 
-{{< blocks/section color="dark" type="row">}}
-{{% blocks/feature icon="fa-lightbulb" title="Learn more about Koperator!" url="/koperator/docs/" %}}
-Read the Koperator documentation.
-{{% /blocks/feature %}}
+<div class="hx:mb-12">
+{{< hextra/hero-subtitle >}}
+  The Koperator (formerly called Banzai Cloud Kafka Operator) is a Kubernetes&nbsp;<br class="hx:sm:block hx:hidden" />operator to automate provisioning, management, autoscaling and operations&nbsp;<br class="hx:sm:block hx:hidden" />of Apache Kafka clusters deployed to Kubernetes.
+{{< /hextra/hero-subtitle >}}
+</div>
 
-{{% blocks/feature icon="fa-brands fa-github" title="Contributions welcome!" url="https://github.com/adobe/koperator" %}}
-We do a [Pull Request](https://github.com/adobe/koperator/pulls) contributions workflow on **GitHub**. New users and developers are always welcome!
-{{% /blocks/feature %}}
+<div class="hx:mb-6 hx:flex hx:gap-3 hx:justify-center">
+{{< hextra/hero-button text="Documentation" link="docs" >}}
+{{< hextra/hero-button text="Install" link="docs/install-kafka-operator" >}}
+</div>
 
-{{< /blocks/section >}}
+<div class="hx:mt-6"></div>
 
+{{< hextra/feature-grid >}}
+  {{< hextra/feature-card
+    title="Learn more about Koperator!"
+    subtitle="Read the Koperator documentation."
+    icon="light-bulb"
+    link="docs"
+  >}}
+  {{< hextra/feature-card
+    title="Contributions welcome!"
+    subtitle="We do a Pull Request contributions workflow on GitHub. New users and developers are always welcome!"
+    icon="github"
+    link="https://github.com/adobe/koperator"
+  >}}
+{{< /hextra/feature-grid >}}

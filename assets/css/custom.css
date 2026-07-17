@@ -1,0 +1,227 @@
+/* Site-specific overrides layered on top of the Hextra theme (see
+   assets/css/custom.css hook in github.com/imfing/hextra layouts/_partials/head.html). */
+
+.warning-block {
+  border-left: 6px solid red;
+  background: #ffffff;
+  padding: 16px;
+}
+
+html.dark .warning-block {
+  background: #171717;
+}
+
+/* CRD reference pages (front matter `layout: crd`, e.g. configurations/crd/*)
+   render deeply-nested schemas as flat <div class="property depth-N"> blocks
+   with no styling of their own - give them an indented, card-like tree
+   instead of an unstyled wall of stacked divs. Collapse/search behavior is
+   added by static/js/crd-schema.js, hooked in via layouts/partials/custom/head-end.html. */
+.property {
+  border-left: 3px solid #dee2e6;
+  padding-left: 1rem;
+  margin: 0.9rem 0;
+}
+
+html.dark .property {
+  border-left-color: #404040;
+}
+
+.property.depth-1 { margin-left: 1.1rem; }
+.property.depth-2 { margin-left: 2.2rem; }
+.property.depth-3 { margin-left: 3.3rem; }
+.property.depth-4 { margin-left: 4.4rem; }
+.property.depth-5 { margin-left: 5.5rem; }
+.property.depth-6 { margin-left: 6.6rem; }
+/* Cap indentation beyond depth 6 so deeply-nested fields (this schema goes to
+   depth 13) don't push content off-screen on narrower viewports. */
+.property.depth-7, .property.depth-8, .property.depth-9,
+.property.depth-10, .property.depth-11, .property.depth-12, .property.depth-13 {
+  margin-left: 6.6rem;
+}
+
+.property-header h3 {
+  font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.95rem;
+  overflow-wrap: break-word;
+  margin-bottom: 0.35rem;
+}
+
+.property-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.4rem;
+}
+
+.property-type {
+  display: inline-block;
+  background-color: #e9ecef;
+  color: #495057;
+  border-radius: 0.25rem;
+  padding: 0.1rem 0.5rem;
+  font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.8rem;
+}
+
+html.dark .property-type {
+  background-color: #262626;
+  color: #d4d4d4;
+}
+
+.property-required, .property-optional {
+  display: inline-block;
+  border-radius: 0.25rem;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.property-required {
+  background-color: #2263bf;
+  color: white;
+}
+.property-optional {
+  background-color: #e9ecef;
+  color: #495057;
+}
+
+html.dark .property-optional {
+  background-color: #262626;
+  color: #d4d4d4;
+}
+
+.property-description {
+  color: #495057;
+}
+
+html.dark .property-description {
+  color: #a3a3a3;
+}
+
+.property-description p:last-child {
+  margin-bottom: 0;
+}
+
+/* The Full name / Group / Scope / Versions summary at the top of a CRD page. */
+.crd-meta {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: 1rem;
+  row-gap: 0.4rem;
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 0.5rem;
+  padding: 1rem 1.25rem;
+  margin: 1rem 0 2rem;
+}
+.crd-meta dt, .crd-meta dd {
+  margin: 0;
+}
+.crd-meta dt {
+  font-weight: 600;
+}
+
+html.dark .crd-meta {
+  background-color: #171717;
+  border-color: #404040;
+}
+
+.crd-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 1rem 0 1.5rem;
+  position: sticky;
+  top: 0.5rem;
+  z-index: 1;
+  background-color: #ffffff;
+  padding: 0.5rem 0;
+}
+
+html.dark .crd-toolbar {
+  background-color: #111111;
+}
+
+.crd-toolbar .crd-search {
+  flex: 1 1 260px;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #ced4da;
+  border-radius: 0.25rem;
+}
+
+.crd-toolbar button {
+  padding: 0.4rem 0.8rem;
+  border: 1px solid #ced4da;
+  border-radius: 0.25rem;
+  background-color: #f8f9fa;
+  cursor: pointer;
+}
+.crd-toolbar button:hover {
+  background-color: #e9ecef;
+}
+
+html.dark .crd-toolbar .crd-search,
+html.dark .crd-toolbar button {
+  border-color: #404040;
+  background-color: #171717;
+  color: inherit;
+}
+html.dark .crd-toolbar button:hover {
+  background-color: #262626;
+}
+
+.crd-toolbar .crd-search-count {
+  color: #6c757d;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.property-header.has-children {
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.property-header.has-children::before {
+  content: "\2212";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 1px solid #ced4da;
+  border-radius: 50%;
+  background-color: #f8f9fa;
+  color: #2263bf;
+  font-size: 1.1rem;
+  font-weight: 700;
+  line-height: 1;
+}
+.property-header.has-children:hover::before {
+  background-color: #e9ecef;
+}
+html.dark .property-header.has-children::before {
+  border-color: #404040;
+  background-color: #171717;
+}
+html.dark .property-header.has-children:hover::before {
+  background-color: #262626;
+}
+
+.property.collapsed > .property-header.has-children::before {
+  content: "+";
+}
+
+.property.js-hidden {
+  display: none;
+}
+
+.main-lead {
+  line-height: 1.5;
+}

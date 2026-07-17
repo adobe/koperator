@@ -53,16 +53,15 @@
   {{ $is_eof = true }}
 {{ end }}
 
-{{/*  DO NOT INDENT THE HTML CODE  */}}
-{{ if and $is_url (not $is_eof) }}
-<pre data-src="{{ $url }}" data-download-link="{{ $url }}" data-download-link-label="Download this file" class='{{ $opts }}'>
-<code class="language-{{ $ext }}">{{ $text }}</code>
-</pre>
-{{ else if $is_eof }}
-<pre class='{{ $opts }}'>
-<code class="language-{{ $ext }}">{{ $text }}</code>
-</pre>
-{{ else }}
-<pre data-src="{{ $url }}" data-download-link data-download-link-label="Download this file" class='{{ $opts }}'>
-</pre>
-{{ end }}
+{{/* Render through the same components/codeblock partial (and wrapping
+     hextra-code-block container + copy button) that Hextra's own
+     render-codeblock.html uses for fenced code blocks, so included files
+     get identical spacing, Chroma colors, and a copy button - not just the
+     bare highlight() output, which is missing the container Hextra's CSS
+     expects and renders with mismatched spacing. */}}
+<div class="hextra-code-block hx:relative hx:mt-6 hx:first:mt-0 hx:group/code">
+  {{- partial "components/codeblock" (dict "lang" $ext "content" $text "options" (dict)) -}}
+  {{- if or (eq site.Params.highlight.copy.enable nil) (site.Params.highlight.copy.enable) -}}
+    {{- partialCached "components/codeblock-copy-button" (dict "filename" "") "include-code" -}}
+  {{- end -}}
+</div>
