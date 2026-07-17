@@ -23,9 +23,9 @@ LICENSEI_VERSION = 0.9.0 # renovate: datasource=github-releases depName=goph/lic
 CONTROLLER_GEN_VERSION = v0.21.0 # renovate: datasource=github-releases depName=kubernetes-sigs/controller-tools
 ENVTEST_K8S_VERSION = 1.36.2 # renovate: datasource=github-releases depName=kubernetes-sigs/controller-tools extractVersion=^envtest-v(?<version>.+)$
 SETUP_ENVTEST_VERSION := latest
-ADDLICENSE_VERSION := 1.2.0 # renovate: datasource=github-releases depName=google/addlicense
-GOTEMPLATE_VERSION := 3.12.0 # renovate: datasource=github-releases depName=cznic/gotemplate
-MOCKGEN_VERSION := 0.6.0 # renovate: datasource=github-releases depName=uber-go/mock
+ADDLICENSE_VERSION = 1.2.0 # renovate: datasource=github-releases depName=google/addlicense
+GOTEMPLATE_VERSION = 3.12.0 # renovate: datasource=github-releases depName=coveooss/gotemplate
+MOCKGEN_VERSION = 0.6.0 # renovate: datasource=github-releases depName=uber-go/mock
 
 GOPROXY=https://proxy.golang.org
 

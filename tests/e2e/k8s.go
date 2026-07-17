@@ -424,7 +424,15 @@ func listK8sCRDs(kubectlOptions k8s.KubectlOptions, crdNames ...string) ([]strin
 		return nil, errors.WrapIfWithDetails(err, "listing K8s CRDs failed failed", "crdNames", crdNames)
 	}
 
-	return strings.Split(output, "\n"), nil
+	// Trim the trailing newline before splitting so a trailing empty-string
+	// element never leaks into the result (see listK8sResourceKinds), and drop
+	// any warning lines - consistent with the other list helpers.
+	output = strings.TrimRight(output, "\n")
+	if output == "" {
+		return nil, nil
+	}
+
+	return kubectlRemoveWarnings(strings.Split(output, "\n")), nil
 }
 
 // deleteK8sResourceOpts deletes K8s resources based on the kind and name or kind and selector.
@@ -516,13 +524,9 @@ func listK8sResourceKinds(kubectlOptions k8s.KubectlOptions, apiGroupSelector st
 
 	args = append(args, extraArgs...)
 
-	output, err := k8s.RunKubectlAndGetOutputContextE(
-		ginkgo.GinkgoT(),
-		context.Background(),
-		&kubectlOptions,
-		args...,
-	)
-
+	// Execute kubectl directly without terratest's logging: api-resources returns
+	// one line per resource kind (100+ lines), which otherwise floods the test output.
+	output, err := runKubectlSilent(kubectlOptions, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -532,6 +536,12 @@ func listK8sResourceKinds(kubectlOptions k8s.KubectlOptions, apiGroupSelector st
 	if output == "" {
 		return nil, nil
 	}
+
+	// Trim the trailing newline before splitting: runKubectlSilent preserves
+	// kubectl's trailing "\n" (unlike terratest's runner), which would otherwise
+	// yield an empty-string element and break callers that join the kinds for
+	// `kubectl get` (error: the server doesn't have a resource type "").
+	output = strings.TrimRight(output, "\n")
 
 	return kubectlRemoveWarnings(strings.Split(output, "\n")), nil
 }
@@ -744,20 +754,6 @@ func kubectlRemoveWarnings(outputSlice []string) []string {
 
 func isKubectlNotFoundError(err error) bool {
 	return err != nil && strings.Contains(err.Error(), kubectlNotFoundErrorMsg)
-}
-
-// setupReducedLogging configures reduced logging for terratest operations
-func setupReducedLogging() {
-	// Set environment variables to reduce terratest logging verbosity
-	if os.Getenv("E2E_VERBOSE_LOGGING") != verboseLoggingEnabled {
-		// Reduce terratest internal logging
-		os.Setenv("TEST_LOG_LEVEL", "-5")
-		// Reduce kubectl verbosity
-		os.Setenv("KUBECTL_VERBOSITY", "0")
-		// Additional environment variables to reduce terratest kubectl command logging
-		os.Setenv("TERRATEST_LOG_LEVEL", "INFO")
-		os.Setenv("KUBECTL_LOG_LEVEL", "0")
-	}
 }
 
 // waitForKafkaClusterWithPodStatusCheck waits for KafkaCluster to be ready and checks pod status every 10 seconds

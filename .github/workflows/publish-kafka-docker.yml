@@ -124,6 +124,9 @@ jobs:
         id: jmx_exporter_version
         run: |
           JMX_VERSION=$(grep "ARG JMX_EXPORTER_VERSION=" docker/jmx_exporter/Dockerfile | cut -d'=' -f2 | cut -d' ' -f1)
+          # Strip a leading "v" so the published image tag is always version-only,
+          # regardless of whether the upstream release tag (and thus the Dockerfile ARG) has one.
+          JMX_VERSION="${JMX_VERSION#v}"
           echo "jmx_version=$JMX_VERSION" >> $GITHUB_OUTPUT
       - name: Check if JMX exporter image already exists
         id: image_exists

@@ -109,7 +109,7 @@ func (r *CruiseControlTaskReconciler) Reconcile(ctx context.Context, request ctr
 	}
 
 	// Update task states with information from Cruise Control
-	updateActiveTasks(tasksAndStates, ccOperations)
+	updateActiveTasks(log, tasksAndStates, ccOperations)
 
 	if err = r.UpdateStatus(ctx, instance, tasksAndStates); err != nil {
 		return requeueWithError(log, "failed to update Kafka Cluster status", err)
@@ -171,19 +171,22 @@ func (r *CruiseControlTaskReconciler) Reconcile(ctx context.Context, request ctr
 			}
 		}
 	case tasksAndStates.NumActiveTasksByOp(banzaiv1alpha1.OperationRemoveBroker) > 0:
-		var removeTask *CruiseControlTask
+		brokerIDs := make([]string, 0)
+		// gather brokers that are marked for removal as a result of downscale operation
 		for _, task := range tasksAndStates.GetActiveTasksByOp(banzaiv1alpha1.OperationRemoveBroker) {
-			removeTask = task
-			break
+			brokerIDs = append(brokerIDs, task.BrokerID)
 		}
 
-		cruiseControlOpRef, err := r.removeBroker(ctx, instance, operationTTLSecondsAfterFinished, removeTask.BrokerID)
+		cruiseControlOpRef, err := r.removeBrokers(ctx, instance, operationTTLSecondsAfterFinished, brokerIDs)
 		if err != nil {
-			return requeueWithError(log, fmt.Sprintf("creating CruiseControlOperation for downscale has failed, brokerID: %s", removeTask.BrokerID), err)
+			return requeueWithError(log, fmt.Sprintf("creating CruiseControlOperation for downscale has failed, brokerIDs: %s", brokerIDs), err)
 		}
 
-		removeTask.SetCruiseControlOperationRef(cruiseControlOpRef)
-		removeTask.SetStateScheduled()
+		// map the CC broker removal operation with each broker status
+		for _, task := range tasksAndStates.GetActiveTasksByOp(banzaiv1alpha1.OperationRemoveBroker) {
+			task.SetCruiseControlOperationRef(cruiseControlOpRef)
+			task.SetStateScheduled()
+		}
 
 	case tasksAndStates.NumActiveTasksByOp(banzaiv1alpha1.OperationRemoveDisks) > 0:
 		brokerLogDirsToRemove := make(map[string][]string)
@@ -367,8 +370,8 @@ func (r *CruiseControlTaskReconciler) addBrokers(ctx context.Context, kafkaClust
 	return r.createCCOperation(ctx, kafkaCluster, banzaiv1alpha1.ErrorPolicyRetry, ttlSecondsAfterFinished, banzaiv1alpha1.OperationAddBroker, bokerIDs, false, nil)
 }
 
-func (r *CruiseControlTaskReconciler) removeBroker(ctx context.Context, kafkaCluster *banzaiv1beta1.KafkaCluster, ttlSecondsAfterFinished *int, brokerID string) (corev1.LocalObjectReference, error) {
-	return r.createCCOperation(ctx, kafkaCluster, banzaiv1alpha1.ErrorPolicyRetry, ttlSecondsAfterFinished, banzaiv1alpha1.OperationRemoveBroker, []string{brokerID}, false, nil)
+func (r *CruiseControlTaskReconciler) removeBrokers(ctx context.Context, kafkaCluster *banzaiv1beta1.KafkaCluster, ttlSecondsAfterFinished *int, brokerIDs []string) (corev1.LocalObjectReference, error) {
+	return r.createCCOperation(ctx, kafkaCluster, banzaiv1alpha1.ErrorPolicyRetry, ttlSecondsAfterFinished, banzaiv1alpha1.OperationRemoveBroker, brokerIDs, false, nil)
 }
 
 func (r *CruiseControlTaskReconciler) removeDisks(ctx context.Context, kafkaCluster *banzaiv1beta1.KafkaCluster, ttlSecondsAfterFinished *int, brokerIdsToRemovedLogDirs map[string][]string) (corev1.LocalObjectReference, error) {
@@ -655,7 +658,7 @@ func getActiveTasksFromCluster(instance *banzaiv1beta1.KafkaCluster) *CruiseCont
 
 // updateActiveTasks updates the state of the tasks from the CruiseControlTasksAndStates instance by getting their
 // status from CruiseControlOperation
-func updateActiveTasks(tasksAndStates *CruiseControlTasksAndStates, ccOperations []*banzaiv1alpha1.CruiseControlOperation) {
+func updateActiveTasks(log logr.Logger, tasksAndStates *CruiseControlTasksAndStates, ccOperations []*banzaiv1alpha1.CruiseControlOperation) {
 	ccOperationMap := make(map[string]*banzaiv1alpha1.CruiseControlOperation)
 	for i := range ccOperations {
 		ccOperationMap[ccOperations[i].Name] = ccOperations[i]
@@ -666,6 +669,16 @@ func updateActiveTasks(tasksAndStates *CruiseControlTasksAndStates, ccOperations
 			continue
 		}
 
+		prev := task.BrokerState
 		task.FromResult(ccOperationMap[task.CruiseControlOperationReference.Name])
+		if !prev.IsDownscaleStalled() && task.BrokerState.IsDownscaleStalled() {
+			if task.BrokerState == banzaiv1beta1.GracefulDownscalePaused {
+				log.Info("broker downscale paused; manual resume required, broker retained in external listener config",
+					"brokerID", task.BrokerID, "state", task.BrokerState)
+			} else {
+				log.Info("broker downscale not progressing; broker retained in external listener config",
+					"brokerID", task.BrokerID, "state", task.BrokerState)
+			}
+		}
 	}
 }

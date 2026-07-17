@@ -281,6 +281,17 @@ func ShouldIncludeBroker(brokerConfig *v1beta1.BrokerConfig, status v1beta1.Kafk
 			}
 		}
 	}
+
+	// Broker removed from spec but still draining — keep in external listener config until CC finishes
+	if brokerConfig == nil {
+		if brokerState, ok := status.BrokersState[strconv.Itoa(brokerID)]; ok {
+			ccState := brokerState.GracefulActionState.CruiseControlState
+			if ccState.IsDownscale() && !ccState.IsSucceeded() &&
+				apiutil.StringSliceContains(brokerState.ExternalListenerConfigNames, ingressConfigName) {
+				return true
+			}
+		}
+	}
 	return false
 }
 

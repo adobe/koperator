@@ -132,7 +132,11 @@ func getBrokerConfigMapLogDirs(kubectlOptions k8s.KubectlOptions, configMapName 
 		"-n", namespace,
 		"-o", fmt.Sprintf("jsonpath={.data.%s}", kafkautils.ConfigPropertyName),
 	}
-	output, err := k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &kubectlOptions, args...)
+	// Fetch broker-config directly without terratest's logging: the ConfigMap holds the
+	// entire broker configuration (a multi-line properties blob) and this runs on every
+	// poll iteration for each broker, so logging the full value would flood the output.
+	// We only need log.dirs, which we parse out of the properties content below.
+	output, err := runKubectlSilent(kubectlOptions, args...)
 	if err != nil {
 		return nil, fmt.Errorf("getting configmap %s: %w", configMapName, err)
 	}
@@ -153,6 +157,8 @@ func getBrokerConfigMapLogDirs(kubectlOptions k8s.KubectlOptions, configMapName 
 					paths = append(paths, q)
 				}
 			}
+			// Log only the extracted log.dirs (not the whole broker config).
+			ginkgo.By(fmt.Sprintf("configmap %s log.dirs: %v", configMapName, paths))
 			return paths, nil
 		}
 	}
