@@ -185,6 +185,15 @@
       "commitMessageAction": "update",
       "commitMessageTopic": "all non-major dependencies",
       "commitMessageExtra": ""
-    }
+    },
+    {
+       "matchBaseBranches": ["gh-pages"],
+       "groupName": "gh-pages dependencies",
+       "groupSlug": "gh-pages-deps",
+       "commitMessagePrefix": "chore(deps):",
+       "commitMessageAction": "update",
+       "commitMessageTopic": "gh-pages dependencies",
+       "commitMessageExtra": ""
+     }
   ]
 }
