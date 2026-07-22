@@ -20,7 +20,15 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/banzaicloud/k8s-objectmatcher/patch"
+
 	"github.com/banzaicloud/koperator/api/v1beta1"
+	"github.com/banzaicloud/koperator/pkg/resources"
 )
 
 func TestGenerateClusterID(t *testing.T) {
@@ -400,5 +408,230 @@ func TestGenerateQuorumVoters(t *testing.T) {
 				t.Error("Expected:", test.expectedQuorumVoters, "Got:", gotQuorumVoters)
 			}
 		})
+	}
+}
+
+// --- podSpecIntentChanged & tainted-broker restart ---
+
+func baseKafkaPod() *corev1.Pod {
+	return &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "broker-0",
+			Namespace: "default",
+			Labels:    map[string]string{"brokerId": "0"},
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:  "kafka",
+					Image: "kafka:3.6",
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("1"),
+							corev1.ResourceMemory: resource.MustParse("4Gi"),
+						},
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("4"),
+							corev1.ResourceMemory: resource.MustParse("4Gi"),
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func scaleOpsNodePreferred() *corev1.NodeAffinity {
+	return &corev1.NodeAffinity{
+		PreferredDuringSchedulingIgnoredDuringExecution: []corev1.PreferredSchedulingTerm{
+			{
+				Weight: 100,
+				Preference: corev1.NodeSelectorTerm{
+					MatchExpressions: []corev1.NodeSelectorRequirement{
+						{Key: "scaleops.sh/node-packing", Operator: corev1.NodeSelectorOpIn, Values: []string{"true"}},
+					},
+				},
+			},
+		},
+	}
+}
+
+func scaleOpsPodPreferred() *corev1.PodAffinity {
+	return &corev1.PodAffinity{
+		PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
+			{
+				Weight: 50,
+				PodAffinityTerm: corev1.PodAffinityTerm{
+					LabelSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"scaleops.sh/managed": "true"},
+					},
+					TopologyKey: "kubernetes.io/hostname",
+				},
+			},
+		},
+	}
+}
+
+// setAnnotationFromDesired stamps currentPod with the last-applied annotation
+// derived from desiredPod, simulating what koperator does at pod creation time
+// (before any admission webhook runs and mutates the live pod).
+func setAnnotationFromDesired(t *testing.T, desiredPod, currentPod *corev1.Pod) {
+	t.Helper()
+	tmp := desiredPod.DeepCopy()
+	if err := patch.DefaultAnnotator.SetLastAppliedAnnotation(tmp); err != nil {
+		t.Fatalf("SetLastAppliedAnnotation: %v", err)
+	}
+	if currentPod.Annotations == nil {
+		currentPod.Annotations = make(map[string]string)
+	}
+	currentPod.Annotations[patch.LastAppliedConfig] = tmp.Annotations[patch.LastAppliedConfig]
+}
+
+// TestPodSpecIntentChanged verifies the intent-aware diff: a rolling upgrade is
+// triggered only when koperator's own desired spec differs from what it last
+// applied. Mutations made to the live pod by admission controllers must never
+// register as a change; intentional CR edits always must.
+func TestPodSpecIntentChanged(t *testing.T) {
+	// scaleOpsMutateResources simulates a VPA/admission controller rewriting the
+	// live pod's kafka request after admission.
+	scaleOpsMutateResources := func(p *corev1.Pod) {
+		p.Spec.Containers[0].Resources.Requests[corev1.ResourceCPU] = resource.MustParse("392m")
+	}
+
+	t.Run("in sync, nothing changed -> false", func(t *testing.T) {
+		desired := baseKafkaPod()
+		current := baseKafkaPod()
+		setAnnotationFromDesired(t, desired, current)
+
+		changed, _, err := podSpecIntentChanged(current, desired)
+		if err != nil {
+			t.Fatalf("podSpecIntentChanged: %v", err)
+		}
+		if changed {
+			t.Error("expected no change when current matches last-applied and the CR is unchanged")
+		}
+	})
+
+	t.Run("admission controller rewrote resources, CR unchanged -> false", func(t *testing.T) {
+		desired := baseKafkaPod()
+		current := baseKafkaPod()
+		setAnnotationFromDesired(t, desired, current)
+		scaleOpsMutateResources(current)
+
+		changed, _, err := podSpecIntentChanged(current, desired)
+		if err != nil {
+			t.Fatalf("podSpecIntentChanged: %v", err)
+		}
+		if changed {
+			t.Error("expected no change: a resource mutation on the live pod must not trigger a restart")
+		}
+	})
+
+	t.Run("admission controller injected preferred affinity, CR unchanged -> false", func(t *testing.T) {
+		desired := baseKafkaPod()
+		current := baseKafkaPod()
+		setAnnotationFromDesired(t, desired, current)
+		current.Spec.Affinity = &corev1.Affinity{
+			NodeAffinity: scaleOpsNodePreferred(),
+			PodAffinity:  scaleOpsPodPreferred(),
+		}
+
+		changed, _, err := podSpecIntentChanged(current, desired)
+		if err != nil {
+			t.Fatalf("podSpecIntentChanged: %v", err)
+		}
+		if changed {
+			t.Error("expected no change: webhook-injected preferred affinity must not trigger a restart")
+		}
+	})
+
+	t.Run("operator changed resources in the CR -> true", func(t *testing.T) {
+		// last-applied reflects the old CR (cpu=1); a VPA then mutated the live pod.
+		lastApplied := baseKafkaPod()
+		current := baseKafkaPod()
+		setAnnotationFromDesired(t, lastApplied, current)
+		scaleOpsMutateResources(current)
+
+		// operator bumps the request in the CR.
+		desired := baseKafkaPod()
+		desired.Spec.Containers[0].Resources.Requests[corev1.ResourceCPU] = resource.MustParse("2")
+
+		changed, _, err := podSpecIntentChanged(current, desired)
+		if err != nil {
+			t.Fatalf("podSpecIntentChanged: %v", err)
+		}
+		if !changed {
+			t.Error("expected change: the operator edited resources in the CR")
+		}
+	})
+
+	t.Run("operator changed a soft (preferred) affinity in the CR -> true", func(t *testing.T) {
+		// koperator emits a soft nodeAffinity; last-applied records it, and the
+		// live pod carries it too.
+		lastApplied := baseKafkaPod()
+		lastApplied.Spec.Affinity = &corev1.Affinity{NodeAffinity: scaleOpsNodePreferred()}
+		current := baseKafkaPod()
+		setAnnotationFromDesired(t, lastApplied, current)
+		current.Spec.Affinity = &corev1.Affinity{NodeAffinity: scaleOpsNodePreferred()}
+
+		// operator changes the preferred weight in the CR.
+		desired := baseKafkaPod()
+		np := scaleOpsNodePreferred()
+		np.PreferredDuringSchedulingIgnoredDuringExecution[0].Weight = 10
+		desired.Spec.Affinity = &corev1.Affinity{NodeAffinity: np}
+
+		changed, _, err := podSpecIntentChanged(current, desired)
+		if err != nil {
+			t.Fatalf("podSpecIntentChanged: %v", err)
+		}
+		if !changed {
+			t.Error("expected change: the operator edited a soft affinity in the CR (the old strip approach swallowed this)")
+		}
+	})
+}
+
+// TestParkedBrokerRestartsIndependentOfIntent verifies that the shredder
+// park mechanism (label on the live pod matched by TaintedBrokersSelector) still
+// triggers a restart under the intent-aware diff. The label lives only on the
+// live pod, so podSpecIntentChanged does not see it; isPodTainted does.
+func TestParkedBrokerRestartsIndependentOfIntent(t *testing.T) {
+	const parkLabel = "shredder.ethos.adobe.net/upgrade-status"
+
+	r := &Reconciler{
+		Reconciler: resources.Reconciler{
+			KafkaCluster: &v1beta1.KafkaCluster{
+				Spec: v1beta1.KafkaClusterSpec{
+					TaintedBrokersSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{parkLabel: "parked"},
+					},
+				},
+			},
+		},
+	}
+
+	desired := baseKafkaPod()
+	current := baseKafkaPod()
+	setAnnotationFromDesired(t, desired, current)
+	// Shredder parks the broker by labeling the live pod.
+	current.Labels[parkLabel] = "parked"
+
+	// The intent diff sees no change: the label is only on the live pod.
+	changed, _, err := podSpecIntentChanged(current, desired)
+	if err != nil {
+		t.Fatalf("podSpecIntentChanged: %v", err)
+	}
+	if changed {
+		t.Error("a parked label on the live pod must not register as a CR intent change")
+	}
+	// But the tainted-broker selector still selects it for restart.
+	if !r.isPodTainted(logr.Discard(), current) {
+		t.Error("expected a parked broker to be tainted and therefore restarted")
+	}
+
+	// Sanity: a non-parked broker is neither changed nor tainted.
+	cleanCur := baseKafkaPod()
+	setAnnotationFromDesired(t, baseKafkaPod(), cleanCur)
+	if r.isPodTainted(logr.Discard(), cleanCur) {
+		t.Error("expected a non-parked broker to not be tainted")
 	}
 }
