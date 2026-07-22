@@ -74,10 +74,10 @@ How to setup the environment for the Kafka Performance Test.
 1. Install the Koperator CustomResourceDefinition resources (adjust the version number to the Koperator release you want to install) and the corresponding version of Koperator, the Operator for managing Apache Kafka on Kubernetes.
 
     ```bash
-    kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_cruisecontroloperations.yaml
-    kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_kafkaclusters.yaml
-    kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_kafkatopics.yaml
-    kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_kafkausers.yaml
+    kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/main/config/base/crds/kafka.banzaicloud.io_cruisecontroloperations.yaml
+    kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/main/config/base/crds/kafka.banzaicloud.io_kafkaclusters.yaml
+    kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/main/config/base/crds/kafka.banzaicloud.io_kafkatopics.yaml
+    kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/main/config/base/crds/kafka.banzaicloud.io_kafkausers.yaml
     ```
 
     OCI registries have no floating "latest" tag, so `--version` is required:
@@ -90,7 +90,7 @@ How to setup the environment for the Kafka Performance Test.
     --version {{< param "latest_version" >}}
     ```
 
-1. Create a 3-broker Kafka Cluster using [this YAML file](https://raw.githubusercontent.com/adobe/koperator/master/docs/benchmarks/infrastructure/kafka.yaml).
+1. Create a 3-broker Kafka Cluster using [this YAML file](https://raw.githubusercontent.com/adobe/koperator/main/docs/benchmarks/infrastructure/kafka.yaml).
 
     This will install 3 brokers with fast SSD. If you would like the brokers in different zones, modify the following configurations to match your environment and use them in the broker configurations:
 
@@ -159,7 +159,7 @@ Monitoring environment is automatically installed. To monitor the infrastructure
 
 ## Run the tests
 
-1. Run performance test against the cluster, by building [this Docker image](https://raw.githubusercontent.com/adobe/koperator/master/docs/benchmarks/loadgens/Dockerfile).
+1. Run performance test against the cluster, by building [this Docker image](https://raw.githubusercontent.com/adobe/koperator/main/docs/benchmarks/loadgens/Dockerfile).
 
     ```bash
     docker build -t <yourname>/perfload:0.1.0 /loadgens
