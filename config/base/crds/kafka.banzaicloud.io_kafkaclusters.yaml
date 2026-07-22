@@ -96,6 +96,13 @@ spec:
                   - containerPort
                   type: object
                 type: array
+              admissionWebhooksEnabled:
+                default: false
+                description: |-
+                  Allows ScaleOps or other Admission Hooks to manage Memory and CPU Resource Requests for
+                  Kafka Broker Pods.  This Disables CPU and Memory request reconciliation from the desired
+                  state defined in the KafkaCluster to the current state in the Kubernetes Cluster
+                type: boolean
               alertManagerConfig:
                 description: AlertManagerConfig defines configuration for alert manager
                 properties:
