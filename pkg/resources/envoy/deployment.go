@@ -118,7 +118,7 @@ func (r *Reconciler) deployment(log logr.Logger, extListener v1beta1.ExternalLis
 					TopologySpreadConstraints: ingressConfig.EnvoyConfig.GetTopologySpreadConstaints(),
 					Containers: []corev1.Container{
 						{
-							Name:  "envoy",
+							Name:  envoyContainerName,
 							Image: ingressConfig.EnvoyConfig.GetEnvoyImage(),
 							Args:  arguments,
 							Ports: append(exposedPorts,

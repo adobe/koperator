@@ -19,8 +19,8 @@ import (
 	"sync"
 
 	"github.com/gruntwork-io/terratest/modules/k8s"
-	ginkgo "github.com/onsi/ginkgo/v2"
-	gomega "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 func testInstall() bool {
@@ -35,10 +35,10 @@ func testInstall() bool {
 
 		ginkgo.It("Installing infrastructure components in parallel", func() {
 			var wg sync.WaitGroup
-			errChan := make(chan error, 2)
+			errChan := make(chan error, 3)
 
-			// Install cert-manager and Contour in parallel - independent charts, no install-order dependency
-			wg.Add(2)
+			// Install cert-manager, Contour, and Envoy Gateway in parallel
+			wg.Add(3)
 
 			go func() {
 				defer wg.Done()
@@ -56,12 +56,32 @@ func testInstall() bool {
 				}
 			}()
 
+			go func() {
+				defer wg.Done()
+				ginkgo.By("Installing Envoy Gateway Helm chart")
+				if installErr := envoyGatewayHelmDescriptor.installHelmChart(kubectlOptions); installErr != nil {
+					errChan <- installErr
+				}
+			}()
+
 			wg.Wait()
 			close(errChan)
 
+			// Check for errors
 			for installErr := range errChan {
 				gomega.Expect(installErr).NotTo(gomega.HaveOccurred())
 			}
+		})
+
+		ginkgo.It("Creating Envoy Gateway GatewayClass", func() {
+			gatewayClassManifest := `apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: eg
+spec:
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller`
+			err = applyK8sResourceManifestFromString(kubectlOptions, gatewayClassManifest)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 
 		ginkgo.It("Installing dependency operators in parallel", func() {

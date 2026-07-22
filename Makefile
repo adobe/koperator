@@ -216,7 +216,7 @@ deploy: install-kustomize install ## Deploy controller into the configured Kuber
 	bin/kustomize build $(KUSTOMIZE_BASE) | kubectl apply -f -
 
 # Generate manifests e.g. CRD, RBAC etc.
-manifests: bin/controller-gen ## Generate (Kubebuilder) manifests e.g. CRD, RBAC etc.
+manifests: bin/controller-gen crds-gatewayapi ## Generate (Kubebuilder) manifests e.g. CRD, RBAC etc.
 	cd api && $(CONTROLLER_GEN) $(CRD_OPTIONS) webhook paths="./..." output:crd:artifacts:config=../config/base/crds output:webhook:artifacts:config=../config/base/webhook
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role paths="./controllers/..." output:rbac:artifacts:config=./config/base/rbac
 	## Regenerate CRDs and RBAC for the helm chart
@@ -228,6 +228,17 @@ manifests: bin/controller-gen ## Generate (Kubebuilder) manifests e.g. CRD, RBAC
 	@awk '/^rules:$$/,0' config/base/rbac/role.yaml | tail -n +2 >> charts/kafka-operator/templates/operator-rbac.yaml.tmp
 	@sed -n '/# RBAC_RULES_END/,$$p' charts/kafka-operator/templates/operator-rbac.yaml >> charts/kafka-operator/templates/operator-rbac.yaml.tmp
 	@mv charts/kafka-operator/templates/operator-rbac.yaml.tmp charts/kafka-operator/templates/operator-rbac.yaml
+
+GATEWAY_API_TEST_CRD_DIR = config/test/crd/gateway-api
+
+.PHONY: crds-gatewayapi
+crds-gatewayapi: ## Regenerate config/test/crd/gateway-api from the sigs.k8s.io/gateway-api version pinned in go.mod.
+	go mod download sigs.k8s.io/gateway-api
+	@GATEWAY_API_MOD_DIR=$$(go list -m -f '{{.Dir}}' sigs.k8s.io/gateway-api); \
+	rm -f $(GATEWAY_API_TEST_CRD_DIR)/*.yaml; \
+	cp "$$GATEWAY_API_MOD_DIR/config/crd/standard/gateway.networking.k8s.io_gatewayclasses.yaml" $(GATEWAY_API_TEST_CRD_DIR)/; \
+	cp "$$GATEWAY_API_MOD_DIR/config/crd/standard/gateway.networking.k8s.io_gateways.yaml" $(GATEWAY_API_TEST_CRD_DIR)/; \
+	cp "$$GATEWAY_API_MOD_DIR/config/crd/experimental/gateway.networking.k8s.io_tcproutes.yaml" $(GATEWAY_API_TEST_CRD_DIR)/
 
 fmt: ## Run go fmt against code.
 	go fmt ./...

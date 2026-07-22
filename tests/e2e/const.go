@@ -109,6 +109,7 @@ func apiGroupKoperatorDependencies() map[string]string {
 		"zookeeper":     "zookeeper.pravega.io",
 		"prometheus":    "monitoring.coreos.com",
 		contourName:     "projectcontour.io",
+		"envoy-gateway": "gateway.networking.k8s.io",
 	}
 }
 
