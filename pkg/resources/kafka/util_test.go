@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/banzaicloud/k8s-objectmatcher/patch"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -411,6 +412,12 @@ func resourceListWithCPU(cpu string) corev1.ResourceList {
 	return corev1.ResourceList{corev1.ResourceCPU: resource.MustParse(cpu)}
 }
 
+func podWithContainerCPU(name, cpu string) *corev1.Pod {
+	return &corev1.Pod{Spec: corev1.PodSpec{
+		Containers: []corev1.Container{{Name: name, Resources: corev1.ResourceRequirements{Requests: resourceListWithCPU(cpu)}}},
+	}}
+}
+
 func TestSyncResourceRequests(t *testing.T) {
 	cpu100m := resource.MustParse("100m")
 	cpu200m := resource.MustParse("200m")
@@ -420,35 +427,35 @@ func TestSyncResourceRequests(t *testing.T) {
 		name     string
 		desired  []corev1.Container
 		current  []corev1.Container
-		baseline map[string]corev1.ResourceList
+		original *corev1.Pod
 		want     corev1.ResourceList
 	}{
 		{
-			name:     "no baseline recorded: CR value wins over live drift",
+			name:     "no original recorded: CR value wins over live drift",
 			desired:  []corev1.Container{{Name: "kafka", Resources: corev1.ResourceRequirements{Requests: resourceListWithCPU("100m")}}},
 			current:  []corev1.Container{{Name: "kafka", Resources: corev1.ResourceRequirements{Requests: resourceListWithCPU("300m")}}},
-			baseline: nil,
+			original: nil,
 			want:     corev1.ResourceList{corev1.ResourceCPU: cpu100m},
 		},
 		{
-			name:     "current matches baseline: CR hasn't changed, external drift preserved",
+			name:     "current matches original: CR hasn't changed, external drift preserved",
 			desired:  []corev1.Container{{Name: "kafka", Resources: corev1.ResourceRequirements{Requests: resourceListWithCPU("100m")}}},
 			current:  []corev1.Container{{Name: "kafka", Resources: corev1.ResourceRequirements{Requests: resourceListWithCPU("300m")}}},
-			baseline: map[string]corev1.ResourceList{"kafka": resourceListWithCPU("100m")},
+			original: podWithContainerCPU("kafka", "100m"),
 			want:     corev1.ResourceList{corev1.ResourceCPU: cpu300m},
 		},
 		{
-			name:     "CR value differs from baseline: CR's new value wins over drift",
+			name:     "CR value differs from original: CR's new value wins over drift",
 			desired:  []corev1.Container{{Name: "kafka", Resources: corev1.ResourceRequirements{Requests: resourceListWithCPU("200m")}}},
 			current:  []corev1.Container{{Name: "kafka", Resources: corev1.ResourceRequirements{Requests: resourceListWithCPU("300m")}}},
-			baseline: map[string]corev1.ResourceList{"kafka": resourceListWithCPU("100m")},
+			original: podWithContainerCPU("kafka", "100m"),
 			want:     corev1.ResourceList{corev1.ResourceCPU: cpu200m},
 		},
 		{
 			name:     "container absent from current: left unchanged",
 			desired:  []corev1.Container{{Name: "kafka", Resources: corev1.ResourceRequirements{Requests: resourceListWithCPU("100m")}}},
 			current:  []corev1.Container{{Name: "other", Resources: corev1.ResourceRequirements{Requests: resourceListWithCPU("300m")}}},
-			baseline: nil,
+			original: nil,
 			want:     corev1.ResourceList{corev1.ResourceCPU: cpu100m},
 		},
 	}
@@ -457,12 +464,8 @@ func TestSyncResourceRequests(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			desiredPod := &corev1.Pod{Spec: corev1.PodSpec{Containers: tt.desired}}
 			currentPod := &corev1.Pod{Spec: corev1.PodSpec{Containers: tt.current}}
-			var baseline *externalResourceBaseline
-			if tt.baseline != nil {
-				baseline = &externalResourceBaseline{ContainerRequests: tt.baseline}
-			}
 
-			syncResourceRequests(desiredPod, currentPod, baseline)
+			syncResourceRequests(desiredPod, currentPod, tt.original)
 
 			got := desiredPod.Spec.Containers[0].Resources.Requests
 			gotCPU := got[corev1.ResourceCPU]
@@ -482,20 +485,20 @@ func TestSyncResourceRequests(t *testing.T) {
 			Containers:     []corev1.Container{{Name: "kafka", Resources: corev1.ResourceRequirements{Requests: resourceListWithCPU("300m")}}},
 			InitContainers: []corev1.Container{{Name: "init-certs", Resources: corev1.ResourceRequirements{Requests: resourceListWithCPU("300m")}}},
 		}}
-		baseline := &externalResourceBaseline{
-			ContainerRequests:     map[string]corev1.ResourceList{"kafka": resourceListWithCPU("100m")},
-			InitContainerRequests: map[string]corev1.ResourceList{"init-certs": resourceListWithCPU("999m")},
-		}
+		original := &corev1.Pod{Spec: corev1.PodSpec{
+			Containers:     []corev1.Container{{Name: "kafka", Resources: corev1.ResourceRequirements{Requests: resourceListWithCPU("100m")}}},
+			InitContainers: []corev1.Container{{Name: "init-certs", Resources: corev1.ResourceRequirements{Requests: resourceListWithCPU("999m")}}},
+		}}
 
-		syncResourceRequests(desiredPod, currentPod, baseline)
+		syncResourceRequests(desiredPod, currentPod, original)
 
 		gotContainerCPU := desiredPod.Spec.Containers[0].Resources.Requests[corev1.ResourceCPU]
 		if !gotContainerCPU.Equal(cpu300m) {
-			t.Errorf("expected container cpu 300m (matches baseline, drift preserved), got %s", gotContainerCPU.String())
+			t.Errorf("expected container cpu 300m (matches original, drift preserved), got %s", gotContainerCPU.String())
 		}
 		gotInitCPU := desiredPod.Spec.InitContainers[0].Resources.Requests[corev1.ResourceCPU]
 		if !gotInitCPU.Equal(cpu100m) {
-			t.Errorf("expected init container cpu 100m (baseline mismatch, CR wins), got %s", gotInitCPU.String())
+			t.Errorf("expected init container cpu 100m (original mismatch, CR wins), got %s", gotInitCPU.String())
 		}
 	})
 }
@@ -520,12 +523,12 @@ func TestSyncPodAffinities(t *testing.T) {
 	crTerm := weightedPodAffinityTerm(10, "cr-declared")
 	externalTerm := weightedPodAffinityTerm(20, "externally-added")
 
-	t.Run("term added externally (absent from baseline) is preserved into desired", func(t *testing.T) {
+	t.Run("term added externally (absent from original) is preserved into desired", func(t *testing.T) {
 		desiredPod := newPodWithPreferredPodAffinity(crTerm)
 		currentPod := newPodWithPreferredPodAffinity(crTerm, externalTerm)
-		baseline := &externalResourceBaseline{PodAffinityTerms: []corev1.WeightedPodAffinityTerm{crTerm}}
+		original := newPodWithPreferredPodAffinity(crTerm)
 
-		syncPodAffinities(desiredPod, currentPod, baseline)
+		syncPodAffinities(desiredPod, currentPod, original)
 
 		got := desiredPod.Spec.Affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution
 		if len(got) != 2 {
@@ -533,12 +536,12 @@ func TestSyncPodAffinities(t *testing.T) {
 		}
 	})
 
-	t.Run("term the CR removed (present in baseline and current) is not resurrected", func(t *testing.T) {
+	t.Run("term the CR removed (present in original and current) is not resurrected", func(t *testing.T) {
 		desiredPod := newPodWithPreferredPodAffinity() // CR no longer declares crTerm
 		currentPod := newPodWithPreferredPodAffinity(crTerm)
-		baseline := &externalResourceBaseline{PodAffinityTerms: []corev1.WeightedPodAffinityTerm{crTerm}}
+		original := newPodWithPreferredPodAffinity(crTerm)
 
-		syncPodAffinities(desiredPod, currentPod, baseline)
+		syncPodAffinities(desiredPod, currentPod, original)
 
 		if desiredPod.Spec.Affinity != nil && desiredPod.Spec.Affinity.PodAffinity != nil &&
 			len(desiredPod.Spec.Affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution) != 0 {
@@ -579,12 +582,12 @@ func TestSyncNodeAffinities(t *testing.T) {
 	crTerm := preferredSchedulingTerm(10, "cr-declared")
 	externalTerm := preferredSchedulingTerm(20, "scaleops.sh/node-packing")
 
-	t.Run("term added externally (absent from baseline) is preserved into desired", func(t *testing.T) {
+	t.Run("term added externally (absent from original) is preserved into desired", func(t *testing.T) {
 		desiredPod := newPodWithPreferredNodeAffinity(crTerm)
 		currentPod := newPodWithPreferredNodeAffinity(crTerm, externalTerm)
-		baseline := &externalResourceBaseline{NodeAffinityTerms: []corev1.PreferredSchedulingTerm{crTerm}}
+		original := newPodWithPreferredNodeAffinity(crTerm)
 
-		syncNodeAffinities(desiredPod, currentPod, baseline)
+		syncNodeAffinities(desiredPod, currentPod, original)
 
 		got := desiredPod.Spec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution
 		if len(got) != 2 {
@@ -592,12 +595,12 @@ func TestSyncNodeAffinities(t *testing.T) {
 		}
 	})
 
-	t.Run("term the CR removed (present in baseline and current) is not resurrected", func(t *testing.T) {
+	t.Run("term the CR removed (present in original and current) is not resurrected", func(t *testing.T) {
 		desiredPod := newPodWithPreferredNodeAffinity() // CR no longer declares crTerm
 		currentPod := newPodWithPreferredNodeAffinity(crTerm)
-		baseline := &externalResourceBaseline{NodeAffinityTerms: []corev1.PreferredSchedulingTerm{crTerm}}
+		original := newPodWithPreferredNodeAffinity(crTerm)
 
-		syncNodeAffinities(desiredPod, currentPod, baseline)
+		syncNodeAffinities(desiredPod, currentPod, original)
 
 		if desiredPod.Spec.Affinity != nil && desiredPod.Spec.Affinity.NodeAffinity != nil &&
 			len(desiredPod.Spec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution) != 0 {
@@ -606,37 +609,34 @@ func TestSyncNodeAffinities(t *testing.T) {
 	})
 }
 
-func TestExternalResourceBaselineRoundTrip(t *testing.T) {
-	original := &externalResourceBaseline{
-		ContainerRequests: map[string]corev1.ResourceList{"kafka": resourceListWithCPU("100m")},
-	}
-	pod := &corev1.Pod{}
+func TestGetOriginalPodRoundTrip(t *testing.T) {
+	pod := podWithContainerCPU("kafka", "100m")
 
-	if err := setExternalResourceBaseline(pod, original); err != nil {
-		t.Fatalf("setExternalResourceBaseline failed: %v", err)
+	if err := patch.DefaultAnnotator.SetLastAppliedAnnotation(pod); err != nil {
+		t.Fatalf("SetLastAppliedAnnotation failed: %v", err)
 	}
 
-	got, err := getExternalResourceBaseline(pod)
+	got, err := getOriginalPod(pod)
 	if err != nil {
-		t.Fatalf("getExternalResourceBaseline failed: %v", err)
+		t.Fatalf("getOriginalPod failed: %v", err)
 	}
 	if got == nil {
-		t.Fatal("expected non-nil baseline")
+		t.Fatal("expected non-nil original pod")
 	}
-	gotCPU := got.ContainerRequests["kafka"][corev1.ResourceCPU]
-	wantCPU := original.ContainerRequests["kafka"][corev1.ResourceCPU]
+	gotCPU := got.Spec.Containers[0].Resources.Requests[corev1.ResourceCPU]
+	wantCPU := resource.MustParse("100m")
 	if !gotCPU.Equal(wantCPU) {
 		t.Errorf("expected cpu %s, got %s", wantCPU.String(), gotCPU.String())
 	}
 }
 
-func TestGetExternalResourceBaselineMissingAnnotation(t *testing.T) {
+func TestGetOriginalPodMissingAnnotation(t *testing.T) {
 	pod := &corev1.Pod{}
-	got, err := getExternalResourceBaseline(pod)
+	got, err := getOriginalPod(pod)
 	if err != nil {
 		t.Fatalf("expected no error for missing annotation, got %v", err)
 	}
 	if got != nil {
-		t.Errorf("expected nil baseline when annotation is absent, got %+v", got)
+		t.Errorf("expected nil original pod when annotation is absent, got %+v", got)
 	}
 }

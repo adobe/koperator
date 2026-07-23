@@ -22,29 +22,12 @@ import (
 	"reflect"
 	"sort"
 
+	"github.com/banzaicloud/k8s-objectmatcher/patch"
 	"github.com/google/uuid"
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/banzaicloud/koperator/api/v1beta1"
 )
-
-// externalResourceBaselineAnnotation records, on each broker Pod, the CPU/memory requests and
-// preferred affinity terms that Koperator itself last declared for that Pod - as opposed to
-// whatever an external controller (for example a mutating admission webhook such as ScaleOps)
-// may have layered on top of the live Pod afterwards. It intentionally does not reuse
-// k8s-objectmatcher's own "last-applied" annotation: that annotation is snapshotted from
-// desiredPod *after* syncResourceRequests/syncAffinities run, so it would end up recording the
-// externally-applied values instead of Koperator's own intent, making it useless for telling
-// the two apart on the next reconcile.
-const externalResourceBaselineAnnotation = "banzaicloud.io/external-resource-baseline"
-
-// externalResourceBaseline is the payload stored under externalResourceBaselineAnnotation.
-type externalResourceBaseline struct {
-	ContainerRequests     map[string]corev1.ResourceList  `json:"containerRequests,omitempty"`
-	InitContainerRequests map[string]corev1.ResourceList  `json:"initContainerRequests,omitempty"`
-	PodAffinityTerms      []corev1.WeightedPodAffinityTerm `json:"podAffinityTerms,omitempty"`
-	NodeAffinityTerms     []corev1.PreferredSchedulingTerm `json:"nodeAffinityTerms,omitempty"`
-}
 
 // generateQuorumVoters generates the quorum voters in the format of brokerID@nodeAddress:listenerPort
 // The generated quorum voters are guaranteed in ascending order by broker IDs to ensure same quorum voters configurations are returned
@@ -95,18 +78,23 @@ func generateRandomClusterID() string {
 	return base64.URLEncoding.EncodeToString(randomUUID[:])
 }
 
-// buildExternalResourceBaseline captures the CPU/memory requests and preferred affinity terms
-// Koperator itself declared on pod, for later comparison against a freshly-computed desired pod.
-// Callers must pass a pod that has not been touched by syncResourceRequests/syncAffinities, so
-// the recorded baseline reflects only Koperator's own intent.
-func buildExternalResourceBaseline(pod *corev1.Pod) *externalResourceBaseline {
-	baseline := &externalResourceBaseline{
-		ContainerRequests:     containerRequestsByName(pod.Spec.Containers),
-		InitContainerRequests: containerRequestsByName(pod.Spec.InitContainers),
-		PodAffinityTerms:      podAffinityTerms(pod),
-		NodeAffinityTerms:     nodeAffinityTerms(pod),
+// getOriginalPod returns the Pod that Koperator itself last declared as desired for currentPod,
+// reconstructed from k8s-objectmatcher's own "last-applied" annotation (the same annotation
+// patch.DefaultPatchMaker.Calculate uses as the "original" side of its three-way merge). It
+// returns nil if no such annotation is present yet - for example before
+// ExternalResourceManagementEnabled was turned on, or on a pod created before this feature
+// existed - in which case callers should treat every field as "changed" and fall back to the
+// freshly-computed desired value rather than trusting currentPod's live drift.
+func getOriginalPod(currentPod *corev1.Pod) (*corev1.Pod, error) {
+	raw, err := patch.DefaultAnnotator.GetOriginalConfiguration(currentPod)
+	if err != nil || len(raw) == 0 {
+		return nil, err
 	}
-	return baseline
+	original := &corev1.Pod{}
+	if err := json.Unmarshal(raw, original); err != nil {
+		return nil, err
+	}
+	return original, nil
 }
 
 func containerRequestsByName(containers []corev1.Container) map[string]corev1.ResourceList {
@@ -134,51 +122,23 @@ func nodeAffinityTerms(pod *corev1.Pod) []corev1.PreferredSchedulingTerm {
 	return pod.Spec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution
 }
 
-// getExternalResourceBaseline reads back the baseline last recorded on pod by
-// setExternalResourceBaseline, or returns nil if none is present yet (for example before
-// externalResourceManagementEnabled was turned on, or on a pod created before this feature
-// existed).
-func getExternalResourceBaseline(pod *corev1.Pod) (*externalResourceBaseline, error) {
-	raw, ok := pod.Annotations[externalResourceBaselineAnnotation]
-	if !ok {
-		return nil, nil
-	}
-	baseline := &externalResourceBaseline{}
-	if err := json.Unmarshal([]byte(raw), baseline); err != nil {
-		return nil, err
-	}
-	return baseline, nil
-}
-
-// setExternalResourceBaseline stamps baseline onto pod's annotations.
-func setExternalResourceBaseline(pod *corev1.Pod, baseline *externalResourceBaseline) error {
-	raw, err := json.Marshal(baseline)
-	if err != nil {
-		return err
-	}
-	if pod.Annotations == nil {
-		pod.Annotations = make(map[string]string)
-	}
-	pod.Annotations[externalResourceBaselineAnnotation] = string(raw)
-	return nil
-}
-
 // syncResourceRequests overwrites CPU and memory requests in desiredPod's containers with the
-// values from currentPod, but only for requests that Koperator's own baseline shows as
-// unchanged - so a genuine change to the KafkaCluster's resource requests still takes effect
-// instead of being silently discarded in favor of externally-applied drift.
-func syncResourceRequests(desiredPod, currentPod *corev1.Pod, baseline *externalResourceBaseline) {
-	var baselineContainers, baselineInitContainers map[string]corev1.ResourceList
-	if baseline != nil {
-		baselineContainers = baseline.ContainerRequests
-		baselineInitContainers = baseline.InitContainerRequests
+// values from currentPod, but only for requests that are unchanged from what Koperator itself
+// last declared (per original) - so a genuine change to the KafkaCluster's resource requests
+// still takes effect instead of being silently discarded in favor of externally-applied drift.
+func syncResourceRequests(desiredPod, currentPod, original *corev1.Pod) {
+	var originalContainers, originalInitContainers []corev1.Container
+	if original != nil {
+		originalContainers = original.Spec.Containers
+		originalInitContainers = original.Spec.InitContainers
 	}
-	syncContainerResourceRequests(desiredPod.Spec.Containers, currentPod.Spec.Containers, baselineContainers)
-	syncContainerResourceRequests(desiredPod.Spec.InitContainers, currentPod.Spec.InitContainers, baselineInitContainers)
+	syncContainerResourceRequests(desiredPod.Spec.Containers, currentPod.Spec.Containers, originalContainers)
+	syncContainerResourceRequests(desiredPod.Spec.InitContainers, currentPod.Spec.InitContainers, originalInitContainers)
 }
 
-func syncContainerResourceRequests(desired, current []corev1.Container, baseline map[string]corev1.ResourceList) {
+func syncContainerResourceRequests(desired, current, original []corev1.Container) {
 	currentIndex := containerRequestsByName(current)
+	originalIndex := containerRequestsByName(original)
 
 	for i := range desired {
 		c := &desired[i]
@@ -186,18 +146,18 @@ func syncContainerResourceRequests(desired, current []corev1.Container, baseline
 		if !ok {
 			continue
 		}
-		baselineReqs := baseline[c.Name]
+		originalReqs := originalIndex[c.Name]
 
 		if c.Resources.Requests == nil {
 			c.Resources.Requests = make(corev1.ResourceList)
 		}
 		for _, res := range []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceMemory} {
 			desiredVal, desiredHas := c.Resources.Requests[res]
-			baselineVal, baselineHas := baselineReqs[res]
-			if desiredHas != baselineHas || (desiredHas && !desiredVal.Equal(baselineVal)) {
-				// The CR declares a different value than our recorded baseline, meaning it
-				// changed since we last recorded it. Let that new value take effect instead
-				// of preserving whatever is live on currentPod.
+			originalVal, originalHas := originalReqs[res]
+			if desiredHas != originalHas || (desiredHas && !desiredVal.Equal(originalVal)) {
+				// The CR declares a different value than what Koperator last applied, meaning
+				// it changed since then. Let that new value take effect instead of preserving
+				// whatever is live on currentPod.
 				continue
 			}
 			if currentVal, ok := currentReqs[res]; ok {
@@ -211,26 +171,26 @@ func syncContainerResourceRequests(desired, current []corev1.Container, baseline
 
 // syncAffinities preserves preferred pod/node affinity terms that an external controller added
 // to currentPod on top of whatever Koperator itself declared, while still letting the
-// KafkaCluster CR remove terms it previously declared (tracked via baseline) without them being
+// KafkaCluster CR remove terms it previously declared (per original) without them being
 // resurrected from currentPod on the next reconcile.
-func syncAffinities(desiredPod, currentPod *corev1.Pod, baseline *externalResourceBaseline) {
-	syncPodAffinities(desiredPod, currentPod, baseline)
-	syncNodeAffinities(desiredPod, currentPod, baseline)
+func syncAffinities(desiredPod, currentPod, original *corev1.Pod) {
+	syncPodAffinities(desiredPod, currentPod, original)
+	syncNodeAffinities(desiredPod, currentPod, original)
 }
 
-func syncPodAffinities(desiredPod, currentPod *corev1.Pod, baseline *externalResourceBaseline) {
+func syncPodAffinities(desiredPod, currentPod, original *corev1.Pod) {
 	currentTerms := podAffinityTerms(currentPod)
 	if len(currentTerms) == 0 {
 		return
 	}
-	var baselineTerms []corev1.WeightedPodAffinityTerm
-	if baseline != nil {
-		baselineTerms = baseline.PodAffinityTerms
+	var originalTerms []corev1.WeightedPodAffinityTerm
+	if original != nil {
+		originalTerms = podAffinityTerms(original)
 	}
 
 	var externallyAddedTerms []corev1.WeightedPodAffinityTerm
 	for _, term := range currentTerms {
-		if !containsWeightedPodAffinityTerm(baselineTerms, term) {
+		if !containsWeightedPodAffinityTerm(originalTerms, term) {
 			externallyAddedTerms = append(externallyAddedTerms, term)
 		}
 	}
@@ -263,19 +223,19 @@ func containsWeightedPodAffinityTerm(terms []corev1.WeightedPodAffinityTerm, tar
 	return false
 }
 
-func syncNodeAffinities(desiredPod, currentPod *corev1.Pod, baseline *externalResourceBaseline) {
+func syncNodeAffinities(desiredPod, currentPod, original *corev1.Pod) {
 	currentTerms := nodeAffinityTerms(currentPod)
 	if len(currentTerms) == 0 {
 		return
 	}
-	var baselineTerms []corev1.PreferredSchedulingTerm
-	if baseline != nil {
-		baselineTerms = baseline.NodeAffinityTerms
+	var originalTerms []corev1.PreferredSchedulingTerm
+	if original != nil {
+		originalTerms = nodeAffinityTerms(original)
 	}
 
 	var externallyAddedTerms []corev1.PreferredSchedulingTerm
 	for _, term := range currentTerms {
-		if !containsPreferredSchedulingTerm(baselineTerms, term) {
+		if !containsPreferredSchedulingTerm(originalTerms, term) {
 			externallyAddedTerms = append(externallyAddedTerms, term)
 		}
 	}
