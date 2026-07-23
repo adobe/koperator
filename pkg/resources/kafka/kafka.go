@@ -956,6 +956,24 @@ func (r *Reconciler) handleRollingUpgrade(log logr.Logger, desiredPod, currentPo
 		}
 		desiredPod.Spec.Tolerations = uniqueTolerations
 	}
+
+	// Capture the pure CR-derived pod spec before any external-resource sync below mutates it,
+	// so the last-applied annotation we record further down always reflects Koperator's own
+	// intent, never drift merged in from currentPod.
+	pureDesired := desiredPod.DeepCopy()
+
+	if r.KafkaCluster.Spec.ExternalResourceManagementEnabled {
+		original, err := getOriginalPod(currentPod)
+		if err != nil {
+			log.Error(err, "could not read last-applied annotation, skipping external resource/affinity sync")
+		} else {
+			// If resource requests or affinities were changed by an external controller (e.g.
+			// ScaleOps), sync them into desiredPod so they aren't discarded as drift below.
+			syncResourceRequests(desiredPod, currentPod, original)
+			syncAffinities(desiredPod, currentPod, original)
+		}
+	}
+
 	// Check if the resource actually updated or if labels match TaintedBrokersSelector
 	patchResult, err := patch.DefaultPatchMaker.Calculate(currentPod, desiredPod)
 	switch {
@@ -979,9 +997,16 @@ func (r *Reconciler) handleRollingUpgrade(log logr.Logger, desiredPod, currentPo
 			"original", string(patchResult.Original))
 	}
 
-	if err := patch.DefaultAnnotator.SetLastAppliedAnnotation(desiredPod); err != nil {
+	// Snapshot the last-applied annotation from the pure, pre-sync pod so it always reflects
+	// Koperator's own intent - never the externally-applied values syncResourceRequests/
+	// syncAffinities may have merged into desiredPod above.
+	if err := patch.DefaultAnnotator.SetLastAppliedAnnotation(pureDesired); err != nil {
 		return errors.WrapIf(err, "could not apply last state to annotation")
 	}
+	if desiredPod.Annotations == nil {
+		desiredPod.Annotations = make(map[string]string)
+	}
+	desiredPod.Annotations[patch.LastAppliedConfig] = pureDesired.Annotations[patch.LastAppliedConfig]
 
 	if !k8sutil.IsPodContainsTerminatedContainer(currentPod) {
 		if r.KafkaCluster.Status.State != banzaiv1beta1.KafkaClusterRollingUpgrading {
