@@ -81,7 +81,8 @@ spec:
     cruiseControlTaskSpec:
       RetryDurationMinutes: 5
     topicConfig:
-      partitions: 12
+      # e2e: fewer partitions => faster CC monitoring coverage and less data movement during disk removal
+      partitions: 3
       replicationFactor: 3
 #    resourceRequirements:
 #      requests:
@@ -143,15 +144,18 @@ spec:
       cruise.control.metrics.reporter.metrics.reporting.interval.ms=15000
       metric.anomaly.detection.interval.ms=180000
       # The partition metrics window size in milliseconds
-      partition.metrics.window.ms=30000
+      # e2e: shrink window to the 15s sampling interval so CC accrues a valid window fast; not production defaults
+      partition.metrics.window.ms=15000
       # The number of partition metric windows to keep in memory
       num.partition.metrics.windows=1
       # The minimum partition metric samples required for a partition in each window
       min.samples.per.partition.metrics.window=1
       # The broker metrics window size in milliseconds
-      broker.metrics.window.ms=30000
+      # e2e: shrink window to the 15s sampling interval to speed up CC warmup; not production defaults
+      broker.metrics.window.ms=15000
       # The number of broker metric windows to keep in memory
-      num.broker.metrics.windows=5
+      # e2e: only 2 broker windows needed for warmup on a tiny static cluster (was 5); not production defaults
+      num.broker.metrics.windows=2
       # The minimum broker metric samples required for a partition in each window
       min.samples.per.broker.metrics.window=1
       # The configuration for the BrokerCapacityConfigFileResolver (supports JBOD and non-JBOD broker capacities)
@@ -166,7 +170,10 @@ spec:
       # The list of supported hard goals
       hard.goals=com.linkedin.kafka.cruisecontrol.analyzer.goals.ReplicaCapacityGoal,com.linkedin.kafka.cruisecontrol.analyzer.goals.DiskCapacityGoal,com.linkedin.kafka.cruisecontrol.analyzer.goals.NetworkInboundCapacityGoal,com.linkedin.kafka.cruisecontrol.analyzer.goals.NetworkOutboundCapacityGoal,com.linkedin.kafka.cruisecontrol.analyzer.goals.CpuCapacityGoal
       # The minimum percentage of well monitored partitions out of all the partitions
-      min.monitored.partition.percentage=0.95
+      # e2e: min.valid.partition.ratio is the REAL CC key — min.monitored.partition.percentage was renamed to it in
+      # CC PR #781 (2019); the old name is silently ignored so CC keeps its 0.995 default. Lowered so CC's load
+      # model becomes valid quickly on a tiny cluster with few partitions/windows; not production defaults
+      min.valid.partition.ratio=0.5
       # The balance threshold for CPU
       cpu.balance.threshold=1.1
       # The balance threshold for disk
@@ -210,7 +217,8 @@ spec:
       # The max number of partitions to move in/out on a given broker at a given time.
       num.concurrent.partition.movements.per.broker=10
       # The interval between two execution progress checks.
-      execution.progress.check.interval.ms=10000
+      # e2e: poll execution progress every 5s (was 10s) so disk removal/rebalance completion is detected sooner; not production defaults
+      execution.progress.check.interval.ms=5000
       # Configurations for anomaly detector
       # =======================================
       # The goal violation notifier class
