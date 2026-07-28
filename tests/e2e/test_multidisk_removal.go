@@ -73,6 +73,17 @@ func testMultiDiskRemoval() bool {
 			gomega.Expect(exclude).To(gomega.BeTrue(), "broker log.dirs must not contain removed path %s", removedLogDirPath)
 		})
 
+		ginkgo.It("Waiting for the Cruise Control disk rebalance to complete", func() {
+			// The log.dirs ConfigMap update above only proves the operator dropped the removed path from
+			// broker config, not that Cruise Control finished draining data off those disks. Gate on a
+			// quiescent Cruise Control so the disk rebalance genuinely completes here rather than lingering
+			// in flight (which would otherwise leave an in-progress operation for the next scenario).
+			ginkgo.By("Waiting until no Cruise Control operation is in flight (disk rebalance finished)")
+			gomega.Eventually(context.Background(), func() (bool, error) {
+				return hasNoInFlightCruiseControlOperation(kubectlOptions)
+			}, multidiskRemovalTimeout, multidiskRemovalPollInterval).Should(gomega.BeTrue())
+		})
+
 		ginkgo.It("Asserting Kafka brokers remain healthy", func() {
 			// Disk removal rolls the broker pods, so their names change underneath us. Gate on
 			// the operator's own ClusterRunning state and re-resolve the live pod set each poll

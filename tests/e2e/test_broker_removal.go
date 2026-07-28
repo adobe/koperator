@@ -47,6 +47,21 @@ func testBatchedBrokerRemoval() bool {
 			kubectlOptions.Namespace = koperatorLocalHelmDescriptor.Namespace
 		})
 
+		ginkgo.It("Waiting for Cruise Control to be ready and idle before triggering removal", func() {
+			// A freshly installed cluster runs an initial CruiseControl rebalance to spread replicas
+			// across the new brokers. Triggering remove_broker while that rebalance is still in flight
+			// makes the two operations race and the removal can stall. Gate on a running cluster with no
+			// in-flight CC operation so removal starts from a quiescent Cruise Control.
+			ginkgo.By("Ensuring the KafkaCluster is running")
+			err := waitForKafkaClusterWithPodStatusCheck(kubectlOptions, kafkaClusterName, kafkaClusterResourceReadinessTimeout)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Waiting until no Cruise Control operation is in flight (initial rebalance finished)")
+			gomega.Eventually(context.Background(), func() (bool, error) {
+				return hasNoInFlightCruiseControlOperation(kubectlOptions)
+			}, batchedBrokerRemovalTimeout, batchedBrokerRemovalPollInterval).Should(gomega.BeTrue())
+		})
+
 		ginkgo.It("Applying 3-broker manifest to trigger removal of brokers 3 and 4", func() {
 			ginkgo.By("Patching KafkaCluster to remove brokers 3 and 4")
 			applyK8sResourceManifest(kubectlOptions, "../../config/samples/simplekafkacluster.yaml")
@@ -102,6 +117,29 @@ func hasExactlyOneRemoveBrokerOperation(kubectlOptions k8s.KubectlOptions) (bool
 		}
 	}
 	return count == 1, nil
+}
+
+// hasNoInFlightCruiseControlOperation returns true when no CruiseControlOperation in the namespace
+// has a currently-running task (Active or InExecution). Completed / CompletedWithError tasks and
+// operations without a currentTask count as idle. It is used to gate mutation tests (broker/disk
+// removal) on a quiescent Cruise Control so a new operation does not race an in-flight one, such as
+// the rebalance CruiseControl runs right after a fresh cluster install.
+func hasNoInFlightCruiseControlOperation(kubectlOptions k8s.KubectlOptions) (bool, error) {
+	states, err := getK8sResources(kubectlOptions,
+		[]string{"cruisecontroloperation"},
+		"",
+		"",
+		"-o", "jsonpath={range .items[*]}{.status.currentTask.state}{'\\n'}{end}",
+	)
+	if err != nil {
+		return false, err
+	}
+	for _, state := range states {
+		if state == string(v1beta1.CruiseControlTaskActive) || state == string(v1beta1.CruiseControlTaskInExecution) {
+			return false, nil
+		}
+	}
+	return true, nil
 }
 
 // hasExactlyNBrokerPods returns true when exactly n broker pods exist in the namespace.

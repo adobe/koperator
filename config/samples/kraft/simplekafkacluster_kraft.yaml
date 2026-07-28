@@ -135,6 +135,11 @@ spec:
       broker.metric.sample.store.topic=__KafkaCruiseControlModelTrainingSamples
       # The replication factor of Kafka metric sample store topic
       sample.store.topic.replication.factor=2
+      # e2e: shrink CC's sample-store topics from their 32-partitions-each default so broker/disk removal
+      # reshuffles only a few partitions (not 64) and the CC execution completes quickly; not production defaults.
+      # NOTE: CC only ever increases these partition counts (never shrinks), so this only takes effect on a fresh cluster.
+      partition.sample.store.topic.partition.count=3
+      broker.sample.store.topic.partition.count=3
       # The config for the number of Kafka sample store consumer threads
       num.sample.loading.threads=8
       # The partition assignor class for the metric samplers
