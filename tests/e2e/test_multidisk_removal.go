@@ -28,7 +28,6 @@ import (
 	ginkgo "github.com/onsi/ginkgo/v2"
 	gomega "github.com/onsi/gomega"
 
-	"github.com/banzaicloud/koperator/api/v1beta1"
 	kafkautils "github.com/banzaicloud/koperator/pkg/util/kafka"
 )
 
@@ -75,8 +74,10 @@ func testMultiDiskRemoval() bool {
 		})
 
 		ginkgo.It("Asserting Kafka brokers remain healthy", func() {
-			err := waitK8sResourceCondition(kubectlOptions, "pod", "condition=Ready", defaultPodReadinessWaitTime,
-				v1beta1.KafkaCRLabelKey+"="+kafkaClusterName+",app=kafka", "")
+			// Disk removal rolls the broker pods, so their names change underneath us. Gate on
+			// the operator's own ClusterRunning state and re-resolve the live pod set each poll
+			// instead of `kubectl wait`-ing on a snapshot of pod names that get deleted mid-roll.
+			err := waitForKafkaClusterWithPodStatusCheck(kubectlOptions, kafkaClusterName, kafkaClusterResourceReadinessTimeout)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 	})

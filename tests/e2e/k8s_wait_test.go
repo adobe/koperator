@@ -64,3 +64,40 @@ func TestIsTransientResourceWaitError(t *testing.T) {
 		})
 	}
 }
+
+func TestIsConditionWaitTimeoutError(t *testing.T) {
+	testCases := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{
+			name: "nil error is not a condition-wait timeout",
+			err:  nil,
+			want: false,
+		},
+		{
+			name: "per-attempt condition timeout is a condition-wait timeout",
+			err:  errors.New("error: timed out waiting for the condition on pods/kafka-2-tzplk"),
+			want: true,
+		},
+		{
+			name: "object-changed race is not a condition-wait timeout",
+			err:  errors.New(`error while running command: exit status 1; Error from server (NotFound): pods "kafka-2-h4grv" not found`),
+			want: false,
+		},
+		{
+			name: "unrelated failure is not a condition-wait timeout",
+			err:  errors.New("error while running command: exit status 1; The connection to the server was refused"),
+			want: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := isConditionWaitTimeoutError(tc.err); got != tc.want {
+				t.Errorf("isConditionWaitTimeoutError(%v) = %v, want %v", tc.err, got, tc.want)
+			}
+		})
+	}
+}

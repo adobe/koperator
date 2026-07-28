@@ -73,8 +73,10 @@ func testBatchedBrokerRemoval() bool {
 		})
 
 		ginkgo.It("Asserting remaining Kafka brokers are healthy", func() {
-			err := waitK8sResourceCondition(kubectlOptions, "pod", "condition=Ready", defaultPodReadinessWaitTime,
-				v1beta1.KafkaCRLabelKey+"="+kafkaClusterName+","+kafkaLabelSelectorBrokers, "")
+			// Broker removal reconciles the cluster; gate on the operator's own ClusterRunning
+			// state and re-resolve the live pod set each poll rather than `kubectl wait`-ing on
+			// a snapshot of pod names that can change while the cluster settles.
+			err := waitForKafkaClusterWithPodStatusCheck(kubectlOptions, kafkaClusterName, kafkaClusterResourceReadinessTimeout)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 	})
