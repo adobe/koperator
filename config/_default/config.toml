@@ -52,10 +52,10 @@ weight = 1
   # latest_version/version below are auto-bumped on every canonical release
   # by .github/workflows/operator-release.yml (master) pushing to this file;
   # that same push also triggers regenerate-crd-docs.yaml (this branch).
-  latest_version = "0.28.0-adobe-20260622" # Used in some installation commands
+  latest_version = "0.28.0-adobe-20260731" # Used in some installation commands
 
   # The version number for the version of the docs represented in this doc set.
-  version = "0.28.0-adobe-20260622"
+  version = "0.28.0-adobe-20260731"
 
   # A link to latest version of the docs.
   url_latest_version = "https://opensource.adobe.com/koperator/"
