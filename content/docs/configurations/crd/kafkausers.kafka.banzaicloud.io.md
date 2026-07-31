@@ -12,7 +12,7 @@ crd:
   technical_name: kafkausers.kafka.banzaicloud.io
   scope: Namespaced
   source_repository: https://github.com/adobe/koperator
-  source_repository_ref: 0.28.0-adobe-20260622
+  source_repository_ref: 0.28.0-adobe-20260731
   versions:
     - v1alpha1
   topics:
@@ -23,12 +23,12 @@ aliases:
   - /reference/cp-k8s-api/kafkausers.kafka.banzaicloud.io/
 technical_name: kafkausers.kafka.banzaicloud.io
 source_repository: https://github.com/adobe/koperator
-source_repository_ref: 0.28.0-adobe-20260622
+source_repository_ref: 0.28.0-adobe-20260731
 ---
 
 ## KafkaUser
 
-> 📖 **Browse this schema interactively**: [doc.crds.dev](https://doc.crds.dev/github.com/adobe/koperator/kafka.banzaicloud.io/KafkaUser/v1alpha1@0.28.0-adobe-20260622)
+> 📖 **Browse this schema interactively**: [doc.crds.dev](https://doc.crds.dev/github.com/adobe/koperator/kafka.banzaicloud.io/KafkaUser/v1alpha1@0.28.0-adobe-20260731)
 
 KafkaUser is the Schema for the kafka users API
 <dl class="crd-meta">

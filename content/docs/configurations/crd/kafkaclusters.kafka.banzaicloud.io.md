@@ -12,7 +12,7 @@ crd:
   technical_name: kafkaclusters.kafka.banzaicloud.io
   scope: Namespaced
   source_repository: https://github.com/adobe/koperator
-  source_repository_ref: 0.28.0-adobe-20260622
+  source_repository_ref: 0.28.0-adobe-20260731
   versions:
     - v1beta1
   topics:
@@ -26,12 +26,12 @@ aliases:
   - /reference/cp-k8s-api/kafkaclusters.kafka.banzaicloud.io/
 technical_name: kafkaclusters.kafka.banzaicloud.io
 source_repository: https://github.com/adobe/koperator
-source_repository_ref: 0.28.0-adobe-20260622
+source_repository_ref: 0.28.0-adobe-20260731
 ---
 
 ## KafkaCluster
 
-> 📖 **Browse this schema interactively**: [doc.crds.dev](https://doc.crds.dev/github.com/adobe/koperator/kafka.banzaicloud.io/KafkaCluster/v1beta1@0.28.0-adobe-20260622)
+> 📖 **Browse this schema interactively**: [doc.crds.dev](https://doc.crds.dev/github.com/adobe/koperator/kafka.banzaicloud.io/KafkaCluster/v1beta1@0.28.0-adobe-20260731)
 
 KafkaCluster is the Schema for the kafkaclusters API
 <dl class="crd-meta">
