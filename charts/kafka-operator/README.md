@@ -29,13 +29,13 @@ OCI registries have no floating "latest" tag, so `--version` is required (see av
 
 ```bash
 helm install kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator \
-  --version 0.28.0-adobe-20260622 --namespace=kafka --create-namespace --skip-crds
+  --version 0.28.0-adobe-20260731 --namespace=kafka --create-namespace --skip-crds
 ```
 
 To install the operator using an already installed cert-manager:
 ```bash
 helm install kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator \
-  --version 0.28.0-adobe-20260622 \
+  --version 0.28.0-adobe-20260731 \
   --set certManager.namespace=<your cert manager namespace> --namespace=kafka --create-namespace --skip-crds
 ```
 
@@ -46,7 +46,7 @@ If this value is not set your CRDs might be deleted. `--version` is required, sa
 
 ```bash
 helm upgrade kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator \
-  --version 0.28.0-adobe-20260622 --namespace=kafka
+  --version 0.28.0-adobe-20260731 --namespace=kafka
 ```
 
 ## Uninstalling the Chart
@@ -66,7 +66,7 @@ The command removes all the Kubernetes components associated with the chart and 
 | replicaCount | int | `1` | Operator replica count can be set |
 | operator.annotations | object | `{}` | Operator pod annotations can be set |
 | operator.image.repository | string | `"ghcr.io/adobe/koperator"` | Operator container image repository |
-| operator.image.tag | string | `"0.28.0-adobe-20260622"` | Operator container image tag |
+| operator.image.tag | string | `"0.28.0-adobe-20260731"` | Operator container image tag |
 | operator.image.pullPolicy | string | `"IfNotPresent"` | Operator container image pull policy |
 | operator.namespaces | string | `"kafka, cert-manager"` | List of namespaces where Operator watches for custom resources.<br><br>**Note** that the operator still requires to read the cluster-scoped `Node` labels to configure `rack awareness`. Make sure the operator ServiceAccount is granted `get` permissions on this `Node` resource when using limited RBACs. |
 | operator.verboseLogging | bool | `false` | Enable verbose logging |
