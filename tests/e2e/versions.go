@@ -19,7 +19,7 @@ package e2e
 // These versions are monitored by Renovate for automatic updates
 const (
 	// CertManagerVersion is the version of cert-manager Helm chart
-	CertManagerVersion = "v1.21.0" // renovate: datasource=helm depName=cert-manager registryUrl=https://charts.jetstack.io
+	CertManagerVersion = "v1.21.1" // renovate: datasource=helm depName=cert-manager registryUrl=https://charts.jetstack.io
 
 	// ContourVersion is the version of Contour ingress controller Helm chart
 	ContourVersion = "0.6.0" // renovate: datasource=helm depName=contour registryUrl=https://projectcontour.github.io/helm-charts

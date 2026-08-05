@@ -64,7 +64,7 @@ const (
 	DefaultMonitorImage = "ghcr.io/adobe/koperator/jmx-javaagent:1.5.0" // renovate: datasource=docker depName=ghcr.io/adobe/koperator/jmx-javaagent
 
 	// DefaultEnvoyImage is the default Envoy proxy image used when users don't specify it in EnvoyConfig.Image
-	DefaultEnvoyImage = "envoyproxy/envoy:v1.38.3" // renovate: datasource=docker depName=envoyproxy/envoy
+	DefaultEnvoyImage = "envoyproxy/envoy:v1.39.0" // renovate: datasource=docker depName=envoyproxy/envoy
 
 	// ControllerNodeProcessRole represents the node is a controller node
 	ControllerNodeProcessRole = "controller"
