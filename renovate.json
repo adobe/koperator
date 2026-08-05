@@ -117,6 +117,12 @@
       "description": "Kafka 4.x drops ZooKeeper support (KRaft-only) and needs an operator-side migration. Keep Renovate on the 3.x line until docker/kafka/Dockerfile is ready for that jump, then remove this rule."
     },
     {
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["adobe/cruise-control"],
+      "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)-adbe-(?<build>\\d+)$",
+      "description": "adobe/cruise-control tags are <semver>-adbe-<yyyymmdd>. Default docker versioning treats the '-adbe-<date>' suffix as an immutable compatibility string, so newer daily builds are never offered. Capturing the date as a purely-numeric 'build' (handled like a patch update) makes e.g. 3.0.3-adbe-20250804 -> 3.0.3-adbe-20260722 resolve. The trailing '$' anchor deliberately excludes '-rc' builds."
+    },
+    {
       "groupName": "kafka docker images (major)",
       "groupSlug": "kafka-docker-major",
       "matchFileNames": [
