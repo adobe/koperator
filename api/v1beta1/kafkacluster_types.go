@@ -55,7 +55,7 @@ const (
 	IsControllerNodeKey = "isControllerNode"
 
 	// DefaultCruiseControlImage is the default CC image used when users don't specify it in CruiseControlConfig.Image
-	DefaultCruiseControlImage = "adobe/cruise-control:3.0.3-adbe-20250804" // renovate: datasource=docker depName=adobe/cruise-control
+	DefaultCruiseControlImage = "adobe/cruise-control:3.0.3-adbe-20260722" // renovate: datasource=docker depName=adobe/cruise-control
 
 	// DefaultKafkaImage is the default Kafka image used when users don't specify it in KafkaClusterSpec.ClusterImage
 	DefaultKafkaImage = "ghcr.io/adobe/koperator/kafka:2.13-3.9.1" // renovate: datasource=docker depName=ghcr.io/adobe/koperator/kafka
@@ -115,7 +115,7 @@ const (
 	/* Cruise Control Config */
 
 	// CruiseControlDeployment.spec.template.spec.container["%s-cruisecontrol"].image
-	defaultCruiseControlImage = "adobe/cruise-control:3.0.3-adbe-20250804" // renovate: datasource=docker depName=adobe/cruise-control
+	defaultCruiseControlImage = "adobe/cruise-control:3.0.3-adbe-20260722" // renovate: datasource=docker depName=adobe/cruise-control
 
 	// CruiseControlDeployment.spec.template.spec.container["%s-cruisecontrol"].resources
 	defaultCruiseControlRequestResourceCpu    = "200m"
