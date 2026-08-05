@@ -34,7 +34,7 @@ RUN apk add --no-cache gnupg wget && \
 
 
 # backported from https://github.com/docker-library/openjdk/blob/master/18/jdk/slim-bullseye/Dockerfile
-FROM debian:bullseye-slim@sha256:f18adf4e1d04b1d8ba48025b8e35003f4c748ddd3dd8e875fe4e7d9a9c0dec84
+FROM debian:bullseye-slim@sha256:f313b4bd62667092a59b3a664d7d3ab8b5e65f41675f48e81455a15dc5abe792
 
 ARG scala_version
 ARG KAFKA_VERSION

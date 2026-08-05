@@ -1,4 +1,4 @@
-FROM maven:3.9-eclipse-temurin-21-alpine@sha256:d88e5b38297858f65f97bc7e7964c760ab988fd18ace41589176f1468c49a489 as build
+FROM maven:3.9-eclipse-temurin-21-alpine@sha256:d6390509b774df0a07d009a194a020aeff9c715afe1e3d2cd5ecb3bf6344700f as build
 
 # Set working directory
 WORKDIR /usr/src/myapp
