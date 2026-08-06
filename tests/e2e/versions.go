@@ -28,5 +28,5 @@ const (
 	PrometheusOperatorVersion = "88.1.5" // renovate: datasource=helm depName=kube-prometheus-stack registryUrl=https://prometheus-community.github.io/helm-charts
 
 	// ZookeeperOperatorVersion is the version of zookeeper-operator
-	ZookeeperOperatorVersion = "0.2.15-adobe-20250923" // renovate: datasource=docker depName=ghcr.io/adobe/helm-charts/zookeeper-operator
+	ZookeeperOperatorVersion = "0.2.15-adobe-20260423" // renovate: datasource=docker depName=ghcr.io/adobe/helm-charts/zookeeper-operator
 )
