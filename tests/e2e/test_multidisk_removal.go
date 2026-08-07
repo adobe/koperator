@@ -28,7 +28,6 @@ import (
 	ginkgo "github.com/onsi/ginkgo/v2"
 	gomega "github.com/onsi/gomega"
 
-	"github.com/banzaicloud/koperator/api/v1beta1"
 	kafkautils "github.com/banzaicloud/koperator/pkg/util/kafka"
 )
 
@@ -74,9 +73,22 @@ func testMultiDiskRemoval() bool {
 			gomega.Expect(exclude).To(gomega.BeTrue(), "broker log.dirs must not contain removed path %s", removedLogDirPath)
 		})
 
+		ginkgo.It("Waiting for the Cruise Control disk rebalance to complete", func() {
+			// The log.dirs ConfigMap update above only proves the operator dropped the removed path from
+			// broker config, not that Cruise Control finished draining data off those disks. Gate on a
+			// quiescent Cruise Control so the disk rebalance genuinely completes here rather than lingering
+			// in flight (which would otherwise leave an in-progress operation for the next scenario).
+			ginkgo.By("Waiting until no Cruise Control operation is in flight (disk rebalance finished)")
+			gomega.Eventually(context.Background(), func() (bool, error) {
+				return hasNoInFlightCruiseControlOperation(kubectlOptions)
+			}, multidiskRemovalTimeout, multidiskRemovalPollInterval).Should(gomega.BeTrue())
+		})
+
 		ginkgo.It("Asserting Kafka brokers remain healthy", func() {
-			err := waitK8sResourceCondition(kubectlOptions, "pod", "condition=Ready", defaultPodReadinessWaitTime,
-				v1beta1.KafkaCRLabelKey+"="+kafkaClusterName+",app=kafka", "")
+			// Disk removal rolls the broker pods, so their names change underneath us. Gate on
+			// the operator's own ClusterRunning state and re-resolve the live pod set each poll
+			// instead of `kubectl wait`-ing on a snapshot of pod names that get deleted mid-roll.
+			err := waitForKafkaClusterWithPodStatusCheck(kubectlOptions, kafkaClusterName, kafkaClusterResourceReadinessTimeout)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 	})
@@ -132,7 +144,11 @@ func getBrokerConfigMapLogDirs(kubectlOptions k8s.KubectlOptions, configMapName 
 		"-n", namespace,
 		"-o", fmt.Sprintf("jsonpath={.data.%s}", kafkautils.ConfigPropertyName),
 	}
-	output, err := k8s.RunKubectlAndGetOutputE(ginkgo.GinkgoT(), &kubectlOptions, args...)
+	// Fetch broker-config directly without terratest's logging: the ConfigMap holds the
+	// entire broker configuration (a multi-line properties blob) and this runs on every
+	// poll iteration for each broker, so logging the full value would flood the output.
+	// We only need log.dirs, which we parse out of the properties content below.
+	output, err := runKubectlSilent(kubectlOptions, args...)
 	if err != nil {
 		return nil, fmt.Errorf("getting configmap %s: %w", configMapName, err)
 	}
@@ -153,6 +169,8 @@ func getBrokerConfigMapLogDirs(kubectlOptions k8s.KubectlOptions, configMapName 
 					paths = append(paths, q)
 				}
 			}
+			// Log only the extracted log.dirs (not the whole broker config).
+			ginkgo.By(fmt.Sprintf("configmap %s log.dirs: %v", configMapName, paths))
 			return paths, nil
 		}
 	}

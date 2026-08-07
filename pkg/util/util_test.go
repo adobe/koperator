@@ -17,6 +17,7 @@ package util
 
 import (
 	"reflect"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -828,4 +829,73 @@ func TestGetMD5Hash(t *testing.T) {
 			t.Errorf("Expected: %s  Got: %s", test.expected, hash)
 		}
 	}
+}
+
+func TestShouldIncludeBroker(t *testing.T) {
+	t.Parallel()
+
+	const ingressConfig = "default"
+	brokerID := 5
+
+	makeStatus := func(state v1beta1.CruiseControlState) v1beta1.KafkaClusterStatus {
+		return v1beta1.KafkaClusterStatus{
+			BrokersState: map[string]v1beta1.BrokerState{
+				strconv.Itoa(brokerID): {
+					GracefulActionState: v1beta1.GracefulActionState{
+						CruiseControlState: state,
+					},
+					ExternalListenerConfigNames: v1beta1.ExternalListenerConfigNames{ingressConfig},
+				},
+			},
+		}
+	}
+
+	testCases := []struct {
+		name     string
+		state    v1beta1.CruiseControlState
+		expected bool
+	}{
+		{"GracefulDownscaleRequired", v1beta1.GracefulDownscaleRequired, true},
+		{"GracefulDownscaleScheduled", v1beta1.GracefulDownscaleScheduled, true},
+		{"GracefulDownscaleRunning", v1beta1.GracefulDownscaleRunning, true},
+		{"GracefulDownscaleCompletedWithError", v1beta1.GracefulDownscaleCompletedWithError, true},
+		{"GracefulDownscalePaused", v1beta1.GracefulDownscalePaused, true},
+		{"GracefulDownscaleSucceeded", v1beta1.GracefulDownscaleSucceeded, false},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := ShouldIncludeBroker(nil, makeStatus(tc.state), brokerID, ingressConfig, ingressConfig)
+			if result != tc.expected {
+				t.Errorf("state %s: expected %v, got %v", tc.name, tc.expected, result)
+			}
+		})
+	}
+
+	t.Run("no broker state entry", func(t *testing.T) {
+		emptyStatus := v1beta1.KafkaClusterStatus{
+			BrokersState: map[string]v1beta1.BrokerState{},
+		}
+		result := ShouldIncludeBroker(nil, emptyStatus, brokerID, ingressConfig, ingressConfig)
+		if result {
+			t.Error("expected false for broker with no status entry, got true")
+		}
+	})
+
+	t.Run("ingress config not in ExternalListenerConfigNames", func(t *testing.T) {
+		status := v1beta1.KafkaClusterStatus{
+			BrokersState: map[string]v1beta1.BrokerState{
+				strconv.Itoa(brokerID): {
+					GracefulActionState: v1beta1.GracefulActionState{
+						CruiseControlState: v1beta1.GracefulDownscaleRunning,
+					},
+					ExternalListenerConfigNames: v1beta1.ExternalListenerConfigNames{"other-ingress"},
+				},
+			},
+		}
+		result := ShouldIncludeBroker(nil, status, brokerID, ingressConfig, ingressConfig)
+		if result {
+			t.Error("expected false when ingressConfig not in ExternalListenerConfigNames, got true")
+		}
+	})
 }

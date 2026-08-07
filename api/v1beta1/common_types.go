@@ -122,6 +122,13 @@ func (r CruiseControlState) IsDownscale() bool {
 		r == GracefulDownscaleScheduled
 }
 
+// IsDownscaleStalled returns true when a downscale is neither progressing nor succeeded:
+// CompletedWithError (auto-retried under ErrorPolicyRetry, may loop) or Paused (needs manual resume).
+// Used to emit a single edge-triggered log when a broker enters a non-progressing state.
+func (r CruiseControlState) IsDownscaleStalled() bool {
+	return r == GracefulDownscaleCompletedWithError || r == GracefulDownscalePaused
+}
+
 // IsRunningState returns true if CruiseControlState indicates
 // that the CC operation is scheduled and in-progress
 func (r CruiseControlState) IsRunningState() bool {

@@ -344,6 +344,17 @@ func TestCreateCCOperation(t *testing.T) {
 			},
 		},
 		{
+			operationType:      banzaiv1alpha1.OperationRemoveBroker,
+			brokerIDs:          []string{"1", "2", "3"},
+			isJBOD:             false,
+			brokerIdsToLogDirs: nil,
+			parameterCheck: func(t *testing.T, params map[string]string) {
+				assert.Equal(t, "1,2,3", params[scale.ParamBrokerID])
+				assert.Equal(t, "true", params[scale.ParamExcludeDemoted])
+				assert.Equal(t, "true", params[scale.ParamExcludeRemoved])
+			},
+		},
+		{
 			operationType: banzaiv1alpha1.OperationRemoveDisks,
 			brokerIDs:     []string{"1", "2"},
 			isJBOD:        false,

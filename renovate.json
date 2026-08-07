@@ -45,6 +45,18 @@
     {
       "customType": "regex",
       "managerFilePatterns": [
+        "/tests/e2e/versions\\.go$/"
+      ],
+      "description": "Same file as above, but for datasource=docker entries, which have no notion of a Helm repo registryUrl and so never carry one. Kept as a separate manager (RE2 has no lookaround, so the split is done by requiring the literal 'docker' datasource rather than a negative match on registryUrl) so registryUrlTemplate is never evaluated for these - a templated empty string is still a defined (invalid) registryUrl to Renovate, not the same as omitting it.",
+      "matchStrings": [
+        "\\s*(?<depName>\\w+)\\s*=\\s*\"(?<currentValue>[^\"]+)\"\\s*//\\s*renovate:\\s*datasource=(?<datasource>docker)\\s*depName=(?<packageName>[^\\s]+)"
+      ],
+      "datasourceTemplate": "{{datasource}}",
+      "depNameTemplate": "{{packageName}}"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
         "/api/v1beta1/kafkacluster_types\\.go$/"
       ],
       "matchStrings": [
@@ -97,6 +109,18 @@
         "patch"
       ]
     },
+    {
+      "matchPackageNames": [
+        "apache/kafka"
+      ],
+      "allowedVersions": "<4.0.0",
+      "description": "Kafka 4.x drops ZooKeeper support (KRaft-only) and needs an operator-side migration. Keep Renovate on the 3.x line until docker/kafka/Dockerfile is ready for that jump, then remove this rule."
+    },
+    {
+      "matchCurrentValue": "/^\\d+\\.\\d+\\.\\d+-ado?be-\\d+$/",
+      "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)(?:-ado?be-(?<build>\\d+))?$",
+      "description": "Self-scoping: applies to ANY docker dep whose current pin is <semver>-adbe|adobe-<yyyymmdd> (cruise-control uses 'adbe', zookeeper-operator 'adobe'; new adobe-fork images inherit this with no config change). Default docker versioning treats that suffix as an immutable compatibility string, so newer daily builds are never offered; capturing the date as a purely-numeric 'build' (handled like patch) makes e.g. 3.0.3-adbe-20250804 -> 3.0.3-adbe-20260722 and 0.2.15-adobe-20250923 track their newest build. matchCurrentValue requires the suffix, so only these deps are touched; the versioning's suffix is optional so the same image can still publish a plain-semver tag. Trailing '$' excludes '-rc'."
+       },
     {
       "groupName": "kafka docker images (major)",
       "groupSlug": "kafka-docker-major",
@@ -166,6 +190,15 @@
       "commitMessageAction": "update",
       "commitMessageTopic": "all non-major dependencies",
       "commitMessageExtra": ""
-    }
+    },
+    {
+       "matchBaseBranches": ["gh-pages"],
+       "groupName": "gh-pages dependencies",
+       "groupSlug": "gh-pages-deps",
+       "commitMessagePrefix": "chore(deps):",
+       "commitMessageAction": "update",
+       "commitMessageTopic": "gh-pages dependencies",
+       "commitMessageExtra": ""
+     }
   ]
 }

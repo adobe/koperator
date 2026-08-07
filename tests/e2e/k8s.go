@@ -424,7 +424,15 @@ func listK8sCRDs(kubectlOptions k8s.KubectlOptions, crdNames ...string) ([]strin
 		return nil, errors.WrapIfWithDetails(err, "listing K8s CRDs failed failed", "crdNames", crdNames)
 	}
 
-	return strings.Split(output, "\n"), nil
+	// Trim the trailing newline before splitting so a trailing empty-string
+	// element never leaks into the result (see listK8sResourceKinds), and drop
+	// any warning lines - consistent with the other list helpers.
+	output = strings.TrimRight(output, "\n")
+	if output == "" {
+		return nil, nil
+	}
+
+	return kubectlRemoveWarnings(strings.Split(output, "\n")), nil
 }
 
 // deleteK8sResourceOpts deletes K8s resources based on the kind and name or kind and selector.
@@ -516,13 +524,9 @@ func listK8sResourceKinds(kubectlOptions k8s.KubectlOptions, apiGroupSelector st
 
 	args = append(args, extraArgs...)
 
-	output, err := k8s.RunKubectlAndGetOutputContextE(
-		ginkgo.GinkgoT(),
-		context.Background(),
-		&kubectlOptions,
-		args...,
-	)
-
+	// Execute kubectl directly without terratest's logging: api-resources returns
+	// one line per resource kind (100+ lines), which otherwise floods the test output.
+	output, err := runKubectlSilent(kubectlOptions, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -532,6 +536,12 @@ func listK8sResourceKinds(kubectlOptions k8s.KubectlOptions, apiGroupSelector st
 	if output == "" {
 		return nil, nil
 	}
+
+	// Trim the trailing newline before splitting: runKubectlSilent preserves
+	// kubectl's trailing "\n" (unlike terratest's runner), which would otherwise
+	// yield an empty-string element and break callers that join the kinds for
+	// `kubectl get` (error: the server doesn't have a resource type "").
+	output = strings.TrimRight(output, "\n")
 
 	return kubectlRemoveWarnings(strings.Split(output, "\n")), nil
 }
@@ -648,11 +658,17 @@ func waitK8sResourceCondition(kubectlOptions k8s.KubectlOptions, resourceKind, w
 
 	// `kubectl wait` resolves the objects matching the selector once, up front, and then
 	// blocks on each of them individually. When those objects are being rolled (for example
-	// broker pods recreated during a disk removal), one can be deleted before `kubectl wait`
-	// evaluates its condition, so the command fails immediately with a transient
-	// "not found" / "no matching resources found" error instead of waiting for the
-	// replacement. Retry on those transient errors within the overall timeout budget, which
-	// makes kubectl re-resolve the selector against the current set of objects.
+	// broker pods recreated during a disk removal), a matched pod can be deleted mid-wait.
+	// Depending on the failure mode kubectl then either errors out with a transient
+	// "not found" / "no matching resources found" error, or (for `--for=condition=...`,
+	// where deletion is not terminal) keeps blocking on the now-doomed pod until its
+	// `--timeout` elapses and reports "timed out waiting for the condition on <res>/<name>".
+	//
+	// To survive both, each attempt uses a capped `--timeout` (so a single doomed pod cannot
+	// consume the whole budget) and the loop retries transient races AND per-attempt timeouts
+	// until the overall deadline, re-resolving the selector against the current object set on
+	// every attempt. A genuinely unmet condition still fails: once the overall budget is
+	// exhausted the last timeout error is returned, so real regressions are not masked.
 	deadline := time.Now().Add(timeout)
 	var lastErr error
 	for {
@@ -660,13 +676,10 @@ func waitK8sResourceCondition(kubectlOptions k8s.KubectlOptions, resourceKind, w
 		if remaining <= 0 {
 			return lastErr
 		}
-		// Round to whole seconds (1s floor) so the kubectl --timeout value reads cleanly in
-		// logs (e.g. 5m0s, not 4m59.999999449s). kubectl treats --timeout=0 specially, so
-		// never go below 1s.
-		attemptTimeout := remaining.Round(time.Second)
-		if attemptTimeout < time.Second {
-			attemptTimeout = time.Second
-		}
+		// Cap each attempt so one hung wait cannot eat the entire budget, then round to whole
+		// seconds (1s floor) so the kubectl --timeout value reads cleanly in logs (e.g. 30s,
+		// not 29.999999449s). kubectl treats --timeout=0 specially, so never go below 1s.
+		attemptTimeout := max(min(remaining, waitResourceConditionMaxAttemptTimeout).Round(time.Second), time.Second)
 
 		args := []string{
 			"wait",
@@ -686,9 +699,10 @@ func waitK8sResourceCondition(kubectlOptions k8s.KubectlOptions, resourceKind, w
 			return nil
 		}
 
-		// Genuine failures (e.g. the condition not being met before the timeout) are
-		// returned immediately; only the transient rolling-update races are retried.
-		if !isTransientResourceWaitError(lastErr) {
+		// Retry transient rolling-update races and per-attempt timeouts within the overall
+		// deadline; both are resolved by re-running kubectl wait against the current object
+		// set. Any other (genuine) failure is returned immediately.
+		if !isTransientResourceWaitError(lastErr) && !isConditionWaitTimeoutError(lastErr) {
 			return lastErr
 		}
 
@@ -709,6 +723,18 @@ func isTransientResourceWaitError(err error) bool {
 	// "no matching resources found": the selector momentarily matched no objects.
 	return isKubectlNotFoundError(err) ||
 		strings.Contains(err.Error(), "no matching resources found")
+}
+
+// isConditionWaitTimeoutError reports whether a `kubectl wait` failure is the per-attempt
+// timeout ("timed out waiting for the condition ..."). With a capped per-attempt timeout this
+// is expected while the condition has not yet been met (e.g. a broker still rolling), so the
+// caller retries within the overall budget, re-resolving the selector against the current
+// object set. It is deliberately kept separate from isTransientResourceWaitError, which
+// classifies the object-changed races: a bare timeout is only "safe to retry" because the
+// enclosing loop bounds total time with an overall deadline, not because the condition itself
+// is transient.
+func isConditionWaitTimeoutError(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "timed out waiting for the condition")
 }
 
 // kubectlArgExtender extends the kubectl arguments and log message based on the parameters
@@ -744,20 +770,6 @@ func kubectlRemoveWarnings(outputSlice []string) []string {
 
 func isKubectlNotFoundError(err error) bool {
 	return err != nil && strings.Contains(err.Error(), kubectlNotFoundErrorMsg)
-}
-
-// setupReducedLogging configures reduced logging for terratest operations
-func setupReducedLogging() {
-	// Set environment variables to reduce terratest logging verbosity
-	if os.Getenv("E2E_VERBOSE_LOGGING") != verboseLoggingEnabled {
-		// Reduce terratest internal logging
-		os.Setenv("TEST_LOG_LEVEL", "-5")
-		// Reduce kubectl verbosity
-		os.Setenv("KUBECTL_VERBOSITY", "0")
-		// Additional environment variables to reduce terratest kubectl command logging
-		os.Setenv("TERRATEST_LOG_LEVEL", "INFO")
-		os.Setenv("KUBECTL_LOG_LEVEL", "0")
-	}
 }
 
 // waitForKafkaClusterWithPodStatusCheck waits for KafkaCluster to be ready and checks pod status every 10 seconds

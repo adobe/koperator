@@ -32,9 +32,6 @@ func TestKoperator(t *testing.T) {
 }
 
 var _ = ginkgo.BeforeSuite(func() {
-	// Setup reduced logging for terratest operations
-	setupReducedLogging()
-
 	ginkgo.By("Acquiring K8s cluster")
 	var kubeconfigPath string
 	var kubecontextName string
@@ -71,6 +68,9 @@ var _ = ginkgo.When("Testing e2e test altogether", ginkgo.Ordered, func() {
 	testUninstallKafkaCluster()
 	testInstallKafkaCluster("../../config/samples/simplekafkacluster_4disk.yaml")
 	testMultiDiskRemoval()
+	testUninstallKafkaCluster()
+	testInstallKafkaCluster("../../config/samples/simplekafkacluster_5broker.yaml")
+	testBatchedBrokerRemoval()
 	testUninstallKafkaCluster()
 	testUninstallZookeeperCluster()
 	// kraft tests
