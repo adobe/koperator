@@ -29,7 +29,7 @@ limitations under the License.
 
 ## Third-Party Components
 
-This project includes third-party components that are subject to their own license terms. See the [NOTICE](https://github.com/adobe/koperator/blob/master/NOTICE) file in the source repository for details.
+This project includes third-party components that are subject to their own license terms. See the [NOTICE](https://github.com/adobe/koperator/blob/main/NOTICE) file in the source repository for details.
 
 ## Contributing
 
