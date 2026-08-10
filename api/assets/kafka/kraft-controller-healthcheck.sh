@@ -15,52 +15,65 @@
 # limitations under the License.
 
 
-# This script returns a successful exit code (0) if the controller is a follower or leader.  For any other state, it returns a failure exit code (1).
-# In addition, if the environment variable KRAFT_HEALTH_CHECK_SKIP is set to "true" (case insensitive), the script will exit successfully without performing any checks.
+# Health check for a KRaft controller, driven by the Prometheus JMX exporter's raft current-state gauge.
+# The jmx-exporter maps the "raft-metrics current-state=<state>" MBean attribute to a single gauge named
+# kafka_server_raft_metrics_current_state_<state> with value 1, so exactly one such gauge exists at a time
+# and its name is the controller's current raft state (leader, follower, candidate, unattached, ...).
 #
-# The behaviour when the raft state metric cannot be read (JMX endpoint not up yet, or the metric is
-# absent) depends on KRAFT_HEALTH_CHECK_MODE:
-#   - "liveness" (default): exit 0 (fail-open) so a slow-starting or briefly-unavailable JMX exporter
-#     does not cause the kubelet to restart an otherwise healthy controller.
-#   - "readiness": exit 1 (fail-closed) so the pod is only marked Ready once it is a confirmed
-#     leader/follower in the quorum. Koperator's rolling upgrade uses this readiness signal to avoid
-#     restarting the next controller before the previously restarted one has rejoined the quorum.
+# Behaviour is selected by KRAFT_HEALTH_CHECK_MODE:
+#   readiness        -> fail-closed: succeeds only when the controller is a leader or follower (a
+#                       functioning quorum member). Koperator's rolling upgrade waits on this readiness
+#                       signal so it never restarts the next controller before the previously restarted
+#                       one has rejoined the metadata quorum.
+#   liveness (default) -> fails only when the controller is reachable and reporting a state that is not
+#                       leader/follower; a not-yet-emitted state (startup/catch-up) or an unreachable
+#                       metrics endpoint is treated as healthy (fail-open) so a slow-starting or briefly
+#                       unavailable JMX exporter does not restart an otherwise healthy controller.
+# If KRAFT_HEALTH_CHECK_SKIP is set to "true" (case insensitive) all checks are skipped.
 
 skip_check=$(echo "$KRAFT_HEALTH_CHECK_SKIP" | tr '[:upper:]' '[:lower:]')
 mode=$(echo "${KRAFT_HEALTH_CHECK_MODE:-liveness}" | tr '[:upper:]' '[:lower:]')
 
 if [ "$skip_check" = "true" ]; then
-    echo "KRAFT_HEALTH_CHECK_SKIP is set to TRUE. Exiting health check."
+    echo "KRAFT_HEALTH_CHECK_SKIP is set to TRUE. Skipping health check."
     exit 0
 fi
 
-JMX_ENDPOINT="http://localhost:9020/metrics"
 METRIC_PREFIX="kafka_server_raft_metrics_current_state_"
 
-# Fetch the matching current-state metric with value of 1.0 from the JMX endpoint
-MATCHING_METRIC=$(curl -s "$JMX_ENDPOINT" | grep "^${METRIC_PREFIX}" | awk '$2 == 1.0 {print $1}')
+# Request only the raft current-state gauges via the Prometheus name[] query filter, so the exporter
+# returns a few lines instead of the whole /metrics exposition (which on a combined broker+controller
+# node is large). Only the node's current state is ever present, but we list all known raft states so we
+# can still tell "reporting a non-leader/follower state" apart from "no state emitted yet". If the
+# exporter version ignores name[] it returns the full exposition and the same greps below still work.
+STATES="unattached voted prospective candidate leader follower observer resigned"
+FILTER=""
+for state in ${STATES}; do
+    FILTER="${FILTER}&name[]=${METRIC_PREFIX}${state}"
+done
+URL="http://localhost:9020/metrics?${FILTER#&}"
 
-# If it's not empty, it means we found a metric with a value of 1.0.
-if [ -n "$MATCHING_METRIC" ]; then
-    # Determine the state of the controller using the last field name of the metric 
-    # Possible values are leader, candidate, voted, follower, unattached, observer
-    STATE=$(echo "$MATCHING_METRIC" | rev | cut -d'_' -f1 | rev)
-
-    # Check if the extracted state is 'leader' or 'follower'
-    if [ "$STATE" == "leader" ] || [ "$STATE" == "follower" ]; then
-        echo "The controller is in a healthy quorum state."
-        exit 0
-    else
-        # Any other state (e.g., 'candidate', 'unattached', 'observer') is not considered healthy
-        echo "Failure: The controller is in an unexpected state: $STATE. Expecting 'leader' or 'follower'."
-        exit 1
-    fi
-else
-    echo "JMX Exporter endpoint is not available or kafka_server_raft_metrics_current_state_ was not found."
-    if [ "$mode" = "readiness" ]; then
-        # Not yet reporting a healthy quorum state: not ready.
-        exit 1
-    fi
-    # Liveness: do not restart on a transient/absent metric.
+if ! METRICS=$(curl -s --max-time 4 "${URL}"); then
+    echo "JMX exporter metrics endpoint is not reachable."
+    # Unreachable: not a confirmed quorum member (not ready), but do not restart on a transient blip.
+    [ "${mode}" = "readiness" ] && exit 1
     exit 0
 fi
+
+# Healthy quorum member: the leader or follower current-state gauge is present.
+if echo "${METRICS}" | grep -Eq "^${METRIC_PREFIX}(leader|follower) 1(\.[0-9]+)?$"; then
+    echo "The controller is in a healthy quorum state (leader or follower)."
+    exit 0
+fi
+
+# Reachable and reporting some other raft state (e.g. candidate, unattached, observer).
+if echo "${METRICS}" | grep -q "^${METRIC_PREFIX}"; then
+    STATE=$(echo "${METRICS}" | grep "^${METRIC_PREFIX}" | head -n 1 | sed -E "s/^${METRIC_PREFIX}([a-z]+).*/\1/")
+    echo "Failure: the controller is in an unexpected state: ${STATE}. Expecting 'leader' or 'follower'."
+    exit 1
+fi
+
+# Reachable but no raft current-state gauge yet (startup / not caught up).
+echo "kafka_server_raft_metrics_current_state_ was not found (controller not caught up yet)."
+[ "${mode}" = "readiness" ] && exit 1
+exit 0

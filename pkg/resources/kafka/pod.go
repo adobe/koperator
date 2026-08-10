@@ -115,10 +115,10 @@ fi`},
 					Command: []string{"/bin/bash", "-c", "export KRAFT_HEALTH_CHECK_MODE=readiness\n" + assets.KraftControllerHealthcheckSh},
 				},
 			},
-			InitialDelaySeconds: 0,
-			PeriodSeconds:       5,
-			TimeoutSeconds:      5,
-			FailureThreshold:    20,
+			InitialDelaySeconds: 15,
+			PeriodSeconds:       15,
+			TimeoutSeconds:      10,
+			FailureThreshold:    6,
 		}
 		kafkaContainer.LivenessProbe = &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
@@ -127,8 +127,8 @@ fi`},
 				},
 			},
 			InitialDelaySeconds: 30,
-			PeriodSeconds:       10,
-			TimeoutSeconds:      5,
+			PeriodSeconds:       15,
+			TimeoutSeconds:      10,
 			FailureThreshold:    6,
 		}
 	}
