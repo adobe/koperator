@@ -16,9 +16,11 @@
 package webhooks
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
+	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -382,6 +384,219 @@ func TestCheckTargetPortsCollisionForEnvoy(t *testing.T) {
 		t.Run(testCase.testName, func(t *testing.T) {
 			got := checkTargetPortsCollisionForEnvoy(&testCase.kafkaClusterSpec)
 			require.Equal(t, testCase.expected, got)
+		})
+	}
+}
+
+func TestCheckKRaftConfig(t *testing.T) {
+	interBrokerListener := v1beta1.InternalListenerConfig{
+		CommonListenerSpec: v1beta1.CommonListenerSpec{
+			Name:                            "internal",
+			ContainerPort:                   29092,
+			UsedForInnerBrokerCommunication: true,
+		},
+	}
+	controllerListener := v1beta1.InternalListenerConfig{
+		CommonListenerSpec:             v1beta1.CommonListenerSpec{Name: "controller", ContainerPort: 29093},
+		UsedForControllerCommunication: true,
+	}
+	// A controller's storage config must provision exactly one PVC (matches the reconcile-time constraint).
+	onePVCStorage := []v1beta1.StorageConfig{{MountPath: "/kafka-logs", PvcSpec: &corev1.PersistentVolumeClaimSpec{}}}
+	// One PVC plus an emptyDir is still a single PVC-backed volume, so it is valid for a controller.
+	onePVCPlusEmptyDir := []v1beta1.StorageConfig{
+		{MountPath: "/kafka-logs", PvcSpec: &corev1.PersistentVolumeClaimSpec{}},
+		{MountPath: "/ephemeral", EmptyDir: &corev1.EmptyDirVolumeSource{}},
+	}
+	twoPVCStorage := []v1beta1.StorageConfig{
+		{MountPath: "/kafka-logs", PvcSpec: &corev1.PersistentVolumeClaimSpec{}},
+		{MountPath: "/kafka-logs-2", PvcSpec: &corev1.PersistentVolumeClaimSpec{}},
+	}
+
+	validListeners := v1beta1.ListenersConfig{
+		InternalListeners: []v1beta1.InternalListenerConfig{interBrokerListener, controllerListener},
+	}
+
+	testCases := []struct {
+		testName         string
+		kafkaClusterSpec v1beta1.KafkaClusterSpec
+		expectedErrCount int
+	}{
+		{
+			testName: "not KRaft mode is a no-op even with an otherwise invalid layout",
+			kafkaClusterSpec: v1beta1.KafkaClusterSpec{
+				KRaftMode:       false,
+				ListenersConfig: v1beta1.ListenersConfig{},
+				Brokers:         []v1beta1.Broker{{Id: 0, BrokerConfig: &v1beta1.BrokerConfig{}}},
+			},
+			expectedErrCount: 0,
+		},
+		{
+			testName: "valid KRaft cluster: broker-only, controller-only and combined nodes",
+			kafkaClusterSpec: v1beta1.KafkaClusterSpec{
+				KRaftMode:       true,
+				ListenersConfig: validListeners,
+				Brokers: []v1beta1.Broker{
+					{Id: 0, BrokerConfig: &v1beta1.BrokerConfig{Roles: []string{"broker"}, StorageConfigs: twoPVCStorage}},
+					{Id: 1, BrokerConfig: &v1beta1.BrokerConfig{Roles: []string{"controller"}, StorageConfigs: onePVCStorage}},
+					{Id: 2, BrokerConfig: &v1beta1.BrokerConfig{Roles: []string{"broker", "controller"}, StorageConfigs: onePVCPlusEmptyDir}},
+				},
+			},
+			expectedErrCount: 0,
+		},
+		{
+			testName: "missing controller listener",
+			kafkaClusterSpec: v1beta1.KafkaClusterSpec{
+				KRaftMode:       true,
+				ListenersConfig: v1beta1.ListenersConfig{InternalListeners: []v1beta1.InternalListenerConfig{interBrokerListener}},
+				Brokers: []v1beta1.Broker{
+					{Id: 1, BrokerConfig: &v1beta1.BrokerConfig{Roles: []string{"controller"}, StorageConfigs: onePVCStorage}},
+				},
+			},
+			expectedErrCount: 1,
+		},
+		{
+			testName: "more than one controller listener",
+			kafkaClusterSpec: v1beta1.KafkaClusterSpec{
+				KRaftMode: true,
+				ListenersConfig: v1beta1.ListenersConfig{InternalListeners: []v1beta1.InternalListenerConfig{
+					controllerListener,
+					{CommonListenerSpec: v1beta1.CommonListenerSpec{Name: "controller2", ContainerPort: 29094}, UsedForControllerCommunication: true},
+				}},
+				Brokers: []v1beta1.Broker{
+					{Id: 1, BrokerConfig: &v1beta1.BrokerConfig{Roles: []string{"controller"}, StorageConfigs: onePVCStorage}},
+				},
+			},
+			expectedErrCount: 1,
+		},
+		{
+			testName: "no controller node",
+			kafkaClusterSpec: v1beta1.KafkaClusterSpec{
+				KRaftMode:       true,
+				ListenersConfig: validListeners,
+				Brokers: []v1beta1.Broker{
+					{Id: 0, BrokerConfig: &v1beta1.BrokerConfig{Roles: []string{"broker"}, StorageConfigs: onePVCStorage}},
+				},
+			},
+			expectedErrCount: 1,
+		},
+		{
+			testName: "broker with no process role",
+			kafkaClusterSpec: v1beta1.KafkaClusterSpec{
+				KRaftMode:       true,
+				ListenersConfig: validListeners,
+				Brokers: []v1beta1.Broker{
+					{Id: 0, BrokerConfig: &v1beta1.BrokerConfig{Roles: []string{}, StorageConfigs: onePVCStorage}},
+					{Id: 1, BrokerConfig: &v1beta1.BrokerConfig{Roles: []string{"controller"}, StorageConfigs: onePVCStorage}},
+				},
+			},
+			expectedErrCount: 1,
+		},
+		{
+			testName: "controller node with more than one storage config",
+			kafkaClusterSpec: v1beta1.KafkaClusterSpec{
+				KRaftMode:       true,
+				ListenersConfig: validListeners,
+				Brokers: []v1beta1.Broker{
+					{Id: 1, BrokerConfig: &v1beta1.BrokerConfig{Roles: []string{"controller"}, StorageConfigs: twoPVCStorage}},
+				},
+			},
+			expectedErrCount: 1,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.testName, func(t *testing.T) {
+			got := checkKRaftConfig(&testCase.kafkaClusterSpec)
+			require.Len(t, got, testCase.expectedErrCount, "unexpected errors: %v", got)
+		})
+	}
+}
+
+// TestKafkaClusterValidatorValidateKRaft exercises the admission entrypoints (ValidateCreate and
+// ValidateUpdate) end-to-end for KRaft clusters, verifying that invalid layouts are actually rejected
+// (non-nil error) and valid ones are admitted - i.e. that checkKRaftConfig is wired into the webhook.
+func TestKafkaClusterValidatorValidateKRaft(t *testing.T) {
+	validator := KafkaClusterValidator{Log: logr.Discard()}
+
+	interBrokerListener := v1beta1.InternalListenerConfig{
+		CommonListenerSpec: v1beta1.CommonListenerSpec{
+			Name:                            "internal",
+			ContainerPort:                   29092,
+			UsedForInnerBrokerCommunication: true,
+		},
+	}
+	controllerListener := v1beta1.InternalListenerConfig{
+		CommonListenerSpec:             v1beta1.CommonListenerSpec{Name: "controller", ContainerPort: 29093},
+		UsedForControllerCommunication: true,
+	}
+	onePVCStorage := []v1beta1.StorageConfig{{MountPath: "/kafka-logs", PvcSpec: &corev1.PersistentVolumeClaimSpec{}}}
+	twoPVCStorage := []v1beta1.StorageConfig{
+		{MountPath: "/kafka-logs", PvcSpec: &corev1.PersistentVolumeClaimSpec{}},
+		{MountPath: "/kafka-logs-2", PvcSpec: &corev1.PersistentVolumeClaimSpec{}},
+	}
+
+	validKRaftCluster := func() *v1beta1.KafkaCluster {
+		return &v1beta1.KafkaCluster{
+			Spec: v1beta1.KafkaClusterSpec{
+				KRaftMode:       true,
+				ListenersConfig: v1beta1.ListenersConfig{InternalListeners: []v1beta1.InternalListenerConfig{interBrokerListener, controllerListener}},
+				Brokers: []v1beta1.Broker{
+					{Id: 0, BrokerConfig: &v1beta1.BrokerConfig{Roles: []string{"broker"}, StorageConfigs: onePVCStorage}},
+					{Id: 1, BrokerConfig: &v1beta1.BrokerConfig{Roles: []string{"controller"}, StorageConfigs: onePVCStorage}},
+				},
+			},
+		}
+	}
+
+	tests := []struct {
+		testName string
+		mutate   func(*v1beta1.KafkaCluster)
+		wantErr  bool
+	}{
+		{
+			testName: "valid KRaft cluster is admitted",
+			mutate:   func(*v1beta1.KafkaCluster) {},
+			wantErr:  false,
+		},
+		{
+			testName: "cluster with no controller node is rejected",
+			mutate:   func(kc *v1beta1.KafkaCluster) { kc.Spec.Brokers[1].BrokerConfig.Roles = []string{"broker"} },
+			wantErr:  true,
+		},
+		{
+			testName: "cluster with no controller listener is rejected",
+			mutate: func(kc *v1beta1.KafkaCluster) {
+				kc.Spec.ListenersConfig.InternalListeners = []v1beta1.InternalListenerConfig{interBrokerListener}
+			},
+			wantErr: true,
+		},
+		{
+			testName: "controller node with two PVC-backed storage configs is rejected",
+			mutate:   func(kc *v1beta1.KafkaCluster) { kc.Spec.Brokers[1].BrokerConfig.StorageConfigs = twoPVCStorage },
+			wantErr:  true,
+		},
+		{
+			testName: "broker with no process role is rejected",
+			mutate:   func(kc *v1beta1.KafkaCluster) { kc.Spec.Brokers[0].BrokerConfig.Roles = []string{} },
+			wantErr:  true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.testName, func(t *testing.T) {
+			kc := validKRaftCluster()
+			test.mutate(kc)
+
+			_, errCreate := validator.ValidateCreate(context.Background(), kc)
+			_, errUpdate := validator.ValidateUpdate(context.Background(), nil, kc)
+
+			if test.wantErr {
+				require.Error(t, errCreate, "ValidateCreate should reject")
+				require.Error(t, errUpdate, "ValidateUpdate should reject")
+			} else {
+				require.NoError(t, errCreate, "ValidateCreate should admit")
+				require.NoError(t, errUpdate, "ValidateUpdate should admit")
+			}
 		})
 	}
 }
