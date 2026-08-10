@@ -18,6 +18,8 @@ package e2e
 
 import (
 	"context"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gruntwork-io/terratest/modules/k8s"
@@ -59,6 +61,16 @@ func testBatchedBrokerRemoval() bool {
 			ginkgo.By("Waiting until no Cruise Control operation is in flight (initial rebalance finished)")
 			gomega.Eventually(context.Background(), func() (bool, error) {
 				return hasNoInFlightCruiseControlOperation(kubectlOptions)
+			}, batchedBrokerRemovalTimeout, batchedBrokerRemovalPollInterval).Should(gomega.BeTrue())
+
+			// The idle-operation gate above only checks CruiseControl's task queue, not the CC
+			// Deployment itself. If the operator is mid-rollout of a new CC revision, two CC pods
+			// race and the new one may never become Ready, resetting CC's metric-sampling window and
+			// stalling the remove_broker task. Gate on a settled CC Deployment so removal starts from
+			// a single, fully rolled-out CruiseControl pod.
+			ginkgo.By("Waiting until the Cruise Control Deployment is fully rolled out (single Ready replica)")
+			gomega.Eventually(context.Background(), func() (bool, error) {
+				return isCruiseControlDeploymentRolledOut(kubectlOptions)
 			}, batchedBrokerRemovalTimeout, batchedBrokerRemovalPollInterval).Should(gomega.BeTrue())
 		})
 
@@ -155,4 +167,57 @@ func hasExactlyNBrokerPods(kubectlOptions k8s.KubectlOptions, n int) (bool, erro
 		return false, err
 	}
 	return len(pods) == n, nil
+}
+
+// isCruiseControlDeploymentRolledOut returns true when the Cruise Control Deployment has fully
+// settled to a single Ready replica: the operator's latest spec has been observed
+// (observedGeneration == generation) and the spec/total/updated/ready/available replica counts all
+// agree, so no pod from a previous revision is lingering. Broker removal drives the operator to
+// regenerate CruiseControl's capacity config; starting removal while CC is mid-rollout leaves two
+// CC pods racing and resets CC's metric-sampling window, which can stall an in-flight remove_broker
+// task. Gating on a settled CC Deployment avoids that race.
+func isCruiseControlDeploymentRolledOut(kubectlOptions k8s.KubectlOptions) (bool, error) {
+	// One line per CC Deployment: generation/observedGeneration/spec.replicas/status.replicas/
+	// updatedReplicas/readyReplicas/availableReplicas. Absent status counts render as empty.
+	lines, err := getK8sResources(kubectlOptions,
+		[]string{"deployment"},
+		v1beta1.KafkaCRLabelKey+"="+kafkaClusterName+",app=cruisecontrol",
+		"",
+		"-o", "jsonpath={range .items[*]}{.metadata.generation}/{.status.observedGeneration}/{.spec.replicas}/{.status.replicas}/{.status.updatedReplicas}/{.status.readyReplicas}/{.status.availableReplicas}{'\\n'}{end}",
+	)
+	if err != nil {
+		return false, err
+	}
+	// Exactly one Cruise Control Deployment is expected; anything else is not a settled state.
+	if len(lines) != 1 {
+		return false, nil
+	}
+
+	fields := strings.Split(lines[0], "/")
+	if len(fields) != 7 {
+		return false, nil
+	}
+	nums := make([]int, len(fields))
+	for i, f := range fields {
+		if f == "" {
+			// A missing status replica count (e.g. readyReplicas before any pod is Ready) is 0.
+			nums[i] = 0
+			continue
+		}
+		n, convErr := strconv.Atoi(f)
+		if convErr != nil {
+			return false, nil
+		}
+		nums[i] = n
+	}
+
+	generation, observed := nums[0], nums[1]
+	specReplicas, statusReplicas, updated, ready, available := nums[2], nums[3], nums[4], nums[5], nums[6]
+
+	return observed == generation &&
+		specReplicas >= 1 &&
+		statusReplicas == specReplicas &&
+		updated == specReplicas &&
+		ready == specReplicas &&
+		available == specReplicas, nil
 }
