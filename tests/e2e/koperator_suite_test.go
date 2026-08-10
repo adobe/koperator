@@ -85,7 +85,7 @@ var _ = ginkgo.When("Testing e2e test altogether", ginkgo.Ordered, func() {
 	testInstallNoIngressKafkaCluster("Installing Kafka cluster (Zookeeper-based, 4 disks, no ingress)", "../../config/samples/simplekafkacluster_4disk.yaml")
 	testMultiDiskRemoval()
 	testUninstallKafkaCluster()
-	testInstallKafkaCluster("../../config/samples/simplekafkacluster_5broker.yaml")
+	testInstallNoIngressKafkaCluster("Installing Kafka cluster (Zookeeper-based, 5 broker, no ingress)", "../../config/samples/simplekafkacluster_5broker.yaml")
 	testBatchedBrokerRemoval()
 	testUninstallKafkaCluster()
 	testUninstallZookeeperCluster()
