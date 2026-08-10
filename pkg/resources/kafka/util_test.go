@@ -29,9 +29,18 @@ func TestGenerateClusterID(t *testing.T) {
 	test := make(map[string]bool, numOfIDs)
 	for i := 0; i < numOfIDs; i++ {
 		clusterID := generateRandomClusterID()
-		_, err := base64.URLEncoding.DecodeString(clusterID)
+		decoded, err := base64.RawURLEncoding.DecodeString(clusterID)
 		if err != nil {
 			t.Errorf("expected nil error, got: %v", err)
+		}
+
+		// Kafka's Uuid is a 128-bit (16-byte) value; the base64 form must decode to exactly 16 bytes
+		// and use the canonical padding-free encoding (22 characters).
+		if len(decoded) != 16 {
+			t.Errorf("expected cluster ID to decode to 16 bytes, got %d bytes for %q", len(decoded), clusterID)
+		}
+		if len(clusterID) != 22 {
+			t.Errorf("expected canonical 22-character cluster ID, got %d characters for %q", len(clusterID), clusterID)
 		}
 
 		if test[clusterID] {
