@@ -122,4 +122,18 @@ jobs:
           echo "::group::warning events (all namespaces)"
           kubectl get events -A --field-selector type=Warning --sort-by=.lastTimestamp | tail -80
           echo "::endgroup::"
+          # Broker/disk removal stalls are almost always a Cruise Control problem: a stuck CC
+          # Deployment rollout (two revisions racing) or a remove_broker task wedged InExecution.
+          # None of that is visible in the per-namespace pod dump above, so capture the koperator
+          # CRs and the CC rollout state explicitly.
+          echo "::group::kafka CRs + cruisecontrol rollout"
+          kubectl -n kafka get kafkacluster,cruisecontroloperation -o wide
+          echo "----- kafkacluster status.state -----"
+          kubectl -n kafka get kafkacluster -o jsonpath='{range .items[*]}{.metadata.name}{": "}{.status.state}{"\n"}{end}'
+          echo "----- cruisecontroloperation (yaml: currentTask.state / errorMessage) -----"
+          kubectl -n kafka get cruisecontroloperation -o yaml
+          echo "----- cruisecontrol deployment + replicasets (exposes stuck/duplicate revisions) -----"
+          kubectl -n kafka get deploy,rs -l app=cruisecontrol -o wide
+          kubectl -n kafka describe deploy -l app=cruisecontrol
+          echo "::endgroup::"
           exit 0
