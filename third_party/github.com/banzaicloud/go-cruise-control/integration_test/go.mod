@@ -5,7 +5,7 @@ go 1.25.0
 require (
 	github.com/banzaicloud/go-cruise-control v0.6.0
 	github.com/compose-spec/compose-go/v2 v2.14.0
-	github.com/docker/cli v29.7.1+incompatible
+	github.com/docker/cli v29.7.2+incompatible
 	github.com/docker/compose/v2 v2.40.3
 	github.com/go-logr/logr v1.4.4
 	github.com/go-logr/zapr v1.3.0
