@@ -177,15 +177,30 @@ func (r *CruiseControlTaskReconciler) Reconcile(ctx context.Context, request ctr
 			brokerIDs = append(brokerIDs, task.BrokerID)
 		}
 
-		cruiseControlOpRef, err := r.removeBrokers(ctx, instance, operationTTLSecondsAfterFinished, brokerIDs)
-		if err != nil {
-			return requeueWithError(log, fmt.Sprintf("creating CruiseControlOperation for downscale has failed, brokerIDs: %s", brokerIDs), err)
+		if instance.Spec.KRaftMode {
+			// In KRaft mode, CC has no information about the controller-only nodes, so a remove_broker
+			// request for one would fail in CC. Controller-only nodes are downscaled by deleting their
+			// pod directly (see reconcileKafkaPodDelete) and never receive a GracefulDownscaleRequired
+			// state, so this filter is defense-in-depth to keep the three broker-id CC operations
+			// (add_broker, remove_broker, rebalance) symmetric.
+			brokerIDs, err = util.FilterControllerOnlyNodes(brokerIDs, instance.Spec)
+			if err != nil {
+				return requeueWithError(log, fmt.Sprintf("failed to filter out controller-only nodes from the Kafka cluster, "+
+					"clusterName: %s, clusterNamespace: %s", instance.GetName(), instance.GetNamespace()), err)
+			}
 		}
 
-		// map the CC broker removal operation with each broker status
-		for _, task := range tasksAndStates.GetActiveTasksByOp(banzaiv1alpha1.OperationRemoveBroker) {
-			task.SetCruiseControlOperationRef(cruiseControlOpRef)
-			task.SetStateScheduled()
+		if len(brokerIDs) != 0 {
+			cruiseControlOpRef, err := r.removeBrokers(ctx, instance, operationTTLSecondsAfterFinished, brokerIDs)
+			if err != nil {
+				return requeueWithError(log, fmt.Sprintf("creating CruiseControlOperation for downscale has failed, brokerIDs: %s", brokerIDs), err)
+			}
+
+			// map the CC broker removal operation with each broker status
+			for _, task := range tasksAndStates.GetActiveTasksByOp(banzaiv1alpha1.OperationRemoveBroker) {
+				task.SetCruiseControlOperationRef(cruiseControlOpRef)
+				task.SetStateScheduled()
+			}
 		}
 
 	case tasksAndStates.NumActiveTasksByOp(banzaiv1alpha1.OperationRemoveDisks) > 0:
