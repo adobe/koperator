@@ -17,8 +17,17 @@
 
 # This script returns a successful exit code (0) if the controller is a follower or leader.  For any other state, it returns a failure exit code (1).
 # In addition, if the environment variable KRAFT_HEALTH_CHECK_SKIP is set to "true" (case insensitive), the script will exit successfully without performing any checks.
+#
+# The behaviour when the raft state metric cannot be read (JMX endpoint not up yet, or the metric is
+# absent) depends on KRAFT_HEALTH_CHECK_MODE:
+#   - "liveness" (default): exit 0 (fail-open) so a slow-starting or briefly-unavailable JMX exporter
+#     does not cause the kubelet to restart an otherwise healthy controller.
+#   - "readiness": exit 1 (fail-closed) so the pod is only marked Ready once it is a confirmed
+#     leader/follower in the quorum. Koperator's rolling upgrade uses this readiness signal to avoid
+#     restarting the next controller before the previously restarted one has rejoined the quorum.
 
 skip_check=$(echo "$KRAFT_HEALTH_CHECK_SKIP" | tr '[:upper:]' '[:lower:]')
+mode=$(echo "${KRAFT_HEALTH_CHECK_MODE:-liveness}" | tr '[:upper:]' '[:lower:]')
 
 if [ "$skip_check" = "true" ]; then
     echo "KRAFT_HEALTH_CHECK_SKIP is set to TRUE. Exiting health check."
@@ -47,6 +56,11 @@ if [ -n "$MATCHING_METRIC" ]; then
         exit 1
     fi
 else
-    echo "JMX Exporter endpoint is not avaiable or kafka_server_raft_metrics_current_state_ was not found."
+    echo "JMX Exporter endpoint is not available or kafka_server_raft_metrics_current_state_ was not found."
+    if [ "$mode" = "readiness" ]; then
+        # Not yet reporting a healthy quorum state: not ready.
+        exit 1
+    fi
+    # Liveness: do not restart on a transient/absent metric.
     exit 0
 fi

@@ -1005,6 +1005,20 @@ func (r *Reconciler) handleRollingUpgrade(log logr.Logger, desiredPod, currentPo
 				return errorfactory.New(errorfactory.ReconcileRollingUpgrade{}, errors.New("pod count differs from brokers spec"), "rolling upgrade in progress")
 			}
 
+			// In KRaft mode, do not delete a controller pod while any other controller is still catching up
+			// in the metadata quorum. A controller pod's readiness reflects quorum membership (see its
+			// readiness probe), so waiting for all other controllers to be Ready keeps the operator from
+			// restarting the next controller before the previously restarted one has rejoined the quorum -
+			// which could otherwise cost the quorum its majority. The pod being reconciled is excluded so an
+			// unhealthy controller can still be replaced. Broker-only restarts cannot affect quorum majority
+			// and are gated by the data-plane health check below, so they are not blocked here.
+			if notReadyControllers := controllersBlockingRollingUpgrade(r.KafkaCluster.Spec.KRaftMode, podList.Items, currentPod); len(notReadyControllers) > 0 {
+				return errorfactory.New(errorfactory.ReconcileRollingUpgrade{},
+					errors.New("KRaft controller quorum is not stable yet"),
+					"waiting for KRaft controllers to rejoin the quorum before continuing rolling upgrade",
+					"notReadyControllerBrokerIDs", strings.Join(notReadyControllers, ","))
+			}
+
 			// Check if we support multiple broker restarts and restart only in same AZ, otherwise restart only 1 broker at once
 			terminatingOrPendingPods := getPodsInTerminatingOrPendingState(podList.Items)
 			if len(terminatingOrPendingPods) >= r.KafkaCluster.Spec.RollingUpgradeConfig.ConcurrentBrokerRestartCountPerRack {
@@ -1613,6 +1627,50 @@ func getPodsInTerminatingOrPendingState(items []corev1.Pod) []corev1.Pod {
 		}
 	}
 	return pods
+}
+
+// controllersBlockingRollingUpgrade returns the not-Ready controller broker IDs that must block the
+// rolling upgrade before currentPod is deleted, or nil when the upgrade may proceed. The quorum-readiness
+// gate applies only when the cluster is in KRaft mode AND currentPod is itself a controller node:
+// restarting a broker-only node cannot cost the metadata quorum its majority (brokers are not voters),
+// so broker restarts are gated by the data-plane health check instead, not by controller readiness.
+func controllersBlockingRollingUpgrade(kRaftMode bool, pods []corev1.Pod, currentPod *corev1.Pod) []string {
+	if !kRaftMode || currentPod.Labels[banzaiv1beta1.IsControllerNodeKey] != configValueTrue {
+		return nil
+	}
+	return notReadyControllerBrokerIDs(pods, currentPod)
+}
+
+// notReadyControllerBrokerIDs returns the broker IDs of KRaft controller pods (broker id label of pods
+// labeled isControllerNode=true) that are not Ready, excluding the pod currently being reconciled.
+// A controller pod's readiness reflects its metadata-quorum membership, so a non-empty result means the
+// quorum is still stabilizing and the rolling upgrade should pause before deleting another pod.
+func notReadyControllerBrokerIDs(pods []corev1.Pod, currentPod *corev1.Pod) []string {
+	var notReady []string
+	currentBrokerID := currentPod.Labels[banzaiv1beta1.BrokerIdLabelKey]
+	for i := range pods {
+		pod := &pods[i]
+		if pod.Labels[banzaiv1beta1.BrokerIdLabelKey] == currentBrokerID {
+			continue
+		}
+		if pod.Labels[banzaiv1beta1.IsControllerNodeKey] != configValueTrue {
+			continue
+		}
+		if !isPodReady(pod) {
+			notReady = append(notReady, pod.Labels[banzaiv1beta1.BrokerIdLabelKey])
+		}
+	}
+	return notReady
+}
+
+// isPodReady reports whether the pod's Ready condition is true.
+func isPodReady(pod *corev1.Pod) bool {
+	for _, cond := range pod.Status.Conditions {
+		if cond.Type == corev1.PodReady {
+			return cond.Status == corev1.ConditionTrue
+		}
+	}
+	return false
 }
 
 func (r *Reconciler) getBrokerAz(pod *corev1.Pod, kafkaBrokerAvailabilityZoneMap map[int32]string) (string, error) {
