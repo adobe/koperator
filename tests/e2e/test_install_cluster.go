@@ -36,37 +36,7 @@ func testInstallZookeeperCluster() bool {
 	})
 }
 
-func testInstallNoIngressKafkaCluster(clusterDescription, kafkaClusterManifestPath string) bool { //nolint:unparam // Note: respecting Ginkgo testing interface by returning bool.
-	return ginkgo.When(clusterDescription, func() {
-		var kubectlOptions k8s.KubectlOptions
-		var err error
-
-		ginkgo.It("Acquiring K8s config and context", func() {
-			kubectlOptions, err = kubectlOptionsForCurrentContext()
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		})
-
-		kubectlOptions.Namespace = koperatorLocalHelmDescriptor.Namespace
-		requireCreatingKafkaCluster(kubectlOptions, kafkaClusterManifestPath)
-	})
-}
-
-func testInstallEnvoyKafkaCluster(clusterDescription, kafkaClusterManifestPath string) bool { //nolint:unparam // Note: respecting Ginkgo testing interface by returning bool.
-	return ginkgo.When(clusterDescription, func() {
-		var kubectlOptions k8s.KubectlOptions
-		var err error
-
-		ginkgo.It("Acquiring K8s config and context", func() {
-			kubectlOptions, err = kubectlOptionsForCurrentContext()
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		})
-
-		kubectlOptions.Namespace = koperatorLocalHelmDescriptor.Namespace
-		requireCreatingKafkaCluster(kubectlOptions, kafkaClusterManifestPath)
-	})
-}
-
-func testInstallEnvoyGatewayKafkaCluster(clusterDescription, kafkaClusterManifestPath string) bool { //nolint:unparam // Note: respecting Ginkgo testing interface by returning bool.
+func testInstallKafkaCluster(clusterDescription, kafkaClusterManifestPath string) bool { //nolint:unparam // Note: respecting Ginkgo testing interface by returning bool.
 	return ginkgo.When(clusterDescription, func() {
 		var kubectlOptions k8s.KubectlOptions
 		var err error
