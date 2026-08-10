@@ -602,8 +602,10 @@ func (r *Reconciler) reconcileKafkaPodDelete(ctx context.Context, log logr.Logge
 			}
 
 			processRoles, found := broker.GetLabels()[banzaiv1beta1.ProcessRolesKey]
-			// only applicable in KRaft: if this Kafka pod is not a controller-only node, there is no corresponding CC
-			// therefore we can just skip the broker state check and delete the pod safely
+			// Only applicable in KRaft: a controller-only node has no corresponding Cruise Control broker,
+			// so it has no graceful-downscale state to honor and can be deleted directly (this branch is skipped).
+			// For every other node (broker-only, combined, or non-KRaft) we wait for the graceful downscale
+			// to finish before deleting the pod.
 			if !found || processRoles != banzaiv1beta1.ControllerNodeProcessRole {
 				if brokerState, ok := r.KafkaCluster.Status.BrokersState[broker.Labels[banzaiv1beta1.BrokerIdLabelKey]]; ok &&
 					brokerState.GracefulActionState.CruiseControlState != banzaiv1beta1.GracefulDownscaleSucceeded &&
