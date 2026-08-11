@@ -184,6 +184,11 @@ fi`},
 	}
 }
 
+// GeneratePodAnnotations computes the Cruise Control pod-template annotations, including a
+// content hash per config file so Kubernetes rolls the pod when a hashed file changes. capacity.json
+// is hashed (and so can trigger a roll) only when cruiseControlAnnotations sets
+// capacityConfigAnnotation to "static"; it is excluded by default. See CapacityConfigAnnotation
+// for why, and the inline comment below for the full rationale.
 func GeneratePodAnnotations(cruiseControlAnnotations, cruiseControlConfig map[string]string) map[string]string {
 	hashedCruiseControlConfigJson := sha256.Sum256([]byte(cruiseControlConfig["cruisecontrol.properties"]))
 	hashedCruiseControlClusterConfigJson := sha256.Sum256([]byte(cruiseControlConfig["clusterConfigs.json"]))
@@ -197,8 +202,23 @@ func GeneratePodAnnotations(cruiseControlAnnotations, cruiseControlConfig map[st
 			"cruiseControlLogConfig.json":     hex.EncodeToString(hashedCruiseControlLogConfigJson[:]),
 		},
 	}
-	if value, ok := cruiseControlAnnotations[capacityConfigAnnotation]; !ok ||
-		value == string(staticCapacityConfig) {
+	// capacity.json is deliberately excluded from the pod-template hash by default: Cruise Control only
+	// reads it at process startup, and the operator already falls back to CC's own capacity estimation for
+	// scale operations, so a capacity.json change does not need to restart a running CC pod. Restarting on
+	// every capacity.json change (e.g. every broker add/remove) risks racing an in-flight add_broker/
+	// remove_broker CruiseControlOperation: the operation is submitted based only on CC's REST API
+	// readiness, so a roll triggered here can replace the CC pod mid-operation, losing its in-memory task
+	// state. Users who need the exact (non-estimated) capacity for newly added brokers immediately, and are
+	// willing to accept the restart-race trade-off, can opt back in by setting the broker-capacity-config
+	// annotation to "static".
+	//
+	// Upgrade note: prior to this change, capacity.json was always hashed here (the annotation being unset
+	// behaved the same as "static"), so every existing cluster's live Deployment already carries the
+	// cruiseControlCapacity.json annotation. The first reconcile after upgrading to this behavior computes a
+	// pod template without that key, which k8sutil.Reconcile detects as a real diff and applies via a full
+	// Deployment update - causing exactly one CruiseControl pod restart per cluster on upgrade. This is a
+	// one-time, expected side effect of adopting the new default, not a bug; call it out in release notes.
+	if value, ok := cruiseControlAnnotations[capacityConfigAnnotation]; ok && value == string(staticCapacityConfig) {
 		hashedCruiseControlCapacityJson := sha256.Sum256([]byte(cruiseControlConfig["capacity.json"]))
 		annotations = append(annotations,
 			map[string]string{"cruiseControlCapacity.json": hex.EncodeToString(hashedCruiseControlCapacityJson[:])})

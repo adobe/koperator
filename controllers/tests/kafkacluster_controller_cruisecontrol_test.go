@@ -252,7 +252,9 @@ func expectCruiseControlDeployment(ctx context.Context, kafkaCluster *v1beta1.Ka
 	Expect(deployment.Spec.Selector.MatchLabels).To(HaveKeyWithValue(v1beta1.AppLabelKey, "cruisecontrol"))
 	Expect(deployment.Spec.Selector.MatchLabels).To(HaveKeyWithValue(v1beta1.KafkaCRLabelKey, kafkaCluster.Name))
 
-	Expect(deployment.Spec.Template.Annotations).To(HaveKey("cruiseControlCapacity.json"))
+	// cruiseControlCapacity.json is only present when the broker-capacity-config annotation opts
+	// into "static" mode (see checks further down); it is intentionally absent by default so that
+	// capacity.json changes (e.g. on broker scaling) do not roll the Cruise Control Deployment.
 	Expect(deployment.Spec.Template.Annotations).To(HaveKey("cruiseControlClusterConfig.json"))
 	Expect(deployment.Spec.Template.Annotations).To(HaveKey("cruiseControlConfig.json"))
 	Expect(deployment.Spec.Template.Annotations).To(HaveKey("cruiseControlLogConfig.json"))
@@ -388,7 +390,7 @@ func expectCruiseControlDeployment(ctx context.Context, kafkaCluster *v1beta1.Ka
 		},
 	)
 
-	if capacityConfigType, ok := userProvidedCCPodAnnotations["cruise-control.banzaicloud.com/broker-capacity-config"]; !ok || capacityConfigType == "static" {
+	if capacityConfigType, ok := userProvidedCCPodAnnotations["cruise-control.banzaicloud.com/broker-capacity-config"]; ok && capacityConfigType == "static" {
 		expectedPodAnnotations["cruiseControlCapacity.json"] = hex.EncodeToString(ccBrokerCapacityConfigHash[:])
 	}
 

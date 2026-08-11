@@ -279,6 +279,26 @@ var _ = Describe("KafkaCluster", func() {
 			expectKafka(ctx, kafkaClusterKRaft, count)
 		})
 	})
+	When("opting into static broker-capacity-config", func() {
+		// Regression coverage for https://github.com/adobe/koperator/issues/301: the
+		// broker-capacity-config: static escape hatch must still work end-to-end through the
+		// real KafkaClusterReconciler and a real API server, not just the fake-client/unit
+		// tests in pkg/resources/cruisecontrol/.
+		BeforeEach(func() {
+			loadBalancerServiceName = fmt.Sprintf("envoy-loadbalancer-test-%s", kafkaCluster.Name)
+			externalListenerHostName = testHostName
+			loadBalancerServiceNameKRaft = fmt.Sprintf("envoy-loadbalancer-test-%s", kafkaClusterKRaft.Name)
+			externalListenerHostNameKRaft = testHostName
+			kafkaCluster.Spec.CruiseControlConfig.CruiseControlAnnotations = map[string]string{
+				"test-cc-ann": "test-cc-ann-val",
+				"cruise-control.banzaicloud.com/broker-capacity-config": "static",
+			}
+		})
+
+		It("still includes cruiseControlCapacity.json in the CruiseControl pod template", func(ctx SpecContext) {
+			expectCruiseControl(ctx, kafkaCluster)
+		})
+	})
 	When("configuring one ingress envoy controller config inside the external listener without bindings", func() {
 		BeforeEach(func() {
 			testExternalListener := kafkaCluster.Spec.ListenersConfig.ExternalListeners[0]

@@ -51,6 +51,9 @@ const (
 	warnLevel                                            = -1
 )
 
+// CapacityConfigAnnotation controls whether capacity.json is hashed into the Cruise Control Deployment's
+// pod template. It defaults to excluded (any value other than "static", including unset); set it to
+// "static" to opt back into restarting the Cruise Control pod whenever capacity.json changes.
 type CapacityConfigAnnotation string
 
 // Reconciler implements the Component Reconciler
