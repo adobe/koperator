@@ -211,7 +211,7 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 
 	log.V(1).Info("Reconciling")
 
-	log.Info("broker rack map", "kafkaBrokerAvailabilityZoneMap", getBrokerAzMap(r.KafkaCluster))
+	log.V(1).Info("broker rack map", "kafkaBrokerAvailabilityZoneMap", getBrokerAzMap(r.KafkaCluster))
 
 	ctx := context.Background()
 	if err := k8sutil.UpdateBrokerConfigurationBackup(r.Client, r.KafkaCluster); err != nil {
@@ -904,7 +904,7 @@ func (r *Reconciler) reconcileKafkaPod(log logr.Logger, desiredPod *corev1.Pod, 
 		brokerId := currentPod.Labels[banzaiv1beta1.BrokerIdLabelKey]
 		if _, ok := r.KafkaCluster.Status.BrokersState[brokerId]; ok {
 			if currentPod.Spec.NodeName == "" {
-				log.Info(fmt.Sprintf("pod for brokerId %s does not scheduled to node yet", brokerId))
+				log.V(1).Info(fmt.Sprintf("pod for brokerId %s not scheduled to node yet", brokerId))
 			} else if r.KafkaCluster.Spec.RackAwareness != nil {
 				rackAwarenessState, err := k8sutil.UpdateCrWithRackAwarenessConfig(currentPod, r.KafkaCluster, r.Client, r.DirectClient)
 				if err != nil {
