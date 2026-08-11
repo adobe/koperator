@@ -148,6 +148,15 @@ type KafkaClusterSpec struct {
 	// +optional
 	KRaftMode              bool `json:"kRaft"`
 	HeadlessServiceEnabled bool `json:"headlessServiceEnabled"`
+	// externalResourceManagementEnabled allows an external controller (for example a mutating
+	// admission webhook such as ScaleOps) to manage CPU/memory requests and scheduling
+	// affinities on Kafka broker pods. When enabled, Koperator will not revert requests or
+	// preferred affinity terms that it did not itself declare, so that a genuine change to
+	// this KafkaCluster's own resource/affinity configuration still takes effect while
+	// externally-applied overrides are preserved across reconciles.
+	// +kubebuilder:default=false
+	// +optional
+	ExternalResourceManagementEnabled bool `json:"externalResourceManagementEnabled,omitempty"`
 	// localDebugEnabled is used to decide whether to create a separate loadbalancer services for the
 	// Kafka and Cruise Control Pods. These services will expose the internal listener ports of the Kafka
 	// cluster with LoadBalancer type, which can be used for running Koperator on a local machine against
