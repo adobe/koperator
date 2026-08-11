@@ -157,7 +157,7 @@ type JBODInvariantCapacityConfig struct {
 func GenerateCapacityConfig(kafkaCluster *v1beta1.KafkaCluster, log logr.Logger, config *corev1.ConfigMap) (string, error) {
 	var err error
 
-	log.Info("generating capacity config")
+	log.V(2).Info("generating capacity config")
 
 	var capacityConfig JBODInvariantCapacityConfig
 	var userConfigBrokerIds []string
@@ -184,7 +184,7 @@ func GenerateCapacityConfig(kafkaCluster *v1beta1.KafkaCluster, log logr.Logger,
 			}
 			// If the -1 default exists we don't have to do anything else here since all brokers will have values.
 			if brokerId == "-1" {
-				log.Info("Using user provided capacity config because it has universal default defined", "capacity config", userProvidedCapacityConfig)
+				log.V(2).Info("Using user provided capacity config because it has universal default defined", "capacity config", userProvidedCapacityConfig)
 				return userProvidedCapacityConfig, nil
 			}
 			userConfigBrokerIds = append(userConfigBrokerIds, brokerId)
@@ -211,7 +211,7 @@ func GenerateCapacityConfig(kafkaCluster *v1beta1.KafkaCluster, log logr.Logger,
 	if err != nil {
 		return "", errors.WrapIf(err, "could not marshal cruise control capacity config")
 	}
-	log.Info("broker capacity config generated successfully", "capacity config", string(result))
+	log.V(2).Info("broker capacity config generated successfully", "capacity config", string(result))
 	return string(result), err
 }
 

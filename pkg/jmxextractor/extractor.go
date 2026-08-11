@@ -31,9 +31,9 @@ import (
 )
 
 const (
-	headlessServiceJMXTemplate           = "http://%s-%d." + kafka.HeadlessServiceTemplate + ".%s.svc.%s:%d"
-	headlessControllerServiceJMXTemplate = "http://%s-%d." + kafka.HeadlessControllerServiceTemplate + ".%s.svc.%s:%d"
-	serviceJMXTemplate                   = "http://%s-%d.%s.svc.%s:%d"
+	headlessServiceJMXTemplate           = "http://%s-%d." + kafka.HeadlessServiceTemplate + ".%s.svc.%s:%d/metrics"
+	headlessControllerServiceJMXTemplate = "http://%s-%d." + kafka.HeadlessControllerServiceTemplate + ".%s.svc.%s:%d/metrics"
+	serviceJMXTemplate                   = "http://%s-%d.%s.svc.%s:%d/metrics"
 	versionRegexGroup                    = "version"
 )
 

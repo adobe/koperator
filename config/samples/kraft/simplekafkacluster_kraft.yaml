@@ -7,11 +7,14 @@ metadata:
 spec:
   kRaft: true
   monitoringConfig:
-    jmxImage: "ghcr.io/adobe/koperator/jmx-javaagent:1.4.0"
+    jmxImage: "ghcr.io/adobe/koperator/jmx-javaagent:1.5.0"
   headlessServiceEnabled: true
   propagateLabels: false
   oneBrokerPerNode: false
-  clusterImage: "ghcr.io/adobe/koperator/kafka:2.13-3.9.1"
+  clusterImage: "ghcr.io/adobe/koperator/kafka:2.13-3.9.2-jdk21.0.11"
+  taintedBrokersSelector:
+    matchLabels:
+      restart: me
   readOnlyConfig: |
     auto.create.topics.enable=false
     cruise.control.metrics.topic.auto.create=true
@@ -30,6 +33,9 @@ spec:
               requests:
                 storage: 10Gi
     broker:
+      kafkaJvmPerfOpts: >-
+        -Dcom.sun.management.jmxremote.port=1090 -Dcom.sun.management.jmxremote.rmi.port=1090
+        -Dcom.sun.management.jmxremote.local.only=false -Djava.rmi.server.hostname=127.0.0.1 -Djute.maxbuffer=0x9fffff
       processRoles:
         - broker
       storageConfigs:
@@ -45,27 +51,26 @@ spec:
         prometheus.io/port: "9020"
   brokers:
     - id: 0
-      brokerConfigGroup: "broker"
+      brokerConfigGroup: "default"
+      brokerConfig:
+        processRoles:
+          - controller
     - id: 1
-      brokerConfigGroup: "broker"
+      brokerConfigGroup: "default"
+      brokerConfig:
+        processRoles:
+          - controller
     - id: 2
+      brokerConfigGroup: "default"
+      brokerConfig:
+        processRoles:
+          - controller
+    - id: 100
       brokerConfigGroup: "broker"
-    - id: 3
-      brokerConfigGroup: "default"
-      brokerConfig:
-        processRoles:
-          - controller
-          # - broker
-    - id: 4
-      brokerConfigGroup: "default"
-      brokerConfig:
-        processRoles:
-          - controller
-    - id: 5
-      brokerConfigGroup: "default"
-      brokerConfig:
-        processRoles:
-          - controller
+    - id: 101
+      brokerConfigGroup: "broker"
+    - id: 102
+      brokerConfigGroup: "broker"
   rollingUpgradeConfig:
     failureThreshold: 1
   listenersConfig:
@@ -299,4 +304,19 @@ spec:
     clusterConfig: |
       {
         "min.insync.replicas": 3
+      }
+    capacityConfig: |-
+      {
+        "brokerCapacities":[
+          {
+            "brokerId": "-1",
+            "capacity": {
+              "DISK": {"/kafka-logs-broker/kafka": "10240"},
+              "CPU": {"num.cores": "1"},
+              "NW_IN": "900000",
+              "NW_OUT": "900000"
+            },
+            "doc": "This is the default capacity. Capacity unit used for disk is in MB, cpu is in cores, network throughput is in KB."
+          }
+        ]
       }

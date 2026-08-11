@@ -991,7 +991,7 @@ func (r *Reconciler) handleRollingUpgrade(log logr.Logger, desiredPod, currentPo
 	case err != nil:
 		log.Error(err, "could not match objects", "kind", desiredType)
 	case r.isPodTainted(log, currentPod):
-		log.Info("pod has tainted labels, deleting it", "pod", currentPod)
+		log.Info("pod has tainted labels, attempting to delete", "pod", currentPod)
 	case patchResult.IsEmpty():
 		if !k8sutil.IsPodContainsTerminatedContainer(currentPod) &&
 			r.KafkaCluster.Status.BrokersState[currentPod.Labels[banzaiv1beta1.BrokerIdLabelKey]].ConfigurationState == banzaiv1beta1.ConfigInSync &&
@@ -1061,14 +1061,14 @@ func (r *Reconciler) handleRollingUpgrade(log logr.Logger, desiredPod, currentPo
 				return errors.WrapIf(err, "health check failed")
 			}
 			if len(allOfflineReplicas) > 0 {
-				log.Info("offline replicas", "IDs", allOfflineReplicas)
+				log.V(1).Info("offline replicas", "IDs", allOfflineReplicas)
 			}
 			outOfSyncReplicas, err := kClient.OutOfSyncReplicas()
 			if err != nil {
 				return errors.WrapIf(err, "health check failed")
 			}
 			if len(outOfSyncReplicas) > 0 {
-				log.Info("out-of-sync replicas", "IDs", outOfSyncReplicas)
+				log.V(1).Info("out-of-sync replicas", "IDs", outOfSyncReplicas)
 			}
 			impactedReplicas := make(map[int32]struct{})
 			for _, brokerID := range allOfflineReplicas {

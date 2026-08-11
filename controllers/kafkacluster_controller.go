@@ -17,6 +17,7 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"time"
@@ -359,6 +360,41 @@ func (r *KafkaClusterReconciler) updateAndFetchLatest(ctx context.Context, clust
 	return cluster, nil
 }
 
+// ignoreMetadataFields returns a patch.CalculateOption that drops only the given fields
+// under metadata (e.g. "managedFields", "resourceVersion") instead of the whole metadata
+// object like patch.IgnoreField("metadata") does, so other metadata changes (labels,
+// annotations, etc.) still count toward the diff.
+func ignoreMetadataFields(fields ...string) patch.CalculateOption {
+	return func(current, modified []byte) ([]byte, []byte, error) {
+		current, err := deleteMetadataFields(current, fields...)
+		if err != nil {
+			return nil, nil, errors.WrapIf(err, "could not delete metadata fields from current byte sequence")
+		}
+
+		modified, err = deleteMetadataFields(modified, fields...)
+		if err != nil {
+			return nil, nil, errors.WrapIf(err, "could not delete metadata fields from modified byte sequence")
+		}
+
+		return current, modified, nil
+	}
+}
+
+func deleteMetadataFields(obj []byte, fields ...string) ([]byte, error) {
+	var objectMap map[string]interface{}
+	if err := json.Unmarshal(obj, &objectMap); err != nil {
+		return nil, errors.WrapIf(err, "could not unmarshal byte sequence")
+	}
+
+	if metadata, ok := objectMap["metadata"].(map[string]interface{}); ok {
+		for _, field := range fields {
+			delete(metadata, field)
+		}
+	}
+
+	return json.Marshal(objectMap)
+}
+
 // SetupKafkaClusterWithManager registers kafka cluster controller to the manager
 func SetupKafkaClusterWithManager(mgr ctrl.Manager, contourEnabled bool) *ctrl.Builder {
 	log := mgr.GetLogger()
@@ -390,7 +426,7 @@ func SetupKafkaClusterWithManager(mgr ctrl.Manager, contourEnabled bool) *ctrl.B
 			UpdateFunc: func(e event.UpdateEvent) bool {
 				switch newObj := e.ObjectNew.(type) {
 				case *corev1.Pod, *corev1.ConfigMap, *corev1.PersistentVolumeClaim:
-					patchResult, err := patch.DefaultPatchMaker.Calculate(e.ObjectOld, e.ObjectNew)
+					patchResult, err := patch.DefaultPatchMaker.Calculate(e.ObjectOld, e.ObjectNew, patch.IgnoreStatusFields(), ignoreMetadataFields("managedFields", "resourceVersion"))
 					if err != nil {
 						log.Error(err, "could not match objects", "kind", e.ObjectOld.GetObjectKind())
 					} else if patchResult.IsEmpty() {

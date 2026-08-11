@@ -203,6 +203,9 @@ manager: generate fmt vet ## Generate (kubebuilder) and build manager binary.
 run: generate fmt vet
 	go run ./main.go
 
+run-dev: 
+	go run ./main.go --disable-cert-signing-support --disable-webhooks 2>&1 | jq  -Cc -R  'fromjson? // empty' 
+
 # Install CRDs into a cluster by manually creating or replacing the CRD depending on whether is currently existing
 # Apply is not applicable as the last-applied-configuration annotation would exceed the size limit enforced by the api server
 install: manifests ## Install generated CRDs into the configured Kubernetes cluster.
