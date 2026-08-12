@@ -127,7 +127,7 @@ func UpdateBrokerStatus(c client.Client, brokerIDs []string, cluster *banzaiclou
 	}
 	// update loses the typeMeta of the config that's used later when setting ownerrefs
 	cluster.TypeMeta = typeMeta
-	logger.Info("Kafka cluster state updated")
+	logger.V(1).Info("Broker status updated", "brokers", brokerIDs, "status", state)
 	return nil
 }
 

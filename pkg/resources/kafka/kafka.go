@@ -211,7 +211,7 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 
 	log.V(1).Info("Reconciling")
 
-	log.Info("broker rack map", "kafkaBrokerAvailabilityZoneMap", getBrokerAzMap(r.KafkaCluster))
+	log.V(1).Info("broker rack map", "kafkaBrokerAvailabilityZoneMap", getBrokerAzMap(r.KafkaCluster))
 
 	ctx := context.Background()
 	if err := k8sutil.UpdateBrokerConfigurationBackup(r.Client, r.KafkaCluster); err != nil {
@@ -414,6 +414,7 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 	reorderedBrokers := reorderBrokers(runningBrokers, boundPersistentVolumeClaims, r.KafkaCluster.Spec.Brokers, r.KafkaCluster.Status.BrokersState, controllerID, log)
 
 	allBrokerDynamicConfigSucceeded := true
+	brokerStatus := make(map[int32]*banzaiv1beta1.BrokerConfig)
 	for _, broker := range reorderedBrokers {
 		brokerConfig, err := broker.GetBrokerConfig(r.KafkaCluster.Spec)
 		if err != nil {
@@ -454,9 +455,10 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 		if err != nil {
 			return err
 		}
-		if err = r.updateStatusWithDockerImageAndVersion(broker.Id, brokerConfig, log); err != nil {
-			return err
+		if r.brokerNeedsVersionUpdate(broker.Id, brokerConfig) {
+			brokerStatus[broker.Id] = brokerConfig
 		}
+
 		// If dynamic configs can not be set then let the loop continue to the next broker,
 		// after the loop we return error. This solves that case when other brokers could get healthy,
 		// but the loop exits too soon because dynamic configs can not be set.
@@ -476,6 +478,10 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 	}
 
 	if err = r.reconcileClusterWideDynamicConfig(); err != nil {
+		return err
+	}
+
+	if err := r.updateStatusWithDockerImageAndVersion(brokerStatus, log); err != nil {
 		return err
 	}
 
@@ -898,7 +904,7 @@ func (r *Reconciler) reconcileKafkaPod(log logr.Logger, desiredPod *corev1.Pod, 
 		brokerId := currentPod.Labels[banzaiv1beta1.BrokerIdLabelKey]
 		if _, ok := r.KafkaCluster.Status.BrokersState[brokerId]; ok {
 			if currentPod.Spec.NodeName == "" {
-				log.Info(fmt.Sprintf("pod for brokerId %s does not scheduled to node yet", brokerId))
+				log.V(1).Info(fmt.Sprintf("pod for brokerId %s not scheduled to node yet", brokerId))
 			} else if r.KafkaCluster.Spec.RackAwareness != nil {
 				rackAwarenessState, err := k8sutil.UpdateCrWithRackAwarenessConfig(currentPod, r.KafkaCluster, r.Client, r.DirectClient)
 				if err != nil {
@@ -922,21 +928,44 @@ func (r *Reconciler) reconcileKafkaPod(log logr.Logger, desiredPod *corev1.Pod, 
 	return nil
 }
 
-func (r *Reconciler) updateStatusWithDockerImageAndVersion(brokerId int32, brokerConfig *banzaiv1beta1.BrokerConfig,
-	log logr.Logger) error {
-	jmxExp := jmxextractor.NewJMXExtractor(r.KafkaCluster.GetNamespace(),
-		r.KafkaCluster.Spec.GetKubernetesClusterDomain(), r.KafkaCluster.GetName(), log)
+// brokerNeedsVersionUpdate returns true when the broker's image/version status is absent,
+// incomplete, or stale relative to the desired image — i.e. a JMX fetch is warranted.
+func (r *Reconciler) brokerNeedsVersionUpdate(brokerID int32, brokerConfig *banzaiv1beta1.BrokerConfig) bool {
+	desiredImage := util.GetBrokerImage(brokerConfig, r.KafkaCluster.Spec.GetClusterImage())
+	state, ok := r.KafkaCluster.Status.BrokersState[strconv.Itoa(int(brokerID))]
+	return !ok || state.Version == "" || state.Image != desiredImage
+}
 
-	kafkaVersion, err := jmxExp.ExtractDockerImageAndVersion(brokerId, brokerConfig,
-		r.KafkaCluster.Spec.GetClusterImage(), r.KafkaCluster.Spec.HeadlessServiceEnabled)
-	if err != nil {
-		return err
+type brokerVersionResult struct {
+	brokerID     int32
+	kafkaVersion *banzaiv1beta1.KafkaVersion
+	err          error
+}
+
+func (r *Reconciler) updateStatusWithDockerImageAndVersion(brokers map[int32]*banzaiv1beta1.BrokerConfig, log logr.Logger) error {
+	ch := make(chan brokerVersionResult, len(brokers))
+	for brokerID, brokerConfig := range brokers {
+		go func(id int32, cfg *banzaiv1beta1.BrokerConfig) {
+			jmxExp := jmxextractor.NewJMXExtractor(r.KafkaCluster.GetNamespace(), r.KafkaCluster.Spec.GetKubernetesClusterDomain(), r.KafkaCluster.GetName(), log)
+			kv, err := jmxExp.ExtractDockerImageAndVersion(id, cfg, r.KafkaCluster.Spec.GetClusterImage(), r.KafkaCluster.Spec.HeadlessServiceEnabled)
+			if err != nil {
+				ch <- brokerVersionResult{brokerID: id, err: err}
+				return
+			}
+			ch <- brokerVersionResult{brokerID: id, kafkaVersion: kv}
+		}(brokerID, brokerConfig)
 	}
-	err = k8sutil.UpdateBrokerStatus(r.Client, []string{strconv.Itoa(int(brokerId))}, r.KafkaCluster,
-		*kafkaVersion, log)
-	if err != nil {
-		return err
+
+	for range brokers {
+		result := <-ch
+		if result.err != nil {
+			return result.err
+		}
+		if err := k8sutil.UpdateBrokerStatus(r.Client, []string{strconv.Itoa(int(result.brokerID))}, r.KafkaCluster, *result.kafkaVersion, log); err != nil {
+			return err
+		}
 	}
+
 	return nil
 }
 
@@ -962,7 +991,7 @@ func (r *Reconciler) handleRollingUpgrade(log logr.Logger, desiredPod, currentPo
 	case err != nil:
 		log.Error(err, "could not match objects", "kind", desiredType)
 	case r.isPodTainted(log, currentPod):
-		log.Info("pod has tainted labels, deleting it", "pod", currentPod)
+		log.Info("pod has tainted labels, attempting to delete", "pod", currentPod)
 	case patchResult.IsEmpty():
 		if !k8sutil.IsPodContainsTerminatedContainer(currentPod) &&
 			r.KafkaCluster.Status.BrokersState[currentPod.Labels[banzaiv1beta1.BrokerIdLabelKey]].ConfigurationState == banzaiv1beta1.ConfigInSync &&
@@ -1032,14 +1061,14 @@ func (r *Reconciler) handleRollingUpgrade(log logr.Logger, desiredPod, currentPo
 				return errors.WrapIf(err, "health check failed")
 			}
 			if len(allOfflineReplicas) > 0 {
-				log.Info("offline replicas", "IDs", allOfflineReplicas)
+				log.V(1).Info("offline replicas", "IDs", allOfflineReplicas)
 			}
 			outOfSyncReplicas, err := kClient.OutOfSyncReplicas()
 			if err != nil {
 				return errors.WrapIf(err, "health check failed")
 			}
 			if len(outOfSyncReplicas) > 0 {
-				log.Info("out-of-sync replicas", "IDs", outOfSyncReplicas)
+				log.V(1).Info("out-of-sync replicas", "IDs", outOfSyncReplicas)
 			}
 			impactedReplicas := make(map[int32]struct{})
 			for _, brokerID := range allOfflineReplicas {

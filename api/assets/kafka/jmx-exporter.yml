@@ -30,8 +30,8 @@ rules:
   # END: Export Kraft metrics
 
   - pattern: 'kafka.server<type=(app-info), id=(\d+)><>(Version): ([-.~+\w\d]+)'
-    name: kafka_server_$1_$3
-    type: COUNTER
+    name: kafka_server_app_info_version
+    type: GAUGE
     labels:
       broker_id: $2
       version: $4

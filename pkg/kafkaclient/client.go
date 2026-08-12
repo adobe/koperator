@@ -130,7 +130,7 @@ func NewFromCluster(k8sclient client.Client, cluster *v1beta1.KafkaCluster) (Kaf
 		if err := client.Close(); err != nil {
 			log.Error(err, "Error closing Kafka client")
 		} else {
-			log.Info("Kafka client closed cleanly")
+			log.V(1).Info("Kafka client closed cleanly")
 		}
 	}
 	return client, close, err
