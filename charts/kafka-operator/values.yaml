@@ -18,7 +18,7 @@ operator:
     # -- Operator container image repository
     repository: ghcr.io/adobe/koperator
     # -- Operator container image tag
-    tag: "0.28.0-adobe-20260731"
+    tag: "0.29.1"
     # -- Operator container image pull policy
     pullPolicy: IfNotPresent
   # In constrained environments where operator cannot
@@ -136,21 +136,21 @@ rbac:
 nodeSelector: {}
 
 # -- Operator pod tolerations can be set
-tolerances: []
+tolerations: []
 
 # -- Operator pod affinity can be set
 affinity: {}
 
 # -- Additional Sidecars Configuration
-additionalSidecars: {}
+additionalSidecars: []
 # - name: nginx
 #   image: nginx:latest
 
 # -- Additional Environment Variables
-additionalEnv: {}
+additionalEnv: []
 
 # -- Additional volumes required for sidecars
-additionalVolumes: {}
+additionalVolumes: []
 # - name: volume1
 #   emptyDir: {}
 # - name: volume2
