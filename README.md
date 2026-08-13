@@ -3,7 +3,7 @@
 ![Koperator](https://img.shields.io/github/v/release/adobe/koperator?label=Koperator)
 ![Released](https://img.shields.io/github/release-date/adobe/koperator?label=Released)
 ![License](https://img.shields.io/github/license/adobe/koperator?label=License)
-![Go version (latest release)](https://img.shields.io/github/go-mod/go-version/adobe/koperator/0.28.0-adobe-20260731)
+![Go version (latest release)](https://img.shields.io/github/go-mod/go-version/adobe/koperator/0.29.1)
 
 </p>
 
@@ -42,7 +42,7 @@ Some of the main features of Koperator are:
 ## AI Code Wiki
 
 Google indexes this repo at:
-https://codewiki.google/github.com/adobe/koperator 
+https://codewiki.google/github.com/adobe/koperator
 
 ## Architecture
 
@@ -127,17 +127,17 @@ kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/ma
 OCI registries have no floating "latest" tag, so `--version` is required (replace with your desired version, see available versions above):
 
 ```sh
-helm install kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator --version 0.28.0-adobe-20260731 --namespace=kafka --create-namespace --skip-crds
+helm install kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator --version 0.29.1 --namespace=kafka --create-namespace --skip-crds
 ```
 
 #### Pull and inspect the chart before installation
 
 ```sh
 # Pull the chart locally
-helm pull oci://ghcr.io/adobe/helm-charts/kafka-operator --version 0.28.0-adobe-20260731
+helm pull oci://ghcr.io/adobe/helm-charts/kafka-operator --version 0.29.1
 
 # Extract and inspect
-tar -xzf kafka-operator-0.28.0-adobe-20260731.tgz
+tar -xzf kafka-operator-0.29.1.tgz
 helm template kafka-operator ./kafka-operator/
 
 # Install from local chart
