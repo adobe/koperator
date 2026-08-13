@@ -29,13 +29,13 @@ OCI registries have no floating "latest" tag, so `--version` is required (see av
 
 ```bash
 helm install kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator \
-  --version 0.28.0-adobe-20260731 --namespace=kafka --create-namespace --skip-crds
+  --version 0.30.0 --namespace=kafka --create-namespace --skip-crds
 ```
 
 To install the operator using an already installed cert-manager:
 ```bash
 helm install kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator \
-  --version 0.28.0-adobe-20260731 \
+  --version 0.30.0 \
   --set certManager.namespace=<your cert manager namespace> --namespace=kafka --create-namespace --skip-crds
 ```
 
@@ -46,7 +46,7 @@ If this value is not set your CRDs might be deleted. `--version` is required, sa
 
 ```bash
 helm upgrade kafka-operator oci://ghcr.io/adobe/helm-charts/kafka-operator \
-  --version 0.28.0-adobe-20260731 --namespace=kafka
+  --version 0.30.0 --namespace=kafka
 ```
 
 ## Uninstalling the Chart

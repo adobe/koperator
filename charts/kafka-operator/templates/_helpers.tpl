@@ -57,12 +57,16 @@ Compute operator prometheus metrics auth proxy service account
 Sidecar implementation details
 */}}
 {{- define "chart.additionalSidecars"}}
-{{ toYaml .Values.additionalSidecars }}
+{{ with .Values.additionalSidecars }}
+    {{- toYaml . -}}
+{{- end }}
 {{- end}}
 
 {{/*
 Sidecar volume implementation details
 */}}
 {{- define "chart.additionalVolumes"}}
-{{ toYaml .Values.additionalVolumes }}
+{{ with .Values.additionalVolumes }}
+    {{- toYaml . -}}
+{{- end }}
 {{- end}}

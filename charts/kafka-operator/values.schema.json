@@ -3,13 +3,13 @@
     "type": "object",
     "properties": {
         "additionalEnv": {
-            "type": "object"
+            "type": "array"
         },
         "additionalSidecars": {
-            "type": "object"
+            "type": "array"
         },
         "additionalVolumes": {
-            "type": "object"
+            "type": "array"
         },
         "affinity": {
             "type": "object"
@@ -54,6 +54,14 @@
         },
         "containerSecurityContext": {
             "type": "object"
+        },
+        "contour": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                }
+            }
         },
         "fullnameOverride": {
             "type": "string"
@@ -177,6 +185,17 @@
                 },
                 "enabled": {
                     "type": "boolean"
+                },
+                "podMonitor": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean"
+                        },
+                        "interval": {
+                            "type": "string"
+                        }
+                    }
                 }
             }
         },
