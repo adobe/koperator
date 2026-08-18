@@ -112,44 +112,53 @@ func testBatchedBrokerRemoval() bool {
 // hasExactlyOneRemoveBrokerOperation returns true if there is exactly one CruiseControlOperation
 // of type remove_broker in the namespace.
 func hasExactlyOneRemoveBrokerOperation(kubectlOptions k8s.KubectlOptions) (bool, error) {
-	ops, err := getK8sResources(kubectlOptions,
-		[]string{"cruisecontroloperation"},
-		"",
-		"",
-		"-o", "jsonpath={range .items[*]}{.status.currentTask.operation}{'\\n'}{end}",
-	)
-	if err != nil {
-		return false, err
-	}
-
-	count := 0
-	for _, op := range ops {
-		if op == string(v1alpha1.OperationRemoveBroker) {
-			count++
-		}
-	}
-	return count == 1, nil
+	return hasExactlyNBrokerOperations(kubectlOptions, v1alpha1.OperationRemoveBroker, 1)
 }
 
-// hasNoInFlightCruiseControlOperation returns true when no CruiseControlOperation in the namespace
-// has a currently-running task (Active or InExecution). Completed / CompletedWithError tasks and
-// operations without a currentTask count as idle. It is used to gate mutation tests (broker/disk
-// removal) on a quiescent Cruise Control so a new operation does not race an in-flight one, such as
-// the rebalance CruiseControl runs right after a fresh cluster install.
+// hasNoInFlightCruiseControlOperation returns true when no scaling/mutation CruiseControlOperation in the
+// namespace has a task that is running or queued. "status" operations (Cruise Control health reads) are
+// ignored - they are not mutations and are created without an error policy, so a stale/failed one must not
+// wedge this gate. A mutation operation is idle only when koperator considers it finished (matching
+// CruiseControlOperation.IsFinished): its currentTask is Completed, or it is CompletedWithError under the
+// "ignore" error policy. Everything else with a currentTask is busy - Active / InExecution (running), an
+// empty state (queued for first execution), and CompletedWithError under the default "retry" policy (queued
+// for retry). Operations without a currentTask are idle. It is used to gate mutation tests (broker/disk
+// removal, KRaft scaling) on a quiescent Cruise Control so a new operation does not race an in-flight,
+// about-to-run, or about-to-retry one, such as the rebalance CruiseControl runs right after a fresh install.
 func hasNoInFlightCruiseControlOperation(kubectlOptions k8s.KubectlOptions) (bool, error) {
-	states, err := getK8sResources(kubectlOptions,
+	// One line per operation: "<currentTask.operation>/<currentTask.state>/<spec.errorPolicy>". The first two
+	// render empty when there is no currentTask, so an operation with a set operation but empty state is a
+	// queued (not-yet-run) task.
+	lines, err := getK8sResources(kubectlOptions,
 		[]string{"cruisecontroloperation"},
 		"",
 		"",
-		"-o", "jsonpath={range .items[*]}{.status.currentTask.state}{'\\n'}{end}",
+		"-o", "jsonpath={range .items[*]}{.status.currentTask.operation}/{.status.currentTask.state}/{.spec.errorPolicy}{'\\n'}{end}",
 	)
 	if err != nil {
 		return false, err
 	}
-	for _, state := range states {
-		if state == string(v1beta1.CruiseControlTaskActive) || state == string(v1beta1.CruiseControlTaskInExecution) {
-			return false, nil
+	for _, line := range lines {
+		operation, rest, _ := strings.Cut(line, "/")
+		state, errorPolicy, _ := strings.Cut(rest, "/")
+		if operation == "" {
+			// No currentTask yet - nothing running or queued for this operation.
+			continue
 		}
+		if operation == string(v1alpha1.OperationStatus) {
+			// "status" operations are Cruise Control health reads, not scaling/mutation tasks, and the
+			// operation controller creates them without an error policy - a failed/stale one would otherwise
+			// wedge this gate. They never conflict with a new scaling operation, so ignore them.
+			continue
+		}
+		taskState := v1beta1.CruiseControlUserTaskState(state)
+		finished := taskState == v1beta1.CruiseControlTaskCompleted ||
+			(taskState == v1beta1.CruiseControlTaskCompletedWithError && errorPolicy == string(v1alpha1.ErrorPolicyIgnore))
+		if finished {
+			continue
+		}
+		// Running, queued for first execution, or CompletedWithError awaiting retry - Cruise Control is busy.
+		return false, nil
 	}
 	return true, nil
 }

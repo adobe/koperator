@@ -129,6 +129,16 @@ func (r CruiseControlState) IsDownscaleStalled() bool {
 	return r == GracefulDownscaleCompletedWithError || r == GracefulDownscalePaused
 }
 
+// IsDownscaleRunning returns true only for GracefulDownscaleRunning - the task is actively executing in
+// Cruise Control right now. Unlike IsDownscale(), this deliberately excludes Required (no CruiseControlOperation
+// exists yet) and Scheduled (the CruiseControlOperation exists but has not been submitted to Cruise Control
+// yet, e.g. because it is itself waiting behind this same roll gate) - states where no in-flight CC-side task
+// can be disrupted by a capacity.json roll, so gating on the broader IsDownscale() there stalls a concurrent
+// add_broker forever without ever protecting a running task (see #301 and isBrokerDeletionInProgress).
+func (r CruiseControlState) IsDownscaleRunning() bool {
+	return r == GracefulDownscaleRunning
+}
+
 // IsRunningState returns true if CruiseControlState indicates
 // that the CC operation is scheduled and in-progress
 func (r CruiseControlState) IsRunningState() bool {

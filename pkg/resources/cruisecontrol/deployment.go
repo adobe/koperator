@@ -184,24 +184,54 @@ fi`},
 	}
 }
 
-func GeneratePodAnnotations(cruiseControlAnnotations, cruiseControlConfig map[string]string) map[string]string {
-	hashedCruiseControlConfigJson := sha256.Sum256([]byte(cruiseControlConfig["cruisecontrol.properties"]))
-	hashedCruiseControlClusterConfigJson := sha256.Sum256([]byte(cruiseControlConfig["clusterConfigs.json"]))
-	hashedCruiseControlLogConfigJson := sha256.Sum256([]byte(cruiseControlConfig["log4j.properties"]))
+// CapacityConfigHashAnnotationKey is the CC pod-template annotation that carries the hash of the deployed
+// capacity.json. Its presence marks a Deployment whose capacity is koperator-managed (see GeneratePodAnnotations),
+// and comparing it against ConfigHash of the current ConfigMap tells whether the running CC pod has
+// already been rolled with that capacity. The operation controller's roll gate
+// (CruiseControlOperationReconciler.requeueIfCCDeploymentNotRolledOut) reads this to decide whether a broker
+// op is safe to submit - changing how it is computed/stamped must keep that gate in sync.
+const CapacityConfigHashAnnotationKey = "cruiseControlCapacity.json"
 
+// ConfigHashAnnotationKey, ClusterConfigHashAnnotationKey and LogConfigHashAnnotationKey are the CC
+// pod-template annotations that carry the hash of, respectively, cruisecontrol.properties,
+// clusterConfigs.json and log4j.properties (see GeneratePodAnnotations). Like
+// CapacityConfigHashAnnotationKey, the operation controller's roll gate
+// (CruiseControlOperationReconciler.requeueIfCCDeploymentNotRolledOut) compares these against the current
+// ConfigMap to decide whether a broker op is safe to submit - a change to any one of them rolls the CC
+// Deployment same as a capacity.json change, so the gate must cover all four, not just capacity.
+const (
+	ConfigHashAnnotationKey        = "cruiseControlConfig.json"
+	ClusterConfigHashAnnotationKey = "cruiseControlClusterConfig.json"
+	LogConfigHashAnnotationKey     = "cruiseControlLogConfig.json"
+)
+
+// ConfigHash returns the hex-encoded sha256 of a ConfigMap entry's content, matching the value
+// GeneratePodAnnotations stamps into the CC pod template for each of the Config/ClusterConfig/LogConfig/
+// Capacity hash annotation keys.
+func ConfigHash(content string) string {
+	sum := sha256.Sum256([]byte(content))
+	return hex.EncodeToString(sum[:])
+}
+
+// CapacityConfigHash returns the hex-encoded sha256 of a capacity.json. Kept as a distinctly named alias of
+// ConfigHash for callers/tests that reference capacity.json specifically.
+func CapacityConfigHash(capacityConfigJSON string) string {
+	return ConfigHash(capacityConfigJSON)
+}
+
+func GeneratePodAnnotations(cruiseControlAnnotations, cruiseControlConfig map[string]string) map[string]string {
 	annotations := []map[string]string{
 		cruiseControlAnnotations,
 		{
-			"cruiseControlConfig.json":        hex.EncodeToString(hashedCruiseControlConfigJson[:]),
-			"cruiseControlClusterConfig.json": hex.EncodeToString(hashedCruiseControlClusterConfigJson[:]),
-			"cruiseControlLogConfig.json":     hex.EncodeToString(hashedCruiseControlLogConfigJson[:]),
+			ConfigHashAnnotationKey:        ConfigHash(cruiseControlConfig[PropertiesConfigMapKey]),
+			ClusterConfigHashAnnotationKey: ConfigHash(cruiseControlConfig[ClusterConfigsConfigMapKey]),
+			LogConfigHashAnnotationKey:     ConfigHash(cruiseControlConfig[Log4jConfigMapKey]),
 		},
 	}
 	if value, ok := cruiseControlAnnotations[capacityConfigAnnotation]; !ok ||
 		value == string(staticCapacityConfig) {
-		hashedCruiseControlCapacityJson := sha256.Sum256([]byte(cruiseControlConfig["capacity.json"]))
 		annotations = append(annotations,
-			map[string]string{"cruiseControlCapacity.json": hex.EncodeToString(hashedCruiseControlCapacityJson[:])})
+			map[string]string{CapacityConfigHashAnnotationKey: CapacityConfigHash(cruiseControlConfig[CapacityConfigMapKey])})
 	}
 
 	return util.MergeAnnotations(annotations...)

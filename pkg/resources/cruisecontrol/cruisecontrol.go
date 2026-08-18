@@ -18,6 +18,7 @@ package cruisecontrol
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"emperror.dev/errors"
 	"github.com/go-logr/logr"
@@ -66,6 +67,19 @@ func ccLabelSelector(kafkaCluster string) map[string]string {
 	}
 }
 
+// DeploymentName returns the name of the Cruise Control Deployment reconciled for kafkaCluster. Callers
+// outside this package (e.g. controllers) must use this instead of re-deriving the name so the convention
+// stays in one place.
+func DeploymentName(kafkaCluster *v1beta1.KafkaCluster) string {
+	return fmt.Sprintf(deploymentNameTemplate, kafkaCluster.Name)
+}
+
+// ConfigMapName returns the name of the Cruise Control ConfigMap reconciled for kafkaCluster (the one that
+// holds capacity.json). See DeploymentName for why this is centralized.
+func ConfigMapName(kafkaCluster *v1beta1.KafkaCluster) string {
+	return fmt.Sprintf(configAndVolumeNameTemplate, kafkaCluster.Name)
+}
+
 // New creates a new reconciler for CC
 func New(client client.Client, cluster *v1beta1.KafkaCluster, kafkaClientProvider kafkaclient.Provider) *Reconciler {
 	return &Reconciler{
@@ -112,7 +126,7 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 			}
 
 			var config *corev1.ConfigMap
-			if isBrokerDeletionInProgress(r.KafkaCluster.Status.BrokersState) {
+			if isBrokerDeletionInProgress(r.KafkaCluster.Status.BrokersState) || isBrokerRemovalPending(r.KafkaCluster) {
 				key := types.NamespacedName{
 					Name:      fmt.Sprintf(configAndVolumeNameTemplate, r.KafkaCluster.Name),
 					Namespace: r.KafkaCluster.Namespace,
@@ -193,9 +207,55 @@ func (r *Reconciler) getClientSecret() (*corev1.Secret, error) {
 	return clientSecret, nil
 }
 
+// isBrokerDeletionInProgress reports whether a broker in the status is actively being downscaled by Cruise
+// Control right now (GracefulDownscaleRunning). It deliberately checks IsDownscaleRunning(), not the broader
+// IsDownscale(): Required/Scheduled downscale states have no in-flight CC-side task to protect from a
+// capacity.json roll, and treating them as "in progress" here can deadlock a concurrent add - the config
+// generator would refuse to add the new broker's capacity forever, while the task controller's add-before-
+// remove priority (cruisecontroltask_controller.go) never lets the downscale advance past Required/Scheduled
+// to unblock it (see #301).
+//
+// KNOWN LIMITATION (accepted; documented here as the record, no separate tracking issue filed):
+// BrokersState.CruiseControlState is a lagging mirror -
+// CruiseControlTaskReconciler copies the CruiseControlOperation's task state into it asynchronously, and the
+// KafkaCluster is read here via the cached client. So there is a brief window where remove_broker is already
+// running on Cruise Control but this still reads GracefulDownscaleScheduled, i.e. returns false. If a broker
+// that is NOT yet in the deployed capacity.json is added concurrently during that window, GenerateCapacityConfig
+// takes the merge path, rewrites capacity.json, and rolls CC - killing the in-flight remove_broker (the #301
+// class, for a narrower trigger). This is intentionally not guarded here because it is narrow (needs a second,
+// independent broker add landing inside the seconds-wide Scheduled->Running mirror-lag; pure removals and
+// single-apply mixed edits are safe because the added broker is already in capacity.json before the removal
+// runs) and self-heals (the killed remove_broker is retried under ErrorPolicyRetry). The robust fix is to key
+// off the live CruiseControlOperation task state (via GracefulActionState.CruiseControlOperationReference, read
+// through the non-cached DirectClient) instead of this mirrored enum - a deliberate design change left as a
+// documented follow-up.
 func isBrokerDeletionInProgress(brokerState map[string]v1beta1.BrokerState) bool {
 	for _, state := range brokerState {
-		if state.GracefulActionState.CruiseControlState.IsDownscale() {
+		if state.GracefulActionState.CruiseControlState.IsDownscaleRunning() {
+			return true
+		}
+	}
+	return false
+}
+
+// isBrokerRemovalPending reports whether a broker that is still present in the status has already been
+// dropped from the spec - i.e. a removal that has not yet been marked as a Cruise Control downscale.
+//
+// During this window the operator must keep reusing the already-deployed capacity.json instead of
+// regenerating a fallback entry for the departing broker. Regenerating it changes capacity.json, which
+// (because capacity.json is hashed into the Cruise Control pod template) rolls the Cruise Control
+// Deployment and resets CC's metric-sampling window - keeping CC un-ready exactly when
+// reconcileKafkaPodDelete needs CC ready (via BrokersWithState) to mark the downscale. That chicken-and-egg
+// otherwise prevents the remove_broker operation from ever being created and stalls the removal (see #301).
+// Once the pod is gone and the broker is dropped from the status too, capacity.json shrinks with a single
+// harmless roll and no operation in flight.
+func isBrokerRemovalPending(kafkaCluster *v1beta1.KafkaCluster) bool {
+	specBrokerIDs := make(map[string]struct{}, len(kafkaCluster.Spec.Brokers))
+	for i := range kafkaCluster.Spec.Brokers {
+		specBrokerIDs[strconv.Itoa(int(kafkaCluster.Spec.Brokers[i].Id))] = struct{}{}
+	}
+	for brokerID := range kafkaCluster.Status.BrokersState {
+		if _, ok := specBrokerIDs[brokerID]; !ok {
 			return true
 		}
 	}

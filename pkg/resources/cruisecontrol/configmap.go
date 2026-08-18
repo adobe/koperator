@@ -48,6 +48,17 @@ const (
 	storageConfigNWINDefaultValue  = "125000"
 	storageConfigNWOUTDefaultValue = "125000"
 	defaultDoc                     = "Capacity unit used for disk is in MB, cpu is in percentage, network throughput is in KB."
+
+	// PropertiesConfigMapKey, ClusterConfigsConfigMapKey, Log4jConfigMapKey and CapacityConfigMapKey are the
+	// keys under which the four hashed entries are stored in the Cruise Control ConfigMap. Exported so all three
+	// sites that must agree on them - the write side (configMap), the pod-template stamp side
+	// (GeneratePodAnnotations) and the operation controller's roll gate - share one source of truth instead of
+	// duplicating the literals, where a rename would silently break a lookup (make the gate hash an empty
+	// string, never match the deployed annotation, and defer operations forever - the #301 stall class).
+	PropertiesConfigMapKey     = "cruisecontrol.properties"
+	ClusterConfigsConfigMapKey = "clusterConfigs.json"
+	Log4jConfigMapKey          = "log4j.properties"
+	CapacityConfigMapKey       = "capacity.json"
 )
 
 func (r *Reconciler) configMap(clientPass string, capacityConfig string, log logr.Logger) runtime.Object {
@@ -100,10 +111,10 @@ func (r *Reconciler) configMap(clientPass string, capacityConfig string, log log
 			r.KafkaCluster,
 		),
 		Data: map[string]string{
-			"cruisecontrol.properties": ccConfig.String(),
-			"capacity.json":            capacityConfig,
-			"clusterConfigs.json":      r.KafkaCluster.Spec.CruiseControlConfig.ClusterConfig,
-			"log4j.properties":         r.KafkaCluster.Spec.CruiseControlConfig.GetCCLog4jConfig(),
+			PropertiesConfigMapKey:     ccConfig.String(),
+			CapacityConfigMapKey:       capacityConfig,
+			ClusterConfigsConfigMapKey: r.KafkaCluster.Spec.CruiseControlConfig.ClusterConfig,
+			Log4jConfigMapKey:          r.KafkaCluster.Spec.CruiseControlConfig.GetCCLog4jConfig(),
 		},
 	}
 	return configMap
@@ -169,17 +180,11 @@ func GenerateCapacityConfig(kafkaCluster *v1beta1.KafkaCluster, log logr.Logger,
 			return "", errors.Wrap(err, "could not unmarshal the user-provided broker capacity config")
 		}
 		for _, brokerCapacity := range capacityConfig.Capacities {
-			brokerCapacityMap, ok := brokerCapacity.(map[string]interface{})
-			if !ok {
-				continue
-			}
-			brokerId, ok, err := unstructured.NestedString(brokerCapacityMap, v1beta1.BrokerIdLabelKey)
+			brokerId, err := brokerIDFromCapacityEntry(brokerCapacity)
 			if err != nil {
-				return "", errors.WrapIfWithDetails(err,
-					"could not retrieve broker Id from broker capacity configuration",
-					"capacity configuration", brokerCapacityMap)
+				return "", err
 			}
-			if !ok {
+			if brokerId == "" {
 				continue
 			}
 			// If the -1 default exists we don't have to do anything else here since all brokers will have values.
@@ -190,12 +195,25 @@ func GenerateCapacityConfig(kafkaCluster *v1beta1.KafkaCluster, log logr.Logger,
 			userConfigBrokerIds = append(userConfigBrokerIds, brokerId)
 		}
 	}
-	// During cluster downscale the CR does not contain data for brokers being downscaled which is
-	// required to generate the proper capacity json for CC so we are reusing the old one.
-	// We can only remove brokers from capacity config when they were removed (pods deleted) from CC as well.
+	// During a scaling operation the CR does not carry capacity data for every broker Cruise Control still
+	// knows about (a broker dropped from the spec but not yet deleted from CC), so we reuse the already
+	// deployed capacity.json instead of regenerating a fallback entry for it - regenerating changes
+	// capacity.json, which rolls the CC Deployment mid-scaling (see #301 and isBrokerRemovalPending). We
+	// only ADD entries for brokers that have newly joined (present in the spec/status but missing from the
+	// deployed config) so a mixed add+remove edit still writes the new broker's capacity before add_broker.
+	// A departing broker keeps its deployed entry until its pod is gone.
 	if config != nil {
-		if data, ok := config.Data["capacity.json"]; ok {
-			return data, err
+		if data, ok := config.Data[CapacityConfigMapKey]; ok {
+			// While a downscale is actively running there is a remove_broker task in flight on the CC pod;
+			// appending a concurrently-added broker here would change capacity.json, roll the CC Deployment,
+			// and kill that in-flight task - the exact #301 failure class. Reuse the deployed config verbatim
+			// in that window. The added broker's capacity is written by the next full regeneration once the
+			// downscale completes, and its add_broker is deferred until then by the operation controller's roll
+			// gate (requeueIfCCDeploymentNotRolledOut), so nothing is lost.
+			if isBrokerDeletionInProgress(kafkaCluster.Status.BrokersState) {
+				return data, nil
+			}
+			return mergeCapacityConfig(kafkaCluster, log, data, capacityConfig.Capacities, userConfigBrokerIds)
 		}
 	}
 
@@ -213,6 +231,149 @@ func GenerateCapacityConfig(kafkaCluster *v1beta1.KafkaCluster, log logr.Logger,
 	}
 	log.V(2).Info("broker capacity config generated successfully", "capacity config", string(result))
 	return string(result), err
+}
+
+// mergeCapacityConfig returns the already-deployed capacity.json augmented with entries for brokers that
+// have joined the cluster since it was written (present in the spec/status but absent from the deployed
+// config). A newly added broker takes its user-provided capacity when the CR defines one, otherwise a
+// generated entry, so add_broker always has capacity data - even in a mixed add+remove edit. Entries
+// already in the deployed config - including brokers being removed (dropped from the spec but still in the
+// status) - are preserved verbatim so their capacity is not rewritten to the fallback default; rewriting it
+// would change capacity.json and roll Cruise Control mid-scaling (see #301).
+//
+// When no broker needs to be added the deployed config is returned byte-for-byte unchanged so no spurious
+// roll happens - this preserves the pre-existing "reuse the deployed capacity.json during downscale"
+// behaviour exactly, while additionally covering a mixed add+remove edit. A side effect of preserving
+// deployed entries verbatim is that a capacity change to a broker that stays in the cluster (e.g. a disk
+// resize) is not written until the reuse window closes and full regeneration resumes; this is invoked only
+// while a broker is departing (see isBrokerRemovalPending / isBrokerDeletionInProgress in Reconcile).
+//
+// The reuse window is bounded only for a healthy downscale: it closes once the departing broker's pod is gone
+// and it drops out of the status. If a removal wedges - the broker stays in the status but out of the spec
+// indefinitely (a stuck/paused downscale that is never resolved) - isBrokerRemovalPending stays true and this
+// suppression of staying-brokers' capacity changes is unbounded until an operator resolves the removal. That
+// is an accepted trade-off: a wedged downscale already needs manual investigation, and rolling CC to write an
+// unrelated capacity change while a removal is stuck would not help.
+func mergeCapacityConfig(kafkaCluster *v1beta1.KafkaCluster, log logr.Logger, deployedCapacityConfig string, userCapacities []interface{}, userConfigBrokerIds []string) (string, error) {
+	var deployed JBODInvariantCapacityConfig
+	if err := json.Unmarshal([]byte(deployedCapacityConfig), &deployed); err != nil {
+		// The deployed capacity.json is unexpectedly unparseable; keep reusing it verbatim rather than
+		// regenerating from scratch, which could roll Cruise Control mid-scaling.
+		log.Error(err, "could not parse deployed cruise control capacity config, reusing it verbatim")
+		return deployedCapacityConfig, nil
+	}
+
+	// Broker ids already present in the deployed config. Their entries win (kept verbatim) so we neither
+	// generate nor re-add them, which avoids rolling Cruise Control for brokers that already have capacity.
+	deployedBrokerIds := make(map[string]struct{}, len(deployed.Capacities))
+	for _, brokerCapacity := range deployed.Capacities {
+		brokerId, err := brokerIDFromCapacityEntry(brokerCapacity)
+		if err != nil {
+			return "", err
+		}
+		if brokerId == "-1" {
+			// A "-1" universal-default entry already covers every broker, so nothing needs appending and
+			// appending a redundant per-broker entry would only change capacity.json and roll CC. Reuse
+			// verbatim. (Unreachable via the normal flow - a user "-1" makes GenerateCapacityConfig return
+			// early before merge - but guard against a deployed config that ever carries one.)
+			return deployedCapacityConfig, nil
+		}
+		if brokerId != "" {
+			deployedBrokerIds[brokerId] = struct{}{}
+		}
+	}
+
+	// User-provided capacities for brokers that are not yet in the deployed config are the explicit
+	// capacity for a newly added broker and must be carried over verbatim (finding: a mixed add+remove
+	// edit must not drop the new broker's user-provided capacity).
+	var newBrokerCapacities []interface{}
+	for _, userCapacity := range userCapacities {
+		brokerId, err := brokerIDFromCapacityEntry(userCapacity)
+		if err != nil {
+			return "", err
+		}
+		if brokerId == "" {
+			continue
+		}
+		if _, ok := deployedBrokerIds[brokerId]; !ok {
+			newBrokerCapacities = append(newBrokerCapacities, userCapacity)
+		}
+	}
+
+	// Generate entries for the remaining newly joined brokers (missing from the deployed config and not
+	// covered by a user-provided capacity), matching the non-reuse path's generation.
+	coveredBrokerIds := append([]string(nil), userConfigBrokerIds...)
+	for brokerId := range deployedBrokerIds {
+		coveredBrokerIds = append(coveredBrokerIds, brokerId)
+	}
+	generatedBrokerCapacities, err := appendGeneratedBrokerCapacities(kafkaCluster, log, coveredBrokerIds)
+	if err != nil {
+		return "", err
+	}
+	newBrokerCapacities = append(newBrokerCapacities, generatedBrokerCapacities...)
+
+	// No broker has joined since the config was deployed: reuse it verbatim so Cruise Control is not rolled.
+	if len(newBrokerCapacities) == 0 {
+		return deployedCapacityConfig, nil
+	}
+
+	deployed.Capacities = append(deployed.Capacities, newBrokerCapacities...)
+	result, err := json.MarshalIndent(deployed, "", "    ")
+	if err != nil {
+		return "", errors.WrapIf(err, "could not marshal merged cruise control capacity config")
+	}
+	log.V(1).Info("merged newly added brokers into the deployed capacity config", "capacity config", string(result))
+	return string(result), nil
+}
+
+// CapacityConfigContainsBrokers reports whether the given capacity.json defines a capacity entry for every
+// broker id in brokerIDs. A "-1" universal-default entry counts as covering every broker. It lets a caller
+// confirm a newly added broker's capacity has actually been written before acting on it.
+func CapacityConfigContainsBrokers(capacityConfigJSON string, brokerIDs []string) (bool, error) {
+	var capacityConfig JBODInvariantCapacityConfig
+	if err := json.Unmarshal([]byte(capacityConfigJSON), &capacityConfig); err != nil {
+		return false, errors.Wrap(err, "could not unmarshal capacity config")
+	}
+	present := make(map[string]struct{}, len(capacityConfig.Capacities))
+	for _, entry := range capacityConfig.Capacities {
+		brokerID, err := brokerIDFromCapacityEntry(entry)
+		if err != nil {
+			return false, err
+		}
+		if brokerID == "-1" {
+			// Universal default: every broker is covered.
+			return true, nil
+		}
+		if brokerID != "" {
+			present[brokerID] = struct{}{}
+		}
+	}
+	for _, id := range brokerIDs {
+		if _, ok := present[id]; !ok {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+// brokerIDFromCapacityEntry extracts the "brokerId" field from a capacity.json entry. It returns an empty
+// string (no error) when the entry is not a JSON object or has no broker id, matching how the rest of the
+// capacity handling tolerates heterogeneous JBOD/non-JBOD entries.
+func brokerIDFromCapacityEntry(entry interface{}) (string, error) {
+	entryMap, ok := entry.(map[string]interface{})
+	if !ok {
+		return "", nil
+	}
+	brokerId, ok, err := unstructured.NestedString(entryMap, v1beta1.BrokerIdLabelKey)
+	if err != nil {
+		return "", errors.WrapIfWithDetails(err,
+			"could not retrieve broker Id from broker capacity configuration",
+			"capacity configuration", entryMap)
+	}
+	if !ok {
+		return "", nil
+	}
+	return brokerId, nil
 }
 
 func appendGeneratedBrokerCapacities(kafkaCluster *v1beta1.KafkaCluster, log logr.Logger, userConfigBrokerIds []string) ([]interface{}, error) {

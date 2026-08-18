@@ -1,3 +1,9 @@
+# This manifest is simplekafkacluster_kraft.yaml with exactly ONE extra broker-only node (id 103).
+# The KRaft broker-scaling e2e (tests/e2e/test_kraft_broker_scaling.go) upscales the 3-broker base to this
+# manifest (adds broker 103) and then downscales back. Everything else - images, controller/broker ids,
+# broker config, and the deliberately-absent capacityConfig - MUST stay identical to the base so the only
+# delta the operator (and Cruise Control) sees is a single broker being added/removed. >=3 broker-only
+# nodes remain at all times so RF=3 / min.insync.replicas=3 topics stay satisfiable during reassignment.
 apiVersion: kafka.banzaicloud.io/v1beta1
 kind: KafkaCluster
 metadata:
@@ -7,11 +13,11 @@ metadata:
 spec:
   kRaft: true
   monitoringConfig:
-    jmxImage: "ghcr.io/adobe/koperator/jmx-javaagent:1.5.0" # renovate: datasource=docker depName=ghcr.io/adobe/koperator/jmx-javaagent
+    jmxImage: "ghcr.io/adobe/koperator/jmx-javaagent:1.5.0"
   headlessServiceEnabled: true
   propagateLabels: false
   oneBrokerPerNode: false
-  clusterImage: "ghcr.io/adobe/koperator/kafka:2.13-3.9.2-jdk21.0.11" # renovate: datasource=docker depName=ghcr.io/adobe/koperator/kafka
+  clusterImage: "ghcr.io/adobe/koperator/kafka:2.13-3.9.2-jdk21.0.11"
   taintedBrokersSelector:
     matchLabels:
       restart: me
@@ -70,6 +76,9 @@ spec:
     - id: 101
       brokerConfigGroup: "broker"
     - id: 102
+      brokerConfigGroup: "broker"
+    # The only difference from simplekafkacluster_kraft.yaml: the fourth broker-only node added by the e2e.
+    - id: 103
       brokerConfigGroup: "broker"
   rollingUpgradeConfig:
     failureThreshold: 1

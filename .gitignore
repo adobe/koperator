@@ -48,3 +48,4 @@ manager_image_patch.yaml
 **/go.work
 **/go.work.sum
 .claude/worktrees/**
+.worktrees/

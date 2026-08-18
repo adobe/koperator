@@ -25,6 +25,8 @@ import (
 
 	"emperror.dev/errors"
 	"github.com/go-logr/logr"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -39,6 +41,7 @@ import (
 	apiutil "github.com/banzaicloud/koperator/api/util"
 	banzaiv1alpha1 "github.com/banzaicloud/koperator/api/v1alpha1"
 	banzaiv1beta1 "github.com/banzaicloud/koperator/api/v1beta1"
+	"github.com/banzaicloud/koperator/pkg/resources/cruisecontrol"
 	"github.com/banzaicloud/koperator/pkg/scale"
 	"github.com/banzaicloud/koperator/pkg/util"
 )
@@ -51,6 +54,13 @@ const (
 	ccOperationRetryExecution                      = "ccOperationRetryExecution"
 	ccOperationInProgress                          = "ccOperationInProgress"
 	defaultCruiseControlStatusOperationMaxDuration = time.Duration(5) * time.Minute
+	// stalledCCDeploymentRequeueIntervalSeconds backs off the roll gate's requeue when the CC Deployment
+	// rollout is wedged (ProgressDeadlineExceeded), so the error surfaced for it is not re-emitted every
+	// default interval for the (potentially hours-long) life of the wedge.
+	stalledCCDeploymentRequeueIntervalSeconds = 60
+	// progressDeadlineExceededReason is the well-known reason the Deployment controller sets on the
+	// Progressing condition when a rollout exceeds spec.progressDeadlineSeconds.
+	progressDeadlineExceededReason = "ProgressDeadlineExceeded"
 )
 
 var (
@@ -76,6 +86,12 @@ type CruiseControlOperationReconciler struct {
 // +kubebuilder:rbac:groups=kafka.banzaicloud.io,resources=cruisecontroloperations,verbs=get;list;watch;create;update;patch;delete;deletecollection
 // +kubebuilder:rbac:groups=kafka.banzaicloud.io,resources=cruisecontroloperations/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=kafka.banzaicloud.io,resources=cruisecontroloperations/finalizers,verbs=create;update;patch;delete
+// The roll gate (requeueIfCCDeploymentNotRolledOut) reads the Cruise Control Deployment and ConfigMap; declare
+// those reads locally so the controller's permissions stay correct even if the aggregated ClusterRole is ever
+// split per-controller. These are a subset of what the KafkaCluster controller already grants, so regenerating
+// the aggregated role produces no diff.
+// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch
 
 //nolint:gocyclo
 func (r *CruiseControlOperationReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
@@ -224,6 +240,13 @@ func (r *CruiseControlOperationReconciler) Reconcile(ctx context.Context, reques
 		return requeueAfter(defaultRequeueIntervalInSeconds)
 	}
 
+	// Defer any Cruise Control operation (except stop_execution) until the CC Deployment is safe to submit to
+	// - settled and carrying the current capacity.json - see requeueIfCCDeploymentNotRolledOut (#301).
+	if result, handled, err := r.requeueIfCCDeploymentNotRolledOut(ctx, log, kafkaCluster,
+		ccOperationExecution.CurrentTaskOperation(), ccOperationExecution.CurrentTaskParameters()); handled {
+		return result, err
+	}
+
 	log.Info("executing Cruise Control task", "operation", ccOperationExecution.CurrentTaskOperation(), "parameters", ccOperationExecution.CurrentTaskParameters())
 	// Executing operation
 	cruseControlTaskResult, err := r.executeOperation(ctx, ccOperationExecution)
@@ -268,6 +291,199 @@ func (r *CruiseControlOperationReconciler) addFinalizer(ctx context.Context, cur
 		}
 	}
 	return nil
+}
+
+// requeueIfCCDeploymentNotRolledOut defers a Cruise Control operation until the CC Deployment is safe to
+// submit to. Any broker-affecting op (add_broker, remove_broker, rebalance, remove_disks) submitted while the
+// CC Deployment is mid-rollout can be wiped: during a RollingUpdate two CC pods briefly run behind one
+// Service, so the fresh pod loses the in-memory task and resets its metric-sampling window, stalling the op
+// (see #301). A roll is triggered by any change hashed into the CC pod template (capacity.json,
+// cruisecontrol.properties, clusterConfigs.json, log4j.properties), so this is not specific to broker scaling.
+// stop_execution is never gated - it is how an operator aborts a stuck task.
+//
+// "Settled right now" is not enough on its own: a ConfigMap change may not have been rolled into the pod
+// template yet. KafkaClusterReconciler marks a new broker GracefulUpscaleRequired (which makes the task
+// controller create the add_broker op) BEFORE, and independently of, the CC reconciler that regenerates the
+// ConfigMap and patches the Deployment - so an op can be picked up while the Deployment is still settled on
+// the OLD config, before the roll is even triggered. We therefore also require the running pod template's
+// four hash annotations - stamped by cruisecontrol.GeneratePodAnnotations under CapacityConfigHashAnnotationKey,
+// ConfigHashAnnotationKey, ClusterConfigHashAnnotationKey and LogConfigHashAnnotationKey - to each match the
+// corresponding entry in the current ConfigMap for EVERY gated op (a rebalance/remove_disks would likewise be
+// wiped by a roll triggered by any of capacity.json, cruisecontrol.properties, clusterConfigs.json or
+// log4j.properties changing and landing just after submission - not just capacity). add_broker additionally
+// requires capacity.json to contain the target broker(s), so it runs against a CC that has loaded their exact
+// capacity (no dependency on capacity estimation). This is an implicit contract with the CC reconciler: both
+// sides compute the same hash for each entry; keep them in sync (see GeneratePodAnnotations / TestCapacityConfigHash).
+//
+// Every check fails open when the evidence to gate on is absent (no Deployment, no ConfigMap, or a given
+// hashed entry not koperator-managed) so it can never deadlock an operation. The returned bool reports
+// whether the caller should return the (result, error) as-is.
+func (r *CruiseControlOperationReconciler) requeueIfCCDeploymentNotRolledOut(ctx context.Context, log logr.Logger,
+	kafkaCluster *banzaiv1beta1.KafkaCluster, op banzaiv1alpha1.CruiseControlTaskOperation, parameters map[string]string) (ctrl.Result, bool, error) {
+	// stop_execution aborts an in-flight task and must never be deferred.
+	if op == banzaiv1alpha1.OperationStopExecution {
+		return ctrl.Result{}, false, nil
+	}
+
+	// Read the Deployment and ConfigMap through the non-cached API reader: freshness is part of this gate's
+	// correctness contract. A lagging informer cache could show the OLD ConfigMap/Deployment annotations as
+	// matching, let an op be submitted, and then have the real update land and roll Cruise Control - killing
+	// the just-submitted task, the exact #301 race this gate prevents. This is a low-frequency path (only
+	// selected non-stop_execution ops reach it), so the direct read is affordable. Fall back to the cached
+	// client for manually constructed reconcilers (e.g. unit tests) that leave DirectClient unset.
+	reader := r.DirectClient
+	if reader == nil {
+		reader = r.Client
+	}
+
+	deployment := &appsv1.Deployment{}
+	deploymentKey := client.ObjectKey{
+		Name:      cruisecontrol.DeploymentName(kafkaCluster),
+		Namespace: kafkaCluster.Namespace,
+	}
+	if err := reader.Get(ctx, deploymentKey, deployment); err != nil {
+		if apiErrors.IsNotFound(err) {
+			// No Cruise Control Deployment: no rollout in progress to race with, so do not gate.
+			return ctrl.Result{}, false, nil
+		}
+		result, wErr := requeueWithError(log, "could not determine Cruise Control Deployment rollout state", err)
+		return result, true, wErr
+	}
+
+	// No op may be submitted to a CC that is mid-rollout - a restart wipes the in-flight task.
+	if isDeploymentRolling(deployment) {
+		requeueInterval := defaultRequeueIntervalInSeconds
+		if deploymentRolloutTimedOut(deployment) {
+			// The old CC pod keeps the Service up (so CC still reports ready) while the new pod never becomes
+			// available - the operation would otherwise defer forever with only a routine log. Surface it, and
+			// back off so a long-lived wedge does not re-emit this error every default interval.
+			log.Error(errors.New("Cruise Control Deployment rollout exceeded its progress deadline"),
+				"deferring Cruise Control operation on a wedged rollout - inspect the Cruise Control pod (image/crashloop); the operation stays deferred until the roll completes",
+				"operation", op, "deployment", deployment.Name,
+				"generation", deployment.Generation, "observedGeneration", deployment.Status.ObservedGeneration,
+				"replicas", deployment.Status.Replicas, "updatedReplicas", deployment.Status.UpdatedReplicas)
+			requeueInterval = stalledCCDeploymentRequeueIntervalSeconds
+		} else {
+			log.Info("requeue: Cruise Control Deployment is mid-rollout; deferring operation to avoid racing a CC restart",
+				"operation", op, "deployment", deployment.Name,
+				"generation", deployment.Generation, "observedGeneration", deployment.Status.ObservedGeneration,
+				"replicas", deployment.Status.Replicas, "updatedReplicas", deployment.Status.UpdatedReplicas)
+		}
+		result, _ := requeueAfter(requeueInterval)
+		return result, true, nil
+	}
+
+	// Pre-roll protection: the Deployment is settled, but a ConfigMap change may not have been rolled into the
+	// pod template yet. This applies to EVERY gated op - a rebalance/remove_disks submitted now would also be
+	// wiped by a roll (triggered by any of the four hashed entries below) that lands just after (see doc
+	// comment). Each entry is checked independently: an absent annotation means that particular entry is not
+	// koperator-managed on this Deployment (e.g. a custom capacity annotation, or a Deployment that predates
+	// one of these annotations), so there is nothing to wait for on that axis specifically.
+	configMap := &corev1.ConfigMap{}
+	configMapKey := client.ObjectKey{
+		Name:      cruisecontrol.ConfigMapName(kafkaCluster),
+		Namespace: kafkaCluster.Namespace,
+	}
+	if err := reader.Get(ctx, configMapKey, configMap); err != nil {
+		if apiErrors.IsNotFound(err) {
+			// No Cruise Control ConfigMap to compare against yet; do not gate.
+			return ctrl.Result{}, false, nil
+		}
+		result, wErr := requeueWithError(log, "could not read Cruise Control ConfigMap", err)
+		return result, true, wErr
+	}
+
+	hashedConfigMapEntries := []struct {
+		annotationKey string
+		content       string
+	}{
+		{cruisecontrol.ConfigHashAnnotationKey, configMap.Data[cruisecontrol.PropertiesConfigMapKey]},
+		{cruisecontrol.ClusterConfigHashAnnotationKey, configMap.Data[cruisecontrol.ClusterConfigsConfigMapKey]},
+		{cruisecontrol.LogConfigHashAnnotationKey, configMap.Data[cruisecontrol.Log4jConfigMapKey]},
+		{cruisecontrol.CapacityConfigHashAnnotationKey, configMap.Data[cruisecontrol.CapacityConfigMapKey]},
+	}
+	for _, entry := range hashedConfigMapEntries {
+		deployedHash, ok := deployment.Spec.Template.Annotations[entry.annotationKey]
+		if !ok {
+			continue
+		}
+		if deployedHash != cruisecontrol.ConfigHash(entry.content) {
+			log.Info("requeue: Cruise Control pod template does not yet carry the current ConfigMap; deferring operation until the roll settles",
+				"operation", op, "annotation", entry.annotationKey,
+				"deployedHash", deployedHash, "expectedHash", cruisecontrol.ConfigHash(entry.content),
+				"generation", deployment.Generation, "observedGeneration", deployment.Status.ObservedGeneration)
+			result, _ := requeueAfter(defaultRequeueIntervalInSeconds)
+			return result, true, nil
+		}
+	}
+
+	// Only add_broker additionally needs the target broker's capacity present before it runs.
+	if op == banzaiv1alpha1.OperationAddBroker {
+		brokerIDs := splitNonEmpty(parameters[scale.ParamBrokerID])
+		hasAll, err := cruisecontrol.CapacityConfigContainsBrokers(configMap.Data[cruisecontrol.CapacityConfigMapKey], brokerIDs)
+		if err != nil {
+			result, wErr := requeueWithError(log, "could not inspect Cruise Control capacity config for the brokers being added", err)
+			return result, true, wErr
+		}
+		if !hasAll {
+			log.Info("requeue: capacity.json does not yet contain the broker(s) being added; deferring add_broker until their capacity is generated",
+				"operation", op, "brokerIDs", brokerIDs, "configMap", configMapKey.Name, "deployment", deployment.Name)
+			result, _ := requeueAfter(defaultRequeueIntervalInSeconds)
+			return result, true, nil
+		}
+	}
+
+	return ctrl.Result{}, false, nil
+}
+
+// splitNonEmpty splits a comma-separated parameter value, returning nil (rather than a single empty element)
+// for an empty string so an absent parameter yields no broker ids.
+func splitNonEmpty(s string) []string {
+	if s == "" {
+		return nil
+	}
+	return strings.Split(s, ",")
+}
+
+// isDeploymentRolling reports whether a Deployment is actively in the middle of a rollout: a new pod
+// template has been applied but not yet observed by the Deployment controller, its pods have surged above
+// the desired count, or not all running replicas are the latest revision yet. It deliberately keys off
+// positive evidence of an in-progress rollout rather than "fully settled" so that a Deployment whose status
+// has never been populated (observedGeneration == 0, e.g. under envtest where no Deployment controller
+// runs) reads as NOT rolling and the check does not block. Initial CruiseControl availability is enforced
+// separately by CruiseControlStatus.IsReady; this gate only guards against submitting a broker operation
+// while an already-running CC is being re-rolled (e.g. by a capacity.json change).
+func isDeploymentRolling(deployment *appsv1.Deployment) bool {
+	specReplicas := int32(1)
+	if deployment.Spec.Replicas != nil {
+		specReplicas = *deployment.Spec.Replicas
+	}
+	s := deployment.Status
+	switch {
+	case s.ObservedGeneration != 0 && deployment.Generation > s.ObservedGeneration:
+		// A new pod template was applied but the Deployment controller has not observed it yet.
+		return true
+	case s.Replicas > specReplicas:
+		// RollingUpdate surge: an old-revision pod is still running alongside the new one.
+		return true
+	case s.UpdatedReplicas < s.Replicas:
+		// Not all running pods are the latest revision yet.
+		return true
+	default:
+		return false
+	}
+}
+
+// deploymentRolloutTimedOut reports whether the Deployment controller has given up on the current rollout
+// (Progressing=False with reason ProgressDeadlineExceeded), i.e. the new pod never became available - a
+// wedged rollout the operator would otherwise defer a broker operation behind indefinitely.
+func deploymentRolloutTimedOut(deployment *appsv1.Deployment) bool {
+	for _, c := range deployment.Status.Conditions {
+		if c.Type == appsv1.DeploymentProgressing && c.Reason == progressDeadlineExceededReason {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *CruiseControlOperationReconciler) executeOperation(ctx context.Context, ccOperationExecution *banzaiv1alpha1.CruiseControlOperation) (*scale.Result, error) {
