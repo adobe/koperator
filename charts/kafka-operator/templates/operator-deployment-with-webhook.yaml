@@ -145,9 +145,7 @@ spec:
           secret:
             secretName: {{ .Values.webhook.certs.secret }}
       {{- end }}
-      {{- if .Values.additionalVolumes }}
       {{- include "chart.additionalVolumes" . | nindent 8 }}
-      {{- end }}
       {{- if .Values.podSecurityContext }}
       securityContext:
       {{ toYaml .Values.podSecurityContext | nindent 8 }}
@@ -253,9 +251,7 @@ spec:
           securityContext:
           {{ toYaml .Values.containerSecurityContext | nindent 12 }}
           {{- end }}
-{{- if .Values.additionalSidecars }}
-{{- include "chart.additionalSidecars" . | nindent 8 }}
-{{- end }}
+        {{- include "chart.additionalSidecars" . | nindent 8 }}
 {{- with .Values.nodeSelector }}
       nodeSelector:
 {{ toYaml . | indent 8 }}
