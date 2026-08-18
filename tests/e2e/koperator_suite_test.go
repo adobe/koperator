@@ -18,6 +18,7 @@
 package e2e
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/gruntwork-io/terratest/modules/k8s"
@@ -30,6 +31,21 @@ func TestKoperator(t *testing.T) {
 	gomega.RegisterFailHandler(ginkgo.Fail) // Note: Ginkgo - Gomega connector.
 	ginkgo.RunSpecs(t, "Koperator end to end test suite")
 }
+
+// totalSpecsToRun and completedSpecCount back the "[k/N]" progress line printed after each spec below.
+// The suite runs in series (no -p/--procs), so plain package vars are safe without synchronization.
+var totalSpecsToRun int
+var completedSpecCount int
+
+var _ = ginkgo.ReportBeforeSuite(func(report ginkgo.Report) {
+	totalSpecsToRun = report.PreRunStats.SpecsThatWillRun
+})
+
+var _ = ginkgo.ReportAfterEach(func(report ginkgo.SpecReport) {
+	completedSpecCount++
+	fmt.Printf("--- [%d/%d specs done] %s: %s (took %s)\n",
+		completedSpecCount, totalSpecsToRun, report.FullText(), report.State, report.RunTime)
+})
 
 var _ = ginkgo.BeforeSuite(func() {
 	ginkgo.By("Acquiring K8s cluster")
