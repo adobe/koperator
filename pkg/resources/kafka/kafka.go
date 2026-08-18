@@ -973,7 +973,6 @@ func (r *Reconciler) updateStatusWithDockerImageAndVersion(brokers map[int32]*ba
 
 //gocyclo:ignore
 func (r *Reconciler) handleRollingUpgrade(log logr.Logger, desiredPod, currentPod *corev1.Pod, desiredType reflect.Type) error {
-
 	// Decide whether a rolling upgrade is needed by comparing koperator's own
 	// desired spec against what it last applied (the last-applied annotation on
 	// the current pod) — NOT against the live pod. This keeps mutations made by
