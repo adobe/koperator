@@ -6,13 +6,13 @@ metadata:
   name: kafka
 spec:
   monitoringConfig:
-    jmxImage: "ghcr.io/adobe/koperator/jmx-javaagent:1.4.0"
+    jmxImage: "ghcr.io/adobe/koperator/jmx-javaagent:1.4.0" # renovate: datasource=docker depName=ghcr.io/adobe/koperator/jmx-javaagent
   headlessServiceEnabled: true
   zkAddresses:
     - "zookeeper-server-client.zookeeper:2181"
   propagateLabels: false
   oneBrokerPerNode: false
-  clusterImage: "ghcr.io/adobe/koperator/kafka:2.13-3.9.1"
+  clusterImage: "ghcr.io/adobe/koperator/kafka:2.13-3.9.1" # renovate: datasource=docker depName=ghcr.io/adobe/koperator/kafka
   ingressController: "contour"
   readOnlyConfig: |
     auto.create.topics.enable=false

@@ -7,11 +7,11 @@ metadata:
 spec:
   kRaft: true
   monitoringConfig:
-    jmxImage: "ghcr.io/adobe/koperator/jmx-javaagent:1.5.0"
+    jmxImage: "ghcr.io/adobe/koperator/jmx-javaagent:1.5.0" # renovate: datasource=docker depName=ghcr.io/adobe/koperator/jmx-javaagent
   headlessServiceEnabled: true
   propagateLabels: false
   oneBrokerPerNode: false
-  clusterImage: "ghcr.io/adobe/koperator/kafka:2.13-3.9.2-jdk21.0.11"
+  clusterImage: "ghcr.io/adobe/koperator/kafka:2.13-3.9.2-jdk21.0.11" # renovate: datasource=docker depName=ghcr.io/adobe/koperator/kafka
   taintedBrokersSelector:
     matchLabels:
       restart: me

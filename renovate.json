@@ -21,7 +21,8 @@
       "managerFilePatterns": [
         "/(^|/)Makefile$/",
         "/(^|/)Dockerfile$/",
-        "/(^|/)\\.github/workflows/regenerate-crd-docs\\.yaml$/"
+        "/(^|/)\\.github/workflows/regenerate-crd-docs\\.yaml$/",
+        "/(^|/)scripts/install_kustomize\\.sh$/"
       ],
       "matchStrings": [
         "(?<depName>[A-Z][A-Z0-9_]*)_VERSION\\s*=\\s*(?<currentValue>[^\\s]+)\\s*#\\s*renovate:\\s*datasource=(?<datasource>[^\\s]+)\\s*depName=(?<packageName>[^\\s]+)(?:\\s*extractVersion=(?<extractVersion>[^\\s]+))?"
@@ -68,10 +69,52 @@
     {
       "customType": "regex",
       "managerFilePatterns": [
-        "/(^|/)\\.github/actions/kind-create/action\\.yaml$/"
+        "/(^|/)\\.github/actions/kind-create/action\\.yaml$/",
+        "/(^|/)\\.github/workflows/e2e-test\\.yaml$/"
       ],
       "matchStrings": [
         "(?:default|version):\\s*'?(?<currentValue>[^\\s'#]+)'?\\s*#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<packageName>\\S+)"
+      ],
+      "datasourceTemplate": "{{datasource}}",
+      "depNameTemplate": "{{packageName}}"
+    },
+    {
+      "customType": "regex",
+      "description": "go install <module>@<version> pins inside composite action shell steps (e.g. .github/actions/kind-create/action.yaml). Not covered by any built-in manager.",
+      "managerFilePatterns": [
+        "/(^|/)\\.github/actions/kind-create/action\\.yaml$/"
+      ],
+      "matchStrings": [
+        "go install \\S+@(?<currentValue>\\S+)\\s*#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<packageName>\\S+)"
+      ],
+      "datasourceTemplate": "{{datasource}}",
+      "depNameTemplate": "{{packageName}}"
+    },
+    {
+      "customType": "regex",
+      "description": "Docker images embedded as flat 'repo:tag' strings in KafkaCluster sample manifests, benchmark infra YAML, and kustomize strategic-merge patches. The built-in helm-values manager only matches files literally named values.yaml/values.yml with a nested {repository,tag} shape, kustomize only reads the kustomization.yaml 'images:' transformer (unused in this repo), and the kubernetes manager has no default managerFilePatterns and is not configured here - so none of these were previously watched.",
+      "managerFilePatterns": [
+        "/(^|/)config/samples/.*\\.yaml$/",
+        "/(^|/)docs/benchmarks/infrastructure/.*\\.yaml$/",
+        "/(^|/)tests/e2e/templates/.*\\.tmpl$/",
+        "/(^|/)config/base/manager/manager\\.yaml$/",
+        "/(^|/)config/overlays/.*/manager_auth_proxy_patch\\.yaml$/",
+        "/(^|/)hack/kafka-test-pod/manifest_certmanager\\.yaml$/"
+      ],
+      "matchStrings": [
+        "[\"']?[a-zA-Z0-9-]+(?:\\.[a-zA-Z0-9-]+)*(?:/[a-zA-Z0-9._-]+)+:(?<currentValue>[a-zA-Z0-9._-]+)[\"']?\\s*#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<packageName>\\S+)"
+      ],
+      "datasourceTemplate": "{{datasource}}",
+      "depNameTemplate": "{{packageName}}"
+    },
+    {
+      "customType": "regex",
+      "description": "Docker images embedded as nested helm-style {repository, tag} blocks in tests/e2e/templates/*.tmpl fixtures. The .tmpl extension is never matched by the built-in helm-values manager (values.yaml/.yml only), even though the shape matches.",
+      "managerFilePatterns": [
+        "/(^|/)tests/e2e/templates/.*\\.tmpl$/"
+      ],
+      "matchStrings": [
+        "tag:\\s*(?<currentValue>\\S+)\\s*#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<packageName>\\S+)"
       ],
       "datasourceTemplate": "{{datasource}}",
       "depNameTemplate": "{{packageName}}"
@@ -95,13 +138,17 @@
     {
       "groupName": "config samples docker images",
       "groupSlug": "config-samples-docker",
+      "description": "Was scoped to matchManagers: [helm-values], but that manager only reads files literally named values.yaml/values.yml with a nested {repository,tag} shape - it never matched anything under these paths, so this rule was a no-op. The images here are now tracked via explicit '# renovate:' comment annotations (custom.regex manager); see the customManagers entries covering config/samples, docs/benchmarks/infrastructure, tests/e2e/templates, config/base/manager, config/overlays, and hack/kafka-test-pod.",
       "matchFileNames": [
         "config/samples/**",
         "docs/benchmarks/infrastructure/**",
-        "tests/e2e/templates/**"
+        "tests/e2e/templates/**",
+        "config/base/manager/**",
+        "config/overlays/**",
+        "hack/kafka-test-pod/**"
       ],
       "matchManagers": [
-        "helm-values"
+        "custom.regex"
       ],
       "matchUpdateTypes": [
         "major",
@@ -121,6 +168,14 @@
       "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)(?:-ado?be-(?<build>\\d+))?$",
       "description": "Self-scoping: applies to ANY docker dep whose current pin is <semver>-adbe|adobe-<yyyymmdd> (cruise-control uses 'adbe', zookeeper-operator 'adobe'; new adobe-fork images inherit this with no config change). Default docker versioning treats that suffix as an immutable compatibility string, so newer daily builds are never offered; capturing the date as a purely-numeric 'build' (handled like patch) makes e.g. 3.0.3-adbe-20250804 -> 3.0.3-adbe-20260722 and 0.2.15-adobe-20250923 track their newest build. matchCurrentValue requires the suffix, so only these deps are touched; the versioning's suffix is optional so the same image can still publish a plain-semver tag. Trailing '$' excludes '-rc'."
        },
+    {
+      "matchPackageNames": [
+        "ghcr.io/adobe/koperator/kafka"
+      ],
+      "matchCurrentValue": "/^\\d+\\.\\d+-\\d+\\.\\d+\\.\\d+$/",
+      "versioning": "regex:^(?<compatibility>\\d+\\.\\d+)-(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)$",
+      "description": "Tag format is <scala_version>-<kafka_version>, e.g. 2.13-3.9.1. Verified live against ghcr.io: default docker versioning parses currentVersion as just '2.13' and silently drops everything after the first hyphen, so Renovate can never see a real 3.9.1->3.9.2 bump (only digest-pin updates fire, via the docker pinDigests rule below) - this affects every '# renovate:' annotated occurrence of this image, including the pre-existing api/v1beta1/kafkacluster_types.go constants. Pinning the scala prefix as 'compatibility' (never auto-changed) and parsing the kafka release as major.minor.patch fixes real version comparison. matchCurrentValue excludes the '-jdk<version>' suffixed variant (config/samples/kraft/simplekafkacluster_kraft.yaml) - that one needs a second compatibility slot this single regex can't express, so it deliberately keeps today's (limited but not broken) default-versioning behavior rather than risk a wrong match."
+    },
     {
       "groupName": "kafka docker images (major)",
       "groupSlug": "kafka-docker-major",

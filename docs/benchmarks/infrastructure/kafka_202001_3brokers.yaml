@@ -7,7 +7,7 @@ metadata:
 spec:
   kRaft: false
   monitoringConfig:
-    jmxImage: "ghcr.io/adobe/koperator/jmx-javaagent:1.5.0"
+    jmxImage: "ghcr.io/adobe/koperator/jmx-javaagent:1.5.0" # renovate: datasource=docker depName=ghcr.io/adobe/koperator/jmx-javaagent
     pathToJar: "/jmx_prometheus_javaagent.jar"
     kafkaJMXExporterConfig: |2
       lowercaseOutputName: true
@@ -66,7 +66,7 @@ spec:
   zkAddresses:
     - "zookeeper-server-client.zookeeper:2181"
   oneBrokerPerNode: true
-  clusterImage: "ghcr.io/adobe/koperator/kafka:2.13-3.9.1"
+  clusterImage: "ghcr.io/adobe/koperator/kafka:2.13-3.9.1" # renovate: datasource=docker depName=ghcr.io/adobe/koperator/kafka
   readOnlyConfig: |
     auto.create.topics.enable=false
     min.insync.replicas=3

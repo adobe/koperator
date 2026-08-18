@@ -14,11 +14,11 @@
 # limitations under the License.
 
 
-version=3.1.0
+KUSTOMIZE_VERSION=3.1.0 # renovate: datasource=github-releases depName=kubernetes-sigs/kustomize extractVersion=^kustomize/v(?<version>.+)$
 opsys=$(echo "$(uname -s)" | awk '{print tolower($0)}')
 
 # download the release
-curl -O -L https://github.com/kubernetes-sigs/kustomize/releases/download/v${version}/kustomize_${version}_${opsys}_amd64
+curl -O -L https://github.com/kubernetes-sigs/kustomize/releases/download/v${KUSTOMIZE_VERSION}/kustomize_${KUSTOMIZE_VERSION}_${opsys}_amd64
 # move to bin
 mkdir -p bin
 mv kustomize_*_${opsys}_amd64 bin/kustomize

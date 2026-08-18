@@ -81,7 +81,7 @@ runs:
     id: cloud-provider-kind
     run: |
       echo "Install cloud-provider-kind"
-      go install sigs.k8s.io/cloud-provider-kind@latest
+      go install sigs.k8s.io/cloud-provider-kind@v0.11.1 # renovate: datasource=go depName=sigs.k8s.io/cloud-provider-kind
       kubectl label node e2e-kind-control-plane node.kubernetes.io/exclude-from-external-load-balancers- 
       ~/go/bin/cloud-provider-kind &
     shell: bash
