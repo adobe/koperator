@@ -489,7 +489,24 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 	// reconcile flow. The services must be deleted at the end of the reconcile flow after the new services
 	// were created and broker configurations reflecting the new services otherwise the Kafka brokers
 	// won't be reachable by koperator.
-	if r.KafkaCluster.Spec.HeadlessServiceEnabled {
+	//
+	// A broker pod can still be running with a live pod outside spec.Brokers while its removal is pending
+	// (deletion is gated on Cruise Control finishing the data migration off it - see isBrokerRemovalPending).
+	// That pod is not touched by the per-broker loop above, so it never gets a replacement address on the
+	// other addressing scheme; its only reachable address is whichever Service this reconcile is about to
+	// delete. Deleting it out from under a broker that is still alive and still needed would orphan that
+	// broker from the network entirely, stalling the very Cruise Control operation the removal is waiting on
+	// (see #316). Rather than reasoning about whether this particular deletion happens to be safe this time,
+	// skip both service-topology transitions outright while any such pod exists, log it clearly, and let the
+	// next reconcile (triggered once that pod is actually gone) retry - koperator would rather stay wedged
+	// here than risk cutting off a broker it still needs.
+	if pendingBrokerID, stillPending := firstRunningBrokerOutsideSpec(runningBrokers, r.KafkaCluster.Spec.Brokers); stillPending {
+		log.Info("deferring headless/non-headless service reconciliation: a broker outside spec.Brokers still has a running pod",
+			"component", componentName,
+			"clusterName", r.KafkaCluster.Name,
+			"clusterNamespace", r.KafkaCluster.Namespace,
+			"pendingBrokerId", pendingBrokerID)
+	} else if r.KafkaCluster.Spec.HeadlessServiceEnabled {
 		log.V(1).Info("deleting non-headless services for all of the brokers")
 
 		if err := r.deleteNonHeadlessServices(ctx); err != nil {
@@ -1680,6 +1697,25 @@ func getServiceFromExternalListener(client client.Client, cluster *banzaiv1beta1
 		return nil, errors.WrapIfWithDetails(err, "could not get LoadBalancer service", "serviceName", iControllerServiceName)
 	}
 	return foundLBService, nil
+}
+
+// firstRunningBrokerOutsideSpec reports whether any broker with a running pod (runningBrokers, keyed by
+// BrokerIdLabelKey value) is absent from desiredBrokers, returning its ID for logging. Such a broker is
+// outside the per-broker reconcile loop entirely (see reorderBrokers) - e.g. one dropped from spec.Brokers
+// while its removal is still pending Cruise Control's data migration - so it never receives a replacement
+// address on the other Service-addressing scheme. Iteration order over the map is nondeterministic, but
+// finding any single one is enough for callers that only need to know whether it is safe to proceed.
+func firstRunningBrokerOutsideSpec(runningBrokers map[string]struct{}, desiredBrokers []banzaiv1beta1.Broker) (string, bool) {
+	inSpec := make(map[string]struct{}, len(desiredBrokers))
+	for _, b := range desiredBrokers {
+		inSpec[strconv.Itoa(int(b.Id))] = struct{}{}
+	}
+	for id := range runningBrokers {
+		if _, ok := inSpec[id]; !ok {
+			return id, true
+		}
+	}
+	return "", false
 }
 
 // reorderBrokers returns the KafkaCluster brokers list reordered for reconciliation such that:

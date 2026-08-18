@@ -80,8 +80,11 @@ func testKRaftBrokerScaling() bool {
 
 		// --- Upscale: add broker 103 ---
 
-		ginkgo.It("Applying the 4-broker KRaft manifest to add broker 103", func() {
-			applyK8sResourceManifest(kubectlOptions, "../../config/samples/kraft/simplekafkacluster_kraft_4broker.yaml")
+		ginkgo.It("Adding broker 103 to the running KafkaCluster", func() {
+			ginkgo.By("Fetching the running KafkaCluster and adding broker 103")
+			// Matches the "broker" config group simplekafkacluster_kraft.yaml assigns brokers 100-102.
+			err := addKafkaClusterBroker(kubectlOptions, kafkaClusterName, v1beta1.Broker{Id: 103, BrokerConfigGroup: "broker"})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 
 		ginkgo.It("Waiting for exactly one add_broker CruiseControlOperation", func() {
@@ -136,8 +139,10 @@ func testKRaftBrokerScaling() bool {
 			}, batchedBrokerRemovalTimeout, batchedBrokerRemovalPollInterval).Should(gomega.BeTrue())
 		})
 
-		ginkgo.It("Applying the 3-broker KRaft manifest to remove broker 103", func() {
-			applyK8sResourceManifest(kubectlOptions, "../../config/samples/kraft/simplekafkacluster_kraft.yaml")
+		ginkgo.It("Removing broker 103 from the running KafkaCluster", func() {
+			ginkgo.By("Fetching the running KafkaCluster and patching out broker 103")
+			err := removeKafkaClusterBrokers(kubectlOptions, kafkaClusterName, 103)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 
 		ginkgo.It("Waiting for exactly one remove_broker CruiseControlOperation", func() {

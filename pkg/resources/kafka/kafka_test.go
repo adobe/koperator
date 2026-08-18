@@ -591,6 +591,52 @@ func TestReorderBrokers(t *testing.T) {
 	}
 }
 
+func TestFirstRunningBrokerOutsideSpec(t *testing.T) {
+	testCases := []struct {
+		testName       string
+		runningBrokers map[string]struct{}
+		desiredBrokers []v1beta1.Broker
+		wantFound      bool
+		wantID         string
+	}{
+		{
+			testName:       "no running brokers at all",
+			runningBrokers: map[string]struct{}{},
+			desiredBrokers: []v1beta1.Broker{{Id: 0}, {Id: 1}},
+			wantFound:      false,
+		},
+		{
+			testName:       "every running broker is still in spec",
+			runningBrokers: map[string]struct{}{"0": {}, "1": {}, "2": {}},
+			desiredBrokers: []v1beta1.Broker{{Id: 0}, {Id: 1}, {Id: 2}},
+			wantFound:      false,
+		},
+		{
+			testName: "a broker dropped from spec still has a running pod",
+			// Mirrors #316: broker 3 removed from spec.Brokers while its pod (pending Cruise
+			// Control's data migration) is still Running.
+			runningBrokers: map[string]struct{}{"0": {}, "1": {}, "2": {}, "3": {}},
+			desiredBrokers: []v1beta1.Broker{{Id: 0}, {Id: 1}, {Id: 2}},
+			wantFound:      true,
+			wantID:         "3",
+		},
+		{
+			testName:       "a desired broker has no running pod yet (scale-up in progress)",
+			runningBrokers: map[string]struct{}{"0": {}},
+			desiredBrokers: []v1beta1.Broker{{Id: 0}, {Id: 1}},
+			wantFound:      false,
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.testName, func(t *testing.T) {
+			id, found := firstRunningBrokerOutsideSpec(tt.runningBrokers, tt.desiredBrokers)
+			assert.Equal(t, tt.wantFound, found)
+			assert.Equal(t, tt.wantID, id)
+		})
+	}
+}
+
 func TestGetServerPasswordKeysAndUsers(t *testing.T) { //nolint funlen
 	t.Parallel()
 	testCases := []struct {
