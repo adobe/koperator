@@ -20,7 +20,7 @@ spec:
         - /manager
         args:
         - --enable-leader-election
-        image: ghcr.io/adobe/koperator:latest
+        image: ghcr.io/adobe/koperator:latest # renovate: datasource=docker depName=ghcr.io/adobe/koperator
         name: manager
         livenessProbe:
           initialDelaySeconds: 15

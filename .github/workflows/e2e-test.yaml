@@ -34,7 +34,7 @@ jobs:
       - name: Setup Helm
         uses: azure/setup-helm@v5
         with:
-          version: '4.2.3'
+          version: '4.2.3' # renovate: datasource=github-releases depName=helm/helm
 
       - name: Clean Go module cache
         run: |
