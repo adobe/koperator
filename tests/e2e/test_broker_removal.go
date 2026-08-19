@@ -74,9 +74,10 @@ func testBatchedBrokerRemoval() bool {
 			}, batchedBrokerRemovalTimeout, batchedBrokerRemovalPollInterval).Should(gomega.BeTrue())
 		})
 
-		ginkgo.It("Applying 3-broker manifest to trigger removal of brokers 3 and 4", func() {
-			ginkgo.By("Patching KafkaCluster to remove brokers 3 and 4")
-			applyK8sResourceManifest(kubectlOptions, "../../config/samples/simplekafkacluster.yaml")
+		ginkgo.It("Removing brokers 3 and 4 from the running KafkaCluster", func() {
+			ginkgo.By("Fetching the running KafkaCluster and patching out brokers 3 and 4")
+			err := removeKafkaClusterBrokers(kubectlOptions, kafkaClusterName, 3, 4)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 
 		ginkgo.It("Waiting for exactly one remove_broker CruiseControlOperation to be created", func() {
