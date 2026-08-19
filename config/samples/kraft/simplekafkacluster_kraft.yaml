@@ -305,18 +305,8 @@ spec:
       {
         "min.insync.replicas": 3
       }
-    capacityConfig: |-
-      {
-        "brokerCapacities":[
-          {
-            "brokerId": "-1",
-            "capacity": {
-              "DISK": {"/kafka-logs-broker/kafka": "10240"},
-              "CPU": {"num.cores": "1"},
-              "NW_IN": "900000",
-              "NW_OUT": "900000"
-            },
-            "doc": "This is the default capacity. Capacity unit used for disk is in MB, cpu is in cores, network throughput is in KB."
-          }
-        ]
-      }
+    # NOTE: intentionally NO capacityConfig here. A "brokerId": "-1" universal-default entry makes
+    # GenerateCapacityConfig return early, so Cruise Control's capacity.json stays constant across scaling
+    # and the #301 capacity-roll path (and its fix) is never exercised. Omitting it forces per-broker
+    # capacity generation, which is exactly what the KRaft broker-scaling e2e regression-tests. Do not add
+    # a universal default back or the regression coverage silently disappears.

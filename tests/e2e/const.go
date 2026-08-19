@@ -87,7 +87,8 @@ const (
 	contourName     = "contour"
 
 	// Kubernetes resource kinds.
-	podsResource = "pods"
+	podsResource       = "pods"
+	configMapsResource = "configmaps"
 
 	// Common string values and CLI flags/keys.
 	falseString   = "false"

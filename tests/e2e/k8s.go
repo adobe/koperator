@@ -483,6 +483,12 @@ func deleteK8sResourceNoErrNotFound(kubectlOptions k8s.KubectlOptions, timeout t
 	return err
 }
 
+func deleteK8sCRDNoErrNotFound(kubectlOptions k8s.KubectlOptions, crdName string) error {
+	clusterScopedOptions := kubectlOptions
+	clusterScopedOptions.Namespace = ""
+	return deleteK8sResourceNoErrNotFound(clusterScopedOptions, defaultDeletionTimeout, crdKind, crdName)
+}
+
 // applyK8sResourceManifestFromString applies the specified manifest in string format to the provided
 // kubectl context and namespace.
 func applyK8sResourceManifestFromString(kubectlOptions k8s.KubectlOptions, manifest string) error {
