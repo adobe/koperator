@@ -220,7 +220,7 @@ func configureBrokerKRaftMode(bConfig *v1beta1.BrokerConfig, brokerID int32, kaf
 	if bConfig.IsControllerOnlyNode() {
 		// "listeners" configuration can only contain controller configuration when the node is a controller-only node
 		for _, listener := range listenerConfig {
-			if listener[:len(controllerListenerName)] == strings.ToUpper(controllerListenerName) {
+			if isControllerListenerEntry(listener, controllerListenerName) {
 				if err := config.Set(kafkautils.KafkaConfigListeners, listener); err != nil {
 					log.Error(err, fmt.Sprintf(kafkautils.BrokerConfigErrorMsgTemplate, kafkautils.KafkaConfigListeners))
 				}
@@ -231,7 +231,7 @@ func configureBrokerKRaftMode(bConfig *v1beta1.BrokerConfig, brokerID int32, kaf
 		// "listeners" configuration cannot contain broker configuration when the node is a broker-only node
 		var nonControllerListener []string
 		for _, listener := range listenerConfig {
-			if listener[:len(controllerListenerName)] != strings.ToUpper(controllerListenerName) {
+			if !isControllerListenerEntry(listener, controllerListenerName) {
 				nonControllerListener = append(nonControllerListener, listener)
 			}
 		}
@@ -426,6 +426,20 @@ func generateControlPlaneListener(iListeners []v1beta1.InternalListenerConfig) s
 	}
 
 	return controlPlaneListener
+}
+
+// isControllerListenerEntry reports whether a "listeners" entry (formatted as "NAME://:PORT")
+// belongs to the controller listener identified by controllerListenerName.
+// It compares the listener NAME segment exactly rather than by string prefix, avoiding both
+// the panic risk of slicing a shorter listener string and false matches when one listener name
+// is a prefix of another (e.g. "CONTROLLER" vs "CONTROLLER-EXTERNAL"). Returns false when
+// controllerListenerName is empty so that an unset controller listener never matches.
+func isControllerListenerEntry(listenerEntry, controllerListenerName string) bool {
+	if controllerListenerName == "" {
+		return false
+	}
+	name, _, _ := strings.Cut(listenerEntry, "://")
+	return strings.EqualFold(name, controllerListenerName)
 }
 
 func generateListenerSpecificConfig(kcs *v1beta1.KafkaClusterSpec, serverPasses map[string]string, log logr.Logger) (*properties.Properties, map[int32]*properties.Properties, []string) {

@@ -1590,7 +1590,7 @@ listener.name.external.ssl.truststore.location=/var/run/secrets/java.io/keystore
 listener.name.external.ssl.truststore.password=
 listener.name.external.ssl.truststore.type=JKS
 listener.security.protocol.map=EXTERNAL:SSL,CONTROLLER:SSL
-listeners=
+listeners=EXTERNAL://:9092,CONTROLLER://:9093
 log.dirs=/test-kafka-logs/kafka,/test-kafka-logs-0/kafka
 metric.reporters=com.linkedin.kafka.cruisecontrol.metricsreporter.CruiseControlMetricsReporter
 node.id=0
@@ -1613,7 +1613,7 @@ listener.name.external.ssl.truststore.location=/var/run/secrets/java.io/keystore
 listener.name.external.ssl.truststore.password=
 listener.name.external.ssl.truststore.type=JKS
 listener.security.protocol.map=EXTERNAL:SSL,CONTROLLER:SSL
-listeners=EXTERNAL://:9092
+listeners=EXTERNAL://:9092,CONTROLLER://:9093
 log.dirs=/test-kafka-logs/kafka
 node.id=500
 process.roles=controller
@@ -1652,6 +1652,58 @@ process.roles=controller
 
 				require.Equal(t, test.expectedBrokerConfigs[i], generatedConfig)
 			}
+		})
+	}
+}
+
+func TestIsControllerListenerEntry(t *testing.T) {
+	tests := []struct {
+		testName               string
+		listenerEntry          string
+		controllerListenerName string
+		expected               bool
+	}{
+		{
+			testName:               "exact controller listener match",
+			listenerEntry:          "CONTROLLER://:9093",
+			controllerListenerName: "CONTROLLER",
+			expected:               true,
+		},
+		{
+			testName:               "case-insensitive match",
+			listenerEntry:          "CONTROLLER://:9093",
+			controllerListenerName: "controller",
+			expected:               true,
+		},
+		{
+			testName:               "prefix collision must not match (CONTROLLER vs CONTROLLER-EXTERNAL)",
+			listenerEntry:          "CONTROLLER-EXTERNAL://:9094",
+			controllerListenerName: "CONTROLLER",
+			expected:               false,
+		},
+		{
+			testName:               "non-controller listener does not match",
+			listenerEntry:          "INTERNAL://:9092",
+			controllerListenerName: "CONTROLLER",
+			expected:               false,
+		},
+		{
+			testName:               "empty controller listener name never matches",
+			listenerEntry:          "INTERNAL://:9092",
+			controllerListenerName: "",
+			expected:               false,
+		},
+		{
+			testName:               "controller name longer than the listener entry does not panic and does not match",
+			listenerEntry:          "IB://:9092",
+			controllerListenerName: "CONTROLLERLISTENERWITHAVERYLONGNAME",
+			expected:               false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.testName, func(t *testing.T) {
+			require.Equal(t, test.expected, isControllerListenerEntry(test.listenerEntry, test.controllerListenerName))
 		})
 	}
 }
