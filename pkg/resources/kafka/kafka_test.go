@@ -2136,3 +2136,149 @@ func TestBrokerNeedsVersionUpdate(t *testing.T) {
 		})
 	}
 }
+
+func TestNotReadyControllerBrokerIDs(t *testing.T) {
+	makePod := func(brokerID, isController string, ready bool) corev1.Pod {
+		readyStatus := corev1.ConditionFalse
+		if ready {
+			readyStatus = corev1.ConditionTrue
+		}
+		return corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					v1beta1.BrokerIdLabelKey:    brokerID,
+					v1beta1.IsControllerNodeKey: isController,
+				},
+			},
+			Status: corev1.PodStatus{
+				Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: readyStatus}},
+			},
+		}
+	}
+
+	tests := []struct {
+		testName      string
+		pods          []corev1.Pod
+		currentBroker string
+		expected      []string
+	}{
+		{
+			testName: "all controllers ready",
+			pods: []corev1.Pod{
+				makePod("0", "false", true),
+				makePod("1", "true", true),
+				makePod("2", "true", true),
+			},
+			currentBroker: "0",
+			expected:      nil,
+		},
+		{
+			testName: "one other controller not ready is reported",
+			pods: []corev1.Pod{
+				makePod("0", "false", true),
+				makePod("1", "true", false),
+				makePod("2", "true", true),
+			},
+			currentBroker: "0",
+			expected:      []string{"1"},
+		},
+		{
+			testName: "the controller being reconciled is excluded even when not ready",
+			pods: []corev1.Pod{
+				makePod("1", "true", false),
+				makePod("2", "true", true),
+			},
+			currentBroker: "1",
+			expected:      nil,
+		},
+		{
+			testName: "not-ready broker-only node is ignored",
+			pods: []corev1.Pod{
+				makePod("0", "false", false),
+				makePod("1", "true", true),
+			},
+			currentBroker: "1",
+			expected:      nil,
+		},
+		{
+			testName: "combined node counts as a controller",
+			pods: []corev1.Pod{
+				makePod("0", "true", false),
+				makePod("1", "true", true),
+			},
+			currentBroker: "1",
+			expected:      []string{"0"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.testName, func(t *testing.T) {
+			currentPod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1beta1.BrokerIdLabelKey: test.currentBroker}}}
+			assert.Equal(t, test.expected, notReadyControllerBrokerIDs(test.pods, currentPod))
+		})
+	}
+}
+
+func TestControllersBlockingRollingUpgrade(t *testing.T) {
+	pod := func(brokerID, isController string, ready bool) corev1.Pod {
+		readyStatus := corev1.ConditionFalse
+		if ready {
+			readyStatus = corev1.ConditionTrue
+		}
+		return corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{
+				v1beta1.BrokerIdLabelKey:    brokerID,
+				v1beta1.IsControllerNodeKey: isController,
+			}},
+			Status: corev1.PodStatus{Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: readyStatus}}},
+		}
+	}
+	// broker 0: broker-only, broker 1: controller (not ready), broker 2: controller (ready)
+	pods := []corev1.Pod{pod("0", "false", true), pod("1", "true", false), pod("2", "true", true)}
+	currentPodFor := func(brokerID string) *corev1.Pod {
+		for i := range pods {
+			if pods[i].Labels[v1beta1.BrokerIdLabelKey] == brokerID {
+				return &pods[i]
+			}
+		}
+		return nil
+	}
+
+	tests := []struct {
+		testName      string
+		kRaftMode     bool
+		currentBroker string
+		expected      []string
+	}{
+		{
+			testName:      "not KRaft mode never gates",
+			kRaftMode:     false,
+			currentBroker: "2",
+			expected:      nil,
+		},
+		{
+			testName:      "rolling a broker-only node is not gated on controller readiness",
+			kRaftMode:     true,
+			currentBroker: "0",
+			expected:      nil,
+		},
+		{
+			testName:      "rolling a controller is blocked by another not-ready controller",
+			kRaftMode:     true,
+			currentBroker: "2",
+			expected:      []string{"1"},
+		},
+		{
+			testName:      "rolling the not-ready controller itself is not blocked by its own readiness",
+			kRaftMode:     true,
+			currentBroker: "1",
+			expected:      nil,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.testName, func(t *testing.T) {
+			assert.Equal(t, test.expected, controllersBlockingRollingUpgrade(test.kRaftMode, pods, currentPodFor(test.currentBroker)))
+		})
+	}
+}

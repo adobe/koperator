@@ -26,7 +26,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"github.com/banzaicloud/koperator/api/assets"
 	apiutil "github.com/banzaicloud/koperator/api/util"
@@ -106,24 +105,20 @@ fi`},
 	}
 
 	if r.KafkaCluster.Spec.KRaftMode && brokerConfig.IsControllerNode() {
-		controllerlistenerPort, err := findControllerListenerPort(r.KafkaCluster)
-		if err != nil {
-			log.Error(err, "failed to find controller listener port")
-		} else {
-			kafkaContainer.ReadinessProbe = &corev1.Probe{
-				ProbeHandler: corev1.ProbeHandler{
-					TCPSocket: &corev1.TCPSocketAction{
-						Port: intstr.IntOrString{
-							Type:   intstr.Int,
-							IntVal: controllerlistenerPort,
-						},
-					},
+		// Readiness reflects quorum membership: the controller pod is Ready only once it reports a
+		// leader/follower raft state. Koperator's rolling upgrade waits on this readiness signal so it
+		// never restarts the next controller before the previously restarted one has rejoined the
+		// metadata quorum. The script runs in readiness mode (fail-closed while not yet in the quorum).
+		kafkaContainer.ReadinessProbe = &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				Exec: &corev1.ExecAction{
+					Command: []string{"/bin/bash", "-c", "export KRAFT_HEALTH_CHECK_MODE=readiness\n" + assets.KraftControllerHealthcheckSh},
 				},
-				InitialDelaySeconds: 0,
-				PeriodSeconds:       5,
-				TimeoutSeconds:      5,
-				FailureThreshold:    20,
-			}
+			},
+			InitialDelaySeconds: 15,
+			PeriodSeconds:       15,
+			TimeoutSeconds:      10,
+			FailureThreshold:    6,
 		}
 		kafkaContainer.LivenessProbe = &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
@@ -132,8 +127,8 @@ fi`},
 				},
 			},
 			InitialDelaySeconds: 30,
-			PeriodSeconds:       10,
-			TimeoutSeconds:      5,
+			PeriodSeconds:       15,
+			TimeoutSeconds:      10,
 			FailureThreshold:    6,
 		}
 	}
@@ -640,15 +635,4 @@ func generateEnvConfig(brokerConfig *v1beta1.BrokerConfig, defaultEnvVars []core
 	}
 
 	return mergedEnv
-}
-
-func findControllerListenerPort(kc *v1beta1.KafkaCluster) (int32, error) {
-	for _, listener := range kc.Spec.ListenersConfig.InternalListeners {
-		if listener.UsedForControllerCommunication {
-			return listener.ContainerPort, nil
-		}
-	}
-
-	// If no controller listener is found, return an error
-	return 0, fmt.Errorf("no controller listener found")
 }
