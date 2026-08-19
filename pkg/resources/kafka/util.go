@@ -67,9 +67,12 @@ func generateQuorumVoters(kafkaCluster *v1beta1.KafkaCluster, controllerListener
 	return quorumVoters, nil
 }
 
-// generateRandomClusterID() generates a based64-encoded random UUID with 16 bytes as the cluster ID
-// it uses URL based64 encoding since that's what Kafka expects
+// generateRandomClusterID() generates a base64-encoded random UUID with 16 bytes as the cluster ID.
+// It uses URL base64 encoding without padding, matching Kafka's canonical org.apache.kafka.common.Uuid
+// string form (Base64.getUrlEncoder().withoutPadding()) which yields 22 characters. The padded form
+// (24 chars ending in "==") happens to be accepted by Kafka 3.9's Uuid.fromString (length <= 24), but it
+// is non-canonical and rejected by newer Kafka versions, so we emit the padding-free canonical form.
 func generateRandomClusterID() string {
 	randomUUID := uuid.New()
-	return base64.URLEncoding.EncodeToString(randomUUID[:])
+	return base64.RawURLEncoding.EncodeToString(randomUUID[:])
 }
