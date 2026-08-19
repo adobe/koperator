@@ -211,18 +211,42 @@ func GetBrokerFromKafkaClusterSpec(brokerId string, spec v1beta1.KafkaClusterSpe
 }
 
 func FilterControllerOnlyNodes(brokerIDs []string, spec v1beta1.KafkaClusterSpec) ([]string, error) {
+	return filterControllerOnlyNodes(brokerIDs, spec, nil)
+}
+
+// FilterControllerOnlyNodesWithBrokerStates filters controller-only nodes while preserving removed brokers
+// whose active downscale task only exists in status.
+func FilterControllerOnlyNodesWithBrokerStates(brokerIDs []string, spec v1beta1.KafkaClusterSpec, brokerStates map[string]v1beta1.BrokerState) ([]string, error) {
+	return filterControllerOnlyNodes(brokerIDs, spec, brokerStates)
+}
+
+func filterControllerOnlyNodes(brokerIDs []string, spec v1beta1.KafkaClusterSpec, brokerStates map[string]v1beta1.BrokerState) ([]string, error) {
 	var filteredIDs []string
 	for _, brokerId := range brokerIDs {
 		broker := GetBrokerFromKafkaClusterSpec(brokerId, spec)
-		if broker != nil {
-			bConfig, err := broker.GetBrokerConfig(spec)
+		if broker == nil {
+			brokerState, ok := brokerStates[brokerId]
+			if !ok || brokerState.ConfigurationBackup == "" {
+				if brokerStates != nil {
+					filteredIDs = append(filteredIDs, brokerId)
+				}
+				continue
+			}
+
+			backupBroker, err := GetBrokerFromBrokerConfigurationBackup(brokerState.ConfigurationBackup)
 			if err != nil {
 				return nil, err
 			}
+			broker = &backupBroker
+		}
 
-			if !bConfig.IsControllerOnlyNode() {
-				filteredIDs = append(filteredIDs, strconv.Itoa(int(broker.Id)))
-			}
+		bConfig, err := broker.GetBrokerConfig(spec)
+		if err != nil {
+			return nil, err
+		}
+
+		if !bConfig.IsControllerOnlyNode() {
+			filteredIDs = append(filteredIDs, strconv.Itoa(int(broker.Id)))
 		}
 	}
 
