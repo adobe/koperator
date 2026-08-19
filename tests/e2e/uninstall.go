@@ -16,6 +16,7 @@
 package e2e
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -41,21 +42,7 @@ func requireUninstallingKoperatorHelmChart(kubectlOptions k8s.KubectlOptions) {
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		ginkgo.By("Verifying Koperator helm chart resources cleanup")
-		k8sResourceKinds, err := listK8sResourceKinds(kubectlOptions, "")
-		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
-
-		koperatorAvailableResourceKinds := stringSlicesInstersect(koperatorCRDs(), k8sResourceKinds)
-		koperatorAvailableResourceKinds = append(koperatorAvailableResourceKinds, basicK8sResourceKinds()...)
-
-		remainedResources, err := getK8sResources(kubectlOptions,
-			koperatorAvailableResourceKinds,
-			fmt.Sprintf(managedByHelmLabelTemplate, koperatorLocalHelmDescriptor.ReleaseName),
-			"",
-			kubectlArgGoTemplateKindNameNamespace,
-			"--all-namespaces")
-
-		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
-		gomega.Expect(remainedResources).Should(gomega.BeEmpty())
+		requireHelmManagedResourcesRemoved(kubectlOptions, koperatorCRDs(), koperatorLocalHelmDescriptor.ReleaseName)
 	})
 }
 
@@ -87,21 +74,7 @@ func requireUninstallingZookeeperOperatorHelmChart(kubectlOptions k8s.KubectlOpt
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		ginkgo.By("Verifying Zookeeper-operator helm chart resources cleanup")
 
-		k8sResourceKinds, err := listK8sResourceKinds(kubectlOptions, "")
-		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
-
-		zookeeperAvailableResourceKinds := stringSlicesInstersect(dependencyCRDs.Zookeeper(), k8sResourceKinds)
-		zookeeperAvailableResourceKinds = append(zookeeperAvailableResourceKinds, basicK8sResourceKinds()...)
-
-		remainedResources, err := getK8sResources(kubectlOptions,
-			zookeeperAvailableResourceKinds,
-			fmt.Sprintf(managedByHelmLabelTemplate, zookeeperOperatorHelmDescriptor.ReleaseName),
-			"",
-			kubectlArgGoTemplateKindNameNamespace,
-			"--all-namespaces")
-		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
-
-		gomega.Expect(remainedResources).Should(gomega.BeEmpty())
+		requireHelmManagedResourcesRemoved(kubectlOptions, dependencyCRDs.Zookeeper(), zookeeperOperatorHelmDescriptor.ReleaseName)
 	})
 }
 
@@ -134,21 +107,7 @@ func requireUninstallingPrometheusOperatorHelmChart(kubectlOptions k8s.KubectlOp
 
 		ginkgo.By("Verifying Prometheus-operator helm chart resources cleanup")
 
-		k8sResourceKinds, err := listK8sResourceKinds(kubectlOptions, "")
-		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
-
-		prometheusAvailableResourceKinds := stringSlicesInstersect(dependencyCRDs.Prometheus(), k8sResourceKinds)
-		prometheusAvailableResourceKinds = append(prometheusAvailableResourceKinds, basicK8sResourceKinds()...)
-
-		remainedResources, err := getK8sResources(kubectlOptions,
-			prometheusAvailableResourceKinds,
-			fmt.Sprintf(managedByHelmLabelTemplate, prometheusOperatorHelmDescriptor.ReleaseName),
-			"",
-			kubectlArgGoTemplateKindNameNamespace,
-			"--all-namespaces")
-		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
-
-		gomega.Expect(remainedResources).Should(gomega.BeEmpty())
+		requireHelmManagedResourcesRemoved(kubectlOptions, dependencyCRDs.Prometheus(), prometheusOperatorHelmDescriptor.ReleaseName)
 	})
 }
 
@@ -181,21 +140,7 @@ func requireUninstallingCertManagerHelmChart(kubectlOptions k8s.KubectlOptions) 
 
 		ginkgo.By("Verifying Cert-manager helm chart resources cleanup")
 
-		k8sResourceKinds, err := listK8sResourceKinds(kubectlOptions, "")
-		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
-
-		certManagerAvailableResourceKinds := stringSlicesInstersect(dependencyCRDs.CertManager(), k8sResourceKinds)
-		certManagerAvailableResourceKinds = append(certManagerAvailableResourceKinds, basicK8sResourceKinds()...)
-
-		remainedResources, err := getK8sResources(kubectlOptions,
-			certManagerAvailableResourceKinds,
-			fmt.Sprintf(managedByHelmLabelTemplate, certManagerHelmDescriptor.ReleaseName),
-			"",
-			kubectlArgGoTemplateKindNameNamespace,
-			"--all-namespaces")
-		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
-
-		gomega.Expect(remainedResources).Should(gomega.BeEmpty())
+		requireHelmManagedResourcesRemoved(kubectlOptions, dependencyCRDs.CertManager(), certManagerHelmDescriptor.ReleaseName)
 	})
 }
 
@@ -255,22 +200,28 @@ func requireUninstallingContourHelmChart(kubectlOptions k8s.KubectlOptions) {
 
 		ginkgo.By("Verifying Project Contour helm chart resources cleanup")
 
-		k8sResourceKinds, err := listK8sResourceKinds(kubectlOptions, "")
-		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
+		requireHelmManagedResourcesRemoved(kubectlOptions, dependencyCRDs.Contour(), contourIngressControllerHelmDescriptor.ReleaseName)
+	})
+}
 
-		contourAvailableResourceKinds := stringSlicesInstersect(dependencyCRDs.Contour(), k8sResourceKinds)
-		contourAvailableResourceKinds = append(contourAvailableResourceKinds, basicK8sResourceKinds()...)
+func requireHelmManagedResourcesRemoved(kubectlOptions k8s.KubectlOptions, crdResourceKinds []string, releaseName string) {
+	k8sResourceKinds, err := listK8sResourceKinds(kubectlOptions, "")
+	gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 
-		remainedResources, err := getK8sResources(kubectlOptions,
-			contourAvailableResourceKinds,
-			fmt.Sprintf(managedByHelmLabelTemplate, contourIngressControllerHelmDescriptor.ReleaseName),
+	availableResourceKinds := stringSlicesInstersect(crdResourceKinds, k8sResourceKinds)
+	availableResourceKinds = append(availableResourceKinds, basicK8sResourceKinds()...)
+	selector := fmt.Sprintf(managedByHelmLabelTemplate, releaseName)
+
+	// Helm uninstall can return before Kubernetes stops serving terminating objects.
+	gomega.Eventually(context.Background(), func() ([]string, error) {
+		return getK8sResourcesQuiet(kubectlOptions,
+			availableResourceKinds,
+			selector,
 			"",
 			kubectlArgGoTemplateKindNameNamespace,
 			"--all-namespaces")
-		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
-
-		gomega.Expect(remainedResources).Should(gomega.BeEmpty())
-	})
+	}, defaultDeletionTimeout, waitResourceConditionRetryInterval).Should(gomega.BeEmpty(),
+		"Helm-managed resources for release %q remained after uninstall", releaseName)
 }
 
 func requireRemoveContourCRDs(kubectlOptions k8s.KubectlOptions) {
