@@ -183,7 +183,7 @@ func (r *CruiseControlTaskReconciler) Reconcile(ctx context.Context, request ctr
 			// pod directly (see reconcileKafkaPodDelete) and never receive a GracefulDownscaleRequired
 			// state, so this filter is defense-in-depth to keep the three broker-id CC operations
 			// (add_broker, remove_broker, rebalance) symmetric.
-			brokerIDs, err = util.FilterControllerOnlyNodes(brokerIDs, instance.Spec)
+			brokerIDs, err = util.FilterControllerOnlyNodesWithBrokerStates(brokerIDs, instance.Spec, instance.Status.BrokersState)
 			if err != nil {
 				return requeueWithError(log, fmt.Sprintf("failed to filter out controller-only nodes from the Kafka cluster, "+
 					"clusterName: %s, clusterNamespace: %s", instance.GetName(), instance.GetNamespace()), err)
