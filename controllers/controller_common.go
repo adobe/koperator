@@ -84,18 +84,15 @@ func checkBrokerConnectionError(logger logr.Logger, err error) (ctrl.Result, err
 	switch {
 	case errors.As(err, &errorfactory.BrokersUnreachable{}):
 		return ctrl.Result{
-			Requeue:      true,
 			RequeueAfter: time.Duration(15) * time.Second,
 		}, nil
 	case errors.As(err, &errorfactory.BrokersNotReady{}):
 		return ctrl.Result{
-			Requeue:      true,
 			RequeueAfter: time.Duration(15) * time.Second,
 		}, nil
 	case errors.As(err, &errorfactory.ResourceNotReady{}):
 		logger.Info("Needed resource for broker connection not found, may not be ready")
 		return ctrl.Result{
-			Requeue:      true,
 			RequeueAfter: time.Duration(5) * time.Second,
 		}, nil
 	default:

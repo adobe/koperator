@@ -145,7 +145,7 @@ func (r *Dispatcher) Handle(object runtime.Object) (ctrl.Result, error) {
 
 		if currentDeletionStatus != isBeingDeleted {
 			// Requeue object so that we can start reconciling in inverse order
-			combinedResult.Combine(&reconcile.Result{Requeue: true, RequeueAfter: 0}, errors.New("object being deleted requeing object"))
+			combinedResult.CombineErr(errors.New("object being deleted requeing object"))
 			break
 		}
 

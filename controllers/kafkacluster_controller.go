@@ -269,7 +269,6 @@ func (r *KafkaClusterReconciler) checkFinalizers(ctx context.Context, cluster *v
 	if len(childTopics.Items) > 0 {
 		log.Info(fmt.Sprintf("Still waiting for the following topics to be deleted: %v", topicListToStrSlice(childTopics)))
 		return ctrl.Result{
-			Requeue:      true,
 			RequeueAfter: time.Duration(3) * time.Second,
 		}, nil
 	}
@@ -304,7 +303,6 @@ func (r *KafkaClusterReconciler) checkFinalizers(ctx context.Context, cluster *v
 			if errors.As(err, &errorfactory.ResourceNotReady{}) {
 				log.Info("The PKI is not ready to be torn down")
 				return ctrl.Result{
-					Requeue:      true,
 					RequeueAfter: time.Duration(5) * time.Second,
 				}, nil
 			}

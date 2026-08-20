@@ -73,7 +73,7 @@ Uses Go workspaces with 5+ modules:
 ### Key Makefile Targets
 
 ```bash
-make test                # Run unit tests with envtest
+make test                # Run all local non-e2e tests across modules (uses envtest)
 make test-e2e            # Run end-to-end tests
 make lint                # Run golangci-lint across all modules
 make check               # Run tests and linters
@@ -88,7 +88,7 @@ make run                 # Run operator locally (outside cluster)
 
 ### Important Make Variables
 - `IMG` - Operator image name (default: `ghcr.io/adobe/koperator:latest`)
-- `ENVTEST_K8S_VERSION` - Kubernetes version for tests (default: 1.31.x)
+- `ENVTEST_K8S_VERSION` - Kubernetes version for envtest assets (default: 1.36.2)
 
 ## Development Workflows
 
@@ -222,8 +222,11 @@ Owner references set:
 Framework: Standard Go testing + testify assertions
 
 ```bash
-# Run all unit tests
+# Run all local non-e2e tests across modules. This is the default test command agents should use.
 make test
+
+# Run tests plus lint before handing off broader changes
+make check
 
 # Run specific package tests
 go test ./pkg/resources/kafka/...

@@ -252,7 +252,7 @@ spec:
         #volumeMounts:
         #  - mountPath: "/opt/kafka/libs/extra-jars"
         #    name: "jars"
-    - image: "ghcr.io/adobe/koperator/kafka:2.13-3.9.1" # renovate: datasource=docker depName=ghcr.io/adobe/koperator/kafka
+    - image: "ghcr.io/adobe/koperator/kafka:2.13-3.9.2-jdk21.0.11" # renovate: datasource=docker depName=ghcr.io/adobe/koperator/kafka
       id: 1
       config: |
         auto.create.topics.enable=false
@@ -274,7 +274,7 @@ spec:
       readOnlyConfig: |
         auto.create.topics.enable=false
       brokerConfig:
-        image: "ghcr.io/adobe/koperator/kafka:2.13-3.9.1" # renovate: datasource=docker depName=ghcr.io/adobe/koperator/kafka
+        image: "ghcr.io/adobe/koperator/kafka:2.13-3.9.2-jdk21.0.11" # renovate: datasource=docker depName=ghcr.io/adobe/koperator/kafka
         storageConfigs:
           - mountPath: "/kafka-logs"
             pvcSpec:
