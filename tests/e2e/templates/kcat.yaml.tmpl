@@ -7,7 +7,7 @@ spec:
   serviceAccount: {{or .ServiceAccount "default"}}
   containers:
   - name: kafka-client
-    image: edenhill/kcat:1.7.0 # renovate: datasource=docker depName=edenhill/kcat
+    image: edenhill/kcat:1.7.1 # renovate: datasource=docker depName=edenhill/kcat
     # Just spin & wait forever
     command: [ "/bin/sh", "-c", "--" ]
     args: [ "while true; do sleep 3000; done;" ]
