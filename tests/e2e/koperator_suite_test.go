@@ -22,8 +22,8 @@ import (
 	"testing"
 
 	"github.com/gruntwork-io/terratest/modules/k8s"
-	ginkgo "github.com/onsi/ginkgo/v2"
-	gomega "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -74,27 +74,47 @@ var _ = ginkgo.When("Testing e2e test altogether", ginkgo.Ordered, func() {
 	snapshotCluster(snapshottedInfo)
 	testInstall()
 	testInstallZookeeperCluster()
-	testInstallKafkaCluster("../../config/samples/simplekafkacluster.yaml")
+	testInstallKafkaCluster("Installing Kafka cluster (Zookeeper-based, plaintext, no ingress)", "../../config/samples/simplekafkacluster.yaml")
 	testProduceConsumeInternal()
 	testJmxExporter()
 	testUninstallKafkaCluster()
-	testInstallKafkaCluster("../../config/samples/simplekafkacluster_ssl.yaml")
+	testInstallKafkaCluster("Installing Kafka cluster (Zookeeper-based, SSL enabled, no ingress)", "../../config/samples/simplekafkacluster_ssl.yaml")
 	testProduceConsumeInternalSSL(defaultTLSSecretName)
 	testJmxExporter()
 	testUninstallKafkaCluster()
-	testInstallKafkaCluster("../../config/samples/simplekafkacluster_4disk.yaml")
+	testInstallKafkaCluster("Installing Kafka cluster (Zookeeper-based, 4 disks, no ingress)", "../../config/samples/simplekafkacluster_4disk.yaml")
 	testMultiDiskRemoval()
 	testUninstallKafkaCluster()
-	testInstallKafkaCluster("../../config/samples/simplekafkacluster_5broker.yaml")
+	testInstallKafkaCluster("Installing Kafka cluster (Zookeeper-based, 5 broker, no ingress)", "../../config/samples/simplekafkacluster_5broker.yaml")
 	testBatchedBrokerRemoval()
 	testUninstallKafkaCluster()
 	testUninstallZookeeperCluster()
 	// kraft tests
-	testInstallKafkaCluster("../../config/samples/kraft/simplekafkacluster_kraft.yaml")
+	testInstallKafkaCluster("Installing Kafka cluster (KRaft mode, plaintext, no ingress)", "../../config/samples/kraft/simplekafkacluster_kraft.yaml")
 	testProduceConsumeInternal()
 	testJmxExporter()
 	testKRaftBrokerScaling()
 	testUninstallKafkaCluster()
+	testInstallZookeeperCluster()
+	testInstallKafkaCluster("Installing Kafka cluster (Zookeeper-based, Envoy ingress)", "../../config/samples/simplekafkacluster_with_envoy.yaml")
+	testProduceConsumeInternal()
+	testJmxExporter()
+	testUninstallKafkaCluster()
+	testUninstallZookeeperCluster()
+	testInstallKafkaCluster("Installing Kafka cluster (KRaft mode, Envoy ingress)", "../../config/samples/kraft/simplekafkacluster_kraft_with_envoy.yaml")
+	testProduceConsumeInternal()
+	testJmxExporter()
+	testUninstallKafkaCluster()
+	testInstallZookeeperCluster()
+	testInstallKafkaCluster("Installing Kafka cluster (Zookeeper-based, Envoy Gateway ingress)", "../../config/samples/simplekafkacluster_with_envoygateway.yaml")
+	testProduceConsumeInternal()
+	testJmxExporter()
+	testUninstallEnvoyGatewayKafkaCluster("../../config/samples/simplekafkacluster_with_envoygateway.yaml")
+	testUninstallZookeeperCluster()
+	testInstallKafkaCluster("Installing Kafka cluster (KRaft mode, Envoy Gateway ingress)", "../../config/samples/kraft/simplekafkacluster_kraft_with_envoygateway.yaml")
+	testProduceConsumeInternal()
+	testJmxExporter()
+	testUninstallEnvoyGatewayKafkaCluster("../../config/samples/kraft/simplekafkacluster_kraft_with_envoygateway.yaml")
 	testUninstall()
 	snapshotClusterAndCompare(snapshottedInfo)
 })

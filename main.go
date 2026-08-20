@@ -47,6 +47,8 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
+	gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 
 	contour "github.com/projectcontour/contour/apis/projectcontour/v1"
 
@@ -74,6 +76,9 @@ func init() {
 	_ = banzaicloudv1beta1.AddToScheme(scheme)
 
 	_ = contour.AddToScheme(scheme)
+
+	_ = gatewayv1.Install(scheme)
+	_ = gatewayv1alpha2.Install(scheme)
 	// +kubebuilder:scaffold:scheme
 }
 
