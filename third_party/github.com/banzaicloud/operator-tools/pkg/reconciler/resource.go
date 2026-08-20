@@ -522,7 +522,6 @@ func (r *GenericResourceReconciler) ReconcileResource(desired runtime.Object, de
 						return nil, errors.WrapIfWithDetails(err, "failed to delete current resource", resourceDetails...)
 					}
 					return &reconcile.Result{
-						Requeue:      true,
 						RequeueAfter: time.Second * time.Duration(utils.PointerToInt32(r.Options.RecreateRequeueDelay)),
 					}, nil
 				} else {

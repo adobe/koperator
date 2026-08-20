@@ -45,8 +45,6 @@ func UnEscapeSeparators(s string) string {
 
 	// Convert s string to slice of rune
 	orig := []rune(s)
-	// Convert Separators to slice of rune
-	sep := []rune(Separators)
 	// Create new slice holding the escaped string
 	newSlice := make([]rune, 0)
 
@@ -58,7 +56,7 @@ func UnEscapeSeparators(s string) string {
 		// Set previous index by making sure that it's value is inbound
 		prevIdx := Max(idx-1, 0)
 		// Iterate over the separator characters.
-		for _, sp := range sep {
+		for _, sp := range Separators {
 			// If there is a separator match and the previous is an escape character
 			// then copy data up to the previous index to the new string then append
 			// the current leaving out the previous character.
@@ -90,8 +88,6 @@ func EscapeSeparators(s string) string {
 
 	// Convert s string to slice of rune
 	orig := []rune(s)
-	// Convert Separators to slice of rune
-	sep := []rune(Separators)
 	// Create new slice holding the escaped string
 	newSlice := make([]rune, 0)
 
@@ -103,7 +99,7 @@ func EscapeSeparators(s string) string {
 		// Set previous index by making sure that it's value is inbound
 		prevIdx := Max(idx-1, 0)
 		// Iterate over the separator characters
-		for _, sp := range sep {
+		for _, sp := range Separators {
 			// If there is a separator match and the previous is not an escape character
 			// then copy data up to the current index to the new string then append the
 			// escape and the current characters.
@@ -141,15 +137,13 @@ func GetSeparator(s string) (string, int, error) {
 
 	// Convert s string to slice of rune
 	r := []rune(s)
-	// Convert Separators to slice of rune
-	separators := []rune(Separators)
 
 	// Iterate over the input string
 	for idx, c := range r {
 		// Avoid out of bound access
 		prevIdx := Max(idx-1, 0)
 		// Iterate over the list of separators
-		for _, sp := range separators {
+		for _, sp := range Separators {
 			// If the current character is a separator and it is not escaped
 			// than separator is found.
 			if c == sp && r[prevIdx] != EscapeChar {
