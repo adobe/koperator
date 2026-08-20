@@ -18,7 +18,7 @@ operator:
     # -- Operator container image repository
     repository: ghcr.io/adobe/koperator
     # -- Operator container image tag
-    tag: "0.29.0"
+    tag: "0.28.0-adobe-20260731
     # -- Operator container image pull policy
     pullPolicy: IfNotPresent
   # In constrained environments where operator cannot
