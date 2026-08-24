@@ -1,6 +1,6 @@
 services:
   zookeeper:
-    image: ghcr.io/adobe/zookeeper-operator/zookeeper:3.8.4-0.2.15-adobe-20250923@sha256:170e5b7a8e0156e414f18b9e2c4fa2331f80a3f587bab55ce28577e4d3d642b5
+    image: ghcr.io/adobe/zookeeper-operator/zookeeper:3.8.4-0.2.15-adobe-20260818@sha256:ee0fe4635019797be3f55b3efd806dac307b2a95a4041735128c4fbef7494bbb
     restart: unless-stopped
     hostname: zookeeper
     container_name: zookeeper
@@ -68,7 +68,7 @@ services:
       start_period: 30s
 
   kafka-0:
-    image: ghcr.io/adobe/koperator/kafka:2.13-3.9.1@sha256:279358e7bc789aba1e3457421e251278ec993a57d0ad2b9691274f1f3ddae134
+    image: ghcr.io/adobe/koperator/kafka:2.13-3.9.2-jdk21.0.11@sha256:80c1f6074e4d305c353cd3f3e31fddceff140da8d4d95baec3ec007702c30b1e
     restart: unless-stopped
     user: root
     hostname: kafka-0
@@ -121,7 +121,7 @@ services:
       start_period: 30s
 
   kafka-1:
-    image: ghcr.io/adobe/koperator/kafka:2.13-3.9.1@sha256:279358e7bc789aba1e3457421e251278ec993a57d0ad2b9691274f1f3ddae134
+    image: ghcr.io/adobe/koperator/kafka:2.13-3.9.2-jdk21.0.11@sha256:80c1f6074e4d305c353cd3f3e31fddceff140da8d4d95baec3ec007702c30b1e
     restart: unless-stopped
     user: root
     hostname: kafka-1
@@ -174,7 +174,7 @@ services:
       start_period: 30s
 
   kafka-2:
-    image: ghcr.io/adobe/koperator/kafka:2.13-3.9.1@sha256:279358e7bc789aba1e3457421e251278ec993a57d0ad2b9691274f1f3ddae134
+    image: ghcr.io/adobe/koperator/kafka:2.13-3.9.2-jdk21.0.11@sha256:80c1f6074e4d305c353cd3f3e31fddceff140da8d4d95baec3ec007702c30b1e
     restart: unless-stopped
     user: root
     hostname: kafka-2
@@ -262,7 +262,7 @@ services:
       start_period: 30s
 
   producer:
-    image: ghcr.io/adobe/koperator/kafka:2.13-3.9.1@sha256:279358e7bc789aba1e3457421e251278ec993a57d0ad2b9691274f1f3ddae134
+    image: ghcr.io/adobe/koperator/kafka:2.13-3.9.2-jdk21.0.11@sha256:80c1f6074e4d305c353cd3f3e31fddceff140da8d4d95baec3ec007702c30b1e
     restart: unless-stopped
     hostname: producer
     container_name: producer
@@ -299,7 +299,7 @@ services:
       start_period: 30s
 
   consumer:
-    image: ghcr.io/adobe/koperator/kafka:2.13-3.9.1@sha256:279358e7bc789aba1e3457421e251278ec993a57d0ad2b9691274f1f3ddae134
+    image: ghcr.io/adobe/koperator/kafka:2.13-3.9.2-jdk21.0.11@sha256:80c1f6074e4d305c353cd3f3e31fddceff140da8d4d95baec3ec007702c30b1e
     restart: unless-stopped
     hostname: consumer
     container_name: consumer

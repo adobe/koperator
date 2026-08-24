@@ -224,7 +224,6 @@ func (r *KafkaUserReconciler) Reconcile(ctx context.Context, request reconcile.R
 			case errors.As(err, &errorfactory.ResourceNotReady{}):
 				reqLogger.Info("generated secret not found, may not be ready")
 				return ctrl.Result{
-					Requeue:      true,
 					RequeueAfter: time.Duration(5) * time.Second,
 				}, nil
 			case errors.As(err, &errorfactory.FatalReconcileError{}):
@@ -233,7 +232,6 @@ func (r *KafkaUserReconciler) Reconcile(ctx context.Context, request reconcile.R
 				// The user can fix while this is looping and it will pick it up next reconcile attempt
 				reqLogger.Error(err, "Fatal error attempting to reconcile the user certificate.")
 				return ctrl.Result{
-					Requeue:      true,
 					RequeueAfter: time.Duration(15) * time.Second,
 				}, nil
 			default:
@@ -250,9 +248,7 @@ func (r *KafkaUserReconciler) Reconcile(ctx context.Context, request reconcile.R
 		kafkaUser, err = user.GetDistinguishedName()
 		if err != nil {
 			reqLogger.Error(err, "could not get Distinguished Name from the generated TLS certificate", "cert", string(user.Certificate))
-			return ctrl.Result{
-				Requeue: false,
-			}, err
+			return ctrl.Result{}, err
 		}
 		// check if marked for deletion and remove created certs
 		if k8sutil.IsMarkedForDeletion(instance.ObjectMeta) {

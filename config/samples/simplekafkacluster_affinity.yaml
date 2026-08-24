@@ -13,7 +13,7 @@ spec:
   # If true OneBrokerPerNode ensures that each kafka broker will be placed on a different node unless a custom
   # Affinity definition overrides this behavior either set in brokerConfigGroups or in one specific brokerConfig
   oneBrokerPerNode: false
-  clusterImage: "ghcr.io/adobe/koperator/kafka:2.13-3.9.1" # renovate: datasource=docker depName=ghcr.io/adobe/koperator/kafka
+  clusterImage: "ghcr.io/adobe/koperator/kafka:2.13-3.9.2-jdk21.0.11" # renovate: datasource=docker depName=ghcr.io/adobe/koperator/kafka
   readOnlyConfig: |
     auto.create.topics.enable=false
     cruise.control.metrics.topic.auto.create=true
