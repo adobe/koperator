@@ -46,10 +46,11 @@ func (r *Reconciler) allBrokerService() runtime.Object {
 			r.KafkaCluster.Spec.ListenersConfig.GetServiceAnnotations(),
 			r.KafkaCluster),
 		Spec: corev1.ServiceSpec{
-			Type:            corev1.ServiceTypeClusterIP,
-			SessionAffinity: corev1.ServiceAffinityNone,
-			Selector:        apiutil.LabelsForKafka(r.KafkaCluster.GetName()),
-			Ports:           usedPorts,
+			Type:                     corev1.ServiceTypeClusterIP,
+			SessionAffinity:          corev1.ServiceAffinityNone,
+			Selector:                 apiutil.LabelsForKafka(r.KafkaCluster.GetName()),
+			Ports:                    usedPorts,
+			PublishNotReadyAddresses: r.KafkaCluster.Spec.PublishNotReadyAddresses,
 		},
 	}
 
