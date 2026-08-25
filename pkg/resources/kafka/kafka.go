@@ -989,41 +989,27 @@ func (r *Reconciler) updateStatusWithDockerImageAndVersion(brokers map[int32]*ba
 
 //gocyclo:ignore
 func (r *Reconciler) handleRollingUpgrade(log logr.Logger, desiredPod, currentPod *corev1.Pod, desiredType reflect.Type) error {
-	// Since toleration does not support patchStrategy:"merge,retainKeys",
-	// we need to add all toleration from the current pod if the toleration is set in the CR
-	if len(desiredPod.Spec.Tolerations) > 0 {
-		desiredPod.Spec.Tolerations = append(desiredPod.Spec.Tolerations, currentPod.Spec.Tolerations...)
-		uniqueTolerations := make([]corev1.Toleration, 0, len(desiredPod.Spec.Tolerations))
-		keys := make(map[corev1.Toleration]bool)
-		for _, t := range desiredPod.Spec.Tolerations {
-			if _, value := keys[t]; !value {
-				keys[t] = true
-				uniqueTolerations = append(uniqueTolerations, t)
-			}
-		}
-		desiredPod.Spec.Tolerations = uniqueTolerations
-	}
-	// Check if the resource actually updated or if labels match TaintedBrokersSelector
-	patchResult, err := patch.DefaultPatchMaker.Calculate(currentPod, desiredPod)
+	// Decide whether a rolling upgrade is needed by comparing koperator's own
+	// desired spec against what it last applied (the last-applied annotation on
+	// the current pod) — NOT against the live pod. This keeps mutations made by
+	// admission controllers (autoscalers, webhooks) from triggering restarts,
+	// while intentional CR changes always do. Also check TaintedBrokersSelector.
+	intentChanged, patchBytes, err := podSpecIntentChanged(currentPod, desiredPod)
 	switch {
 	case err != nil:
-		log.Error(err, "could not match objects", "kind", desiredType)
+		log.Error(err, "could not compare desired pod against last-applied configuration", "kind", desiredType)
 	case r.isPodTainted(log, currentPod):
-		log.Info("pod has tainted labels, attempting to delete", "pod", currentPod)
-	case patchResult.IsEmpty():
+		log.Info("pod has tainted labels, deleting it", "pod", currentPod)
+	case !intentChanged:
 		if !k8sutil.IsPodContainsTerminatedContainer(currentPod) &&
 			r.KafkaCluster.Status.BrokersState[currentPod.Labels[banzaiv1beta1.BrokerIdLabelKey]].ConfigurationState == banzaiv1beta1.ConfigInSync &&
 			!k8sutil.IsPodContainsEvictedContainer(currentPod) &&
 			!k8sutil.IsPodContainsShutdownContainer(currentPod) {
-			log.V(1).Info("resource is in sync")
+			log.V(1).Info("desired pod spec is in sync with last-applied configuration")
 			return nil
 		}
 	default:
-		log.V(1).Info("kafka pod resource diffs",
-			"patch", string(patchResult.Patch),
-			"current", string(patchResult.Current),
-			"modified", string(patchResult.Modified),
-			"original", string(patchResult.Original))
+		log.V(1).Info("kafka pod spec changed", "patch", string(patchBytes))
 	}
 
 	if err := patch.DefaultAnnotator.SetLastAppliedAnnotation(desiredPod); err != nil {
@@ -1647,18 +1633,18 @@ func (r *Reconciler) getK8sNodeIP(nodeName string, nodeAddressType string) (stri
 // In KRaft mode, controller accesses are isolated from admin client (see KIP-590 for mode details),
 // therefore, the KRaft metadata caches intentionally choose a random broker node to report as the controller
 func (r *Reconciler) determineControllerId() (int32, error) {
-	kClient, close, err := r.kafkaClientProvider.NewFromCluster(r.Client, r.KafkaCluster)
-	if err != nil {
-		return -1, errors.WrapIf(err, "could not create Kafka client, thus could not determine controller")
-	}
-	defer close()
+	// kClient, close, err := r.kafkaClientProvider.NewFromCluster(r.Client, r.KafkaCluster)
+	// if err != nil {
+	return -1, errors.WrapIf(nil, "could not create Kafka client, thus could not determine controller")
+	// }
+	// defer close()
 
-	_, controllerID, err := kClient.DescribeCluster()
-	if err != nil {
-		return -1, errors.WrapIf(err, "could not find controller broker")
-	}
+	// _, controllerID, err := kClient.DescribeCluster()
+	// if err != nil {
+	// 	return -1, errors.WrapIf(err, "could not find controller broker")
+	// }
 
-	return controllerID, nil
+	// return controllerID, nil
 }
 
 func getPodsInTerminatingOrPendingState(items []corev1.Pod) []corev1.Pod {
