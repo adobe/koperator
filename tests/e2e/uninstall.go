@@ -38,8 +38,7 @@ func requireUninstallingKoperator(kubectlOptions k8s.KubectlOptions) {
 // and checks the success of that operation.
 func requireUninstallingKoperatorHelmChart(kubectlOptions k8s.KubectlOptions) {
 	ginkgo.It("Uninstalling Koperator Helm chart", func() {
-		err := koperatorLocalHelmDescriptor.uninstallHelmChart(kubectlOptions, true)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		requireHelmChartUninstalled(kubectlOptions, &koperatorLocalHelmDescriptor)
 
 		ginkgo.By("Verifying Koperator helm chart resources cleanup")
 		requireHelmManagedResourcesRemoved(kubectlOptions, koperatorCRDs(), koperatorLocalHelmDescriptor.ReleaseName)
@@ -70,8 +69,7 @@ func requireUninstallingZookeeperOperator(kubectlOptions k8s.KubectlOptions) {
 // and checks the success of that operation.
 func requireUninstallingZookeeperOperatorHelmChart(kubectlOptions k8s.KubectlOptions) {
 	ginkgo.It("Uninstalling zookeeper-operator Helm chart", func() {
-		err := zookeeperOperatorHelmDescriptor.uninstallHelmChart(kubectlOptions, true)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		requireHelmChartUninstalled(kubectlOptions, &zookeeperOperatorHelmDescriptor)
 		ginkgo.By("Verifying Zookeeper-operator helm chart resources cleanup")
 
 		requireHelmManagedResourcesRemoved(kubectlOptions, dependencyCRDs.Zookeeper(), zookeeperOperatorHelmDescriptor.ReleaseName)
@@ -102,8 +100,7 @@ func requireUninstallingPrometheusOperator(kubectlOptions k8s.KubectlOptions) {
 // and checks the success of that operation.
 func requireUninstallingPrometheusOperatorHelmChart(kubectlOptions k8s.KubectlOptions) {
 	ginkgo.It("Uninstalling Prometheus-operator Helm chart", func() {
-		err := prometheusOperatorHelmDescriptor.uninstallHelmChart(kubectlOptions, true)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		requireHelmChartUninstalled(kubectlOptions, &prometheusOperatorHelmDescriptor)
 
 		ginkgo.By("Verifying Prometheus-operator helm chart resources cleanup")
 
@@ -135,8 +132,7 @@ func requireUninstallingCertManager(kubectlOptions k8s.KubectlOptions) {
 // and checks the success of that operation.
 func requireUninstallingCertManagerHelmChart(kubectlOptions k8s.KubectlOptions) {
 	ginkgo.It("Uninstalling Cert-manager Helm chart", func() {
-		err := certManagerHelmDescriptor.uninstallHelmChart(kubectlOptions, true)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		requireHelmChartUninstalled(kubectlOptions, &certManagerHelmDescriptor)
 
 		ginkgo.By("Verifying Cert-manager helm chart resources cleanup")
 
@@ -195,13 +191,26 @@ func requireUninstallingContour(kubectlOptions k8s.KubectlOptions) {
 // and checks the success of that operation.
 func requireUninstallingContourHelmChart(kubectlOptions k8s.KubectlOptions) {
 	ginkgo.It("Uninstalling Project Contour Helm chart", func() {
-		err := contourIngressControllerHelmDescriptor.uninstallHelmChart(kubectlOptions, true)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		requireHelmChartUninstalled(kubectlOptions, &contourIngressControllerHelmDescriptor)
 
 		ginkgo.By("Verifying Project Contour helm chart resources cleanup")
 
 		requireHelmManagedResourcesRemoved(kubectlOptions, dependencyCRDs.Contour(), contourIngressControllerHelmDescriptor.ReleaseName)
 	})
+}
+
+// requireHelmChartUninstalled uninstalls the given Helm release, retrying on the
+// transient "resource still exists (status: Terminating)" error that Helm's
+// `--wait --cascade=foreground` uninstall can report when it checks resource
+// removal before Kubernetes' garbage collector has finished reaping owned
+// objects. The release itself is already removed from Helm's storage by then,
+// so a retry is safe: it will either see the release as no longer installed
+// (nil error) or hit the same transient state again.
+func requireHelmChartUninstalled(kubectlOptions k8s.KubectlOptions, helmDescriptor *helmDescriptor) {
+	gomega.Eventually(context.Background(), func() error {
+		return helmDescriptor.uninstallHelmChart(kubectlOptions, true)
+	}, defaultDeletionTimeout, waitResourceConditionRetryInterval).Should(gomega.Succeed(),
+		"Uninstalling Helm release %q", helmDescriptor.ReleaseName)
 }
 
 func requireHelmManagedResourcesRemoved(kubectlOptions k8s.KubectlOptions, crdResourceKinds []string, releaseName string) {
