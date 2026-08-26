@@ -84,6 +84,7 @@ var _ = ginkgo.When("Testing e2e test altogether", ginkgo.Ordered, func() {
 	testUninstallKafkaCluster()
 	testInstallKafkaCluster("../../config/samples/simplekafkacluster_4disk.yaml")
 	testMultiDiskRemoval()
+	testConfigChangeWithDiskRemoval()
 	testUninstallKafkaCluster()
 	testInstallKafkaCluster("../../config/samples/simplekafkacluster_5broker.yaml")
 	testBatchedBrokerRemoval()

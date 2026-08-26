@@ -47,6 +47,7 @@ type PvcTestCase struct {
 	testName            string
 	brokersDesiredPvcs  map[string][]*corev1.PersistentVolumeClaim
 	existingPvcs        []*corev1.PersistentVolumeClaim
+	runningBrokers      map[string]struct{}
 	kafkaClusterSpec    v1beta1.KafkaClusterSpec
 	kafkaClusterStatus  v1beta1.KafkaClusterStatus
 	expectedError       bool
@@ -1017,7 +1018,7 @@ func TestGetServerPasswordKeysAndUsers(t *testing.T) { //nolint funlen
 	}
 }
 
-func TestReconcileKafkaPvcDiskRemoval(t *testing.T) {
+func TestReconcileKafkaPvcDiskRemoval(t *testing.T) { //nolint:funlen
 	t.Parallel()
 	testCases := []PvcTestCase{
 		{
@@ -1048,6 +1049,7 @@ func TestReconcileKafkaPvcDiskRemoval(t *testing.T) {
 				createPvc("test-pvc-1", "0", "/path/to/mount1"),
 				createPvc("test-pvc-2", "0", "/path/to/mount2"),
 			},
+			runningBrokers: map[string]struct{}{"0": {}},
 			kafkaClusterStatus: v1beta1.KafkaClusterStatus{
 				BrokersState: map[string]v1beta1.BrokerState{
 					"0": {
@@ -1078,6 +1080,7 @@ func TestReconcileKafkaPvcDiskRemoval(t *testing.T) {
 				createPvc("test-pvc-1", "0", "/path/to/mount1"),
 				createPvc("test-pvc-2", "0", "/path/to/mount2"),
 			},
+			runningBrokers: map[string]struct{}{"0": {}},
 			kafkaClusterStatus: v1beta1.KafkaClusterStatus{
 				BrokersState: map[string]v1beta1.BrokerState{
 					"0": {
@@ -1108,6 +1111,7 @@ func TestReconcileKafkaPvcDiskRemoval(t *testing.T) {
 				createPvc("test-pvc-1", "0", "/path/to/mount1"),
 				createPvc("test-pvc-2", "0", "/path/to/mount2"),
 			},
+			runningBrokers: map[string]struct{}{"0": {}},
 			kafkaClusterStatus: v1beta1.KafkaClusterStatus{
 				BrokersState: map[string]v1beta1.BrokerState{
 					"0": {
@@ -1125,6 +1129,102 @@ func TestReconcileKafkaPvcDiskRemoval(t *testing.T) {
 			expectedDeletePvc: false,
 			expectedVolumeState: map[string]v1beta1.CruiseControlVolumeState{
 				"/path/to/mount2": v1beta1.GracefulDiskRemovalRunning,
+			},
+		},
+		{
+			testName: "Disk removal pending but broker pod missing - allow reconcile to proceed",
+			brokersDesiredPvcs: map[string][]*corev1.PersistentVolumeClaim{
+				"0": {
+					createPvc("test-pvc-1", "0", "/path/to/mount1"),
+				},
+			},
+			existingPvcs: []*corev1.PersistentVolumeClaim{
+				createPvc("test-pvc-1", "0", "/path/to/mount1"),
+				createPvc("test-pvc-2", "0", "/path/to/mount2"),
+			},
+			runningBrokers: map[string]struct{}{}, // broker pod is missing
+			kafkaClusterStatus: v1beta1.KafkaClusterStatus{
+				BrokersState: map[string]v1beta1.BrokerState{
+					"0": {
+						GracefulActionState: v1beta1.GracefulActionState{
+							VolumeStates: map[string]v1beta1.VolumeState{
+								"/path/to/mount2": {
+									CruiseControlVolumeState: v1beta1.GracefulDiskRemovalScheduled,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedError:     false,
+			expectedDeletePvc: false,
+			expectedVolumeState: map[string]v1beta1.CruiseControlVolumeState{
+				"/path/to/mount2": v1beta1.GracefulDiskRemovalScheduled,
+			},
+		},
+		{
+			testName: "Disk rebalance pending but broker pod missing - allow reconcile to proceed",
+			brokersDesiredPvcs: map[string][]*corev1.PersistentVolumeClaim{
+				"0": {
+					createPvc("test-pvc-1", "0", "/path/to/mount1"),
+				},
+			},
+			existingPvcs: []*corev1.PersistentVolumeClaim{
+				createPvc("test-pvc-1", "0", "/path/to/mount1"),
+				createPvc("test-pvc-2", "0", "/path/to/mount2"),
+			},
+			runningBrokers: map[string]struct{}{}, // broker pod is missing
+			kafkaClusterStatus: v1beta1.KafkaClusterStatus{
+				BrokersState: map[string]v1beta1.BrokerState{
+					"0": {
+						GracefulActionState: v1beta1.GracefulActionState{
+							VolumeStates: map[string]v1beta1.VolumeState{
+								"/path/to/mount2": {
+									CruiseControlVolumeState: v1beta1.GracefulDiskRebalanceScheduled,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedError:     false,
+			expectedDeletePvc: false,
+			expectedVolumeState: map[string]v1beta1.CruiseControlVolumeState{
+				"/path/to/mount2": v1beta1.GracefulDiskRebalanceScheduled,
+			},
+		},
+		{
+			testName: "Disk newly marked for removal with pod missing - allow reconcile to proceed",
+			brokersDesiredPvcs: map[string][]*corev1.PersistentVolumeClaim{
+				"0": {
+					createPvc("test-pvc-1", "0", "/path/to/mount1"),
+				},
+			},
+			existingPvcs: []*corev1.PersistentVolumeClaim{
+				createPvc("test-pvc-1", "0", "/path/to/mount1"),
+				createPvc("test-pvc-2", "0", "/path/to/mount2"),
+			},
+			runningBrokers: map[string]struct{}{}, // broker pod is missing
+			kafkaClusterStatus: v1beta1.KafkaClusterStatus{
+				BrokersState: map[string]v1beta1.BrokerState{
+					"0": {
+						GracefulActionState: v1beta1.GracefulActionState{
+							VolumeStates: map[string]v1beta1.VolumeState{
+								"/path/to/mount2": {
+									// GracefulDiskRebalanceSucceeded triggers the default case in
+									// handleDiskRemoval which marks GracefulDiskRemovalRequired.
+									// With pod missing, the override should still allow proceeding.
+									CruiseControlVolumeState: v1beta1.GracefulDiskRebalanceSucceeded,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedError:     false,
+			expectedDeletePvc: false,
+			expectedVolumeState: map[string]v1beta1.CruiseControlVolumeState{
+				"/path/to/mount2": v1beta1.GracefulDiskRemovalRequired,
 			},
 		},
 		{
@@ -1184,6 +1284,99 @@ func TestReconcileKafkaPvcDiskRemoval(t *testing.T) {
 			expectedDeletePvc: false,
 			expectedVolumeState: map[string]v1beta1.CruiseControlVolumeState{
 				"/path/to/mount2": v1beta1.GracefulDiskRebalanceRequired,
+			},
+		},
+		{
+			testName: "Disk removal failed (CompletedWithError) with pod present - do not block",
+			brokersDesiredPvcs: map[string][]*corev1.PersistentVolumeClaim{
+				"0": {
+					createPvc("test-pvc-1", "0", "/path/to/mount1"),
+				},
+			},
+			existingPvcs: []*corev1.PersistentVolumeClaim{
+				createPvc("test-pvc-1", "0", "/path/to/mount1"),
+				createPvc("test-pvc-2", "0", "/path/to/mount2"),
+			},
+			runningBrokers: map[string]struct{}{"0": {}}, // pod present - old behavior would BLOCK
+			kafkaClusterStatus: v1beta1.KafkaClusterStatus{
+				BrokersState: map[string]v1beta1.BrokerState{
+					"0": {
+						GracefulActionState: v1beta1.GracefulActionState{
+							VolumeStates: map[string]v1beta1.VolumeState{
+								"/path/to/mount2": {
+									CruiseControlVolumeState: v1beta1.GracefulDiskRemovalCompletedWithError,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedError:     false, // stalled task must not freeze the reconcile
+			expectedDeletePvc: false,
+			expectedVolumeState: map[string]v1beta1.CruiseControlVolumeState{
+				"/path/to/mount2": v1beta1.GracefulDiskRemovalCompletedWithError,
+			},
+		},
+		{
+			testName: "Disk removal paused with pod present - do not block",
+			brokersDesiredPvcs: map[string][]*corev1.PersistentVolumeClaim{
+				"0": {
+					createPvc("test-pvc-1", "0", "/path/to/mount1"),
+				},
+			},
+			existingPvcs: []*corev1.PersistentVolumeClaim{
+				createPvc("test-pvc-1", "0", "/path/to/mount1"),
+				createPvc("test-pvc-2", "0", "/path/to/mount2"),
+			},
+			runningBrokers: map[string]struct{}{"0": {}},
+			kafkaClusterStatus: v1beta1.KafkaClusterStatus{
+				BrokersState: map[string]v1beta1.BrokerState{
+					"0": {
+						GracefulActionState: v1beta1.GracefulActionState{
+							VolumeStates: map[string]v1beta1.VolumeState{
+								"/path/to/mount2": {
+									CruiseControlVolumeState: v1beta1.GracefulDiskRemovalPaused,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedError:     false,
+			expectedDeletePvc: false,
+			expectedVolumeState: map[string]v1beta1.CruiseControlVolumeState{
+				"/path/to/mount2": v1beta1.GracefulDiskRemovalPaused,
+			},
+		},
+		{
+			testName: "Disk rebalance failed (CompletedWithError) with pod present - do not block",
+			brokersDesiredPvcs: map[string][]*corev1.PersistentVolumeClaim{
+				"0": {
+					createPvc("test-pvc-1", "0", "/path/to/mount1"),
+				},
+			},
+			existingPvcs: []*corev1.PersistentVolumeClaim{
+				createPvc("test-pvc-1", "0", "/path/to/mount1"),
+				createPvc("test-pvc-2", "0", "/path/to/mount2"),
+			},
+			runningBrokers: map[string]struct{}{"0": {}},
+			kafkaClusterStatus: v1beta1.KafkaClusterStatus{
+				BrokersState: map[string]v1beta1.BrokerState{
+					"0": {
+						GracefulActionState: v1beta1.GracefulActionState{
+							VolumeStates: map[string]v1beta1.VolumeState{
+								"/path/to/mount2": {
+									CruiseControlVolumeState: v1beta1.GracefulDiskRebalanceCompletedWithError,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedError:     false,
+			expectedDeletePvc: false,
+			expectedVolumeState: map[string]v1beta1.CruiseControlVolumeState{
+				"/path/to/mount2": v1beta1.GracefulDiskRebalanceCompletedWithError,
 			},
 		},
 	}
@@ -1337,8 +1530,12 @@ func execPvcTest(t *testing.T, testCases []PvcTestCase) {
 			// Set up the r.KafkaCluster.Status with the provided test.kafkaClusterStatus
 			r.KafkaCluster.Status = test.kafkaClusterStatus
 
+			runningBrokers := test.runningBrokers
+			if runningBrokers == nil {
+				runningBrokers = make(map[string]struct{})
+			}
 			// Call the reconcileKafkaPvc function with the provided test.brokersDesiredPvcs
-			err := r.reconcileKafkaPvc(context.TODO(), logf.Log, test.brokersDesiredPvcs)
+			err := r.reconcileKafkaPvc(context.TODO(), logf.Log, test.brokersDesiredPvcs, runningBrokers)
 
 			// Test that the expected error is returned
 			if test.expectedError {

@@ -327,13 +327,6 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 			brokersVolumes[strconv.Itoa(int(broker.Id))] = brokerVolumes
 		}
 	}
-	if len(brokersVolumes) > 0 {
-		err := r.reconcileKafkaPvc(ctx, log, brokersVolumes)
-		if err != nil {
-			return errors.WrapIfWithDetails(err, "failed to reconcile resource", "resources", "PersistentVolumeClaim")
-		}
-	}
-
 	var brokerPods corev1.PodList
 	matchingLabels := client.MatchingLabels(apiutil.LabelsForKafka(r.KafkaCluster.Name))
 	err = r.List(ctx, &brokerPods, client.ListOption(client.InNamespace(r.KafkaCluster.Namespace)), client.ListOption(matchingLabels))
@@ -345,6 +338,13 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 	for _, b := range brokerPods.Items {
 		brokerID := b.GetLabels()[banzaiv1beta1.BrokerIdLabelKey]
 		runningBrokers[brokerID] = struct{}{}
+	}
+
+	if len(brokersVolumes) > 0 {
+		err := r.reconcileKafkaPvc(ctx, log, brokersVolumes, runningBrokers)
+		if err != nil {
+			return errors.WrapIfWithDetails(err, "failed to reconcile resource", "resources", "PersistentVolumeClaim")
+		}
 	}
 
 	var pvcList corev1.PersistentVolumeClaimList
@@ -1189,7 +1189,7 @@ func (r *Reconciler) isPodTainted(log logr.Logger, pod *corev1.Pod) bool {
 }
 
 //nolint:funlen
-func (r *Reconciler) reconcileKafkaPvc(ctx context.Context, log logr.Logger, brokersDesiredPvcs map[string][]*corev1.PersistentVolumeClaim) error {
+func (r *Reconciler) reconcileKafkaPvc(ctx context.Context, log logr.Logger, brokersDesiredPvcs map[string][]*corev1.PersistentVolumeClaim, runningBrokers map[string]struct{}) error {
 	brokersVolumesState := make(map[string]map[string]banzaiv1beta1.VolumeState)
 	var brokerIds []string
 	waitForDiskRemovalToFinish := false
@@ -1328,6 +1328,23 @@ func (r *Reconciler) reconcileKafkaPvc(ctx context.Context, log logr.Logger, bro
 	}
 
 	if waitForDiskRemovalToFinish {
+		// Don't block if any broker with pending disk removal/rebalance has a missing pod.
+		// Blocking prevents pod recreation, creating a deadlock where CC can't
+		// complete the disk removal or rebalance because the broker isn't running.
+		for brokerId := range brokersDesiredPvcs {
+			if _, podExists := runningBrokers[brokerId]; !podExists {
+				if brokerState, ok := r.KafkaCluster.Status.BrokersState[brokerId]; ok {
+					for mountPath, volumeState := range brokerState.GracefulActionState.VolumeStates {
+						if volumeState.CruiseControlVolumeState.IsDiskRemoval() || volumeState.CruiseControlVolumeState.IsDiskRebalance() {
+							log.Info("Disk removal pending but broker pod is missing, "+
+								"allowing reconcile to proceed for pod recreation",
+								"brokerId", brokerId, "mountPath", mountPath)
+							return nil
+						}
+					}
+				}
+			}
+		}
 		return errorfactory.New(errorfactory.CruiseControlTaskRunning{}, errors.New("Disk removal pending"), "Disk removal pending")
 	}
 
@@ -1376,11 +1393,26 @@ func handleDiskRemoval(ctx context.Context, pvcList *corev1.PersistentVolumeClai
 					return false, errors.WrapIfWithDetails(err, "could not delete volume status for broker volume", "brokerId", brokerId, mountPathAnnotationKey, mountPathToRemove)
 				}
 			case ccVolumeState.IsDiskRemoval():
-				log.Info("Graceful disk removal is in progress", "brokerId", brokerId, mountPathAnnotationKey, mountPathToRemove)
-				waitForDiskRemovalToFinish = true
+				// Only block the reconcile while the CC task is actively progressing. When it has
+				// stalled (CompletedWithError/Paused) there is no in-flight work a broker restart
+				// could disrupt, and the removed disk stays in log.dirs and mounted until removal
+				// is confirmed succeeded (shouldKeepRemovedLogDirInConfig), so proceeding is
+				// data-safe. Blocking on a stalled task would freeze rolling upgrades indefinitely.
+				if ccVolumeState.IsDiskOperationStalled() {
+					log.Info("Graceful disk removal is not progressing (error/paused); not blocking reconcile",
+						"brokerId", brokerId, mountPathAnnotationKey, mountPathToRemove, "volumeState", ccVolumeState)
+				} else {
+					log.Info("Graceful disk removal is in progress", "brokerId", brokerId, mountPathAnnotationKey, mountPathToRemove)
+					waitForDiskRemovalToFinish = true
+				}
 			case ccVolumeState.IsDiskRebalance():
-				log.Info("Graceful disk rebalance is in progress, waiting for it to finish before marking disk for removal", "brokerId", brokerId, mountPathAnnotationKey, mountPathToRemove)
-				waitForDiskRemovalToFinish = true
+				if ccVolumeState.IsDiskOperationStalled() {
+					log.Info("Graceful disk rebalance is not progressing (error/paused); not blocking reconcile",
+						"brokerId", brokerId, mountPathAnnotationKey, mountPathToRemove, "volumeState", ccVolumeState)
+				} else {
+					log.Info("Graceful disk rebalance is in progress, waiting for it to finish before marking disk for removal", "brokerId", brokerId, mountPathAnnotationKey, mountPathToRemove)
+					waitForDiskRemovalToFinish = true
+				}
 			default:
 				brokerVolumesState[mountPathToRemove] = banzaiv1beta1.VolumeState{CruiseControlVolumeState: banzaiv1beta1.GracefulDiskRemovalRequired}
 				log.Info("Marked the volume for removal", "brokerId", brokerId, mountPathAnnotationKey, mountPathToRemove)
