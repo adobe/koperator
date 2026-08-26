@@ -63,9 +63,13 @@ func testMultiDiskRemoval() bool {
 			// A freshly installed cluster runs an initial CruiseControl rebalance to spread replicas
 			// across the brokers, and/or the operator may still be mid-rollout of the CC Deployment.
 			// Triggering remove_disks while either is still in flight races the operation: Cruise
-			// Control can permanently reject the request (e.g. "Invalid log dirs provided for broker
-			// N") because its monitoring state for the racing broker is stale or was just reset by a
-			// pod restart. See testBatchedBrokerRemoval for the same race on the broker-removal path.
+			// Control can reject the request (e.g. "Invalid log dirs provided for broker N") because
+			// its monitoring state for the racing broker is stale or was just reset by a pod restart.
+			// The controller re-validates a stalled retry against Cruise Control's current state and
+			// skips resubmission until it agrees again (see staleRemoveDisksRetry in
+			// cruisecontroloperation_controller.go), so this now self-heals within a retry cycle
+			// instead of stalling indefinitely - but gating here avoids the race, and the wasted
+			// retry, outright. See testBatchedBrokerRemoval for the same race on the broker-removal path.
 			// Gate on a running cluster with no in-flight CC operation and a settled CC Deployment so
 			// removal starts from a quiescent Cruise Control.
 			ginkgo.By("Ensuring the KafkaCluster is running")
