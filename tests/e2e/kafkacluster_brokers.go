@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/gruntwork-io/terratest/modules/k8s"
 
@@ -79,5 +80,70 @@ func removeKafkaClusterBrokers(kubectlOptions k8s.KubectlOptions, clusterName st
 func addKafkaClusterBroker(kubectlOptions k8s.KubectlOptions, clusterName string, newBroker v1beta1.Broker) error {
 	return patchKafkaClusterBrokers(kubectlOptions, clusterName, func(brokers []v1beta1.Broker) []v1beta1.Broker {
 		return append(brokers, newBroker)
+	})
+}
+
+// patchKafkaClusterStorageConfigs fetches the running KafkaCluster CR, applies mutate to the current
+// spec.brokerConfigGroups[groupName].storageConfigs, and patches back only that field - leaving every
+// other field untouched. Like patchKafkaClusterBrokers, this avoids the unrelated drift a full manifest
+// re-apply can silently carry (the disk-removal test previously applied a whole simplekafkacluster_2disk.yaml
+// just to drop two storageConfigs entries).
+func patchKafkaClusterStorageConfigs(kubectlOptions k8s.KubectlOptions, clusterName, groupName string, mutate func([]v1beta1.StorageConfig) []v1beta1.StorageConfig) error {
+	raw, err := runKubectlSilent(kubectlOptions, "get", "kafkacluster", clusterName, "-o", "json")
+	if err != nil {
+		return err
+	}
+
+	var current struct {
+		Spec struct {
+			BrokerConfigGroups map[string]struct {
+				StorageConfigs []v1beta1.StorageConfig `json:"storageConfigs"`
+			} `json:"brokerConfigGroups"`
+		} `json:"spec"`
+	}
+	if err := json.Unmarshal([]byte(raw), &current); err != nil {
+		return err
+	}
+
+	group, ok := current.Spec.BrokerConfigGroups[groupName]
+	if !ok {
+		return fmt.Errorf("broker config group %q not found in KafkaCluster %q", groupName, clusterName)
+	}
+
+	// A JSON merge patch replaces list-valued keys wholesale, so patching only
+	// spec.brokerConfigGroups[groupName].storageConfigs swaps the storage list without
+	// touching any other field of the group or the cluster.
+	mergePatch, err := json.Marshal(map[string]any{
+		"spec": map[string]any{
+			"brokerConfigGroups": map[string]any{
+				groupName: map[string]any{
+					"storageConfigs": mutate(group.StorageConfigs),
+				},
+			},
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	_, err = runKubectlSilent(kubectlOptions, "patch", "kafkacluster", clusterName, "--type=merge", "-p", string(mergePatch))
+	return err
+}
+
+// removeKafkaClusterStorageConfigs patches the given broker config group's storageConfigs to exclude
+// the entries whose mountPath is in mountPathsToRemove. See patchKafkaClusterStorageConfigs.
+func removeKafkaClusterStorageConfigs(kubectlOptions k8s.KubectlOptions, clusterName, groupName string, mountPathsToRemove ...string) error {
+	remove := make(map[string]bool, len(mountPathsToRemove))
+	for _, mountPath := range mountPathsToRemove {
+		remove[mountPath] = true
+	}
+	return patchKafkaClusterStorageConfigs(kubectlOptions, clusterName, groupName, func(configs []v1beta1.StorageConfig) []v1beta1.StorageConfig {
+		remaining := make([]v1beta1.StorageConfig, 0, len(configs))
+		for _, config := range configs {
+			if !remove[config.MountPath] {
+				remaining = append(remaining, config)
+			}
+		}
+		return remaining
 	})
 }
