@@ -1018,7 +1018,7 @@ func TestGetServerPasswordKeysAndUsers(t *testing.T) { //nolint funlen
 	}
 }
 
-func TestReconcileKafkaPvcDiskRemoval(t *testing.T) {
+func TestReconcileKafkaPvcDiskRemoval(t *testing.T) { //nolint:funlen
 	t.Parallel()
 	testCases := []PvcTestCase{
 		{
