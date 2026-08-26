@@ -19,6 +19,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
+      - name: Check values schema json
+        uses: losisin/helm-values-schema-json-action@v3
+        with:
+          values: values.yaml
+          working-directory: charts/kafka-operator
+          fail-on-diff: true
+
       - name: Set up Go
         uses: actions/setup-go@v7
         with:
@@ -124,4 +131,3 @@ jobs:
         with:
           path: .licensei.cache
           key: ci-license-v1-${{ hashFiles('**/go.sum') }}
-
