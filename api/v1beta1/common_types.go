@@ -102,6 +102,18 @@ func (s CruiseControlVolumeState) IsDiskRemoval() bool {
 	return s.IsDiskRemovalRunning() || s == GracefulDiskRemovalRequired
 }
 
+// IsDiskOperationStalled returns true when a disk removal or rebalance task is in a
+// non-progressing state: CompletedWithError (the Cruise Control task finished with an
+// error) or Paused (halted, awaiting manual resume). In these states Cruise Control is
+// doing no work, so waiting on them to "finish" would block the reconcile indefinitely.
+// Mirrors IsDownscaleStalled at the broker-operation level.
+func (s CruiseControlVolumeState) IsDiskOperationStalled() bool {
+	return s == GracefulDiskRemovalCompletedWithError ||
+		s == GracefulDiskRebalanceCompletedWithError ||
+		s == GracefulDiskRemovalPaused ||
+		s == GracefulDiskRebalancePaused
+}
+
 // IsUpscale returns true if CruiseControlState in GracefulUpscale* state.
 func (r CruiseControlState) IsUpscale() bool {
 	return r == GracefulUpscaleRequired ||

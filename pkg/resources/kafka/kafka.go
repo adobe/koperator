@@ -1393,11 +1393,26 @@ func handleDiskRemoval(ctx context.Context, pvcList *corev1.PersistentVolumeClai
 					return false, errors.WrapIfWithDetails(err, "could not delete volume status for broker volume", "brokerId", brokerId, mountPathAnnotationKey, mountPathToRemove)
 				}
 			case ccVolumeState.IsDiskRemoval():
-				log.Info("Graceful disk removal is in progress", "brokerId", brokerId, mountPathAnnotationKey, mountPathToRemove)
-				waitForDiskRemovalToFinish = true
+				// Only block the reconcile while the CC task is actively progressing. When it has
+				// stalled (CompletedWithError/Paused) there is no in-flight work a broker restart
+				// could disrupt, and the removed disk stays in log.dirs and mounted until removal
+				// is confirmed succeeded (shouldKeepRemovedLogDirInConfig), so proceeding is
+				// data-safe. Blocking on a stalled task would freeze rolling upgrades indefinitely.
+				if ccVolumeState.IsDiskOperationStalled() {
+					log.Info("Graceful disk removal is not progressing (error/paused); not blocking reconcile",
+						"brokerId", brokerId, mountPathAnnotationKey, mountPathToRemove, "volumeState", ccVolumeState)
+				} else {
+					log.Info("Graceful disk removal is in progress", "brokerId", brokerId, mountPathAnnotationKey, mountPathToRemove)
+					waitForDiskRemovalToFinish = true
+				}
 			case ccVolumeState.IsDiskRebalance():
-				log.Info("Graceful disk rebalance is in progress, waiting for it to finish before marking disk for removal", "brokerId", brokerId, mountPathAnnotationKey, mountPathToRemove)
-				waitForDiskRemovalToFinish = true
+				if ccVolumeState.IsDiskOperationStalled() {
+					log.Info("Graceful disk rebalance is not progressing (error/paused); not blocking reconcile",
+						"brokerId", brokerId, mountPathAnnotationKey, mountPathToRemove, "volumeState", ccVolumeState)
+				} else {
+					log.Info("Graceful disk rebalance is in progress, waiting for it to finish before marking disk for removal", "brokerId", brokerId, mountPathAnnotationKey, mountPathToRemove)
+					waitForDiskRemovalToFinish = true
+				}
 			default:
 				brokerVolumesState[mountPathToRemove] = banzaiv1beta1.VolumeState{CruiseControlVolumeState: banzaiv1beta1.GracefulDiskRemovalRequired}
 				log.Info("Marked the volume for removal", "brokerId", brokerId, mountPathAnnotationKey, mountPathToRemove)

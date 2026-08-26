@@ -96,3 +96,39 @@ if waitForDiskRemovalToFinish {
 3. **Pod deleted between runningBrokers check and reconcileKafkaPod**: Possible but harmless — `reconcileKafkaPod` re-queries the pod list per broker (line 826).
 
 4. **Disk removal completes while pod is being created**: The next reconcile cycle will see `IsDiskRemovalSucceeded` and clean up the PVC. No conflict.
+
+## Follow-up: narrow the blocking wait to genuinely-progressing states
+
+The missing-pod bypass above fixes the deadlock only while a pod is *missing*. A live incident (`pipeline-kafka`, 3 brokers, all `GracefulDiskRemovalCompletedWithError` on the removed disk) showed a second failure mode: with all pods **present** but the CC removal task terminally failed, `reconcileKafkaPvc` still blocks forever and the rolling upgrade (brokers `ConfigOutOfSync`) can never start a restart, because it lives downstream of the PVC block.
+
+### Root cause
+
+`GracefulDiskRemovalCompletedWithError` is bucketed under `IsDiskRemovalRunning()` (`common_types.go:83`), so a **failed** CC task is treated as "in progress" and blocks the reconcile indefinitely. There is no self-healing path unless the volume is on `ErrorPolicyIgnore` (`cruisecontroltask_types.go:147-148`).
+
+### Why relaxing the block is data-safe
+
+The blanket block is **not** what protects `log.dirs` integrity — two independent mechanisms already do, and both key off *success*, not the desired spec:
+
+- **`log.dirs` retention**: `shouldKeepRemovedLogDirInConfig` (`configmap.go:312-335`) keeps the removed disk's mount path in `log.dirs` while the state is `IsDiskRemoval()`/`IsDiskRebalance()` (which includes `CompletedWithError`), dropping it only on `…Succeeded`. The KRaft path writes the shrunk set at `configmap.go:202`, but the protective merge at `configmap.go:90-97` runs afterward and overwrites it.
+- **PVC mount retention**: the pod mounts the *actually existing* PVCs (`generateDataVolumeAndVolumeMount`, `pod.go:438`; `getCreatedPvcForBroker`, `kafka.go:143` returns all existing PVCs). The removed disk's PVC is deleted only in `handleDiskRemoval`'s `IsDiskRemovalSucceeded()` branch.
+
+So a `ConfigOutOfSync` broker can restart mid-removal with the disk still in `log.dirs` and still mounted — no stranded data.
+
+### Cruise Control does not hang on a dead broker (verified against CC source)
+
+`remove_disks` executes as intra-broker replica movement. If the broker (hence its destination disk) is down, CC's progress check marks the task DEAD ("Killing execution for task … because the destination disk is down", `Executor.java:2145-2151`), the wait loop exits (`Executor.java:2009`), and the user task reaches a terminal state — mapped by koperator to `…CompletedWithError`. It does **not** stay pinned in `IN_EXECUTION`. This is why the external-termination variant also lands in `CompletedWithError` and, pre-fix, deadlocks permanently.
+
+### The change
+
+Add `CruiseControlVolumeState.IsDiskOperationStalled()` (`CompletedWithError`/`Paused`, mirroring `IsDownscaleStalled`) and, in `handleDiskRemoval`, set `waitForDiskRemovalToFinish = true` only for non-stalled `IsDiskRemoval()`/`IsDiskRebalance()` states. Branch selection (PVC deletion, state marking) is unchanged. The `default`/`Required` branch still blocks (conservative; covered by the missing-pod bypass when the pod is also gone).
+
+The two fixes are complementary:
+
+| Scenario | Fixed by |
+|---|---|
+| Removal failed/paused, pods up | state-narrowing (`IsDiskOperationStalled`) |
+| Removal genuinely Running/Scheduled, this broker's pod missing | missing-pod bypass |
+
+### Not fixed here
+
+The failed removal itself (`CompletedWithError`) is not retried/cleared by this change — it stops that failure from freezing the cluster. Driving the removal to success (or surfacing it for manual action) is a separate concern in the CC task reconciler.
