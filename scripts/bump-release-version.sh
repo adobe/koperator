@@ -20,7 +20,7 @@
 
 set -euo pipefail
 
-: ${1?"Usage: $0 <release-tag> e.g. 0.28.0-adobe-20260622"}
+: ${1?"Usage: $0 <release-tag> e.g. 0.29.0"}
 TAG="$1"
 
 CHART_DIR="charts/kafka-operator"
@@ -33,10 +33,10 @@ sed -i 's/\t/  /g' "${CHART_DIR}/values.yaml"
 sed -i "/# -- Operator container image tag/{n;s/^[[:space:]]*tag:.*/    tag: \"${TAG}\"/}" "${CHART_DIR}/values.yaml"
 
 for f in "${CHART_DIR}/README.md" "${CHART_DIR}/README.md.gotmpl"; do
-  sed -i "s/--version [0-9]\+\.[0-9]\+\.[0-9]\+-[a-zA-Z0-9-]\+/--version ${TAG}/g" "$f"
-  sed -i "s/\`\"\?[0-9]\+\.[0-9]\+\.[0-9]\+-[a-zA-Z0-9-]\+\"\?\`/\`\"${TAG}\"\`/g" "$f"
+  sed -i "s/--version [0-9]\+\.[0-9]\+\.[0-9]\+/--version ${TAG}/g" "$f"
+  sed -i "s/\`\"\?[0-9]\+\.[0-9]\+\.[0-9]\+\"\?\`/\`\"${TAG}\"\`/g" "$f"
 done
 
-sed -i "s/--version [0-9]\+\.[0-9]\+\.[0-9]\+-[a-zA-Z0-9-]\+/--version ${TAG}/g" README.md
-sed -i "s#img.shields.io/github/go-mod/go-version/adobe/koperator/[0-9]\+\.[0-9]\+\.[0-9]\+-[a-zA-Z0-9-]\+#img.shields.io/github/go-mod/go-version/adobe/koperator/${TAG}#" README.md
-sed -i "s/kafka-operator-[0-9]\+\.[0-9]\+\.[0-9]\+-[a-zA-Z0-9-]\+\.tgz/kafka-operator-${TAG}.tgz/g" README.md
+sed -i "s/--version [0-9]\+\.[0-9]\+\.[0-9]\+/--version ${TAG}/g" README.md
+sed -i "s#img.shields.io/github/go-mod/go-version/adobe/koperator/[0-9]\+\.[0-9]\+\.[0-9]\+#img.shields.io/github/go-mod/go-version/adobe/koperator/${TAG}#" README.md
+sed -i "s/kafka-operator-[0-9]\+\.[0-9]\+\.[0-9]\+\.tgz/kafka-operator-${TAG}.tgz/g" README.md
