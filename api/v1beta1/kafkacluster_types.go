@@ -148,6 +148,16 @@ type KafkaClusterSpec struct {
 	// +optional
 	KRaftMode              bool `json:"kRaft"`
 	HeadlessServiceEnabled bool `json:"headlessServiceEnabled"`
+	// PublishNotReadyAddresses controls whether the non-headless broker Services
+	// (kafka-{id} and kafka-all-broker) include the pod IP in their endpoints even
+	// when the pod fails its readiness probe.
+	// Enable this when using a custom readiness sidecar that checks Under-Replicated
+	// Partitions (URP) combined with a PodDisruptionBudget, so that brokers continue
+	// serving existing partition traffic while the PDB holds eviction.
+	// Headless services always publish not-ready addresses regardless of this field.
+	// +kubebuilder:default=false
+	// +optional
+	PublishNotReadyAddresses bool `json:"publishNotReadyAddresses,omitempty"`
 	// localDebugEnabled is used to decide whether to create a separate loadbalancer services for the
 	// Kafka and Cruise Control Pods. These services will expose the internal listener ports of the Kafka
 	// cluster with LoadBalancer type, which can be used for running Koperator on a local machine against
