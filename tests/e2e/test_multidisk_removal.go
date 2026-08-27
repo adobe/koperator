@@ -38,12 +38,16 @@ const (
 )
 
 var (
+	// removedMountPaths are the storageConfigs mountPaths dropped from the broker config group.
+	removedMountPaths = []string{"/kafka-logs2", "/kafka-logs4"}
+	// removedLogDirPath are the corresponding broker log.dirs entries (mountPath + "/kafka")
+	// that must disappear from the broker ConfigMaps once the disks are removed.
 	removedLogDirPath = []string{"/kafka-logs2/kafka", "/kafka-logs4/kafka"}
 )
 
-// testMultiDiskRemoval applies the single-disk manifest to remove the second disk from the cluster,
+// testMultiDiskRemoval patches the KafkaCluster's default broker config group to drop two disks,
 // waits for Cruise Control and PVC cleanup, then asserts broker ConfigMaps' log.dirs no longer
-// contain the removed path and brokers stay healthy.
+// contain the removed paths and brokers stay healthy.
 func testMultiDiskRemoval() bool {
 	return ginkgo.When("Multi-disk removal: remove multiple disks and assert log.dirs is updated", func() {
 		var kubectlOptions k8s.KubectlOptions
@@ -55,9 +59,40 @@ func testMultiDiskRemoval() bool {
 			kubectlOptions.Namespace = koperatorLocalHelmDescriptor.Namespace
 		})
 
-		ginkgo.It("Applying two-disk manifest to trigger disk removal", func() {
-			ginkgo.By("Patching KafkaCluster to remove two disks (storageConfigs -> two entries)")
-			applyK8sResourceManifest(kubectlOptions, "../../config/samples/simplekafkacluster_2disk.yaml")
+		ginkgo.It("Waiting for Cruise Control to be ready and idle before triggering removal", func() {
+			// A freshly installed cluster runs an initial CruiseControl rebalance to spread replicas
+			// across the brokers, and/or the operator may still be mid-rollout of the CC Deployment.
+			// Triggering remove_disks while either is still in flight races the operation: Cruise
+			// Control can reject the request (e.g. "Invalid log dirs provided for broker N") because
+			// its monitoring state for the racing broker is stale or was just reset by a pod restart.
+			// The controller re-validates a stalled retry against Cruise Control's current state and
+			// skips resubmission until it agrees again (see staleRemoveDisksRetry in
+			// cruisecontroloperation_controller.go), so this now self-heals within a retry cycle
+			// instead of stalling indefinitely - but gating here avoids the race, and the wasted
+			// retry, outright. See testBatchedBrokerRemoval for the same race on the broker-removal path.
+			// Gate on a running cluster with no in-flight CC operation and a settled CC Deployment so
+			// removal starts from a quiescent Cruise Control.
+			ginkgo.By("Ensuring the KafkaCluster is running")
+			err := waitForKafkaClusterWithPodStatusCheck(kubectlOptions, kafkaClusterName, kafkaClusterResourceReadinessTimeout)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Waiting until no Cruise Control operation is in flight (initial rebalance finished)")
+			gomega.Eventually(context.Background(), func() (bool, error) {
+				return hasNoInFlightCruiseControlOperation(kubectlOptions)
+			}, multidiskRemovalTimeout, multidiskRemovalPollInterval).Should(gomega.BeTrue())
+
+			ginkgo.By("Waiting until the Cruise Control Deployment is fully rolled out (single Ready replica)")
+			gomega.Eventually(context.Background(), func() (bool, error) {
+				return isCruiseControlDeploymentRolledOut(kubectlOptions)
+			}, multidiskRemovalTimeout, multidiskRemovalPollInterval).Should(gomega.BeTrue())
+		})
+
+		ginkgo.It("Patching the KafkaCluster to trigger disk removal", func() {
+			ginkgo.By("Patching spec.brokerConfigGroups.default.storageConfigs to drop two disks")
+			// Patch only storageConfigs instead of re-applying a full manifest: a whole-manifest
+			// apply can silently carry unrelated drift, whereas this changes exactly the field under test.
+			err := removeKafkaClusterStorageConfigs(kubectlOptions, kafkaClusterName, "default", removedMountPaths...)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 
 		ginkgo.It("Waiting for disk removal and PVC cleanup", func() {
