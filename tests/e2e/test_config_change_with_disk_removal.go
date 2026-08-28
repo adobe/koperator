@@ -95,7 +95,10 @@ func testConfigChangeWithDiskRemoval() bool {
 			// The core regression assertion: a config change while a disk removal is pending must not
 			// wedge the reconcile. If the deadlock regressed, the cluster would stay in
 			// ClusterRollingUpgrading and this wait would time out.
-			err := waitForKafkaClusterWithPodStatusCheck(kubectlOptions, kafkaClusterName, kafkaClusterResourceReadinessTimeout)
+			// Use the scenario's own (longer) timeout budget, not the generic readiness one: the
+			// preceding steps already use configChangeDiskRemovalTimeout because this scenario can
+			// take long, and the final rolling restart this gates on is no faster.
+			err := waitForKafkaClusterWithPodStatusCheck(kubectlOptions, kafkaClusterName, configChangeDiskRemovalTimeout)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 
