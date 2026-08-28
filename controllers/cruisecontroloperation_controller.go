@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -224,6 +225,12 @@ func (r *CruiseControlOperationReconciler) Reconcile(ctx context.Context, reques
 		return requeueAfter(defaultRequeueIntervalInSeconds)
 	}
 
+	// A retried OperationRemoveDisks replays a stale parameter snapshot unchanged; skip resubmission
+	// this cycle if Cruise Control's current state no longer agrees with it. See staleRemoveDisksRetry.
+	if r.staleRemoveDisksRetry(ctx, log, ccOperationExecution) {
+		return requeueAfter(defaultRequeueIntervalInSeconds)
+	}
+
 	log.Info("executing Cruise Control task", "operation", ccOperationExecution.CurrentTaskOperation(), "parameters", ccOperationExecution.CurrentTaskParameters())
 	// Executing operation
 	cruseControlTaskResult, err := r.executeOperation(ctx, ccOperationExecution)
@@ -290,6 +297,49 @@ func (r *CruiseControlOperationReconciler) executeOperation(ctx context.Context,
 		err = errors.NewWithDetails("Cruise Control operation not supported", "name", ccOperationExecution.GetName(), "namespace", ccOperationExecution.GetNamespace(), "operation", ccOperationExecution.CurrentTaskOperation(), "parameters", ccOperationExecution.CurrentTaskParameters())
 	}
 	return cruseControlTaskResult, err
+}
+
+// staleRemoveDisksRetry reports whether a retried OperationRemoveDisks should be skipped this cycle
+// because Cruise Control's current view of broker log dirs no longer matches the request's frozen
+// brokerid_and_logdirs snapshot (e.g. a Cruise Control restart reset its state while the request was in
+// flight). We don't trim the request down to just the still-valid pairs and resubmit it: Cruise Control
+// reports success/failure for the whole operation, so submitting a partial request could make the
+// dropped broker/log-dir's disk-removal status be falsely marked succeeded once the trimmed request
+// completes. Skipping costs one retry backoff interval; a later cycle resubmits once Cruise Control's
+// view catches back up.
+func (r *CruiseControlOperationReconciler) staleRemoveDisksRetry(ctx context.Context, log logr.Logger, ccOperationExecution *banzaiv1alpha1.CruiseControlOperation) bool {
+	if ccOperationExecution.CurrentTaskOperation() != banzaiv1alpha1.OperationRemoveDisks ||
+		ccOperationExecution.CurrentTaskState() != banzaiv1beta1.CruiseControlTaskCompletedWithError {
+		return false
+	}
+
+	logDirsByBroker, err := r.scaler.LogDirsByBroker(ctx)
+	if err != nil {
+		log.Error(err, "failed to refresh broker log dirs before retrying remove_disks", "name", ccOperationExecution.GetName(), "namespace", ccOperationExecution.GetNamespace())
+		return true
+	}
+	if removeDisksParamsCurrentlyOnline(ccOperationExecution.CurrentTaskParameters(), logDirsByBroker) {
+		return false
+	}
+
+	log.Info("skipping remove_disks retry: Cruise Control no longer reports all requested log dirs online for their broker",
+		"name", ccOperationExecution.GetName(), "namespace", ccOperationExecution.GetNamespace(), "parameters", ccOperationExecution.CurrentTaskParameters())
+	return true
+}
+
+// removeDisksParamsCurrentlyOnline returns true if every (brokerID, logDir) pair encoded in the
+// brokerid_and_logdirs parameter is still reported online for that broker in logDirsByBroker.
+func removeDisksParamsCurrentlyOnline(params map[string]string, logDirsByBroker map[string]map[scale.LogDirState][]string) bool {
+	for _, pair := range strings.Split(params[scale.ParamBrokerIDAndLogDirs], ",") {
+		brokerID, logDir, ok := strings.Cut(pair, "-")
+		if !ok {
+			continue
+		}
+		if !slices.Contains(logDirsByBroker[brokerID][scale.LogDirStateOnline], logDir) {
+			return false
+		}
+	}
+	return true
 }
 
 func sortOperations(ccOperations []*banzaiv1alpha1.CruiseControlOperation) map[string][]*banzaiv1alpha1.CruiseControlOperation {

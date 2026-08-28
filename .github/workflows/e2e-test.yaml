@@ -136,4 +136,14 @@ jobs:
           kubectl -n kafka get deploy,rs -l app=cruisecontrol -o wide
           kubectl -n kafka describe deploy -l app=cruisecontrol
           echo "::endgroup::"
+          # Disk-removal stalls can also leave orphaned PVCs behind: a broker's old volume
+          # gets deleted once Cruise Control confirms removal, but the delete only completes
+          # once the pvc-protection finalizer clears (i.e. nothing still mounts it). `get -o wide`
+          # surfaces a stuck `Terminating` STATUS at a glance; `describe` shows the finalizers/
+          # deletionTimestamp and any FailedAttachVolume/VolumeFailedDelete events explaining why.
+          echo "::group::persistentvolumeclaims (kafka)"
+          kubectl -n kafka get pvc -o wide
+          echo "----- describe pvc (kafka) -----"
+          kubectl -n kafka describe pvc
+          echo "::endgroup::"
           exit 0
