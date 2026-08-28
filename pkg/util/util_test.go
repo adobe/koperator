@@ -722,6 +722,78 @@ func TestFilterControllerOnlyNodes(t *testing.T) {
 	}
 }
 
+func TestFilterControllerOnlyNodesWithBrokerStates(t *testing.T) {
+	removedBrokerConfigBackup, err := GzipAndBase64BrokerConfiguration(&v1beta1.Broker{
+		Id: 103,
+		BrokerConfig: &v1beta1.BrokerConfig{
+			Roles: []string{"broker"},
+		},
+	})
+	require.NoError(t, err)
+
+	removedControllerConfigBackup, err := GzipAndBase64BrokerConfiguration(&v1beta1.Broker{
+		Id: 4,
+		BrokerConfig: &v1beta1.BrokerConfig{
+			Roles: []string{"controller"},
+		},
+	})
+	require.NoError(t, err)
+
+	testCases := []struct {
+		testName                  string
+		kafkaClusterSpec          v1beta1.KafkaClusterSpec
+		brokerStates              map[string]v1beta1.BrokerState
+		allBrokerIDs              []string
+		expectedIDsAfterFiltering []string
+	}{
+		{
+			testName: "removed broker is classified from status backup and preserved",
+			kafkaClusterSpec: v1beta1.KafkaClusterSpec{
+				KRaftMode: true,
+				Brokers: []v1beta1.Broker{
+					{
+						Id: 100,
+						BrokerConfig: &v1beta1.BrokerConfig{
+							Roles: []string{"broker"},
+						},
+					},
+					{
+						Id: 0,
+						BrokerConfig: &v1beta1.BrokerConfig{
+							Roles: []string{"controller"},
+						},
+					},
+				},
+			},
+			brokerStates: map[string]v1beta1.BrokerState{
+				"103": {
+					ConfigurationBackup: removedBrokerConfigBackup,
+				},
+				"4": {
+					ConfigurationBackup: removedControllerConfigBackup,
+				},
+			},
+			allBrokerIDs:              []string{"100", "0", "103", "4"},
+			expectedIDsAfterFiltering: []string{"100", "103"},
+		},
+		{
+			testName:                  "removed broker without status backup is preserved",
+			kafkaClusterSpec:          v1beta1.KafkaClusterSpec{KRaftMode: true},
+			brokerStates:              map[string]v1beta1.BrokerState{"103": {}},
+			allBrokerIDs:              []string{"103"},
+			expectedIDsAfterFiltering: []string{"103"},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.testName, func(t *testing.T) {
+			filteredIDs, err := FilterControllerOnlyNodesWithBrokerStates(tc.allBrokerIDs, tc.kafkaClusterSpec, tc.brokerStates)
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedIDsAfterFiltering, filteredIDs)
+		})
+	}
+}
+
 func TestConstructEListenerLabelName(t *testing.T) {
 	tests := []struct {
 		ingressConfigName string
