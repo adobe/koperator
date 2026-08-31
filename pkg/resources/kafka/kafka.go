@@ -143,6 +143,7 @@ func getBrokerAzMap(cluster *banzaiv1beta1.KafkaCluster) map[int32]string {
 func getCreatedPvcForBroker(
 	ctx context.Context,
 	c client.Reader,
+	volumeStates map[string]banzaiv1beta1.VolumeState,
 	brokerID int32,
 	storageConfigs []banzaiv1beta1.StorageConfig,
 	namespace, crName string) ([]corev1.PersistentVolumeClaim, error) {
@@ -179,10 +180,31 @@ func getCreatedPvcForBroker(
 		return nil, errors.NewWithDetails("broker mount paths missing persistent volume claim",
 			banzaiv1beta1.BrokerIdLabelKey, brokerID, "mount paths", missing)
 	}
-	sort.Slice(foundPvcList.Items, func(i, j int) bool {
-		return foundPvcList.Items[i].Name < foundPvcList.Items[j].Name
+
+	// Only mount the disks the broker currently wants. A PVC for a disk that was removed from the
+	// broker's storage config is included only while its removal is still in progress (keepRemovedVolume),
+	// so Cruise Control can finish draining it. Once removal is confirmed succeeded — or its volume state
+	// has been cleared — that PVC is about to be (or already has been) deleted by the disk-removal
+	// reconciler, so it MUST NOT be baked into a (re)created broker pod: doing so leaves the pod
+	// referencing a PVC that then disappears, wedging it in Pending ("persistentvolumeclaim ... not found")
+	// indefinitely. This keeps the pod's mounted PVCs consistent with the ConfigMap's log.dirs
+	// (both go through the shared keepRemovedVolume predicate).
+	desiredMountPaths := make(map[string]struct{}, len(storageConfigs))
+	for i := range storageConfigs {
+		desiredMountPaths[storageConfigs[i].MountPath] = struct{}{}
+	}
+	brokerPvcs := make([]corev1.PersistentVolumeClaim, 0, len(foundPvcList.Items))
+	for i := range foundPvcList.Items {
+		mountPath := foundPvcList.Items[i].GetAnnotations()[mountPathAnnotationKey]
+		if _, desired := desiredMountPaths[mountPath]; desired || keepRemovedVolume(volumeStates, mountPath) {
+			brokerPvcs = append(brokerPvcs, foundPvcList.Items[i])
+		}
+	}
+
+	sort.Slice(brokerPvcs, func(i, j int) bool {
+		return brokerPvcs[i].Name < brokerPvcs[j].Name
 	})
-	return foundPvcList.Items, nil
+	return brokerPvcs, nil
 }
 
 func getLoadBalancerIP(foundLBService *corev1.Service) (string, error) {
@@ -438,7 +460,11 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 			}
 		}
 
-		pvcs, err := getCreatedPvcForBroker(ctx, r.Client, broker.Id, brokerConfig.StorageConfigs, r.KafkaCluster.Namespace, r.KafkaCluster.Name)
+		var brokerVolumeStates map[string]banzaiv1beta1.VolumeState
+		if brokerState, ok := r.KafkaCluster.Status.BrokersState[fmt.Sprintf("%d", broker.Id)]; ok {
+			brokerVolumeStates = brokerState.GracefulActionState.VolumeStates
+		}
+		pvcs, err := getCreatedPvcForBroker(ctx, r.Client, brokerVolumeStates, broker.Id, brokerConfig.StorageConfigs, r.KafkaCluster.Namespace, r.KafkaCluster.Name)
 		if err != nil {
 			return errors.WrapIfWithDetails(err, "failed to list PVC's")
 		}
@@ -1016,7 +1042,17 @@ func (r *Reconciler) handleRollingUpgrade(log logr.Logger, desiredPod, currentPo
 		return errors.WrapIf(err, "could not apply last state to annotation")
 	}
 
-	if !k8sutil.IsPodContainsTerminatedContainer(currentPod) {
+	if podUnschedulableReferencingRemovedPVC(currentPod, desiredPod) {
+		// Self-heal: a broker pod stuck Pending because it references a PVC for a disk that was
+		// removed while the pod was being (re)created can never schedule ("persistentvolumeclaim ...
+		// not found"), and a never-started broker keeps the rolling-upgrade health check below
+		// perpetually unsatisfied — a deadlock that no timeout resolves. Since the pod was never
+		// scheduled it holds no data and serves no traffic, so we delete it (bypassing the gates) to
+		// let it be recreated from the corrected desired spec.
+		log.Info("broker pod is unschedulable because it still references a removed disk's PVC; "+
+			"recreating it to pick up the corrected spec",
+			"pod", currentPod.GetName(), banzaiv1beta1.BrokerIdLabelKey, currentPod.Labels[banzaiv1beta1.BrokerIdLabelKey])
+	} else if !k8sutil.IsPodContainsTerminatedContainer(currentPod) {
 		if r.KafkaCluster.Status.State != banzaiv1beta1.KafkaClusterRollingUpgrading {
 			if err := k8sutil.UpdateCRStatus(r.Client, r.KafkaCluster, banzaiv1beta1.KafkaClusterRollingUpgrading, log); err != nil {
 				return errorfactory.New(errorfactory.StatusUpdateError{}, err, "setting state to rolling upgrade failed")
@@ -1690,6 +1726,45 @@ func getPodsInTerminatingOrPendingState(items []corev1.Pod) []corev1.Pod {
 		}
 	}
 	return pods
+}
+
+// pvcClaimNames returns the set of PersistentVolumeClaim names referenced by the pod's volumes.
+func pvcClaimNames(pod *corev1.Pod) map[string]struct{} {
+	claims := make(map[string]struct{})
+	for _, v := range pod.Spec.Volumes {
+		if v.PersistentVolumeClaim != nil {
+			claims[v.PersistentVolumeClaim.ClaimName] = struct{}{}
+		}
+	}
+	return claims
+}
+
+// podUnschedulableReferencingRemovedPVC reports whether currentPod is wedged unscheduled because it
+// still references a PVC that the desired pod no longer mounts — i.e. a disk that was removed from
+// the broker's storage config while this pod was being (re)created, whose PVC has since been deleted
+// (the pod's FailedScheduling event reads "persistentvolumeclaim ... not found"). Such a pod was
+// never scheduled to a node: it holds no data and serves no traffic, so it can be deleted and
+// recreated from the corrected desired spec without any availability impact — and doing so is the
+// only way to break the resulting deadlock, because a never-started broker keeps the rolling-upgrade
+// health gate perpetually unsatisfied, which otherwise blocks the very restart that would heal it.
+// A running pod (even one with a now-stale mount) is deliberately excluded: it must go through the
+// normal, health-gated rolling restart instead.
+func podUnschedulableReferencingRemovedPVC(currentPod, desiredPod *corev1.Pod) bool {
+	if currentPod == nil || desiredPod == nil {
+		return false
+	}
+	// Act only on a pod that was never scheduled to a node (still Pending, no NodeName). A pod that
+	// already runs — or is merely initializing on its assigned node — is not stuck on a missing PVC.
+	if currentPod.Status.Phase != corev1.PodPending || currentPod.Spec.NodeName != "" {
+		return false
+	}
+	desiredClaims := pvcClaimNames(desiredPod)
+	for claim := range pvcClaimNames(currentPod) {
+		if _, ok := desiredClaims[claim]; !ok {
+			return true
+		}
+	}
+	return false
 }
 
 // controllersBlockingRollingUpgrade returns the not-Ready controller broker IDs that must block the

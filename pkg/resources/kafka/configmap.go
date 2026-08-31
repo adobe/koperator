@@ -320,13 +320,22 @@ func shouldKeepRemovedLogDirInConfig(logDirPath, brokerID string, kafkaCluster *
 	}
 
 	volumePath := strings.TrimSuffix(logDirPath, "/kafka")
-	volumeState, found := brokerState.GracefulActionState.VolumeStates[volumePath]
+	return keepRemovedVolume(brokerState.GracefulActionState.VolumeStates, volumePath)
+}
+
+// keepRemovedVolume reports whether a volume (identified by its PVC mount path) that is no longer in
+// the broker's desired storage config must still be kept — mounted into the broker pod and listed in
+// its log.dirs — because its Cruise Control disk removal/rebalance has not been confirmed succeeded
+// yet. It is the single source of truth shared by the broker ConfigMap (log.dirs) and the broker Pod
+// (mounted PVCs) so the two never disagree: keep the volume while removal is in progress (data still
+// there, Cruise Control draining it), drop it only once removal is confirmed succeeded or its state
+// has been cleared. On error/paused (unconfirmed success) the volume is kept to avoid data loss and
+// allow retry.
+func keepRemovedVolume(volumeStates map[string]v1beta1.VolumeState, mountPath string) bool {
+	volumeState, found := volumeStates[mountPath]
 	if !found {
 		return false
 	}
-
-	// Keep removed path until removal/rebalance is confirmed succeeded; drop only when state succeeded.
-	// On error or paused (unconfirmed success), keep the path to avoid data loss and allow retry.
 	s := volumeState.CruiseControlVolumeState
 	if s.IsDiskRemovalSucceeded() || s.IsDiskRebalanceSucceeded() {
 		return false
