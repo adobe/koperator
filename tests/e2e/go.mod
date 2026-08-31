@@ -7,6 +7,7 @@ require (
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/banzaicloud/koperator v0.25.1
 	github.com/banzaicloud/koperator/api v0.28.8
+	github.com/banzaicloud/koperator/properties v0.4.1
 	github.com/cisco-open/k8s-objectmatcher v1.10.0
 	github.com/gruntwork-io/terratest v1.0.1
 	github.com/onsi/ginkgo/v2 v2.32.0
@@ -62,7 +63,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.36.6 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.43.3 // indirect
 	github.com/aws/smithy-go v1.27.3 // indirect
-	github.com/banzaicloud/koperator/properties v0.4.1 // indirect
 	github.com/banzaicloud/operator-tools v0.28.10 // indirect
 	github.com/boombuler/barcode v1.0.1 // indirect
 	github.com/briandowns/spinner v1.23.2 // indirect
