@@ -17,6 +17,7 @@ package kafka
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"sort"
@@ -995,11 +996,27 @@ func (r *Reconciler) handleRollingUpgrade(log logr.Logger, desiredPod, currentPo
 	// admission controllers (autoscalers, webhooks) from triggering restarts,
 	// while intentional CR changes always do. Also check TaintedBrokersSelector.
 	intentChanged, patchBytes, err := podSpecIntentChanged(currentPod, desiredPod)
+
+	log = log.WithValues("pod", currentPod.Name)
+
 	switch {
 	case err != nil:
 		log.Error(err, "could not compare desired pod against last-applied configuration", "kind", desiredType)
 	case r.isPodTainted(log, currentPod):
-		log.Info("pod has tainted labels, deleting it", "pod", currentPod)
+		log.Info("pod has tainted labels, deleting it")
+	case r.isLabelsOnlyPatch(patchBytes):
+		log.Info("pod labels changed, fast patching it", "patch", string(patchBytes))
+		metadataPatch := client.MergeFrom(currentPod.DeepCopy())
+		if err := patch.DefaultAnnotator.SetLastAppliedAnnotation(desiredPod); err != nil {
+			return errors.WrapIf(err, "could not apply last state to annotation")
+		}
+		currentPod.Labels = desiredPod.Labels
+		currentPod.Annotations[patch.LastAppliedConfig] = desiredPod.Annotations[patch.LastAppliedConfig]
+		if err := r.Patch(context.TODO(), currentPod, metadataPatch); err != nil {
+			return errors.WrapIfWithDetails(err, "could not patch pod metadata", "pod", currentPod)
+		}
+
+		return nil
 	case !intentChanged:
 		if !k8sutil.IsPodContainsTerminatedContainer(currentPod) &&
 			r.KafkaCluster.Status.BrokersState[currentPod.Labels[banzaiv1beta1.BrokerIdLabelKey]].ConfigurationState == banzaiv1beta1.ConfigInSync &&
@@ -1009,7 +1026,7 @@ func (r *Reconciler) handleRollingUpgrade(log logr.Logger, desiredPod, currentPo
 			return nil
 		}
 	default:
-		log.V(1).Info("kafka pod spec changed", "patch", string(patchBytes))
+		log.Info("kafka pod spec changed", "patch", string(patchBytes))
 	}
 
 	if err := patch.DefaultAnnotator.SetLastAppliedAnnotation(desiredPod); err != nil {
@@ -1118,13 +1135,31 @@ func (r *Reconciler) handleRollingUpgrade(log logr.Logger, desiredPod, currentPo
 	if k8sutil.IsPodContainsTerminatedContainer(currentPod) {
 		for _, containerState := range currentPod.Status.ContainerStatuses {
 			if containerState.State.Terminated != nil {
-				log.Info("terminated container for broker pod", "pod", currentPod.GetName(), banzaiv1beta1.BrokerIdLabelKey, currentPod.Labels[banzaiv1beta1.BrokerIdLabelKey],
+				log.Info("terminated container for broker pod", banzaiv1beta1.BrokerIdLabelKey, currentPod.Labels[banzaiv1beta1.BrokerIdLabelKey],
 					"containerName", containerState.Name, "exitCode", containerState.State.Terminated.ExitCode, "reason", containerState.State.Terminated.Reason)
 			}
 		}
 	}
-	log.Info("broker pod deleted", "pod", currentPod.GetName(), banzaiv1beta1.BrokerIdLabelKey, currentPod.Labels[banzaiv1beta1.BrokerIdLabelKey])
+	log.Info("broker pod deleted", banzaiv1beta1.BrokerIdLabelKey, currentPod.Labels[banzaiv1beta1.BrokerIdLabelKey])
 	return nil
+}
+
+func (r *Reconciler) isLabelsOnlyPatch(patchBytes []byte) bool {
+	var patchMap map[string]interface{}
+	if err := json.Unmarshal(patchBytes, &patchMap); err != nil {
+		return false
+	}
+	// Check if the only change is in the metadata.labels field
+	if len(patchMap) == 1 {
+		if metadata, ok := patchMap["metadata"].(map[string]interface{}); ok {
+			if len(metadata) == 1 {
+				if _, ok := metadata["labels"]; ok {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 func (r *Reconciler) checkCCRackAwareDistributionGoal() error {
