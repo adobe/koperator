@@ -116,6 +116,71 @@ func TestSortOperations(t *testing.T) {
 	}
 }
 
+// TestRemoveDisksParamsCurrentlyOnline exercises the re-validation predicate used before retrying a
+// stalled OperationRemoveDisks task. The task's brokerid_and_logdirs parameter is a snapshot frozen at
+// operation-creation time and replayed unchanged on every retry; if Cruise Control's own view of a
+// broker's online log dirs has since diverged from that snapshot (e.g. because Cruise Control restarted
+// and rebuilt its state while the request was created), blindly resubmitting the frozen snapshot repeats
+// the same permanent rejection forever. This predicate re-checks the snapshot against a freshly fetched
+// LogDirsByBroker result so a retry can tell whether Cruise Control's current state still agrees with it.
+func TestRemoveDisksParamsCurrentlyOnline(t *testing.T) {
+	testCases := []struct {
+		testName        string
+		params          map[string]string
+		logDirsByBroker map[string]map[scale.LogDirState][]string
+		expectedValid   bool
+	}{
+		{
+			testName: "all requested log dirs are still online for their broker",
+			params: map[string]string{
+				scale.ParamBrokerIDAndLogDirs: "0-/kafka-logs2/kafka,1-/kafka-logs2/kafka",
+			},
+			logDirsByBroker: map[string]map[scale.LogDirState][]string{
+				"0": {scale.LogDirStateOnline: {"/kafka-logs1/kafka", "/kafka-logs2/kafka"}},
+				"1": {scale.LogDirStateOnline: {"/kafka-logs2/kafka"}},
+			},
+			expectedValid: true,
+		},
+		{
+			testName: "a requested log dir is no longer online for its broker",
+			params: map[string]string{
+				scale.ParamBrokerIDAndLogDirs: "0-/kafka-logs2/kafka,1-/kafka-logs2/kafka",
+			},
+			logDirsByBroker: map[string]map[scale.LogDirState][]string{
+				// Broker 0 no longer reports this log dir online (e.g. after a Cruise Control restart
+				// reset its view) even though it was online when this snapshot was originally taken.
+				"0": {scale.LogDirStateOnline: {"/kafka-logs1/kafka"}},
+				"1": {scale.LogDirStateOnline: {"/kafka-logs2/kafka"}},
+			},
+			expectedValid: false,
+		},
+		{
+			testName: "the broker is entirely absent from Cruise Control's current view",
+			params: map[string]string{
+				scale.ParamBrokerIDAndLogDirs: "0-/kafka-logs2/kafka",
+			},
+			logDirsByBroker: map[string]map[scale.LogDirState][]string{},
+			expectedValid:   false,
+		},
+		{
+			testName: "a requested log dir is reported offline rather than online",
+			params: map[string]string{
+				scale.ParamBrokerIDAndLogDirs: "0-/kafka-logs2/kafka",
+			},
+			logDirsByBroker: map[string]map[scale.LogDirState][]string{
+				"0": {scale.LogDirStateOffline: {"/kafka-logs2/kafka"}},
+			},
+			expectedValid: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.testName, func(t *testing.T) {
+			assert.Equal(t, tc.expectedValid, removeDisksParamsCurrentlyOnline(tc.params, tc.logDirsByBroker))
+		})
+	}
+}
+
 // TestGetStatusDoesNotPanicWhenStatusNil exercises the res.Status==nil branch of
 // getStatus. On that path statusOperation is always nil (it is only assigned in the
 // early-returning statusOperation!=nil branch), so the error-wraps must reference the

@@ -123,7 +123,10 @@ func testMultiDiskRemoval() bool {
 			// Disk removal rolls the broker pods, so their names change underneath us. Gate on
 			// the operator's own ClusterRunning state and re-resolve the live pod set each poll
 			// instead of `kubectl wait`-ing on a snapshot of pod names that get deleted mid-roll.
-			err := waitForKafkaClusterWithPodStatusCheck(kubectlOptions, kafkaClusterName, kafkaClusterResourceReadinessTimeout)
+			// Use the scenario's own (longer) timeout budget, not the generic readiness one: a
+			// rolling restart across all brokers with fresh PVC provisioning per broker can
+			// legitimately take longer than kafkaClusterResourceReadinessTimeout under CI load.
+			err := waitForKafkaClusterWithPodStatusCheck(kubectlOptions, kafkaClusterName, multidiskRemovalTimeout)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 	})
