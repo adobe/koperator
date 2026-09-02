@@ -1193,9 +1193,10 @@ func (r *Reconciler) reconcileKafkaPvc(ctx context.Context, log logr.Logger, bro
 	brokersVolumesState := make(map[string]map[string]banzaiv1beta1.VolumeState)
 	var brokerIds []string
 	waitForDiskRemovalToFinish := false
+	desiredType := reflect.TypeOf(&corev1.PersistentVolumeClaim{})
+	log = log.WithValues("kind", desiredType)
 
 	for brokerId, desiredPvcs := range brokersDesiredPvcs {
-		desiredType := reflect.TypeOf(&corev1.PersistentVolumeClaim{})
 		brokerVolumesState := make(map[string]banzaiv1beta1.VolumeState)
 
 		pvcList := &corev1.PersistentVolumeClaimList{}
@@ -1206,8 +1207,6 @@ func (r *Reconciler) reconcileKafkaPvc(ctx context.Context, log logr.Logger, bro
 				map[string]string{banzaiv1beta1.BrokerIdLabelKey: brokerId},
 			),
 		)
-
-		log = log.WithValues("kind", desiredType)
 
 		err := r.List(ctx, pvcList,
 			client.InNamespace(r.KafkaCluster.GetNamespace()), matchingLabels)
@@ -1290,6 +1289,13 @@ func (r *Reconciler) reconcileKafkaPvc(ctx context.Context, log logr.Logger, bro
 				continue
 			}
 			if err == nil {
+				// Compute desire state (only patchable fields) before checking if the object needs to be updated.
+				resReq := desiredPvc.Spec.Resources.Requests
+				labels := desiredPvc.Labels
+				desiredPvc = currentPvc.DeepCopy()
+				desiredPvc.Spec.Resources.Requests = resReq
+				desiredPvc.Labels = labels
+
 				if k8sutil.CheckIfObjectUpdated(log, desiredType, currentPvc, desiredPvc) {
 					if err := patch.DefaultAnnotator.SetLastAppliedAnnotation(desiredPvc); err != nil {
 						return errors.WrapIf(err, "could not apply last state to annotation")
@@ -1300,16 +1306,10 @@ func (r *Reconciler) reconcileKafkaPvc(ctx context.Context, log logr.Logger, bro
 							"one can not reduce the size of a PVC", "kind", desiredType)
 					}
 
-					resReq := desiredPvc.Spec.Resources.Requests
-					labels := desiredPvc.Labels
-					desiredPvc = currentPvc.DeepCopy()
-					desiredPvc.Spec.Resources.Requests = resReq
-					desiredPvc.Labels = labels
-
 					if err := r.Update(ctx, desiredPvc); err != nil {
 						return errorfactory.New(errorfactory.APIFailure{}, err, "updating resource failed", "kind", desiredType)
 					}
-					log.Info("resource updated")
+					log.Info("resource updated", "name", desiredPvc.Name)
 				}
 			}
 		}
