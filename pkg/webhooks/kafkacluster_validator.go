@@ -45,6 +45,8 @@ func (s KafkaClusterValidator) ValidateUpdate(ctx context.Context, _, kafkaClust
 		allErrs = append(allErrs, listenerErrs...)
 	}
 
+	allErrs = append(allErrs, checkKRaftConfig(&kafkaClusterNew.Spec)...)
+
 	if len(allErrs) == 0 {
 		return nil, nil
 	}
@@ -64,6 +66,8 @@ func (s KafkaClusterValidator) ValidateCreate(ctx context.Context, kafkaCluster 
 		allErrs = append(allErrs, listenerErrs...)
 	}
 
+	allErrs = append(allErrs, checkKRaftConfig(&kafkaCluster.Spec)...)
+
 	if len(allErrs) == 0 {
 		return nil, nil
 	}
@@ -76,6 +80,83 @@ func (s KafkaClusterValidator) ValidateCreate(ctx context.Context, kafkaCluster 
 
 func (s KafkaClusterValidator) ValidateDelete(_ context.Context, _ *banzaicloudv1beta1.KafkaCluster) (warnings admission.Warnings, err error) {
 	return nil, nil
+}
+
+// checkKRaftConfig validates KRaft-specific requirements on the KafkaCluster spec.
+// It is a no-op when the cluster is not in KRaft mode. These checks surface, at admission time,
+// misconfigurations that would otherwise only fail (or panic) later during reconciliation:
+//   - a KRaft cluster with no controller node cannot form a metadata quorum,
+//   - a KRaft cluster with no controller listener has no address for the quorum to communicate on,
+//   - a broker with no process role is meaningless in KRaft mode,
+//   - a node with the controller role stores the metadata log and supports only a single, immutable
+//     log directory (mirrors the reconcile-time restriction in the kafka resource reconciler).
+func checkKRaftConfig(kafkaClusterSpec *banzaicloudv1beta1.KafkaClusterSpec) field.ErrorList {
+	if !kafkaClusterSpec.KRaftMode {
+		return nil
+	}
+
+	var allErrs field.ErrorList
+
+	// Exactly one internal listener must be designated for controller communication.
+	controllerListeners := 0
+	for _, il := range kafkaClusterSpec.ListenersConfig.InternalListeners {
+		if il.UsedForControllerCommunication {
+			controllerListeners++
+		}
+	}
+	internalListenersPath := field.NewPath("spec").Child("listenersConfig").Child("internalListeners")
+	switch {
+	case controllerListeners == 0:
+		allErrs = append(allErrs, field.Required(internalListenersPath,
+			"in KRaft mode exactly one internal listener must set 'usedForControllerCommunication: true'"))
+	case controllerListeners > 1:
+		allErrs = append(allErrs, field.Invalid(internalListenersPath, controllerListeners,
+			"in KRaft mode only one internal listener may set 'usedForControllerCommunication: true'"))
+	}
+
+	// Per-broker role and storage validation.
+	controllerNodeCount := 0
+	for i, broker := range kafkaClusterSpec.Brokers {
+		brokerConfig, err := broker.GetBrokerConfig(*kafkaClusterSpec)
+		if err != nil {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec").Child("brokers").Index(i), broker.Id,
+				fmt.Sprintf("could not resolve broker configuration: %v", err)))
+			continue
+		}
+
+		if !brokerConfig.IsBrokerNode() && !brokerConfig.IsControllerNode() {
+			allErrs = append(allErrs, field.Required(
+				field.NewPath("spec").Child("brokers").Index(i).Child("brokerConfig").Child("processRoles"),
+				fmt.Sprintf("in KRaft mode broker %d must declare at least one process role ('broker' and/or 'controller')", broker.Id)))
+		}
+
+		if brokerConfig.IsControllerNode() {
+			controllerNodeCount++
+			// A KRaft node with the controller role stores the cluster metadata log and supports only a
+			// single persistent log directory; Koperator additionally treats its mount path as immutable.
+			// This mirrors the reconcile-time restriction (reconcileKafkaPvc), which requires exactly one
+			// PVC-backed storage config for a controller (extra emptyDir volumes do not create PVCs).
+			pvcBackedStorageConfigs := 0
+			for _, sc := range brokerConfig.StorageConfigs {
+				if sc.PvcSpec != nil {
+					pvcBackedStorageConfigs++
+				}
+			}
+			if pvcBackedStorageConfigs != 1 {
+				allErrs = append(allErrs, field.Invalid(
+					field.NewPath("spec").Child("brokers").Index(i).Child("brokerConfig").Child("storageConfigs"),
+					pvcBackedStorageConfigs,
+					fmt.Sprintf("a KRaft node with the 'controller' role (broker %d) must have exactly one PVC-backed storage config", broker.Id)))
+			}
+		}
+	}
+
+	if controllerNodeCount == 0 {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec").Child("brokers"), controllerNodeCount,
+			"in KRaft mode at least one broker must have the 'controller' process role"))
+	}
+
+	return allErrs
 }
 
 // checkListeners validates the spec.listenersConfig object
