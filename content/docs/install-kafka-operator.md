@@ -491,10 +491,10 @@ Koperator can be deployed using its [Helm chart](https://github.com/adobe/kopera
 1. Install the Koperator CustomResourceDefinition resources (adjust the version number to the Koperator release you want to install). This is performed in a separate step to allow you to uninstall and reinstall Koperator without deleting your installed custom resources.
 
     ```bash
-    kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_cruisecontroloperations.yaml
-    kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_kafkaclusters.yaml
-    kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_kafkatopics.yaml
-    kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_kafkausers.yaml
+    kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/main/config/base/crds/kafka.banzaicloud.io_cruisecontroloperations.yaml
+    kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/main/config/base/crds/kafka.banzaicloud.io_kafkaclusters.yaml
+    kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/main/config/base/crds/kafka.banzaicloud.io_kafkatopics.yaml
+    kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/main/config/base/crds/kafka.banzaicloud.io_kafkausers.yaml
     ```
 
     Expected output:
@@ -621,7 +621,7 @@ Koperator can be deployed using its [Helm chart](https://github.com/adobe/kopera
         ```bash
         kubectl create \
         -n kafka \
-        -f https://raw.githubusercontent.com/adobe/koperator/master/config/samples/kraft/simplekafkacluster_kraft.yaml
+        -f https://raw.githubusercontent.com/adobe/koperator/main/config/samples/kraft/simplekafkacluster_kraft.yaml
         ```
 
     Expected output:
