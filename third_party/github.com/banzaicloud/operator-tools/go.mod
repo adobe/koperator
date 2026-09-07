@@ -1,18 +1,22 @@
 module github.com/banzaicloud/operator-tools
 
-go 1.26.0
+go 1.27.1
 
 require (
 	emperror.dev/errors v0.8.1
+	github.com/MakeNowJust/heredoc/v2 v2.0.1
 	github.com/banzaicloud/k8s-objectmatcher v1.8.0
 	github.com/briandowns/spinner v1.23.2
 	github.com/evanphx/json-patch/v5 v5.9.11
 	github.com/fatih/color v1.19.0
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-logr/logr v1.4.4
+	github.com/go-test/deep v1.1.1
+	github.com/google/go-cmp v0.7.0
 	github.com/iancoleman/orderedmap v0.3.0
 	github.com/pborman/uuid v1.2.1
 	github.com/spf13/cast v1.10.0
+	github.com/stretchr/testify v1.11.1
 	github.com/wayneashleyberry/terminal-dimensions v1.1.0
 	helm.sh/helm/v3 v3.21.3
 	k8s.io/api v0.36.3
@@ -22,13 +26,6 @@ require (
 	k8s.io/utils v0.0.0-20260707023825-cf1189d6abe3
 	sigs.k8s.io/controller-runtime v0.24.1
 	sigs.k8s.io/yaml v1.6.0
-)
-
-require (
-	github.com/MakeNowJust/heredoc/v2 v2.0.1
-	github.com/go-test/deep v1.1.1
-	github.com/google/go-cmp v0.7.0
-	github.com/stretchr/testify v1.11.1
 )
 
 require (

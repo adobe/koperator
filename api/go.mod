@@ -1,18 +1,15 @@
 module github.com/banzaicloud/koperator/api
 
-go 1.26.0
+go 1.27.1
 
 require (
 	dario.cat/mergo v1.0.2
 	emperror.dev/errors v0.8.1
 	github.com/cert-manager/cert-manager v1.21.1
-	k8s.io/api v0.36.3
-	k8s.io/apimachinery v0.36.3
-)
-
-require (
 	github.com/stretchr/testify v1.11.1
 	gotest.tools v2.2.0+incompatible
+	k8s.io/api v0.36.3
+	k8s.io/apimachinery v0.36.3
 )
 
 require (

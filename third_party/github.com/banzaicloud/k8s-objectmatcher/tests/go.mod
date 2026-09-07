@@ -1,6 +1,6 @@
 module github.com/banzaicloud/k8s-objectmatcher/tests
 
-go 1.26.0
+go 1.27.1
 
 require (
 	emperror.dev/errors v0.8.1
