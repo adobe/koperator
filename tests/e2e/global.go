@@ -111,7 +111,7 @@ var (
 			"kubeApiServer.enabled":         falseString,
 			"kubelet.enabled":               falseString,
 			"kubeControllerManager.enabled": falseString,
-			"coreDNS.enabled":               falseString,
+			"coreDns.enabled":               falseString,
 			"kubeEtcd.enabled":              falseString,
 			"kubeScheduler.enabled":         falseString,
 			"kubeProxy.enabled":             falseString,
