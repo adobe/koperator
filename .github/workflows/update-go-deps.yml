@@ -62,6 +62,7 @@ jobs:
 
             ### Changes made:
             - Updated Go module dependencies via `make update-go-deps`
+            - Bumped `CONTROLLER_GEN_VERSION` in the Makefile to the latest release
             - Regenerated manifests via `make generate manifests`
             - Applied formatting and linting fixes via `make fmt lint-fix`
 

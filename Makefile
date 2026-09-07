@@ -20,7 +20,7 @@ REL_TAG = $(shell ./scripts/increment_version.sh -${RELEASE_TYPE} ${TAG})
 # Version constants
 GOLANGCI_VERSION = 2.13.2 # renovate: datasource=github-releases depName=golangci/golangci-lint
 LICENSEI_VERSION = 0.9.0 # renovate: datasource=github-releases depName=goph/licensei
-CONTROLLER_GEN_VERSION = v0.21.0 # renovate: datasource=github-releases depName=kubernetes-sigs/controller-tools
+CONTROLLER_GEN_VERSION = v0.21.0 # kept in sync with kubernetes-sigs/controller-tools by `make update-go-deps`
 ENVTEST_K8S_VERSION = 1.37.0 # renovate: datasource=github-releases depName=kubernetes-sigs/controller-tools extractVersion=^envtest-v(?<version>.+)$
 SETUP_ENVTEST_VERSION := latest
 ADDLICENSE_VERSION = 1.2.0 # renovate: datasource=github-releases depName=google/addlicense
@@ -346,6 +346,13 @@ update-go-deps: ## Update Go modules dependencies.
 	@if [ -f ./tests/e2e/go.mod ]; then \
 		($(call update-module-deps,./tests/e2e)); \
 	fi
+	@echo "Updating CONTROLLER_GEN_VERSION..."
+	@latest="$$(go list -m -versions sigs.k8s.io/controller-tools | tr ' ' '\n' | tail -1)"; \
+	if [ -z "$$latest" ]; then \
+		echo "Could not determine latest controller-gen version" >&2; \
+		exit 1; \
+	fi; \
+	sed -E "s/^CONTROLLER_GEN_VERSION = v[0-9.]+ /CONTROLLER_GEN_VERSION = $$latest /" Makefile > Makefile.tmp && mv Makefile.tmp Makefile
 
 tidy: ## Run go mod tidy in all Go modules.
 	@echo "Finding all directories with go.mod files..."
