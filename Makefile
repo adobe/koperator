@@ -327,6 +327,11 @@ define update-module-deps
 		api_ver="$$(go list -m -f '{{.Version}}' k8s.io/api)"; \
 		go get k8s.io/kubectl@"$$api_ver" k8s.io/cli-runtime@"$$api_ver"; \
 	fi; \
+	if go list -m k8s.io/apimachinery >/dev/null 2>&1 && go list -m k8s.io/kube-openapi >/dev/null 2>&1; then \
+		apimachinery_ver="$$(go list -m -f '{{.Version}}' k8s.io/apimachinery)"; \
+		openapi_ver="$$(go mod graph | grep "^k8s.io/apimachinery@$$apimachinery_ver k8s.io/kube-openapi@" | head -1 | sed 's/.*kube-openapi@//')"; \
+		if [ -n "$$openapi_ver" ]; then go get k8s.io/kube-openapi@"$$openapi_ver"; fi; \
+	fi; \
 	go mod tidy
 endef
 
