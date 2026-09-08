@@ -57,6 +57,37 @@ func IgnoreField(field string) CalculateOption {
 	}
 }
 
+func IgnoreMetadataFields(fields ...string) CalculateOption {
+	return func(current, modified []byte) ([]byte, []byte, error) {
+		current, err := deleteMetadataFields(current, fields...)
+		if err != nil {
+			return nil, nil, errors.WrapIf(err, "could not delete metadata fields from current byte sequence")
+		}
+
+		modified, err = deleteMetadataFields(modified, fields...)
+		if err != nil {
+			return nil, nil, errors.WrapIf(err, "could not delete metadata fields from modified byte sequence")
+		}
+
+		return current, modified, nil
+	}
+}
+
+func deleteMetadataFields(obj []byte, fields ...string) ([]byte, error) {
+	var objectMap map[string]interface{}
+	if err := json.Unmarshal(obj, &objectMap); err != nil {
+		return nil, errors.WrapIf(err, "could not unmarshal byte sequence")
+	}
+
+	if metadata, ok := objectMap["metadata"].(map[string]interface{}); ok {
+		for _, field := range fields {
+			delete(metadata, field)
+		}
+	}
+
+	return json.Marshal(objectMap)
+}
+
 func IgnoreVolumeClaimTemplateTypeMetaAndStatus() CalculateOption {
 	return func(current, modified []byte) ([]byte, []byte, error) {
 		current, err := deleteVolumeClaimTemplateFields(current)
