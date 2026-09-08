@@ -42,20 +42,25 @@ const (
 	configChangeProperty = "log.retention.hours=170"
 )
 
-// configChangeRemovedLogDirPath is the log dir dropped by simplekafkacluster_1disk_configchange.yaml
-// (it keeps only /kafka-logs1). This test chains after testMultiDiskRemoval, which leaves the cluster
-// with /kafka-logs1 and /kafka-logs3.
+// configChangeRemovedMountPath is the storageConfigs mount path dropped by this test (keeping only
+// /kafka-logs1). This test chains after testMultiDiskRemoval, which leaves the cluster with
+// /kafka-logs1 and /kafka-logs3.
+const configChangeRemovedMountPath = "/kafka-logs3"
+
+// configChangeRemovedLogDirPath is the broker log.dirs entry (mount path + "/kafka") that must
+// disappear once configChangeRemovedMountPath is removed.
 var configChangeRemovedLogDirPath = []string{"/kafka-logs3/kafka"}
 
-// testConfigChangeWithDiskRemoval applies a single manifest that BOTH changes a read-only broker
-// config property (forcing a rolling restart) AND removes a disk. This is the scenario that
-// previously deadlocked: reconcileKafkaPvc blocked the whole reconcile on the pending disk removal,
-// so reconcileKafkaPod never ran to restart the brokers for the config change, and the cluster was
-// stuck in ClusterRollingUpgrading indefinitely. The test asserts the cluster reconciles correctly:
-// the config change propagates, the disk is removed, Cruise Control goes quiescent, and the cluster
-// returns to ClusterRunning within the timeout (a deadlock would make the final wait time out).
+// testConfigChangeWithDiskRemoval makes a single targeted patch that BOTH changes a read-only broker
+// config property (forcing a rolling restart) AND removes a disk, so the operator observes both in the
+// same reconcile. This is the scenario that previously deadlocked: reconcileKafkaPvc blocked the whole
+// reconcile on the pending disk removal, so reconcileKafkaPod never ran to restart the brokers for the
+// config change, and the cluster was stuck in ClusterRollingUpgrading indefinitely. The test asserts
+// the cluster reconciles correctly: the config change propagates, the disk is removed, Cruise Control
+// goes quiescent, and the cluster returns to ClusterRunning within the timeout (a deadlock would make
+// the final wait time out).
 func testConfigChangeWithDiskRemoval() bool {
-	return ginkgo.When("Config change + disk removal in one manifest: cluster reconciles correctly", func() {
+	return ginkgo.When("Config change + disk removal in one patch: cluster reconciles correctly", func() {
 		var kubectlOptions k8s.KubectlOptions
 		var err error
 
@@ -65,9 +70,14 @@ func testConfigChangeWithDiskRemoval() bool {
 			kubectlOptions.Namespace = koperatorLocalHelmDescriptor.Namespace
 		})
 
-		ginkgo.It("Applying manifest that changes broker config AND removes a disk", func() {
-			ginkgo.By("Patching KafkaCluster: single storageConfig (removes /kafka-logs3) + changed readOnlyConfig")
-			applyK8sResourceManifest(kubectlOptions, "../../config/samples/simplekafkacluster_1disk_configchange.yaml")
+		ginkgo.It("Patching the KafkaCluster to change broker config AND remove a disk", func() {
+			ginkgo.By(fmt.Sprintf("Patching spec.readOnlyConfig (%s) and dropping storageConfig %s in one merge patch",
+				configChangeProperty, configChangeRemovedMountPath))
+			// Change both fields in a single targeted patch (not a whole-manifest re-apply, which can
+			// silently carry unrelated drift and re-trigger a Cruise Control rollout) so the operator
+			// sees the restart-forcing config change and the disk removal in the same reconcile.
+			err := patchKafkaClusterReadOnlyConfigAndRemoveDisks(kubectlOptions, kafkaClusterName, "default", configChangeProperty, configChangeRemovedMountPath)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 
 		ginkgo.It("Waiting for the broker config change to propagate to broker ConfigMaps", func() {

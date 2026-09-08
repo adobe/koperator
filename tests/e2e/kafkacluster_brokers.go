@@ -19,10 +19,12 @@ package e2e
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/gruntwork-io/terratest/modules/k8s"
 
 	"github.com/banzaicloud/koperator/api/v1beta1"
+	properties "github.com/banzaicloud/koperator/properties/pkg"
 )
 
 // patchKafkaClusterBrokers fetches the running KafkaCluster CR, applies mutate to its current spec.brokers,
@@ -146,4 +148,79 @@ func removeKafkaClusterStorageConfigs(kubectlOptions k8s.KubectlOptions, cluster
 		}
 		return remaining
 	})
+}
+
+// patchKafkaClusterReadOnlyConfigAndRemoveDisks atomically, in a SINGLE merge patch, sets a read-only
+// broker property (which forces a rolling restart) and drops the given mount paths from a broker config
+// group's storageConfigs. Applying both in one patch makes the operator observe the config change and
+// the disk removal in the same reconcile — the config-change + disk-removal deadlock scenario. Like the
+// other patch helpers here, a targeted patch avoids the unrelated drift a whole-manifest re-apply can
+// silently carry (see patchKafkaClusterStorageConfigs). The read-only property is upserted via the same
+// properties library the operator uses to parse spec.readOnlyConfig, so an existing key is replaced
+// (not duplicated).
+func patchKafkaClusterReadOnlyConfigAndRemoveDisks(kubectlOptions k8s.KubectlOptions, clusterName, groupName, property string, mountPathsToRemove ...string) error {
+	raw, err := runKubectlSilent(kubectlOptions, "get", "kafkacluster", clusterName, "-o", "json")
+	if err != nil {
+		return err
+	}
+
+	var current struct {
+		Spec struct {
+			ReadOnlyConfig     string `json:"readOnlyConfig"`
+			BrokerConfigGroups map[string]struct {
+				StorageConfigs []v1beta1.StorageConfig `json:"storageConfigs"`
+			} `json:"brokerConfigGroups"`
+		} `json:"spec"`
+	}
+	if err := json.Unmarshal([]byte(raw), &current); err != nil {
+		return err
+	}
+
+	group, ok := current.Spec.BrokerConfigGroups[groupName]
+	if !ok {
+		return fmt.Errorf("broker config group %q not found in KafkaCluster %q", groupName, clusterName)
+	}
+
+	remove := make(map[string]bool, len(mountPathsToRemove))
+	for _, mountPath := range mountPathsToRemove {
+		remove[mountPath] = true
+	}
+	remaining := make([]v1beta1.StorageConfig, 0, len(group.StorageConfigs))
+	for _, config := range group.StorageConfigs {
+		if !remove[config.MountPath] {
+			remaining = append(remaining, config)
+		}
+	}
+
+	key, value, found := strings.Cut(property, "=")
+	if !found {
+		return fmt.Errorf("invalid read-only property %q: expected key=value", property)
+	}
+	readOnlyConfig, err := properties.NewFromString(current.Spec.ReadOnlyConfig)
+	if err != nil {
+		return fmt.Errorf("parsing current spec.readOnlyConfig failed: %w", err)
+	}
+	if err := readOnlyConfig.Set(strings.TrimSpace(key), value); err != nil {
+		return fmt.Errorf("setting read-only property %q failed: %w", property, err)
+	}
+
+	// A JSON merge patch replaces list- and scalar-valued keys wholesale, so patching only
+	// spec.readOnlyConfig and spec.brokerConfigGroups[groupName].storageConfigs changes exactly those
+	// two fields and nothing else.
+	mergePatch, err := json.Marshal(map[string]any{
+		"spec": map[string]any{
+			"readOnlyConfig": readOnlyConfig.String(),
+			"brokerConfigGroups": map[string]any{
+				groupName: map[string]any{
+					"storageConfigs": remaining,
+				},
+			},
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	_, err = runKubectlSilent(kubectlOptions, "patch", "kafkacluster", clusterName, "--type=merge", "-p", string(mergePatch))
+	return err
 }

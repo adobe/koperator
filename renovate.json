@@ -130,6 +130,17 @@
       "description": "Disable Go module updates on master - handled by automated workflow: .github/workflows/update-go-deps.yml. gh-pages' go.mod is Hugo Modules (theme deps like docsy), not app code, so it stays enabled there."
     },
     {
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchDepNames": ["go"],
+      "matchBaseBranches": ["master"],
+      "enabled": true,
+      "rangeStrategy": "bump",
+      "postUpdateOptions": ["gomodTidy"],
+      "description": "Re-enable just the 'go' directive (depName 'go', covers a future 'toolchain' directive too) so go.mod's Go version tracks upstream instead of drifting from the Dockerfile's golang image, which bumps independently (see PR #302). rangeStrategy=bump: default 'replace' treats 'go X.Y.Z' as a caret range, so newer releases always 'satisfy' it and no update is ever proposed. postUpdateOptions=gomodTidy: without it Renovate only runs 'go get', not 'go mod tidy', and CI's tidy-check job would reject the PR."
+    },
+    {
       "matchCategories": [
         "docker"
       ],
@@ -227,7 +238,8 @@
         "dockerfile",
         "docker-compose",
         "custom.regex",
-        "helm-values"
+        "helm-values",
+        "gomod"
       ],
       "commitMessagePrefix": "chore(deps):",
       "commitMessageAction": "update",
@@ -249,7 +261,8 @@
         "docker-compose",
         "custom.regex",
         "helm-values",
-        "docker"
+        "docker",
+        "gomod"
       ],
       "commitMessagePrefix": "chore(deps):",
       "commitMessageAction": "update",
