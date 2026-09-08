@@ -29,10 +29,11 @@ const (
 	KafkaConfigBrokerLogDirectory = "log.dirs"
 
 	// Configuration keys for KRaft
-	KafkaConfigNodeID                 = "node.id"
-	KafkaConfigProcessRoles           = "process.roles"
-	KafkaConfigControllerQuorumVoters = "controller.quorum.voters"
-	KafkaConfigControllerListenerName = "controller.listener.names"
+	KafkaConfigNodeID                           = "node.id"
+	KafkaConfigProcessRoles                     = "process.roles"
+	KafkaConfigControllerQuorumVoters           = "controller.quorum.voters"
+	KafkaConfigControllerQuorumBootstrapServers = "controller.quorum.bootstrap.servers"
+	KafkaConfigControllerListenerName           = "controller.listener.names"
 
 	KafkaConfigListeners                   = "listeners"
 	KafkaConfigListenerName                = "listener.name"
@@ -57,6 +58,13 @@ const (
 	MigrationBrokerControllerQuorumConfigEnabled = "migration.broker.controllerQuorumConfigEnabled"
 	MigrationBrokerKRaftMode                     = "migration.broker.kRaftMode"
 )
+
+// DynamicKRaftControllerQuorum is an operator-only readOnlyConfig flag (never rendered into the
+// final broker config) that opts a broker into a KIP-853 dynamic KRaft controller quorum
+// (controller.quorum.bootstrap.servers) instead of the legacy static quorum
+// (controller.quorum.voters). Unlike the migration flags above, it defaults to "false" when
+// absent, so existing static-quorum clusters are unaffected.
+const DynamicKRaftControllerQuorum = "kraft.dynamicControllerQuorum.enabled"
 
 // used for Cruise Control configurations
 const (

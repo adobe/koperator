@@ -31,22 +31,20 @@ import (
 	"github.com/banzaicloud/koperator/api/v1beta1"
 )
 
-// generateQuorumVoters generates the quorum voters in the format of brokerID@nodeAddress:listenerPort
-// The generated quorum voters are guaranteed in ascending order by broker IDs to ensure same quorum voters configurations are returned
-// regardless of the order of brokers and controllerListenerStatuses are passed in - this is needed to avoid triggering
-// unnecessary rolling upgrade operations
-func generateQuorumVoters(kafkaCluster *v1beta1.KafkaCluster, controllerListenerStatuses map[string]v1beta1.ListenerStatusList) ([]string, error) {
-	var (
-		quorumVoters []string
-		brokerIDs    []int32
-	)
+// controllerNodeAddressesByID walks the cluster's brokers, finds the controller-role nodes and
+// their corresponding controller-listener addresses, and returns their broker IDs (ascending) plus
+// an ID -> address ("nodeAddress:listenerPort") lookup. The ascending order guarantees the same
+// result regardless of the order brokers/controllerListenerStatuses are passed in - this is needed
+// to avoid triggering unnecessary rolling upgrade operations. Shared by generateQuorumVoters and
+// generateQuorumBootstrapServers, which differ only in how they format each entry.
+func controllerNodeAddressesByID(kafkaCluster *v1beta1.KafkaCluster, controllerListenerStatuses map[string]v1beta1.ListenerStatusList) ([]int32, map[int32]string, error) {
+	var brokerIDs []int32
 	idToListenerAddrMap := make(map[int32]string)
 
-	// find the controller nodes and their corresponding listener addresses
 	for _, b := range kafkaCluster.Spec.Brokers {
 		brokerConfig, err := b.GetBrokerConfig(kafkaCluster.Spec)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		if brokerConfig.IsControllerNode() {
@@ -66,11 +64,64 @@ func generateQuorumVoters(kafkaCluster *v1beta1.KafkaCluster, controllerListener
 		return brokerIDs[i] < brokerIDs[j]
 	})
 
+	return brokerIDs, idToListenerAddrMap, nil
+}
+
+// generateQuorumVoters generates the static KRaft quorum voters (controller.quorum.voters) in the
+// format of brokerID@nodeAddress:listenerPort, in ascending order by broker ID.
+func generateQuorumVoters(kafkaCluster *v1beta1.KafkaCluster, controllerListenerStatuses map[string]v1beta1.ListenerStatusList) ([]string, error) {
+	brokerIDs, idToListenerAddrMap, err := controllerNodeAddressesByID(kafkaCluster, controllerListenerStatuses)
+	if err != nil {
+		return nil, err
+	}
+
+	var quorumVoters []string
 	for _, brokerId := range brokerIDs {
 		quorumVoters = append(quorumVoters, fmt.Sprintf("%d@%s", brokerId, idToListenerAddrMap[brokerId]))
 	}
 
 	return quorumVoters, nil
+}
+
+// generateQuorumBootstrapServers generates the dynamic KRaft quorum bootstrap servers
+// (controller.quorum.bootstrap.servers, KIP-853) in the format of nodeAddress:listenerPort (no
+// broker ID prefix), in ascending order by broker ID.
+func generateQuorumBootstrapServers(kafkaCluster *v1beta1.KafkaCluster, controllerListenerStatuses map[string]v1beta1.ListenerStatusList) ([]string, error) {
+	brokerIDs, idToListenerAddrMap, err := controllerNodeAddressesByID(kafkaCluster, controllerListenerStatuses)
+	if err != nil {
+		return nil, err
+	}
+
+	var bootstrapServers []string
+	for _, brokerId := range brokerIDs {
+		bootstrapServers = append(bootstrapServers, idToListenerAddrMap[brokerId])
+	}
+
+	return bootstrapServers, nil
+}
+
+// minControllerNodeBrokerID returns the lowest broker ID among all controller-role brokers
+// (controller-only or combined) declared in the cluster spec, and false if there are none. Used to
+// deterministically and statelessly pick the single controller that bootstraps a dynamic KRaft
+// quorum standalone (kafka-storage.sh format --standalone); every other controller/broker joins
+// via --no-initial-controllers and is promoted later through the manual
+// kafka-metadata-quorum.sh add-controller runbook step.
+func minControllerNodeBrokerID(spec v1beta1.KafkaClusterSpec) (int32, bool) {
+	var (
+		minID int32
+		found bool
+	)
+	for _, b := range spec.Brokers {
+		brokerConfig, err := b.GetBrokerConfig(spec)
+		if err != nil {
+			continue
+		}
+		if brokerConfig.IsControllerNode() && (!found || b.Id < minID) {
+			minID = b.Id
+			found = true
+		}
+	}
+	return minID, found
 }
 
 // generateRandomClusterID() generates a base64-encoded random UUID with 16 bytes as the cluster ID.

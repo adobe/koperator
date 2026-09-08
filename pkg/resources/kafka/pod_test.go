@@ -18,11 +18,13 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/go-logr/logr"
 	"gotest.tools/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/banzaicloud/koperator/api/v1beta1"
+	"github.com/banzaicloud/koperator/pkg/resources"
 )
 
 func TestGetAffinity(t *testing.T) {
@@ -183,5 +185,103 @@ func Test_generateEnvConfig(t *testing.T) {
 	}
 	if !reflect.DeepEqual(result, expected) {
 		t.Error("Expected:", expected, "Got:", result)
+	}
+}
+
+func TestAddDynamicKRaftQuorumFormatEnv(t *testing.T) {
+	brokers := []v1beta1.Broker{
+		{Id: 0, BrokerConfig: &v1beta1.BrokerConfig{Roles: []string{"controller"}}},
+		{Id: 1, BrokerConfig: &v1beta1.BrokerConfig{Roles: []string{"controller"}}},
+		{Id: 2, BrokerConfig: &v1beta1.BrokerConfig{Roles: []string{"broker", "controller"}}},
+		{Id: 100, BrokerConfig: &v1beta1.BrokerConfig{Roles: []string{"broker"}}},
+	}
+
+	tests := []struct {
+		testName        string
+		brokerID        int32
+		readOnlyConfig  string
+		expectedEnvVars []corev1.EnvVar
+	}{
+		{
+			testName:        "flag absent injects nothing (today's static-quorum behavior)",
+			brokerID:        0,
+			readOnlyConfig:  "",
+			expectedEnvVars: nil,
+		},
+		{
+			testName:        "flag false injects nothing",
+			brokerID:        0,
+			readOnlyConfig:  "kraft.dynamicControllerQuorum.enabled=false",
+			expectedEnvVars: nil,
+		},
+		{
+			testName:       "lowest-ID controller-only broker bootstraps standalone",
+			brokerID:       0,
+			readOnlyConfig: "kraft.dynamicControllerQuorum.enabled=true",
+			expectedEnvVars: []corev1.EnvVar{
+				{Name: "KRAFT_STORAGE_FORMAT_FLAG", Value: "--standalone"},
+				{Name: "KRAFT_ENFORCE_DYNAMIC_QUORUM", Value: "true"},
+			},
+		},
+		{
+			testName:       "non-lowest-ID controller-only broker joins without initial controllers",
+			brokerID:       1,
+			readOnlyConfig: "kraft.dynamicControllerQuorum.enabled=true",
+			expectedEnvVars: []corev1.EnvVar{
+				{Name: "KRAFT_STORAGE_FORMAT_FLAG", Value: "--no-initial-controllers"},
+				{Name: "KRAFT_ENFORCE_DYNAMIC_QUORUM", Value: "true"},
+			},
+		},
+		{
+			testName:       "combined broker+controller node (not lowest ID) joins without initial controllers, still enforces dynamic quorum",
+			brokerID:       2,
+			readOnlyConfig: "kraft.dynamicControllerQuorum.enabled=true",
+			expectedEnvVars: []corev1.EnvVar{
+				{Name: "KRAFT_STORAGE_FORMAT_FLAG", Value: "--no-initial-controllers"},
+				{Name: "KRAFT_ENFORCE_DYNAMIC_QUORUM", Value: "true"},
+			},
+		},
+		{
+			testName:       "broker-only node joins without initial controllers and never enforces the feature flag",
+			brokerID:       100,
+			readOnlyConfig: "kraft.dynamicControllerQuorum.enabled=true",
+			expectedEnvVars: []corev1.EnvVar{
+				{Name: "KRAFT_STORAGE_FORMAT_FLAG", Value: "--no-initial-controllers"},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.testName, func(t *testing.T) {
+			for i, b := range brokers {
+				if b.Id == test.brokerID {
+					brokers[i].ReadOnlyConfig = test.readOnlyConfig
+				} else {
+					brokers[i].ReadOnlyConfig = ""
+				}
+			}
+
+			r := &Reconciler{
+				Reconciler: resources.Reconciler{
+					KafkaCluster: &v1beta1.KafkaCluster{
+						Spec: v1beta1.KafkaClusterSpec{KRaftMode: true, Brokers: brokers},
+					},
+				},
+			}
+
+			var brokerConfig *v1beta1.BrokerConfig
+			for _, b := range brokers {
+				if b.Id == test.brokerID {
+					brokerConfig = b.BrokerConfig
+				}
+			}
+
+			pod := &corev1.Pod{Spec: corev1.PodSpec{Containers: []corev1.Container{{}}}}
+			addDynamicKRaftQuorumFormatEnv(r, pod, 0, test.brokerID, brokerConfig, logr.Discard())
+
+			if !reflect.DeepEqual(pod.Spec.Containers[0].Env, test.expectedEnvVars) {
+				t.Error("Expected:", test.expectedEnvVars, "Got:", pod.Spec.Containers[0].Env)
+			}
+		})
 	}
 }
