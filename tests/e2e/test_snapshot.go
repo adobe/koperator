@@ -21,9 +21,8 @@ import (
 	"strings"
 
 	"github.com/gruntwork-io/terratest/modules/k8s"
-	ginkgo "github.com/onsi/ginkgo/v2"
-	gomega "github.com/onsi/gomega"
-	"github.com/onsi/gomega/format"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -41,10 +40,21 @@ func (s *clusterSnapshot) Resources() []metav1.PartialObjectMetadata {
 func (s *clusterSnapshot) ResourcesAsComparisonType() []localComparisonPartialObjectMetadataType {
 	var localList []localComparisonPartialObjectMetadataType
 	for _, r := range s.resources {
-		// Filter out cert-manager related resources to avoid comparison failures
-		// when cert-manager is not fully cleaned up during uninstall
+		// Filter out cert-manager and envoy-gateway related resources to avoid comparison failures
+		// when these components are not fully cleaned up during uninstall
 		resourceName := r.GetName()
 		if strings.Contains(resourceName, "cert-manager") || strings.Contains(resourceName, "acme.cert-manager") {
+			continue
+		}
+		// Filter out Envoy Gateway and Gateway API resources (CRDs, RBAC, APIServices)
+		if strings.Contains(resourceName, "gateway.envoyproxy.io") ||
+			strings.Contains(resourceName, "gateway.networking.x-k8s.io") ||
+			strings.Contains(resourceName, "gateway.networking.k8s.io") ||
+			strings.Contains(resourceName, "eg-gateway-helm-certgen") {
+			continue
+		}
+		// Filter out Kind cluster infrastructure resources
+		if resourceName == "cloud-provider-kind" {
 			continue
 		}
 
@@ -162,13 +172,57 @@ func snapshotClusterAndCompare(snapshottedInitialInfo *clusterSnapshot) bool {
 		snapshotCluster(snapshottedCurrentInfo)
 
 		ginkgo.It("Checking resources list", func() {
-			// Temporarily increase maximum output length (default 4000) to fit more objects in the printed diff.
-			// Only doing this here because other assertions typically don't run against objects with this many elements.
-			initialMaxLength := format.MaxLength
-			defer func() { format.MaxLength = initialMaxLength }()
-			format.MaxLength = 9000
+			current := snapshottedCurrentInfo.ResourcesAsComparisonType()
+			initial := snapshottedInitialInfo.ResourcesAsComparisonType()
 
-			gomega.Expect(snapshottedCurrentInfo.ResourcesAsComparisonType()).To(gomega.ConsistOf(snapshottedInitialInfo.ResourcesAsComparisonType()))
+			// Calculate differences for better error reporting
+			var extra []localComparisonPartialObjectMetadataType
+			var missing []localComparisonPartialObjectMetadataType
+
+			for _, c := range current {
+				found := false
+				for _, i := range initial {
+					if c.GVK == i.GVK && c.Namespace == i.Namespace && c.Name == i.Name {
+						found = true
+						break
+					}
+				}
+				if !found {
+					extra = append(extra, c)
+				}
+			}
+
+			for _, i := range initial {
+				found := false
+				for _, c := range current {
+					if c.GVK == i.GVK && c.Namespace == i.Namespace && c.Name == i.Name {
+						found = true
+						break
+					}
+				}
+				if !found {
+					missing = append(missing, i)
+				}
+			}
+
+			// If there are differences, print them clearly and fail with a simple message
+			if len(extra) > 0 || len(missing) > 0 {
+				if len(extra) > 0 {
+					ginkgo.GinkgoWriter.Printf("\n=== EXTRA RESOURCES (present now but not in initial snapshot) ===\n")
+					for _, r := range extra {
+						ginkgo.GinkgoWriter.Printf("  %s/%s %s (namespace: %q)\n", r.GVK.Group, r.GVK.Kind, r.Name, r.Namespace)
+					}
+				}
+
+				if len(missing) > 0 {
+					ginkgo.GinkgoWriter.Printf("\n=== MISSING RESOURCES (present in initial snapshot but not now) ===\n")
+					for _, r := range missing {
+						ginkgo.GinkgoWriter.Printf("  %s/%s %s (namespace: %q)\n", r.GVK.Group, r.GVK.Kind, r.Name, r.Namespace)
+					}
+				}
+
+				ginkgo.Fail(fmt.Sprintf("Cluster resources mismatch: %d extra, %d missing (see details above)", len(extra), len(missing)))
+			}
 		})
 	})
 }

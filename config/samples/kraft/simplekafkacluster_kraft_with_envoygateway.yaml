@@ -1,3 +1,29 @@
+---
+# Self-signed issuer for creating TLS certificates
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: envoygateway-selfsigned-issuer
+  namespace: kafka
+spec:
+  selfSigned: {}
+---
+# TLS certificate for Envoy Gateway
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: envoygateway-tls-cert
+  namespace: kafka
+spec:
+  secretName: envoygateway-tls-secret
+  issuerRef:
+    name: envoygateway-selfsigned-issuer
+    kind: Issuer
+  dnsNames:
+    - "*.kafka.cluster.local"
+    - "kafka.cluster.local"
+  commonName: "kafka.cluster.local"
+---
 apiVersion: kafka.banzaicloud.io/v1beta1
 kind: KafkaCluster
 metadata:
@@ -8,14 +34,34 @@ metadata:
 spec:
   kRaft: true
   monitoringConfig:
-    jmxImage: "ghcr.io/adobe/koperator/jmx-javaagent:1.5.0" # renovate: datasource=docker depName=ghcr.io/adobe/koperator/jmx-javaagent
+    jmxImage: "ghcr.io/adobe/koperator/jmx-javaagent:1.4.0"
   headlessServiceEnabled: true
   propagateLabels: false
   oneBrokerPerNode: false
-  clusterImage: "ghcr.io/adobe/koperator/kafka:2.13-3.9.2-jdk21.0.11" # renovate: datasource=docker depName=ghcr.io/adobe/koperator/kafka
-  taintedBrokersSelector:
-    matchLabels:
-      restart: me
+  clusterImage: "ghcr.io/adobe/koperator/kafka:2.13-3.9.1"
+  ingressController: "envoygateway"
+  envoyGatewayConfig:
+    gatewayClassName: "eg"
+    tlsSecretName: "envoygateway-tls-secret"
+    brokerHostnameTemplate: "broker-%id.kafka.cluster.local"
+  listenersConfig:
+    internalListeners:
+      - type: "plaintext"
+        name: "internal"
+        containerPort: 29092
+        usedForInnerBrokerCommunication: true
+      - type: "plaintext"
+        name: "controller"
+        containerPort: 29093
+        usedForInnerBrokerCommunication: false
+        usedForControllerCommunication: true
+    externalListeners:
+      - accessMethod: LoadBalancer
+        containerPort: 29095
+        externalStartingPort: -1
+        name: envoyg
+        type: plaintext
+        usedForInnerBrokerCommunication: false
   readOnlyConfig: |
     auto.create.topics.enable=false
     cruise.control.metrics.topic.auto.create=true
@@ -34,9 +80,6 @@ spec:
               requests:
                 storage: 10Gi
     broker:
-      kafkaJvmPerfOpts: >-
-        -Dcom.sun.management.jmxremote.port=1090 -Dcom.sun.management.jmxremote.rmi.port=1090
-        -Dcom.sun.management.jmxremote.local.only=false -Djava.rmi.server.hostname=127.0.0.1 -Djute.maxbuffer=0x9fffff
       processRoles:
         - broker
       storageConfigs:
@@ -52,58 +95,36 @@ spec:
         prometheus.io/port: "9020"
   brokers:
     - id: 0
-      brokerConfigGroup: "default"
-      brokerConfig:
-        processRoles:
-          - controller
+      brokerConfigGroup: "broker"
     - id: 1
-      brokerConfigGroup: "default"
-      brokerConfig:
-        processRoles:
-          - controller
+      brokerConfigGroup: "broker"
     - id: 2
+      brokerConfigGroup: "broker"
+    - id: 3
       brokerConfigGroup: "default"
       brokerConfig:
         processRoles:
           - controller
-    - id: 100
-      brokerConfigGroup: "broker"
-    - id: 101
-      brokerConfigGroup: "broker"
-    - id: 102
-      brokerConfigGroup: "broker"
+          # - broker
+    - id: 4
+      brokerConfigGroup: "default"
+      brokerConfig:
+        processRoles:
+          - controller
+    - id: 5
+      brokerConfigGroup: "default"
+      brokerConfig:
+        processRoles:
+          - controller
   rollingUpgradeConfig:
     failureThreshold: 1
-  listenersConfig:
-    internalListeners:
-      - type: "plaintext"
-        name: "internal"
-        containerPort: 29092
-        usedForInnerBrokerCommunication: true
-      - type: "plaintext"
-        name: "controller"
-        containerPort: 29093
-        usedForInnerBrokerCommunication: false
-        usedForControllerCommunication: true
   cruiseControlConfig:
-    # podSecurityContext:
-    #  runAsNonRoot: false
-    # securityContext:
-    #  privileged: true
     cruiseControlTaskSpec:
       RetryDurationMinutes: 5
     topicConfig:
       # e2e: fewer partitions on the __CruiseControlMetrics topic => faster CC monitoring coverage
       partitions: 3
       replicationFactor: 3
-#    resourceRequirements:
-#      requests:
-#        cpu: 500m
-#        memory: 1Gi
-#      limits:
-#        cpu: 500m
-#        memory: 1Gi
-#    image: "adobe/cruise-control:3.0.3-adbe-20250804"
     config: |
       # Copyright 2017 LinkedIn Corp. Licensed under the BSD 2-Clause License (the "License"). See License in the project root for license information.
       #
@@ -306,8 +327,4 @@ spec:
       {
         "min.insync.replicas": 3
       }
-    # NOTE: intentionally NO capacityConfig here. A "brokerId": "-1" universal-default entry makes
-    # GenerateCapacityConfig return early, so Cruise Control's capacity.json stays constant across scaling
-    # and the #301 capacity-roll path (and its fix) is never exercised. Omitting it forces per-broker
-    # capacity generation, which is exactly what the KRaft broker-scaling e2e regression-tests. Do not add
-    # a universal default back or the regression coverage silently disappears.
+
