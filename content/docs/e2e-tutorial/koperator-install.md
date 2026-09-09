@@ -41,16 +41,16 @@ The Koperator requires several Custom Resource Definitions to manage Kafka clust
 
 ```bash
 # Install KafkaCluster CRD
-kubectl apply --server-side -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_kafkaclusters.yaml
+kubectl apply --server-side -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/main/config/base/crds/kafka.banzaicloud.io_kafkaclusters.yaml
 
 # Install KafkaTopic CRD
-kubectl apply --server-side -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_kafkatopics.yaml
+kubectl apply --server-side -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/main/config/base/crds/kafka.banzaicloud.io_kafkatopics.yaml
 
 # Install KafkaUser CRD
-kubectl apply --server-side -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_kafkausers.yaml
+kubectl apply --server-side -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/main/config/base/crds/kafka.banzaicloud.io_kafkausers.yaml
 
 # Install CruiseControlOperation CRD
-kubectl apply --server-side -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_cruisecontroloperations.yaml
+kubectl apply --server-side -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/main/config/base/crds/kafka.banzaicloud.io_cruisecontroloperations.yaml
 ```
 
 ### Verify CRD Installation
@@ -239,7 +239,7 @@ If CRDs are not properly installed:
 ```bash
 # Reinstall CRDs
 kubectl delete crd kafkaclusters.kafka.banzaicloud.io
-kubectl apply --server-side -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_kafkaclusters.yaml
+kubectl apply --server-side -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/main/config/base/crds/kafka.banzaicloud.io_kafkaclusters.yaml
 
 # Check CRD status
 kubectl get crd kafkaclusters.kafka.banzaicloud.io -o yaml
