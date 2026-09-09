@@ -69,6 +69,19 @@ fi
 # Reachable and reporting some other raft state (e.g. candidate, unattached, observer).
 if echo "${METRICS}" | grep -q "^${METRIC_PREFIX}"; then
     STATE=$(echo "${METRICS}" | grep "^${METRIC_PREFIX}" | head -n 1 | sed -E "s/^${METRIC_PREFIX}([a-z]+).*/\1/")
+    # Under a KIP-853 dynamic controller quorum, a controller that has not yet been promoted with
+    # "kafka-metadata-quorum add-controller" (or that has been removed) legitimately runs as a
+    # non-voting observer, replicating the metadata log without being part of the quorum. This is an
+    # expected, potentially long-lived state - not a fault:
+    #   readiness -> stays fail-closed (exit 1): an observer is not a voting quorum member, so it must
+    #                not receive quorum-member traffic and koperator's rolling upgrade must keep waiting.
+    #   liveness  -> must be fail-open (exit 0): killing the container here would recreate the pod as an
+    #                observer again, so it could never survive long enough to be promoted (a deadlock).
+    if [ "${STATE}" = "observer" ]; then
+        echo "The controller is a non-voting observer (dynamic quorum: awaiting add-controller)."
+        [ "${mode}" = "readiness" ] && exit 1
+        exit 0
+    fi
     echo "Failure: the controller is in an unexpected state: ${STATE}. Expecting 'leader' or 'follower'."
     exit 1
 fi
