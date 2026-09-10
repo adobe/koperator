@@ -26,8 +26,6 @@ spec:
   # pods will correctly show NotReady), promote each of them into the voting quorum:
   #   kafka-metadata-quorum.sh --command-config <broker-N's own broker-config> \
   #     --bootstrap-controller <broker-0-controller-address> add-controller
-  # This is a manual runbook step, not automated by koperator. The same tool's
-  # `remove-controller` subcommand is used to shrink the quorum later.
   readOnlyConfig: |
     auto.create.topics.enable=false
     cruise.control.metrics.topic.auto.create=true

@@ -209,10 +209,10 @@ func addClusterIdEnv(r *Reconciler, pod *corev1.Pod, i int) {
 }
 
 // addDynamicKRaftQuorumFormatEnv injects the storage-format env vars consumed by
-// wait-for-envoy-sidecar.sh when this broker has opted into a KIP-853 dynamic KRaft controller
+// wait-for-envoy-sidecar.sh when this broker has opted into a dynamic KRaft controller
 // quorum (see DynamicKRaftControllerQuorum / shouldUseDynamicKRaftQuorum). When the flag is absent
-// or false for this broker, nothing is injected and the storage-format command is unchanged from
-// today's static-quorum behavior.
+// or false for this broker, nothing is changed from
+// the static-quorum behavior.
 func addDynamicKRaftQuorumFormatEnv(r *Reconciler, pod *corev1.Pod, i int, id int32, brokerConfig *v1beta1.BrokerConfig, log logr.Logger) {
 	var broker v1beta1.Broker
 	found := false

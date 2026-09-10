@@ -261,9 +261,9 @@ func shouldConfigureControllerQuorumForBroker(brokerReadOnlyConfig *properties.P
 	return !found || migrationBrokerControllerQuorumConfigEnabled.Value() == configValueTrue
 }
 
-// shouldUseDynamicKRaftQuorum returns true only when DynamicKRaftControllerQuorum is explicitly set
-// to 'true'. Unlike the migration flags above, it defaults to false (static quorum) when absent, so
-// existing static-quorum clusters render byte-for-byte identical config.
+// shouldUseDynamicKRaftQuorum returns true only when DynamicKRaftControllerQuorum is set
+// to 'true'. It defaults to false (static quorum) when absent, so
+// existing static-quorum clusters will continue to remain static.
 func shouldUseDynamicKRaftQuorum(brokerReadOnlyConfig *properties.Properties) bool {
 	dynamicKRaftControllerQuorum, found := brokerReadOnlyConfig.Get(kafkautils.DynamicKRaftControllerQuorum)
 	return found && dynamicKRaftControllerQuorum.Value() == configValueTrue

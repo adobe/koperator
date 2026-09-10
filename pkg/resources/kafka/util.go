@@ -34,7 +34,7 @@ import (
 // controllerNodeAddressesByID walks the cluster's brokers, finds the controller-role nodes and
 // their corresponding controller-listener addresses, and returns their broker IDs (ascending) plus
 // an ID -> address ("nodeAddress:listenerPort") lookup. The ascending order guarantees the same
-// result regardless of the order brokers/controllerListenerStatuses are passed in - this is needed
+// result regardless of the order brokers/controllerListenerStatuses are passed in. This is needed
 // to avoid triggering unnecessary rolling upgrade operations. Shared by generateQuorumVoters and
 // generateQuorumBootstrapServers, which differ only in how they format each entry.
 func controllerNodeAddressesByID(kafkaCluster *v1beta1.KafkaCluster, controllerListenerStatuses map[string]v1beta1.ListenerStatusList) ([]int32, map[int32]string, error) {
