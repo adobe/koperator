@@ -389,7 +389,7 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 		log.Error(err, "could not find controller broker")
 	}
 
-	var quorumVoters []string
+	var quorumVoters, quorumBootstrapServers []string
 	if r.KafkaCluster.Spec.KRaftMode {
 		// all broker nodes under the same Kafka cluster must use the same cluster UUID
 		if r.KafkaCluster.Status.ClusterID == "" {
@@ -426,6 +426,15 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 				"clusterNamespace", r.KafkaCluster.GetNamespace())
 		}
 
+		quorumBootstrapServers, err = generateQuorumBootstrapServers(r.KafkaCluster, controllerIntListenerStatuses)
+		if err != nil {
+			return errors.WrapIfWithDetails(err,
+				"failed to generate quorum bootstrap servers configuration",
+				"component", componentName,
+				"clusterName", r.KafkaCluster.GetName(),
+				"clusterNamespace", r.KafkaCluster.GetNamespace())
+		}
+
 		// In KRaft mode:
 		// 1. there is no way for admin client to know which node is the active controller, controllerID obtained above is just a broker ID of a random active broker (this is intentional by Kafka)
 		// 2. the follower controllers replicate the data that is written to the active controller and serves as hot standbys if the active controller fails.
@@ -446,14 +455,14 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 
 		var configMap *corev1.ConfigMap
 		if r.KafkaCluster.Spec.RackAwareness == nil {
-			configMap = r.configMap(broker, brokerConfig, quorumVoters, extListenerStatuses, intListenerStatuses, controllerIntListenerStatuses, serverPasses, clientPass, superUsers, log)
+			configMap = r.configMap(broker, brokerConfig, quorumVoters, quorumBootstrapServers, extListenerStatuses, intListenerStatuses, controllerIntListenerStatuses, serverPasses, clientPass, superUsers, log)
 			err := k8sutil.Reconcile(log, r.Client, configMap, r.KafkaCluster)
 			if err != nil {
 				return errors.WrapIfWithDetails(err, "failed to reconcile resource", "resource", configMap.GetObjectKind().GroupVersionKind())
 			}
 		} else if brokerState, ok := r.KafkaCluster.Status.BrokersState[strconv.Itoa(int(broker.Id))]; ok {
 			if brokerState.RackAwarenessState != "" {
-				configMap = r.configMap(broker, brokerConfig, quorumVoters, extListenerStatuses, intListenerStatuses, controllerIntListenerStatuses, serverPasses, clientPass, superUsers, log)
+				configMap = r.configMap(broker, brokerConfig, quorumVoters, quorumBootstrapServers, extListenerStatuses, intListenerStatuses, controllerIntListenerStatuses, serverPasses, clientPass, superUsers, log)
 				err := k8sutil.Reconcile(log, r.Client, configMap, r.KafkaCluster)
 				if err != nil {
 					return errors.WrapIfWithDetails(err, "failed to reconcile resource", "resource", configMap.GetObjectKind().GroupVersionKind())

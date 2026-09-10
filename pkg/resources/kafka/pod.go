@@ -181,6 +181,9 @@ fi`},
 						},
 					)
 				}
+
+				// see how these env vars are used in wait-for-envoy-sidecars.sh
+				addDynamicKRaftQuorumFormatEnv(r, pod, i, id, brokerConfig, log)
 				break
 			}
 		}
@@ -203,6 +206,53 @@ func addClusterIdEnv(r *Reconciler, pod *corev1.Pod, i int) {
 			Value: r.KafkaCluster.Status.ClusterID,
 		},
 	)
+}
+
+// addDynamicKRaftQuorumFormatEnv injects the storage-format env vars consumed by
+// wait-for-envoy-sidecar.sh when this broker has opted into a dynamic KRaft controller
+// quorum (see DynamicKRaftControllerQuorum / shouldUseDynamicKRaftQuorum). When the flag is absent
+// or false for this broker, nothing is changed from
+// the static-quorum behavior.
+func addDynamicKRaftQuorumFormatEnv(r *Reconciler, pod *corev1.Pod, i int, id int32, brokerConfig *v1beta1.BrokerConfig, log logr.Logger) {
+	var broker v1beta1.Broker
+	found := false
+	for _, b := range r.KafkaCluster.Spec.Brokers {
+		if b.Id == id {
+			broker = b
+			found = true
+			break
+		}
+	}
+	if !found {
+		return
+	}
+
+	brokerReadOnlyConfig := getBrokerReadOnlyConfig(broker, r.KafkaCluster, log)
+	if !shouldUseDynamicKRaftQuorum(brokerReadOnlyConfig) {
+		return
+	}
+
+	formatFlag := "--no-initial-controllers"
+	if minID, ok := minControllerNodeBrokerID(r.KafkaCluster.Spec); ok && brokerConfig.IsControllerNode() && id == minID {
+		formatFlag = "--standalone"
+	}
+	pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env,
+		corev1.EnvVar{
+			Name:  "KRAFT_STORAGE_FORMAT_FLAG",
+			Value: formatFlag,
+		},
+	)
+
+	// Per Kafka's docs, --feature kraft.version=1 must only be passed when formatting controllers,
+	// never brokers.
+	if brokerConfig.IsControllerNode() {
+		pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env,
+			corev1.EnvVar{
+				Name:  "KRAFT_ENFORCE_DYNAMIC_QUORUM",
+				Value: "true",
+			},
+		)
+	}
 }
 
 func (r *Reconciler) generateKafkaContainerPorts(log logr.Logger) []corev1.ContainerPort {

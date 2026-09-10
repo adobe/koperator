@@ -420,6 +420,133 @@ func TestGenerateQuorumVoters(t *testing.T) {
 	}
 }
 
+func TestGenerateQuorumBootstrapServers(t *testing.T) {
+	kafkaCluster := &v1beta1.KafkaCluster{}
+
+	tests := []struct {
+		testName                     string
+		brokers                      []v1beta1.Broker
+		listenersStatuses            map[string]v1beta1.ListenerStatusList
+		expectedQuorumBootstrapAddrs []string
+	}{
+		{
+			testName: "brokers with ascending order by IDs; controller listener statuses has the same order as brokers",
+			brokers: []v1beta1.Broker{
+				{Id: int32(0), BrokerConfig: &v1beta1.BrokerConfig{Roles: []string{"broker"}}},
+				{Id: int32(40), BrokerConfig: &v1beta1.BrokerConfig{Roles: []string{"controller"}}},
+				{Id: int32(50), BrokerConfig: &v1beta1.BrokerConfig{Roles: []string{"controller"}}},
+				{Id: int32(60), BrokerConfig: &v1beta1.BrokerConfig{Roles: []string{"controller"}}},
+			},
+			listenersStatuses: map[string]v1beta1.ListenerStatusList{
+				"test-listener": {
+					{Name: "broker-0", Address: "fakeKafka-0.fakeKafka-headless.default.svc.cluster.local:29093"},
+					{Name: "broker-40", Address: "fakeKafka-40.fakeKafka-headless.default.svc.cluster.local:29093"},
+					{Name: "broker-50", Address: "fakeKafka-50.fakeKafka-headless.default.svc.cluster.local:29093"},
+					{Name: "broker-60", Address: "fakeKafka-60.fakeKafka-headless.default.svc.cluster.local:29093"},
+				},
+			},
+			expectedQuorumBootstrapAddrs: []string{
+				"fakeKafka-40.fakeKafka-headless.default.svc.cluster.local:29093",
+				"fakeKafka-50.fakeKafka-headless.default.svc.cluster.local:29093",
+				"fakeKafka-60.fakeKafka-headless.default.svc.cluster.local:29093",
+			},
+		},
+		{
+			testName: "brokers and controller listener statuses with random order, including a combined broker+controller node",
+			brokers: []v1beta1.Broker{
+				{Id: int32(100), BrokerConfig: &v1beta1.BrokerConfig{Roles: []string{"broker", "controller"}}},
+				{Id: int32(50), BrokerConfig: &v1beta1.BrokerConfig{Roles: []string{"broker"}}},
+				{Id: int32(80), BrokerConfig: &v1beta1.BrokerConfig{Roles: []string{"controller"}}},
+				{Id: int32(90), BrokerConfig: &v1beta1.BrokerConfig{Roles: []string{"controller"}}},
+			},
+			listenersStatuses: map[string]v1beta1.ListenerStatusList{
+				"test-listener": {
+					{Name: "broker-50", Address: "fakeKafka-50.fakeKafka-headless.default.svc.cluster.local:29093"},
+					{Name: "broker-100", Address: "fakeKafka-100.fakeKafka-headless.default.svc.cluster.local:29093"},
+					{Name: "broker-80", Address: "fakeKafka-80.fakeKafka-headless.default.svc.cluster.local:29093"},
+					{Name: "broker-90", Address: "fakeKafka-90.fakeKafka-headless.default.svc.cluster.local:29093"},
+				},
+			},
+			expectedQuorumBootstrapAddrs: []string{
+				"fakeKafka-80.fakeKafka-headless.default.svc.cluster.local:29093",
+				"fakeKafka-90.fakeKafka-headless.default.svc.cluster.local:29093",
+				"fakeKafka-100.fakeKafka-headless.default.svc.cluster.local:29093",
+			},
+		},
+		{
+			testName:                     "no controller-role brokers yields no bootstrap servers",
+			brokers:                      []v1beta1.Broker{{Id: int32(0), BrokerConfig: &v1beta1.BrokerConfig{Roles: []string{"broker"}}}},
+			listenersStatuses:            map[string]v1beta1.ListenerStatusList{},
+			expectedQuorumBootstrapAddrs: nil,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.testName, func(t *testing.T) {
+			kafkaCluster.Spec.Brokers = test.brokers
+			gotBootstrapServers, err := generateQuorumBootstrapServers(kafkaCluster, test.listenersStatuses)
+			if err != nil {
+				t.Error(err)
+			}
+			if !reflect.DeepEqual(gotBootstrapServers, test.expectedQuorumBootstrapAddrs) {
+				t.Error("Expected:", test.expectedQuorumBootstrapAddrs, "Got:", gotBootstrapServers)
+			}
+		})
+	}
+}
+
+func TestMinControllerNodeBrokerID(t *testing.T) {
+	tests := []struct {
+		testName      string
+		brokers       []v1beta1.Broker
+		expectedID    int32
+		expectedFound bool
+	}{
+		{
+			testName:      "no controller-role brokers",
+			brokers:       []v1beta1.Broker{{Id: int32(0), BrokerConfig: &v1beta1.BrokerConfig{Roles: []string{"broker"}}}},
+			expectedID:    0,
+			expectedFound: false,
+		},
+		{
+			testName:      "single controller",
+			brokers:       []v1beta1.Broker{{Id: int32(5), BrokerConfig: &v1beta1.BrokerConfig{Roles: []string{"controller"}}}},
+			expectedID:    5,
+			expectedFound: true,
+		},
+		{
+			testName: "multiple controllers in non-ascending input order",
+			brokers: []v1beta1.Broker{
+				{Id: int32(2), BrokerConfig: &v1beta1.BrokerConfig{Roles: []string{"controller"}}},
+				{Id: int32(0), BrokerConfig: &v1beta1.BrokerConfig{Roles: []string{"controller"}}},
+				{Id: int32(1), BrokerConfig: &v1beta1.BrokerConfig{Roles: []string{"controller"}}},
+				{Id: int32(100), BrokerConfig: &v1beta1.BrokerConfig{Roles: []string{"broker"}}},
+			},
+			expectedID:    0,
+			expectedFound: true,
+		},
+		{
+			testName: "combined broker+controller node counts as a controller",
+			brokers: []v1beta1.Broker{
+				{Id: int32(3), BrokerConfig: &v1beta1.BrokerConfig{Roles: []string{"broker"}}},
+				{Id: int32(1), BrokerConfig: &v1beta1.BrokerConfig{Roles: []string{"broker", "controller"}}},
+			},
+			expectedID:    1,
+			expectedFound: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.testName, func(t *testing.T) {
+			spec := v1beta1.KafkaClusterSpec{Brokers: test.brokers}
+			gotID, gotFound := minControllerNodeBrokerID(spec)
+			if gotFound != test.expectedFound || (gotFound && gotID != test.expectedID) {
+				t.Errorf("Expected: (%d, %v), Got: (%d, %v)", test.expectedID, test.expectedFound, gotID, gotFound)
+			}
+		})
+	}
+}
+
 // --- podSpecIntentChanged & tainted-broker restart ---
 
 func baseKafkaPod() *corev1.Pod {

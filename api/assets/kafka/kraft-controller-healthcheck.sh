@@ -69,6 +69,13 @@ fi
 # Reachable and reporting some other raft state (e.g. candidate, unattached, observer).
 if echo "${METRICS}" | grep -q "^${METRIC_PREFIX}"; then
     STATE=$(echo "${METRICS}" | grep "^${METRIC_PREFIX}" | head -n 1 | sed -E "s/^${METRIC_PREFIX}([a-z]+).*/\1/")
+    # Under a dynamic controller quorum, a controller that has not yet been promoted with
+    # "kafka-metadata-quorum add-controller" will be a non-voting observer until promoted.
+    if [ "${STATE}" = "observer" ]; then
+        echo "The controller is a non-voting observer (dynamic quorum: awaiting add-controller)."
+        [ "${mode}" = "readiness" ] && exit 1
+        exit 0
+    fi
     echo "Failure: the controller is in an unexpected state: ${STATE}. Expecting 'leader' or 'follower'."
     exit 1
 fi
