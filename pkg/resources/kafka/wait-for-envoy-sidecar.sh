@@ -39,7 +39,7 @@ if [[ -n "${CLUSTER_ID}" ]]; then
   echo "Formatting KRaft storage with cluster ID ${CLUSTER_ID}"
 
   # KRAFT_STORAGE_FORMAT_FLAG/KRAFT_ENFORCE_DYNAMIC_QUORUM are only set when this broker has opted
-  # into a KIP-853 dynamic KRaft controller quorum (see DynamicKRaftControllerQuorum in
+  # into a dynamic KRaft controller quorum (see DynamicKRaftControllerQuorum in
   # pkg/util/kafka/const.go). When unset, this is exactly today's static-quorum format command.
   FORMAT_ARGS=(--cluster-id="${CLUSTER_ID}" --ignore-formatted)
   if [[ -n "${KRAFT_STORAGE_FORMAT_FLAG}" ]]; then
