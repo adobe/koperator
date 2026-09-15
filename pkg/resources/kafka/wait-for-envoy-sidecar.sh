@@ -37,14 +37,30 @@ if [[ -n "${CLUSTER_ID}" ]]; then
   # If the storage is already formatted (e.g. broker restarts), the kafka-storage.sh will skip formatting for that storage
   # thus we can safely run the storage format command regardless if the storage has been formatted or not
   echo "Formatting KRaft storage with cluster ID ${CLUSTER_ID}"
-  ${KAFKA_HOME}/bin/kafka-storage.sh format --cluster-id="${CLUSTER_ID}" --ignore-formatted -c /config/broker-config
+
+  # KRAFT_STORAGE_FORMAT_FLAG/KRAFT_ENFORCE_DYNAMIC_QUORUM are only set when this broker has opted
+  # into a dynamic KRaft controller quorum (see DynamicKRaftControllerQuorum in
+  # pkg/util/kafka/const.go). When unset, this is exactly today's static-quorum format command.
+  FORMAT_ARGS=(--cluster-id="${CLUSTER_ID}" --ignore-formatted)
+  if [[ -n "${KRAFT_STORAGE_FORMAT_FLAG}" ]]; then
+    FORMAT_ARGS+=("${KRAFT_STORAGE_FORMAT_FLAG}")
+  fi
+  if [[ "${KRAFT_ENFORCE_DYNAMIC_QUORUM}" == "true" ]]; then
+    # Fail the format instead of silently falling back to a static quorum (Kafka only forms a
+    # dynamic quorum when controller.quorum.voters is absent from the config being formatted).
+    FORMAT_ARGS+=(--feature kraft.version=1)
+  fi
+  ${KAFKA_HOME}/bin/kafka-storage.sh format "${FORMAT_ARGS[@]}" -c /config/broker-config
 
   # Adding or removing controller nodes to the Kafka cluster would trigger cluster rolling upgrade so all the nodes in the cluster are aware of the newly added/removed controllers.
   # When this happens, Kafka's local quorum state file would be outdated since it is static and the Kafka server can't be started with conflicting controllers info (compared to info stored in ConfigMap),
   # so we need to wipe out the local state files before starting the server so the information about the controller nodes is up-to-date with what is stored in ConfigMap
   # (Note: although we don't know if the server start-up is due to scaling up/down of the controller nodes, it is not harmful to remove the quorum state file before the server start-up process
   #  because the server will re-create the quorum state file after it starts up successfully)
-  if [[ -n "${LOG_DIRS}" ]]; then
+  # This only applies to the legacy static quorum: dynamic quorum (KRAFT_STORAGE_FORMAT_FLAG set)
+  # has no such config/disk conflict, since controller membership lives in the replicated
+  # __cluster_metadata log rather than in the ConfigMap, so the wipe is skipped for those nodes.
+  if [[ -z "${KRAFT_STORAGE_FORMAT_FLAG}" && -n "${LOG_DIRS}" ]]; then
     IFS=',' read -ra LOGS <<< "${LOG_DIRS}"
     for LOG in "${LOGS[@]}"; do
       QUORUM_STATE_FILE="${LOG}/kafka/__cluster_metadata-0/quorum-state"
