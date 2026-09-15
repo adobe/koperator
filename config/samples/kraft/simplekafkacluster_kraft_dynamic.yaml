@@ -15,19 +15,13 @@ spec:
   taintedBrokersSelector:
     matchLabels:
       restart: me
-  # kraft.dynamicControllerQuorum.enabled opts every broker/controller into a KIP-853(issues.apache.org/jira/browse/KAFKA-14094) dynamic
+  # kraft.dynamicControllerQuorum.enabled opts every broker/controller into a dynamic
   # KRaft controller quorum (controller.quorum.bootstrap.servers) instead of the legacy static
   # quorum (controller.quorum.voters)
   #
-  # REQUIRED MANUAL STEP: after brokers 1 and 2 come up and are a part (check
-  # `kafka-metadata-quorum.sh --bootstrap-controller <broker-0-controller-address> describe
-  # --replication`, or watch for the JMX raft-state metric consumed by
-  # api/assets/kafka/kraft-controller-healthcheck.sh to report "follower". Until then those
-  # pods will correctly show NotReady), promote each of them into the voting quorum:
+  # REQUIRED MANUAL STEP: after brokers 1 and 2 come up, promote each of them into the voting quorum:
   #   kafka-metadata-quorum.sh --command-config <broker-N's own broker-config> \
-  #     --bootstrap-controller <broker-0-controller-address> add-controller
-  # This is a manual runbook step, not automated by koperator. The same tool's
-  # `remove-controller` subcommand is used to shrink the quorum later.
+  #     --bootstrap-controller <broker-0-controller-address> add-controller.
   readOnlyConfig: |
     auto.create.topics.enable=false
     cruise.control.metrics.topic.auto.create=true
@@ -277,7 +271,7 @@ spec:
       # Location where the Cruise Control frontend is deployed
       webserver.ui.diskpath=./cruise-control-ui/dist/
       # URL path prefix for UI
-      webserver.ui.urlprefix=/*
+      webserver.ui.urlprefix=/*s
       # Time After which request is converted to Async
       webserver.request.maxBlockTimeMs=10000
       # Default Session Expiry Period
