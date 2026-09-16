@@ -15,7 +15,7 @@ spec:
   #   - name: "remote-debug"
   #     containerPort: 5005
   #     protocol: "TCP"
-  # Specify the usable ingress controller, only envoy and istioingress supported can be left blank
+  # Specify the usable ingress controller, only envoy and contour supported can be left blank
   ingressController: "envoy"
   # Specify the zookeeper addresses where the Kafka should store it's metadata
   # This configuration has no impact if the KafkaCluster is under KRaft mode
@@ -306,7 +306,7 @@ spec:
           # defaultIngressConfig describes which ingress configuration to use
           # when non set on the brokerIngressMapping field inside BrokerConfig
           defaultIngressConfig: "az2"
-          # ingressConfig bundles the two available ingress configuration envoy and istio ingress
+          # ingressConfig bundles the available ingress configurations (envoy and contour)
           ingressConfig:
             # Ingress config name should be unique per external listener
             ingress-az1:
@@ -366,42 +366,6 @@ spec:
                 # If specified and supported by the platform, traffic through the
                 # cloud-provider load-balancer will be restricted to the specified client
                 # IPs. This field will be ignored if the
-                # cloud-provider does not support the feature."
-                # More info: https://kubernetes.io/docs/tasks/access-application-cluster/configure-cloud-provider-firewall/
-                # loadBalancerSourceRanges:
-            ingress-az1-istio:
-              istioIngressConfig:
-                # annotations can be used to place annotations on the istio ingress controller deployment
-                annotations: istio-az1
-                # resourceRequirements works exactly like Container resources, the user can specify the limit and the requests
-                # through this property
-                # resourceRequirements:
-                #  limits:
-                #    memory: "300Mi"
-                #    cpu: "200m"
-                #  requests:
-                #    memory: "300Mi"
-                #    cpu: "200m"
-                #  replicas describes how many pods will be used for the created envoy proxy
-                #  replicas: 1
-
-                # nodeSelector can be specified, which set the pod to fit on a node
-                # nodeSelector:
-
-                # tolerations can be specified, which set the pod's tolerations
-                # tolerations:
-
-                # allows to set the created gateway configuration
-                # gatewayConfig:
-
-                # annotations will be placed on the created virtual service
-                # virtualServiceAnnotations:
-
-                # annotations defines the annotations placed on the envoy ingress controller deployment
-                # annotations:
-
-                # If specified and supported by the platform, this will restrict traffic through the cloud-provider
-                # load-balancer will be restricted to the specified client IPs. This field will be ignored if the
                 # cloud-provider does not support the feature."
                 # More info: https://kubernetes.io/docs/tasks/access-application-cluster/configure-cloud-provider-firewall/
                 # loadBalancerSourceRanges:

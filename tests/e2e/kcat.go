@@ -23,6 +23,11 @@ import (
 	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
+const (
+	// kcatTLSParams defines the TLS parameters for kcat when using SSL security protocol
+	kcatTLSParams = "-X security.protocol=SSL -X ssl.key.location=/ssl/certs/tls.key -X ssl.certificate.location=/ssl/certs/tls.crt -X ssl.ca.location=/ssl/certs/ca.crt"
+)
+
 // consumingMessagesInternally consuming messages based on parameters from Kafka cluster.
 // It returns messages in string slice.
 func consumingMessagesInternally(kubectlOptions k8s.KubectlOptions, kcatPodName string, internalKafkaAddress string, topicName string, tlsMode bool) (string, error) {
@@ -30,7 +35,7 @@ func consumingMessagesInternally(kubectlOptions k8s.KubectlOptions, kcatPodName 
 
 	kcatTLSParameters := ""
 	if tlsMode {
-		kcatTLSParameters += "-X security.protocol=SSL -X ssl.key.location=/ssl/certs/tls.key -X ssl.certificate.location=/ssl/certs/tls.crt -X ssl.ca.location=/ssl/certs/ca.crt"
+		kcatTLSParameters += kcatTLSParams
 	}
 
 	consumedMessages, err := k8s.RunKubectlAndGetOutputContextE(ginkgo.GinkgoT(),
@@ -55,7 +60,7 @@ func producingMessagesInternally(kubectlOptions k8s.KubectlOptions, kcatPodName 
 
 	kcatTLSParameters := ""
 	if tlsMode {
-		kcatTLSParameters += "-X security.protocol=SSL -X ssl.key.location=/ssl/certs/tls.key -X ssl.certificate.location=/ssl/certs/tls.crt -X ssl.ca.location=/ssl/certs/ca.crt"
+		kcatTLSParameters += kcatTLSParams
 	}
 
 	_, err := k8s.RunKubectlAndGetOutputContextE(ginkgo.GinkgoT(),
