@@ -40,7 +40,7 @@ import (
 	properties "github.com/banzaicloud/koperator/properties/pkg"
 )
 
-func (r *Reconciler) getConfigProperties(bConfig *v1beta1.BrokerConfig, broker v1beta1.Broker, quorumVoters []string,
+func (r *Reconciler) getConfigProperties(bConfig *v1beta1.BrokerConfig, broker v1beta1.Broker, quorumVoters, quorumBootstrapServers []string,
 	extListenerStatuses, intListenerStatuses, controllerIntListenerStatuses map[string]v1beta1.ListenerStatusList,
 	serverPasses map[string]string, clientPass string, superUsers []string, log logr.Logger) *properties.Properties {
 	config := properties.NewProperties()
@@ -69,7 +69,7 @@ func (r *Reconciler) getConfigProperties(bConfig *v1beta1.BrokerConfig, broker v
 
 	// Kafka Broker configurations
 	if r.KafkaCluster.Spec.KRaftMode {
-		configureBrokerKRaftMode(bConfig, broker.Id, r.KafkaCluster, config, quorumVoters, serverPasses, extListenerStatuses, intListenerStatuses, log, brokerReadOnlyConfig)
+		configureBrokerKRaftMode(bConfig, broker.Id, r.KafkaCluster, config, quorumVoters, quorumBootstrapServers, serverPasses, extListenerStatuses, intListenerStatuses, log, brokerReadOnlyConfig)
 	} else {
 		configureBrokerZKMode(broker.Id, r.KafkaCluster, config, extListenerStatuses, intListenerStatuses, controllerIntListenerStatuses, log)
 	}
@@ -157,7 +157,7 @@ func (r *Reconciler) configCCMetricsReporter(broker v1beta1.Broker, bConfig *v1b
 }
 
 func configureBrokerKRaftMode(bConfig *v1beta1.BrokerConfig, brokerID int32, kafkaCluster *v1beta1.KafkaCluster, config *properties.Properties,
-	quorumVoters []string, serverPasses map[string]string, extListenerStatuses, intListenerStatuses map[string]v1beta1.ListenerStatusList, log logr.Logger,
+	quorumVoters, quorumBootstrapServers []string, serverPasses map[string]string, extListenerStatuses, intListenerStatuses map[string]v1beta1.ListenerStatusList, log logr.Logger,
 	brokerReadOnlyConfig *properties.Properties) {
 	controllerListenerName := generateControlPlaneListener(kafkaCluster.Spec.ListenersConfig.InternalListeners)
 
@@ -185,8 +185,14 @@ func configureBrokerKRaftMode(bConfig *v1beta1.BrokerConfig, brokerID int32, kaf
 	}
 
 	if shouldConfigureControllerQuorumForBroker(brokerReadOnlyConfig) {
-		if err := config.Set(kafkautils.KafkaConfigControllerQuorumVoters, quorumVoters); err != nil {
-			log.Error(err, fmt.Sprintf(kafkautils.BrokerConfigErrorMsgTemplate, kafkautils.KafkaConfigControllerQuorumVoters))
+		if shouldUseDynamicKRaftQuorum(brokerReadOnlyConfig) {
+			if err := config.Set(kafkautils.KafkaConfigControllerQuorumBootstrapServers, quorumBootstrapServers); err != nil {
+				log.Error(err, fmt.Sprintf(kafkautils.BrokerConfigErrorMsgTemplate, kafkautils.KafkaConfigControllerQuorumBootstrapServers))
+			}
+		} else {
+			if err := config.Set(kafkautils.KafkaConfigControllerQuorumVoters, quorumVoters); err != nil {
+				log.Error(err, fmt.Sprintf(kafkautils.BrokerConfigErrorMsgTemplate, kafkautils.KafkaConfigControllerQuorumVoters))
+			}
 		}
 
 		if controllerListenerName != "" {
@@ -253,6 +259,14 @@ func shouldUseKRaftModeForBroker(brokerReadOnlyConfig *properties.Properties) bo
 func shouldConfigureControllerQuorumForBroker(brokerReadOnlyConfig *properties.Properties) bool {
 	migrationBrokerControllerQuorumConfigEnabled, found := brokerReadOnlyConfig.Get(kafkautils.MigrationBrokerControllerQuorumConfigEnabled)
 	return !found || migrationBrokerControllerQuorumConfigEnabled.Value() == configValueTrue
+}
+
+// shouldUseDynamicKRaftQuorum returns true only when DynamicKRaftControllerQuorum is set
+// to 'true'. It defaults to false (static quorum) when absent, so
+// existing static-quorum clusters will continue to remain static.
+func shouldUseDynamicKRaftQuorum(brokerReadOnlyConfig *properties.Properties) bool {
+	dynamicKRaftControllerQuorum, found := brokerReadOnlyConfig.Get(kafkautils.DynamicKRaftControllerQuorum)
+	return found && dynamicKRaftControllerQuorum.Value() == configValueTrue
 }
 
 func configureBrokerZKMode(brokerID int32, kafkaCluster *v1beta1.KafkaCluster, config *properties.Properties, extListenerStatuses, intListenerStatuses,
@@ -351,7 +365,7 @@ func generateSuperUsers(users []string) (suStrings []string) {
 	return
 }
 
-func (r *Reconciler) configMap(broker v1beta1.Broker, brokerConfig *v1beta1.BrokerConfig, quorumVoters []string,
+func (r *Reconciler) configMap(broker v1beta1.Broker, brokerConfig *v1beta1.BrokerConfig, quorumVoters, quorumBootstrapServers []string,
 	extListenerStatuses, intListenerStatuses, controllerIntListenerStatuses map[string]v1beta1.ListenerStatusList,
 	serverPasses map[string]string, clientPass string, superUsers []string, log logr.Logger) *corev1.ConfigMap {
 	brokerConf := &corev1.ConfigMap{
@@ -363,7 +377,7 @@ func (r *Reconciler) configMap(broker v1beta1.Broker, brokerConfig *v1beta1.Brok
 			),
 			r.KafkaCluster,
 		),
-		Data: map[string]string{kafkautils.ConfigPropertyName: r.generateBrokerConfig(broker, brokerConfig, quorumVoters, extListenerStatuses,
+		Data: map[string]string{kafkautils.ConfigPropertyName: r.generateBrokerConfig(broker, brokerConfig, quorumVoters, quorumBootstrapServers, extListenerStatuses,
 			intListenerStatuses, controllerIntListenerStatuses, serverPasses, clientPass, superUsers, log)},
 	}
 	if brokerConfig.Log4jConfig != "" {
@@ -612,13 +626,13 @@ func mergeSuperUsersPropertyValue(source *properties.Properties, target *propert
 	return ""
 }
 
-func (r Reconciler) generateBrokerConfig(broker v1beta1.Broker, brokerConfig *v1beta1.BrokerConfig, quorumVoters []string,
+func (r Reconciler) generateBrokerConfig(broker v1beta1.Broker, brokerConfig *v1beta1.BrokerConfig, quorumVoters, quorumBootstrapServers []string,
 	extListenerStatuses, intListenerStatuses, controllerIntListenerStatuses map[string]v1beta1.ListenerStatusList,
 	serverPasses map[string]string, clientPass string, superUsers []string, log logr.Logger) string {
 	finalBrokerConfig := getBrokerReadOnlyConfig(broker, r.KafkaCluster, log)
 
 	// Get operator generated configuration
-	opGenConf := r.getConfigProperties(brokerConfig, broker, quorumVoters, extListenerStatuses, intListenerStatuses,
+	opGenConf := r.getConfigProperties(brokerConfig, broker, quorumVoters, quorumBootstrapServers, extListenerStatuses, intListenerStatuses,
 		controllerIntListenerStatuses, serverPasses, clientPass, superUsers, log)
 
 	// Merge operator generated configuration to the final one
@@ -636,6 +650,7 @@ func (r Reconciler) generateBrokerConfig(broker v1beta1.Broker, brokerConfig *v1
 	// Remove the migration broker configuration since its only used as flags to derive other configs
 	finalBrokerConfig.Delete(kafkautils.MigrationBrokerControllerQuorumConfigEnabled)
 	finalBrokerConfig.Delete(kafkautils.MigrationBrokerKRaftMode)
+	finalBrokerConfig.Delete(kafkautils.DynamicKRaftControllerQuorum)
 
 	finalBrokerConfig.Sort()
 
