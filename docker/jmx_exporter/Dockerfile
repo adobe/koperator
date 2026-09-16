@@ -1,4 +1,4 @@
-ARG JMX_EXPORTER_VERSION=v1.6.0 # renovate: datasource=github-releases depName=prometheus/jmx_exporter
+ARG JMX_EXPORTER_VERSION=1.6.0 # renovate: datasource=github-releases depName=prometheus/jmx_exporter
 
 FROM maven:3-amazoncorretto-21@sha256:81de222c1f34ac467bf968e1800b73fb41e714427c0212ba004296ea972e808a AS build
 ARG JMX_EXPORTER_VERSION
