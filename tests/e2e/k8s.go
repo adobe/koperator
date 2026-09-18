@@ -32,6 +32,8 @@ import (
 	"github.com/Masterminds/sprig/v3"
 	"github.com/cisco-open/k8s-objectmatcher/patch"
 	"github.com/gruntwork-io/terratest/modules/k8s"
+	"github.com/gruntwork-io/terratest/modules/logger"
+	"github.com/gruntwork-io/terratest/modules/shell"
 	ginkgo "github.com/onsi/ginkgo/v2"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -621,33 +623,34 @@ func getK8sResourcesQuiet(kubectlOptions k8s.KubectlOptions, resourceKind []stri
 // runKubectlWithStdin executes a kubectl command with the given string piped to its stdin and
 // returns only what the command wrote to stdout.
 //
-// terratest's kubectl helpers cannot supply stdin, which "kcl produce" requires (it reads records
-// from stdin and has no flag to pass a value on the command line). stdout and stderr are captured
-// separately so the caller compares against the records kcl printed, not against kubectl's own
-// chatter (for example the "pod deleted" line that --rm writes to stderr).
+// The k8s.RunKubectl* helpers are unsuitable here on two counts: they never set shell.Command.Stdin,
+// which "kcl produce" requires (it reads records from stdin and has no flag to pass a value on the
+// command line), and they return stdout and stderr combined, which would mix kcl's progress notes
+// ("waiting for new records...") into the records a consuming pod returns. terratest's underlying
+// shell package supports both, so it is used directly rather than shelling out by hand.
 //
 // Unlike runKubectlSilent, no arguments are appended after the caller's: kubectl run forwards
 // everything following a bare "--" to the container, so a trailing --namespace/--context could end
 // up being interpreted by the containerized command instead of by kubectl.
 func runKubectlWithStdin(kubectlOptions k8s.KubectlOptions, stdin string, args ...string) (string, error) {
-	cmd := exec.Command("kubectl", args...)
-
+	command := shell.Command{
+		Command: "kubectl",
+		Args:    args,
+		Logger:  logger.Discard,
+	}
+	if os.Getenv("E2E_VERBOSE_LOGGING") == verboseLoggingEnabled {
+		command.Logger = kubectlOptions.Logger
+	}
 	if kubectlOptions.ConfigPath != "" {
-		cmd.Env = append(os.Environ(), fmt.Sprintf("KUBECONFIG=%s", kubectlOptions.ConfigPath))
+		command.Env = map[string]string{"KUBECONFIG": kubectlOptions.ConfigPath}
 	}
 	if stdin != "" {
-		cmd.Stdin = strings.NewReader(stdin)
+		command.Stdin = strings.NewReader(stdin)
 	}
 
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("kubectl %s failed: %w: %s", strings.Join(args, " "), err, stderr.String())
-	}
-
-	return stdout.String(), nil
+	// On failure the returned error is a shell.ErrWithCmdOutput carrying both streams, so kcl's own
+	// message survives into the test failure.
+	return shell.RunCommandContextAndGetStdOutE(ginkgo.GinkgoT(), context.Background(), &command)
 }
 
 // runKubectlSilent executes kubectl command silently without any logging
