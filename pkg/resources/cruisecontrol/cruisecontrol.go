@@ -38,18 +38,19 @@ import (
 )
 
 const (
-	componentNameTemplate                                = "%s-cruisecontrol"
-	serviceNameTemplate                                  = "%s-cruisecontrol-svc"
-	configAndVolumeNameTemplate                          = "%s-cruisecontrol-config"
-	deploymentNameTemplate                               = "%s-cruisecontrol"
-	keystoreVolume                                       = "ks-files"
-	keystoreVolumePath                                   = "/var/run/secrets/java.io/keystores"
-	jmxVolumePath                                        = "/opt/jmx-exporter/"
-	jmxVolumeName                                        = "jmx-jar-data"
-	metricsPort                                          = 9020
-	capacityConfigAnnotation                             = "cruise-control.banzaicloud.com/broker-capacity-config"
-	staticCapacityConfig        CapacityConfigAnnotation = "static"
-	warnLevel                                            = -1
+	componentNameTemplate                                 = "%s-cruisecontrol"
+	serviceNameTemplate                                   = "%s-cruisecontrol-svc"
+	configAndVolumeNameTemplate                           = "%s-cruisecontrol-config"
+	deploymentNameTemplate                                = "%s-cruisecontrol"
+	keystoreVolume                                        = "ks-files"
+	keystoreVolumePath                                    = "/var/run/secrets/java.io/keystores"
+	jmxVolumePath                                         = "/opt/jmx-exporter/"
+	jmxVolumeName                                         = "jmx-jar-data"
+	metricsPort                                           = 9020
+	capacityConfigAnnotation                              = "cruise-control.banzaicloud.com/broker-capacity-config"
+	staticCapacityConfig         CapacityConfigAnnotation = "static"
+	warnLevel                                             = -1
+	capacityConfigDegradedReason                          = "CruiseControlCapacityConfigDegraded"
 )
 
 type CapacityConfigAnnotation string
