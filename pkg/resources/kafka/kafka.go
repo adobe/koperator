@@ -56,7 +56,7 @@ import (
 	certutil "github.com/banzaicloud/koperator/pkg/util/cert"
 	contourutils "github.com/banzaicloud/koperator/pkg/util/contour"
 	envoyutils "github.com/banzaicloud/koperator/pkg/util/envoy"
-	"github.com/banzaicloud/koperator/pkg/util/kafka"
+	kafkautils "github.com/banzaicloud/koperator/pkg/util/kafka"
 	pkicommon "github.com/banzaicloud/koperator/pkg/util/pki"
 )
 
@@ -197,7 +197,7 @@ func getCreatedPvcForBroker(
 	brokerPvcs := make([]corev1.PersistentVolumeClaim, 0, len(foundPvcList.Items))
 	for i := range foundPvcList.Items {
 		mountPath := foundPvcList.Items[i].GetAnnotations()[mountPathAnnotationKey]
-		if _, desired := desiredMountPaths[mountPath]; desired || keepRemovedVolume(volumeStates, mountPath) {
+		if _, desired := desiredMountPaths[mountPath]; desired || kafkautils.KeepRemovedVolume(volumeStates, mountPath) {
 			brokerPvcs = append(brokerPvcs, foundPvcList.Items[i])
 		}
 	}
@@ -1670,7 +1670,7 @@ func (r *Reconciler) getK8sAssignedNodeport(log logr.Logger, eListenerName strin
 		banzaiv1beta1.BrokerIdLabelKey, brokerId, "listenerName", eListenerName)
 	nodePortSvc := &corev1.Service{}
 	err := r.Get(context.Background(),
-		types.NamespacedName{Name: fmt.Sprintf(kafka.NodePortServiceTemplate,
+		types.NamespacedName{Name: fmt.Sprintf(kafkautils.NodePortServiceTemplate,
 			r.KafkaCluster.GetName(), brokerId, eListenerName),
 			Namespace: r.KafkaCluster.GetNamespace()}, nodePortSvc)
 	if err != nil {
