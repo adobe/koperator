@@ -18,10 +18,12 @@ package cruisecontrol
 import (
 	"encoding/json"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/go-logr/logr"
+	"github.com/go-logr/logr/funcr"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
@@ -759,8 +761,15 @@ func TestGenerateCapacityConfigKeepsDiskPendingRemoval(t *testing.T) {
 	}
 }
 
+// TestGenerateCapacityConfigFallsBackWhenExactCapacityIsUnavailable asserts the non-wedging contract:
+// when the pending disk's exact previous capacity cannot be recovered (no ConfigMap, no capacity.json,
+// malformed capacity.json, or an entry that simply lacks the disk), generation must NOT fail. A hard
+// error here has no self-healing path -- nothing ever repopulates the missing size -- so Cruise Control
+// reconciliation would stay broken until someone hand-edits the ConfigMap. Instead the disk is kept
+// with a fallback capacity and the degradation is logged as an error.
+//
 //nolint:funlen
-func TestGenerateCapacityConfigRequiresExactCapacityForPendingDisk(t *testing.T) {
+func TestGenerateCapacityConfigFallsBackWhenExactCapacityIsUnavailable(t *testing.T) {
 	quantity, _ := resource.ParseQuantity("10Gi")
 	kafkaCluster := v1beta1.KafkaCluster{
 		Spec: v1beta1.KafkaClusterSpec{
@@ -840,11 +849,99 @@ func TestGenerateCapacityConfigRequiresExactCapacityForPendingDisk(t *testing.T)
 	for _, test := range testCases {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
-			_, err := GenerateCapacityConfig(&kafkaCluster, logr.Discard(), test.oldConfig)
-			if err == nil {
-				t.Fatal("expected an error when exact prior capacity for pending disk is unavailable")
+			logSink, capturedLog := newCapturingLogger()
+			rawStringActual, err := GenerateCapacityConfig(&kafkaCluster, logSink, test.oldConfig)
+			if err != nil {
+				t.Fatal("expected a degraded capacity config rather than an error, got:", err)
+			}
+
+			var actual JBODInvariantCapacityConfig
+			if err := json.Unmarshal([]byte(rawStringActual), &actual); err != nil {
+				t.Fatal("could not unmarshal actual json:", err)
+			}
+			brokerCapacityMap, ok := actual.Capacities[0].(map[string]interface{})
+			if !ok {
+				t.Fatal("could not cast broker capacity to map")
+			}
+			diskMap, ok := brokerCapacityMap["capacity"].(map[string]interface{})["DISK"].(map[string]interface{})
+			if !ok {
+				t.Fatal("could not cast DISK to map")
+			}
+
+			// The disk must still be present (otherwise Cruise Control reports "Missing disk
+			// information" for a log dir the broker still actively uses) with the fallback capacity
+			// of the broker's largest desired disk.
+			size, found := diskMap["/kafka-logs3/kafka"]
+			if !found {
+				t.Fatal("expected disk pending removal /kafka-logs3/kafka to be kept with a fallback capacity")
+			}
+			if size != "10737" {
+				t.Errorf("expected fallback capacity 10737 (largest desired disk), got %v", size)
+			}
+			if _, found := diskMap["/kafka-logs1/kafka"]; !found {
+				t.Error("expected desired disk /kafka-logs1/kafka to be present")
+			}
+
+			// Since the fallback is invisible to reconciliation, it must at least be logged as an
+			// error naming the affected disk, its pending state and the substituted capacity.
+			logged := capturedLog.String()
+			if !strings.Contains(logged, ErrCapacityDegraded.Error()) {
+				t.Errorf("expected the capacity degradation to be logged as an error, got: %s", logged)
+			}
+			for _, want := range []string{"/kafka-logs3", string(v1beta1.GracefulDiskRemovalRunning), "10737"} {
+				if !strings.Contains(logged, want) {
+					t.Errorf("expected %q in the logged degradation, got: %s", want, logged)
+				}
 			}
 		})
+	}
+}
+
+// TestGenerateCapacityConfigFallsBackToMinimumWithoutDesiredDisks covers the corner case where the
+// broker has no desired disk left to borrow a fallback capacity from, so MinLogDirSizeInMB is used.
+// The point is still that the disk stays listed and reconciliation keeps making progress.
+func TestGenerateCapacityConfigFallsBackToMinimumWithoutDesiredDisks(t *testing.T) {
+	kafkaCluster := v1beta1.KafkaCluster{
+		Spec: v1beta1.KafkaClusterSpec{
+			Brokers: []v1beta1.Broker{
+				{Id: 0, BrokerConfig: &v1beta1.BrokerConfig{}},
+			},
+		},
+		Status: v1beta1.KafkaClusterStatus{
+			BrokersState: map[string]v1beta1.BrokerState{
+				"0": {
+					GracefulActionState: v1beta1.GracefulActionState{
+						VolumeStates: map[string]v1beta1.VolumeState{
+							"/kafka-logs3": {
+								CruiseControlVolumeState: v1beta1.GracefulDiskRemovalRunning,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	rawStringActual, err := GenerateCapacityConfig(&kafkaCluster, logr.Discard(), nil)
+	if err != nil {
+		t.Fatal("expected a degraded capacity config rather than an error, got:", err)
+	}
+
+	var actual JBODInvariantCapacityConfig
+	if err := json.Unmarshal([]byte(rawStringActual), &actual); err != nil {
+		t.Fatal("could not unmarshal actual json:", err)
+	}
+	brokerCapacityMap, ok := actual.Capacities[0].(map[string]interface{})
+	if !ok {
+		t.Fatal("could not cast broker capacity to map")
+	}
+	diskMap, ok := brokerCapacityMap["capacity"].(map[string]interface{})["DISK"].(map[string]interface{})
+	if !ok {
+		t.Fatal("could not cast DISK to map")
+	}
+	expected := strconv.FormatInt(MinLogDirSizeInMB, 10)
+	if diskMap["/kafka-logs3/kafka"] != expected {
+		t.Errorf("expected fallback capacity %s, got %v", expected, diskMap["/kafka-logs3/kafka"])
 	}
 }
 
@@ -1100,6 +1197,16 @@ func TestGenerateCapacityConfigIsIdempotentAcrossReconciles(t *testing.T) {
 	if secondPass != thirdPass {
 		t.Errorf("expected capacity config to remain stable on a third reconcile, but it changed:\nsecond:\n%s\nthird:\n%s", secondPass, thirdPass)
 	}
+}
+
+// newCapturingLogger returns a logger that records everything written to it, so tests can assert that
+// a deliberately non-fatal degradation is still reported to the operator.
+func newCapturingLogger() (logr.Logger, *strings.Builder) {
+	captured := &strings.Builder{}
+	logger := funcr.New(func(prefix, args string) {
+		captured.WriteString(prefix + args + "\n")
+	}, funcr.Options{})
+	return logger, captured
 }
 
 //nolint:funlen
