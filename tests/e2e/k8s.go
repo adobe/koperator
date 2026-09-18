@@ -618,6 +618,38 @@ func getK8sResourcesQuiet(kubectlOptions k8s.KubectlOptions, resourceKind []stri
 	return kubectlRemoveWarnings(outputSlice), nil
 }
 
+// runKubectlWithStdin executes a kubectl command with the given string piped to its stdin and
+// returns only what the command wrote to stdout.
+//
+// terratest's kubectl helpers cannot supply stdin, which "kcl produce" requires (it reads records
+// from stdin and has no flag to pass a value on the command line). stdout and stderr are captured
+// separately so the caller compares against the records kcl printed, not against kubectl's own
+// chatter (for example the "pod deleted" line that --rm writes to stderr).
+//
+// Unlike runKubectlSilent, no arguments are appended after the caller's: kubectl run forwards
+// everything following a bare "--" to the container, so a trailing --namespace/--context could end
+// up being interpreted by the containerized command instead of by kubectl.
+func runKubectlWithStdin(kubectlOptions k8s.KubectlOptions, stdin string, args ...string) (string, error) {
+	cmd := exec.Command("kubectl", args...)
+
+	if kubectlOptions.ConfigPath != "" {
+		cmd.Env = append(os.Environ(), fmt.Sprintf("KUBECONFIG=%s", kubectlOptions.ConfigPath))
+	}
+	if stdin != "" {
+		cmd.Stdin = strings.NewReader(stdin)
+	}
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("kubectl %s failed: %w: %s", strings.Join(args, " "), err, stderr.String())
+	}
+
+	return stdout.String(), nil
+}
+
 // runKubectlSilent executes kubectl command silently without any logging
 // This is used to avoid JSON output pollution in logs during snapshotting operations
 func runKubectlSilent(kubectlOptions k8s.KubectlOptions, args ...string) (string, error) {

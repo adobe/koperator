@@ -47,7 +47,7 @@ const (
 	testInternalTopicName = "topic-test-internal"
 
 	defaultTLSSecretName       = "kafka-ca-certificate"
-	kcatName                   = "kcat"
+	kclName                    = "kcl"
 	zookeeperKind              = "zookeeperclusters.zookeeper.pravega.io"
 	zookeeperClusterName       = "zookeeper-server"
 	managedByHelmLabelTemplate = "app.kubernetes.io/managed-by=Helm,app.kubernetes.io/instance=%s"
@@ -62,7 +62,11 @@ const (
 	defaultUserCreationWaitTime            = 60 * time.Second  // Increased for kind environments
 	kafkaClusterCreateTimeout              = 1800 * time.Second
 	kafkaClusterResourceCleanupTimeout     = 600 * time.Second
-	kcatDeleetionTimeout                   = 120 * time.Second // Increased for kind environments
+	kclPodRunningTimeout                   = 180 * time.Second // Time kubectl run waits for the one-shot kcl pod to start (image pull included)
+	kclConsumeTimeout                      = 60 * time.Second  // kcl consume --timeout: bounds the wait for a record so a missing message fails the assertion instead of hanging
+	kclPodCompletionTimeout                = 120 * time.Second // Must exceed kclConsumeTimeout: kcl exits on its own when that elapses, and only then is its output complete
+	kclPodDeletionTimeout                  = 120 * time.Second // Increased for kind environments
+	kclPodPhasePollInterval                = 2 * time.Second   // How often the one-shot kcl pod is polled for a terminal phase
 	zookeeperClusterCreateTimeout          = 10 * time.Minute  // Increased for kind environments
 	zookeeperClusterResourceCleanupTimeout = 180 * time.Second // Increased for kind environments
 	externalConsumerTimeout                = 120 * time.Second // Increased for kind environments
@@ -70,10 +74,14 @@ const (
 
 	zookeeperClusterReplicaCount = 1
 
-	kcatPodTemplate          = "templates/kcat.yaml.tmpl"
 	kafkaTopicTemplate       = "templates/topic.yaml.tmpl"
 	kafkaUserTemplate        = "templates/user.yaml.tmpl"
 	zookeeperClusterTemplate = "templates/zookeeper_cluster.yaml.tmpl"
+
+	// kclImageRepository is the upstream kcl image; the tag lives in versions.go so Renovate tracks it.
+	kclImageRepository = "ghcr.io/twmb/kcl"
+	kclTLSVolumeName   = "sslcerts"
+	kclTLSMountPath    = "/ssl/certs"
 
 	kubectlNotFoundErrorMsg = "NotFound"
 
