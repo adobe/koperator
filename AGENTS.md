@@ -4,8 +4,8 @@
 
 **Koperator** is a Kubernetes operator for managing Apache Kafka clusters on Kubernetes. Originally developed by Cisco/Banzai Cloud, now maintained by Adobe.
 
-- **Language**: Go 1.25
-- **Framework**: Kubebuilder v2 with controller-runtime v0.22.4
+- **Language**: Go
+- **Framework**: Kubebuilder v2 with controller-runtime
 - **Primary CRD**: `KafkaCluster` (v1beta1)
 - **Key Features**: Fine-grained broker management, Cruise Control integration, multiple ingress options (Envoy, Istio, Contour)
 
