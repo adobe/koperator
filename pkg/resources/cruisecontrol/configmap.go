@@ -153,7 +153,35 @@ type JBODInvariantCapacityConfig struct {
 	Capacities []interface{} `json:"brokerCapacities"`
 }
 
-// GenerateCapacityConfig generates a CC capacity config with default values or returns the manually overridden value if it exists
+type previousBrokerCapacity struct {
+	raw       json.RawMessage
+	diskSizes map[string]string
+}
+
+// ErrCapacityDegraded is logged (never returned) for a disk that had to be kept in Cruise Control's
+// capacity config while its removal/rebalance is pending, but whose exact capacity could not be
+// recovered from the previous capacity.json, so a fallback size was used instead. Cruise Control's
+// capacity model is then temporarily inaccurate for that one disk, which is materially less harmful
+// than failing the whole reconcile: the disk is being drained anyway, so its capacity ceiling barely
+// matters, while a hard error would wedge Cruise Control reconciliation with no self-healing path (the
+// missing size is never repopulated by anything else).
+var ErrCapacityDegraded = errors.New("could not recover exact capacity for a disk pending a Cruise Control operation, using a fallback capacity until it completes")
+
+// GenerateCapacityConfig generates a CC capacity config with default values or returns the manually overridden value if it exists.
+// If an old config is available, it is used in two additive ways so Cruise Control's capacity.json
+// never disagrees with what the broker/Kafka are actually still using:
+//   - for brokers still present in the desired spec, per-broker disk sizes are recovered from the old
+//     config to additively keep disks whose Cruise Control disk removal/rebalance is still in progress
+//     (see generateBrokerDisks);
+//   - for brokers no longer present in the desired spec (broker deletion in progress), the old config's
+//     full broker capacity entry is reused as-is instead of inventing default/placeholder values, since
+//     regenerating from spec is not possible once the broker has been removed from it.
+//
+// Brokers covered by a user-provided Spec.CruiseControlConfig.CapacityConfig entry are left entirely to
+// that user-provided config and are therefore NOT subject to the disk-keeping logic above: if such a
+// broker has a disk removal/rebalance in progress, the user is responsible for keeping the disk listed
+// in their pinned capacity config until it completes, otherwise Cruise Control reports
+// "Missing disk information" for the still-mounted log dir.
 func GenerateCapacityConfig(kafkaCluster *v1beta1.KafkaCluster, log logr.Logger, config *corev1.ConfigMap) (string, error) {
 	var err error
 
@@ -190,18 +218,23 @@ func GenerateCapacityConfig(kafkaCluster *v1beta1.KafkaCluster, log logr.Logger,
 			userConfigBrokerIds = append(userConfigBrokerIds, brokerId)
 		}
 	}
-	// During cluster downscale the CR does not contain data for brokers being downscaled which is
-	// required to generate the proper capacity json for CC so we are reusing the old one.
-	// We can only remove brokers from capacity config when they were removed (pods deleted) from CC as well.
+
+	// Recover the old per-broker capacity so it can be reused/merged below: full entries for brokers no
+	// longer in the desired spec (broker deletion in progress), and just disk sizes for brokers still in
+	// spec whose disk removal/rebalance is in progress.
+	var oldBrokerCapacities map[string]previousBrokerCapacity
 	if config != nil {
 		if data, ok := config.Data["capacity.json"]; ok {
-			return data, err
+			oldBrokerCapacities, err = parseCapacityConfigBrokerCapacities(data, log)
+			if err != nil {
+				log.Error(err, "could not parse old Cruise Control capacity config, disks pending removal may not be preserved")
+			}
 		}
 	}
 
 	// If there was no user provided config we shall generate all configuration or
 	// adding generated values to all Brokers not provided by the user.
-	brokerCapacities, err := appendGeneratedBrokerCapacities(kafkaCluster, log, userConfigBrokerIds)
+	brokerCapacities, err := appendGeneratedBrokerCapacities(kafkaCluster, log, userConfigBrokerIds, oldBrokerCapacities)
 	if err != nil {
 		return "", err
 	}
@@ -212,10 +245,10 @@ func GenerateCapacityConfig(kafkaCluster *v1beta1.KafkaCluster, log logr.Logger,
 		return "", errors.WrapIf(err, "could not marshal cruise control capacity config")
 	}
 	log.V(2).Info("broker capacity config generated successfully", "capacity config", string(result))
-	return string(result), err
+	return string(result), nil
 }
 
-func appendGeneratedBrokerCapacities(kafkaCluster *v1beta1.KafkaCluster, log logr.Logger, userConfigBrokerIds []string) ([]interface{}, error) {
+func appendGeneratedBrokerCapacities(kafkaCluster *v1beta1.KafkaCluster, log logr.Logger, userConfigBrokerIds []string, oldBrokerCapacities map[string]previousBrokerCapacity) ([]interface{}, error) {
 	var brokerCapacities []interface{}
 
 	brokerIdFromStatus := make([]string, 0, len(kafkaCluster.Status.BrokersState))
@@ -239,7 +272,8 @@ func appendGeneratedBrokerCapacities(kafkaCluster *v1beta1.KafkaCluster, log log
 		for _, broker := range kafkaCluster.Spec.Brokers {
 			if brokerId == strconv.Itoa(int(broker.Id)) {
 				brokerFoundInSpec = true
-				brokerDisks, err := generateBrokerDisks(broker, kafkaCluster.Spec, log)
+				volumeStates := kafkaCluster.Status.BrokersState[brokerId].GracefulActionState.VolumeStates
+				brokerDisks, err := generateBrokerDisks(broker, kafkaCluster.Spec, volumeStates, oldBrokerCapacities[brokerId].diskSizes, log)
 				if err != nil {
 					return nil, errors.WrapIfWithDetails(err, "could not generate broker disks config for broker", v1beta1.BrokerIdLabelKey, broker.Id)
 				}
@@ -255,10 +289,16 @@ func appendGeneratedBrokerCapacities(kafkaCluster *v1beta1.KafkaCluster, log log
 				}
 			}
 		}
-		// When removing a broker it still needs to have values assigned in capacity config
-		// although it doesn't really matter what the values are, so we are setting defaults
-		// here, this way we don't have to deal with a universal default.
+		// When removing a broker it still needs to have values assigned in capacity config. Reuse the
+		// broker's last known real capacity entry from the old config if available (it can no longer be
+		// regenerated from spec once the broker has been removed from it), otherwise fall back to
+		// placeholder defaults, since it doesn't really matter what the values are in that case.
 		if !brokerFoundInSpec {
+			if oldCapacity, found := oldBrokerCapacities[brokerId]; found {
+				log.V(1).Info("broker spec not found, reusing last known capacity config", v1beta1.BrokerIdLabelKey, brokerId)
+				brokerCapacities = append(brokerCapacities, oldCapacity.raw)
+				continue
+			}
 			log.Info("broker spec not found, using default fallback")
 			brokerCapacity = generateDefaultBrokerCapacityWithId(brokerId)
 		}
@@ -324,7 +364,24 @@ func generateBrokerCPU(broker v1beta1.Broker, kafkaClusterSpec v1beta1.KafkaClus
 	return strconv.Itoa(int(brokerConfig.GetResources().Limits.Cpu().ScaledValue(-2)))
 }
 
-func generateBrokerDisks(brokerState v1beta1.Broker, kafkaClusterSpec v1beta1.KafkaClusterSpec, log logr.Logger) (map[string]string, error) {
+// generateBrokerDisks computes the DISK map used in Cruise Control's capacity.json for a single
+// broker. Besides the desired storage configs, it additively keeps any disk that is no longer in the
+// desired spec but whose Cruise Control disk removal/rebalance is still in progress
+// (kafkautils.KeepRemovedVolume), mirroring the behavior of the broker's own log.dirs
+// (pkg/resources/kafka/configmap.go) and mounted PVCs (pkg/resources/kafka/kafka.go). Without this,
+// Cruise Control's model would be missing a Disk entry for a log dir that Kafka/the broker pod still
+// actively use, causing a permanent "Missing disk information" error while removal is pending.
+// The exact size for a kept disk is recovered from oldDiskSizes, the previous capacity.json entry for
+// this broker/disk. When that is unavailable (previous ConfigMap deleted, unparseable, or holding a
+// non-JBOD scalar DISK value), generation does NOT fail: it falls back to the largest desired disk of
+// the same broker, or to MinLogDirSizeInMB when the broker has no desired disk left, and reports a
+// CapacityDegradation. A temporarily inaccurate capacity ceiling on a disk that is being drained
+// anyway is far less harmful than a hard error, which would wedge Cruise Control reconciliation
+// permanently: nothing else ever repopulates the missing size, so every later reconcile would fail
+// identically until a human hand-edits the ConfigMap. Omitting the disk is not an option either, as it
+// recreates Cruise Control's permanent "Missing disk information" failure. Because the fallback is
+// silent as far as reconciliation is concerned, it is logged as an error (ErrCapacityDegraded).
+func generateBrokerDisks(brokerState v1beta1.Broker, kafkaClusterSpec v1beta1.KafkaClusterSpec, volumeStates map[string]v1beta1.VolumeState, oldDiskSizes map[string]string, log logr.Logger) (map[string]string, error) {
 	storageConfigs := make(map[string]v1beta1.StorageConfig)
 
 	// Get disks from the BrokerConfigGroup if it's in use
@@ -345,6 +402,7 @@ func generateBrokerDisks(brokerState v1beta1.Broker, kafkaClusterSpec v1beta1.Ka
 
 	// Generate log dir configuration
 	logDirs := make(map[string]string, len(storageConfigs))
+	largestDesiredSize := int64(0)
 	for path, conf := range storageConfigs {
 		size := parseMountPathWithSize(conf)
 		log.V(1).Info(fmt.Sprintf("broker log.dir %s size in MB: %d", path, size), v1beta1.BrokerIdLabelKey, brokerState.Id)
@@ -355,10 +413,96 @@ func generateBrokerDisks(brokerState v1beta1.Broker, kafkaClusterSpec v1beta1.Ka
 		}
 
 		logDir := util.StorageConfigKafkaMountPath(path)
-		logDirs[logDir] = fmt.Sprintf("%d", size)
+		sizeStr := fmt.Sprintf("%d", size)
+		logDirs[logDir] = sizeStr
+		largestDesiredSize = max(largestDesiredSize, size)
+	}
+
+	// Additively keep disks whose removal/rebalance is still in progress, even though they are no
+	// longer part of the desired storage configs above. Iterate in a deterministic order so the
+	// generated ConfigMap (and its content hash) never churns between reconciles.
+	pendingMountPaths := make([]string, 0, len(volumeStates))
+	for mountPath := range volumeStates {
+		pendingMountPaths = append(pendingMountPaths, mountPath)
+	}
+	sort.Strings(pendingMountPaths)
+
+	for _, mountPath := range pendingMountPaths {
+		if _, alreadyPresent := storageConfigs[mountPath]; alreadyPresent {
+			continue
+		}
+		if !kafkautils.KeepRemovedVolume(volumeStates, mountPath) {
+			continue
+		}
+
+		logDir := util.StorageConfigKafkaMountPath(mountPath)
+		if size, ok := oldDiskSizes[logDir]; ok {
+			logDirs[logDir] = size
+			continue
+		}
+
+		// The exact previous capacity is unrecoverable. Keep the disk with a best-effort size rather
+		// than failing the whole Cruise Control reconcile (see the function doc).
+		fallbackSize := max(largestDesiredSize, MinLogDirSizeInMB)
+		fallbackSizeStr := strconv.FormatInt(fallbackSize, 10)
+		logDirs[logDir] = fallbackSizeStr
+		log.Error(ErrCapacityDegraded, "Cruise Control capacity config is temporarily inaccurate for a disk pending removal",
+			v1beta1.BrokerIdLabelKey, brokerState.Id,
+			"mountPath", mountPath,
+			"volumeState", volumeStates[mountPath].CruiseControlVolumeState,
+			"fallbackCapacityMB", fallbackSizeStr)
 	}
 
 	return logDirs, nil
+}
+
+// parseCapacityConfigBrokerCapacities parses a previously generated capacity.json into independent
+// per-broker entries. It preserves each raw entry so supported scalar DISK configurations can be
+// reused for removed brokers, while extracting per-logdir disk sizes only from JBOD entries. It is used to:
+//   - recover the size of a disk that must still be additively kept in the newly generated capacity
+//     config while its Cruise Control disk removal/rebalance is in progress (see generateBrokerDisks);
+//   - reuse the last known real capacity entry, as-is, for a broker that is no longer present in the
+//     desired spec (broker deletion in progress), instead of inventing placeholder values.
+func parseCapacityConfigBrokerCapacities(oldCapacityConfig string, log logr.Logger) (map[string]previousBrokerCapacity, error) {
+	var parsed struct {
+		BrokerCapacities []json.RawMessage `json:"brokerCapacities"`
+	}
+	if err := json.Unmarshal([]byte(oldCapacityConfig), &parsed); err != nil {
+		return nil, errors.Wrap(err, "could not unmarshal old Cruise Control capacity config")
+	}
+
+	capacitiesByBroker := make(map[string]previousBrokerCapacity, len(parsed.BrokerCapacities))
+	for _, rawBrokerCapacity := range parsed.BrokerCapacities {
+		var brokerCapacity struct {
+			BrokerID string `json:"brokerId"`
+			Capacity struct {
+				DISK json.RawMessage `json:"DISK"`
+			} `json:"capacity"`
+		}
+		if err := json.Unmarshal(rawBrokerCapacity, &brokerCapacity); err != nil {
+			// Skipping the entry only degrades this one broker (placeholder values on deletion, or a
+			// fallback disk size), so log it instead of failing the whole config generation.
+			log.V(1).Info("skipping unparseable broker entry in old Cruise Control capacity config",
+				"entry", string(rawBrokerCapacity), "error", err.Error())
+			continue
+		}
+		if brokerCapacity.BrokerID == "" {
+			log.V(1).Info("skipping broker entry without a brokerId in old Cruise Control capacity config",
+				"entry", string(rawBrokerCapacity))
+			continue
+		}
+
+		previousCapacity := previousBrokerCapacity{raw: rawBrokerCapacity}
+		if err := json.Unmarshal(brokerCapacity.Capacity.DISK, &previousCapacity.diskSizes); err != nil {
+			// Non-JBOD (scalar) or absent DISK value: the raw entry is still reusable as-is for a
+			// removed broker, but no per-logdir sizes can be recovered for a pending disk removal.
+			log.V(1).Info("no per-logdir disk sizes recoverable from old Cruise Control capacity config entry",
+				v1beta1.BrokerIdLabelKey, brokerCapacity.BrokerID, "error", err.Error())
+			previousCapacity.diskSizes = nil
+		}
+		capacitiesByBroker[brokerCapacity.BrokerID] = previousCapacity
+	}
+	return capacitiesByBroker, nil
 }
 
 func parseMountPathWithSize(storage v1beta1.StorageConfig) int64 {
