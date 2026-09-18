@@ -26,43 +26,11 @@ import (
 	"github.com/twmb/franz-go/pkg/kgo"
 )
 
-// requireDeployingKcatPod deploys kcat pod form a template and checks the pod readiness
-func requireDeployingKcatPod(kubectlOptions k8s.KubectlOptions, podName string, tlsSecretName string) {
-	ginkgo.It("Deploying Kcat Pod", func() {
-		templateParameters := map[string]interface{}{
-			nameField:      podName,
-			namespaceField: kubectlOptions.Namespace,
-		}
-		if tlsSecretName != "" {
-			templateParameters["TLSSecretName"] = tlsSecretName
-		}
-
-		err := applyK8sResourceFromTemplate(kubectlOptions,
-			kcatPodTemplate,
-			templateParameters,
-		)
-		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
-
-		err = waitK8sResourceCondition(kubectlOptions, podsResource,
-			"condition=Ready", defaultPodReadinessWaitTime, "", podName)
-
-		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
-	})
-}
-
-// requireDeleteKcatPod deletes kcat pod.
-func requireDeleteKcatPod(kubectlOptions k8s.KubectlOptions, podName string) {
-	ginkgo.It("Deleting Kcat pod", func() {
-		err := deleteK8sResource(kubectlOptions, kcatDeleetionTimeout, podsResource, "", podName)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	})
-}
-
-// requireInternalProducingConsumingMessage produces and consumes messages internally through a kcat pod
-// and makes comparisons between the produced and consumed messages.
+// requireInternalProducingConsumingMessage produces and consumes messages internally through
+// short-lived kcl pods and makes comparisons between the produced and consumed messages.
 // When internalAddress parameter is empty, it gets the internal address from the kafkaCluster CR status.
-// When tlsSecretName is set
-func requireInternalProducingConsumingMessage(kubectlOptions k8s.KubectlOptions, internalAddress, kcatPodName, topicName string, tlsSecretName string) {
+// When tlsSecretName is set, the secret is mounted into the kcl pods and mTLS is used.
+func requireInternalProducingConsumingMessage(kubectlOptions k8s.KubectlOptions, internalAddress, topicName string, tlsSecretName string) {
 	ginkgo.It(fmt.Sprintf("Producing and consuming messages to/from topicName: '%s", topicName), func() {
 		if internalAddress == "" {
 			ginkgo.By("Getting Kafka cluster internal addresses")
@@ -89,13 +57,11 @@ func requireInternalProducingConsumingMessage(kubectlOptions k8s.KubectlOptions,
 			internalAddress = internalListenerAddresses[0]
 		}
 
-		tlsMode := tlsSecretName != ""
-
 		currentTime := time.Now()
-		err := producingMessagesInternally(kubectlOptions, kcatPodName, internalAddress, topicName, currentTime.String(), tlsMode)
+		err := producingMessagesInternally(kubectlOptions, internalAddress, topicName, currentTime.String(), tlsSecretName)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		consumedMessages, err := consumingMessagesInternally(kubectlOptions, kcatPodName, internalAddress, topicName, tlsMode)
+		consumedMessages, err := consumingMessagesInternally(kubectlOptions, internalAddress, topicName, tlsSecretName)
 
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(consumedMessages).Should(gomega.ContainSubstring(currentTime.String()))
