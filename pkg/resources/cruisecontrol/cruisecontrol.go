@@ -33,6 +33,7 @@ import (
 	"github.com/banzaicloud/koperator/pkg/kafkaclient"
 	"github.com/banzaicloud/koperator/pkg/resources"
 	certutil "github.com/banzaicloud/koperator/pkg/util/cert"
+	kafkautils "github.com/banzaicloud/koperator/pkg/util/kafka"
 	pkicommon "github.com/banzaicloud/koperator/pkg/util/pki"
 )
 
@@ -111,22 +112,9 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 				return errors.WrapIfWithDetails(err, "failed to reconcile resource", "resource", o.GetObjectKind().GroupVersionKind())
 			}
 
-			var config *corev1.ConfigMap
-			if isBrokerDeletionInProgress(r.KafkaCluster.Status.BrokersState) {
-				key := types.NamespacedName{
-					Name:      fmt.Sprintf(configAndVolumeNameTemplate, r.KafkaCluster.Name),
-					Namespace: r.KafkaCluster.Namespace,
-				}
-				config = &corev1.ConfigMap{}
-				err := r.Get(context.Background(), key, config)
-				if err != nil && !apierrors.IsNotFound(err) {
-					return errorfactory.New(
-						errorfactory.APIFailure{},
-						err,
-						"getting cruise control configmap failed",
-						"name", key.Name,
-					)
-				}
+			config, err := r.getPreviousCapacityConfig(context.Background())
+			if err != nil {
+				return err
 			}
 			capacityConfig, err := GenerateCapacityConfig(r.KafkaCluster, log, config)
 			if err != nil {
@@ -155,6 +143,31 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 	log.V(1).Info("Reconciled")
 
 	return nil
+}
+
+func (r *Reconciler) getPreviousCapacityConfig(ctx context.Context) (*corev1.ConfigMap, error) {
+	brokerState := r.KafkaCluster.Status.BrokersState
+	if !isBrokerDeletionInProgress(brokerState) && !isDiskRemovalOrRebalanceInProgress(brokerState) {
+		return nil, nil
+	}
+
+	key := types.NamespacedName{
+		Name:      fmt.Sprintf(configAndVolumeNameTemplate, r.KafkaCluster.Name),
+		Namespace: r.KafkaCluster.Namespace,
+	}
+	config := &corev1.ConfigMap{}
+	if err := r.Get(ctx, key, config); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, nil
+		}
+		return nil, errorfactory.New(
+			errorfactory.APIFailure{},
+			err,
+			"getting cruise control configmap failed",
+			"name", key.Name,
+		)
+	}
+	return config, nil
 }
 
 func (r *Reconciler) getClientPassword() (string, error) {
@@ -197,6 +210,23 @@ func isBrokerDeletionInProgress(brokerState map[string]v1beta1.BrokerState) bool
 	for _, state := range brokerState {
 		if state.GracefulActionState.CruiseControlState.IsDownscale() {
 			return true
+		}
+	}
+	return false
+}
+
+// isDiskRemovalOrRebalanceInProgress reports whether any broker has a disk removal/rebalance that is
+// not yet confirmed succeeded (see kafkautils.KeepRemovedVolume). When true, the old Cruise Control
+// capacity config must be fetched so its previous disk sizes can be additively kept in the newly
+// generated capacity.json for as long as the removal/rebalance is pending, otherwise Cruise Control's
+// own model would be missing a disk that Kafka/the broker pod still actively use.
+func isDiskRemovalOrRebalanceInProgress(brokerState map[string]v1beta1.BrokerState) bool {
+	for _, state := range brokerState {
+		volumeStates := state.GracefulActionState.VolumeStates
+		for mountPath := range volumeStates {
+			if kafkautils.KeepRemovedVolume(volumeStates, mountPath) {
+				return true
+			}
 		}
 	}
 	return false
