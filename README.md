@@ -11,12 +11,12 @@
 
 <p align="center">
 
-![Go version](https://img.shields.io/github/go-mod/go-version/adobe/koperator/master)
+![Go version](https://img.shields.io/github/go-mod/go-version/adobe/koperator/main)
 [![Go Report Card](https://goreportcard.com/badge/github.com/adobe/koperator)](https://goreportcard.com/report/github.com/adobe/koperator)
-![CI](https://img.shields.io/github/actions/workflow/status/adobe/koperator/ci.yml?branch=master&label=CI)
-![CI](https://img.shields.io/github/actions/workflow/status/adobe/koperator/codeql-analysis.yml?branch=master&label=CodeQL)
-![Image](https://img.shields.io/github/actions/workflow/status/adobe/koperator/e2e-test.yaml?branch=master&label=E2E)
-![Helm chart](https://img.shields.io/github/actions/workflow/status/adobe/koperator/helm.yml?branch=master&label=Helm%20chart)
+![CI](https://img.shields.io/github/actions/workflow/status/adobe/koperator/ci.yml?branch=main&label=CI)
+![CI](https://img.shields.io/github/actions/workflow/status/adobe/koperator/codeql-analysis.yml?branch=main&label=CodeQL)
+![Image](https://img.shields.io/github/actions/workflow/status/adobe/koperator/e2e-test.yaml?branch=main&label=E2E)
+![Helm chart](https://img.shields.io/github/actions/workflow/status/adobe/koperator/helm.yml?branch=main&label=Helm%20chart)
 
 
 </p>
@@ -114,10 +114,10 @@ You can deploy Koperator using a Helm chart from GitHub Container Registry (OCI)
 1. Install the Koperator `CustomResourceDefinition` resources (adjust the version number to the Koperator release you want to install). This is performed in a separate step to allow you to uninstall and reinstall Koperator without deleting your already installed custom resources.
 
 ```sh
-kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_cruisecontroloperations.yaml
-kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_kafkaclusters.yaml
-kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_kafkatopics.yaml
-kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/master/config/base/crds/kafka.banzaicloud.io_kafkausers.yaml
+kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/main/config/base/crds/kafka.banzaicloud.io_cruisecontroloperations.yaml
+kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/main/config/base/crds/kafka.banzaicloud.io_kafkaclusters.yaml
+kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/main/config/base/crds/kafka.banzaicloud.io_kafkatopics.yaml
+kubectl apply -f https://raw.githubusercontent.com/adobe/koperator/refs/heads/main/config/base/crds/kafka.banzaicloud.io_kafkausers.yaml
 ```
 
 2. Install Koperator into the `kafka` namespace using the OCI Helm chart from GitHub Container Registry. Use `--skip-crds` since the CRDs were already installed in the previous step - without it, Helm's own CRD install can conflict with the `kubectl apply` above ([#265](https://github.com/adobe/koperator/issues/265)):
@@ -147,7 +147,7 @@ helm install kafka-operator ./kafka-operator/ --namespace=kafka --create-namespa
 1. Create the Kafka cluster using the `KafkaCluster` custom resource. The quick start uses a minimal custom resource, but there are other examples in the same directory.
 
 ```sh
-kubectl create -n kafka -f https://raw.githubusercontent.com/adobe/koperator/master/config/samples/simplekafkacluster.yaml
+kubectl create -n kafka -f https://raw.githubusercontent.com/adobe/koperator/main/config/samples/simplekafkacluster.yaml
 ```
 
 1. Verify that the Kafka cluster has been created.
@@ -209,7 +209,7 @@ For detailed documentation on the Koperator project, see the [Koperator document
 We use GitHub to track issues and accept contributions.
 If you would like to raise an issue or open a pull request, please refer to our [contribution guide](./CONTRIBUTING.md).
 
-If you use Koperator in a production environment, we encourage you to add yourself to the list of production [adopters](https://github.com/adobe/koperator/blob/master/ADOPTERS.md).
+If you use Koperator in a production environment, we encourage you to add yourself to the list of production [adopters](https://github.com/adobe/koperator/blob/main/ADOPTERS.md).
 
 ## Community
 
