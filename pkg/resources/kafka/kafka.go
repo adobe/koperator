@@ -83,11 +83,13 @@ const (
 	MetricsHealthCheck = "/-/healthy"
 	MetricsPort        = 9020
 
-	metricsPortName        = "metrics"
-	clusterIDEnvVarName    = "CLUSTER_ID"
-	extensionsVolumeName   = "extensions"
-	mountPathAnnotationKey = "mountPath"
-	configValueTrue        = "true"
+	metricsPortName                     = "metrics"
+	clusterIDEnvVarName                 = "CLUSTER_ID"
+	kraftStorageFormatFlagEnvVarName    = "KRAFT_STORAGE_FORMAT_FLAG"
+	kraftEnforceDynamicQuorumEnvVarName = "KRAFT_ENFORCE_DYNAMIC_QUORUM"
+	extensionsVolumeName                = "extensions"
+	mountPathAnnotationKey              = "mountPath"
+	configValueTrue                     = "true"
 
 	// missingBrokerDownScaleRunningPriority the priority is used  for missing brokers where there is an incomplete downscale operation
 	missingBrokerDownScaleRunningPriority brokerReconcilePriority = iota
@@ -390,6 +392,12 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 	}
 
 	var quorumVoters, quorumBootstrapServers []string
+	// standaloneBootstrapControllerID is the controller that formats a brand-new dynamic KRaft quorum
+	// with --standalone; -1 means the quorum is not dynamic, (or it has already been
+	// bootstrapped), in which case a disk-loss controller rejoins as an observer instead of forming a
+	// divergent single-voter quorum.
+	standaloneBootstrapControllerID := int32(-1)
+	dynamicQuorum := false
 	if r.KafkaCluster.Spec.KRaftMode {
 		// all broker nodes under the same Kafka cluster must use the same cluster UUID
 		if r.KafkaCluster.Status.ClusterID == "" {
@@ -433,6 +441,15 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 				"component", componentName,
 				"clusterName", r.KafkaCluster.GetName(),
 				"clusterNamespace", r.KafkaCluster.GetNamespace())
+		}
+
+		// Only the lowest-ID controller bootstraps a brand-new dynamic quorum with --standalone, and only
+		// until the quorum has formed (see the KRaftDynamicQuorumBootstrapped status set after the loop).
+		dynamicQuorum = isDynamicKRaftControllerQuorum(r.KafkaCluster, log)
+		if dynamicQuorum && !r.KafkaCluster.Status.KRaftDynamicQuorumBootstrapped {
+			if minID, ok := minControllerNodeBrokerID(r.KafkaCluster.Spec); ok {
+				standaloneBootstrapControllerID = minID
+			}
 		}
 
 		// In KRaft mode:
@@ -486,7 +503,7 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 				return errors.WrapIfWithDetails(err, "failed to reconcile resource", "resource", o.GetObjectKind().GroupVersionKind())
 			}
 		}
-		o := r.pod(broker.Id, brokerConfig, pvcs, log)
+		o := r.pod(broker.Id, brokerConfig, pvcs, standaloneBootstrapControllerID, log)
 		err = r.reconcileKafkaPod(log, o.(*corev1.Pod), brokerConfig)
 		if err != nil {
 			return err
@@ -511,6 +528,25 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 			"component", componentName,
 			"clusterName", r.KafkaCluster.Name,
 			"clusterNamespace", r.KafkaCluster.Namespace)
+	}
+
+	// Once the dynamic KRaft quorum has formed (any controller pod reports Ready, i.e. a leader/follower
+	// raft state), koperator stops emitting --standalone. After this, a controller that loses
+	// its disk rejoins the existing quorum as an observer instead of bootstrapping a divergent single-voter
+	// quorum (split-brain).
+	if dynamicQuorum && !r.KafkaCluster.Status.KRaftDynamicQuorumBootstrapped && anyControllerPodReady(brokerPods.Items) {
+		r.KafkaCluster.Status.KRaftDynamicQuorumBootstrapped = true
+		if updateErr := r.Client.Status().Update(ctx, r.KafkaCluster); updateErr != nil {
+			if apierrors.IsNotFound(updateErr) {
+				updateErr = r.Update(ctx, r.KafkaCluster)
+			}
+			if updateErr != nil {
+				return errors.WrapIfWithDetails(updateErr, "could not update KRaftDynamicQuorumBootstrapped status",
+					"component", componentName,
+					"clusterName", r.KafkaCluster.Name,
+					"clusterNamespace", r.KafkaCluster.Namespace)
+			}
+		}
 	}
 
 	if err = r.reconcileClusterWideDynamicConfig(); err != nil {
@@ -1850,6 +1886,33 @@ func isPodReady(pod *corev1.Pod) bool {
 	for _, cond := range pod.Status.Conditions {
 		if cond.Type == corev1.PodReady {
 			return cond.Status == corev1.ConditionTrue
+		}
+	}
+	return false
+}
+
+// isDynamicKRaftControllerQuorum reports whether any controller-role broker has opted into a dynamic
+// KRaft controller quorum (kraft.dynamicControllerQuorum.enabled). Evaluated once per reconcile.
+func isDynamicKRaftControllerQuorum(kafkaCluster *banzaiv1beta1.KafkaCluster, log logr.Logger) bool {
+	for _, b := range kafkaCluster.Spec.Brokers {
+		brokerConfig, err := b.GetBrokerConfig(kafkaCluster.Spec)
+		if err != nil {
+			continue
+		}
+		if brokerConfig.IsControllerNode() && shouldUseDynamicKRaftQuorum(getBrokerReadOnlyConfig(b, kafkaCluster, log)) {
+			return true
+		}
+	}
+	return false
+}
+
+// anyControllerPodReady reports whether at least one KRaft controller pod is Ready (reporting a
+// leader/follower raft state), which indicates the dynamic controller quorum has formed.
+func anyControllerPodReady(pods []corev1.Pod) bool {
+	for i := range pods {
+		pod := &pods[i]
+		if pod.Labels[banzaiv1beta1.IsControllerNodeKey] == configValueTrue && isPodReady(pod) {
+			return true
 		}
 	}
 	return false

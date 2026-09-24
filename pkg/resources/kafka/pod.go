@@ -43,7 +43,7 @@ var (
 	envoySidecarScript string
 )
 
-func (r *Reconciler) pod(id int32, brokerConfig *v1beta1.BrokerConfig, pvcs []corev1.PersistentVolumeClaim, log logr.Logger) runtime.Object {
+func (r *Reconciler) pod(id int32, brokerConfig *v1beta1.BrokerConfig, pvcs []corev1.PersistentVolumeClaim, standaloneBootstrapControllerID int32, log logr.Logger) runtime.Object {
 	const kafkaContainerName = "kafka"
 
 	dataVolume, dataVolumeMount := generateDataVolumeAndVolumeMount(pvcs, brokerConfig.StorageConfigs)
@@ -183,7 +183,7 @@ fi`},
 				}
 
 				// see how these env vars are used in wait-for-envoy-sidecars.sh
-				addDynamicKRaftQuorumFormatEnv(r, pod, i, id, brokerConfig, log)
+				addDynamicKRaftQuorumFormatEnv(r, pod, i, id, brokerConfig, standaloneBootstrapControllerID, log)
 				break
 			}
 		}
@@ -213,7 +213,7 @@ func addClusterIdEnv(r *Reconciler, pod *corev1.Pod, i int) {
 // quorum (see DynamicKRaftControllerQuorum / shouldUseDynamicKRaftQuorum). When the flag is absent
 // or false for this broker, nothing is changed from
 // the static-quorum behavior.
-func addDynamicKRaftQuorumFormatEnv(r *Reconciler, pod *corev1.Pod, i int, id int32, brokerConfig *v1beta1.BrokerConfig, log logr.Logger) {
+func addDynamicKRaftQuorumFormatEnv(r *Reconciler, pod *corev1.Pod, i int, id int32, brokerConfig *v1beta1.BrokerConfig, standaloneBootstrapControllerID int32, log logr.Logger) {
 	var broker v1beta1.Broker
 	found := false
 	for _, b := range r.KafkaCluster.Spec.Brokers {
@@ -232,13 +232,17 @@ func addDynamicKRaftQuorumFormatEnv(r *Reconciler, pod *corev1.Pod, i int, id in
 		return
 	}
 
+	// The lowest-ID controller bootstraps the quorum standalone, but only until the quorum has formed;
+	// standaloneBootstrapControllerID is -1 once bootstrapped (see the reconcile loop), so a controller
+	// that later reformats a fresh disk joins with --no-initial-controllers and rejoins as an observer
+	// rather than bootstrapping a divergent single-voter quorum.
 	formatFlag := "--no-initial-controllers"
-	if minID, ok := minControllerNodeBrokerID(r.KafkaCluster.Spec); ok && brokerConfig.IsControllerNode() && id == minID {
+	if brokerConfig.IsControllerNode() && id == standaloneBootstrapControllerID {
 		formatFlag = "--standalone"
 	}
 	pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env,
 		corev1.EnvVar{
-			Name:  "KRAFT_STORAGE_FORMAT_FLAG",
+			Name:  kraftStorageFormatFlagEnvVarName,
 			Value: formatFlag,
 		},
 	)
@@ -248,7 +252,7 @@ func addDynamicKRaftQuorumFormatEnv(r *Reconciler, pod *corev1.Pod, i int, id in
 	if brokerConfig.IsControllerNode() {
 		pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env,
 			corev1.EnvVar{
-				Name:  "KRAFT_ENFORCE_DYNAMIC_QUORUM",
+				Name:  kraftEnforceDynamicQuorumEnvVarName,
 				Value: "true",
 			},
 		)

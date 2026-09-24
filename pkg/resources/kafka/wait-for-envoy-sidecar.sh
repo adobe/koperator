@@ -50,6 +50,7 @@ if [[ -n "${CLUSTER_ID}" ]]; then
     # dynamic quorum when controller.quorum.voters is absent from the config being formatted).
     FORMAT_ARGS+=(--feature kraft.version=1)
   fi
+  echo "Running: kafka-storage.sh format ${FORMAT_ARGS[*]} -c /config/broker-config"
   ${KAFKA_HOME}/bin/kafka-storage.sh format "${FORMAT_ARGS[@]}" -c /config/broker-config
 
   # Adding or removing controller nodes to the Kafka cluster would trigger cluster rolling upgrade so all the nodes in the cluster are aware of the newly added/removed controllers.
