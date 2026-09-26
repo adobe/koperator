@@ -1,6 +1,6 @@
 services:
   zookeeper:
-    image: ghcr.io/adobe/zookeeper-operator/zookeeper:3.8.4-0.2.15-adobe-20260818@sha256:ee0fe4635019797be3f55b3efd806dac307b2a95a4041735128c4fbef7494bbb
+    image: ghcr.io/adobe/zookeeper-operator/zookeeper:3.9.6-0.2.15-adobe-20260924@sha256:4904581857a1c1aea7397942b1cca66deeebb818f1817de4805eef9fe2bc4ff0
     restart: unless-stopped
     hostname: zookeeper
     container_name: zookeeper
