@@ -495,6 +495,86 @@ func TestGenerateQuorumBootstrapServers(t *testing.T) {
 	}
 }
 
+func TestGenerateQuorumBootstrapServersHeadless(t *testing.T) {
+	brokers := []v1beta1.Broker{
+		{Id: int32(0), BrokerConfig: &v1beta1.BrokerConfig{Roles: []string{"broker"}}},
+		{Id: int32(40), BrokerConfig: &v1beta1.BrokerConfig{Roles: []string{"controller"}}},
+		{Id: int32(50), BrokerConfig: &v1beta1.BrokerConfig{Roles: []string{"controller"}}},
+	}
+
+	listenersStatuses := map[string]v1beta1.ListenerStatusList{
+		"test-listener": {
+			{Name: "headless", Address: "fakeKafka-controller-headless.default.svc.cluster.local:29093"},
+			{Name: "broker-40", Address: "fakeKafka-40.fakeKafka-controller-headless.default.svc.cluster.local:29093"},
+			{Name: "broker-50", Address: "fakeKafka-50.fakeKafka-controller-headless.default.svc.cluster.local:29093"},
+		},
+	}
+
+	t.Run("headless service enabled collapses to the controller headless address", func(t *testing.T) {
+		kafkaCluster := &v1beta1.KafkaCluster{}
+		kafkaCluster.Spec.HeadlessServiceEnabled = true
+		kafkaCluster.Spec.Brokers = brokers
+
+		got, err := generateQuorumBootstrapServers(kafkaCluster, listenersStatuses)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		expected := []string{"fakeKafka-controller-headless.default.svc.cluster.local:29093"}
+		if !reflect.DeepEqual(got, expected) {
+			t.Error("Expected:", expected, "Got:", got)
+		}
+	})
+
+	t.Run("value is unchanged when a controller is added", func(t *testing.T) {
+		kafkaCluster := &v1beta1.KafkaCluster{}
+		kafkaCluster.Spec.HeadlessServiceEnabled = true
+		kafkaCluster.Spec.Brokers = brokers
+
+		before, err := generateQuorumBootstrapServers(kafkaCluster, listenersStatuses)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		kafkaCluster.Spec.Brokers = append(brokers, v1beta1.Broker{
+			Id: int32(60), BrokerConfig: &v1beta1.BrokerConfig{Roles: []string{"controller"}},
+		})
+		grownStatuses := map[string]v1beta1.ListenerStatusList{
+			"test-listener": append(listenersStatuses["test-listener"], v1beta1.ListenerStatus{
+				Name: "broker-60", Address: "fakeKafka-60.fakeKafka-controller-headless.default.svc.cluster.local:29093",
+			}),
+		}
+
+		after, err := generateQuorumBootstrapServers(kafkaCluster, grownStatuses)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !reflect.DeepEqual(before, after) {
+			t.Error("adding a controller must not change controller.quorum.bootstrap.servers. Before:", before, "After:", after)
+		}
+	})
+
+	t.Run("headless service disabled falls back to per-node addresses", func(t *testing.T) {
+		kafkaCluster := &v1beta1.KafkaCluster{}
+		kafkaCluster.Spec.HeadlessServiceEnabled = false
+		kafkaCluster.Spec.Brokers = brokers
+
+		got, err := generateQuorumBootstrapServers(kafkaCluster, listenersStatuses)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		expected := []string{
+			"fakeKafka-40.fakeKafka-controller-headless.default.svc.cluster.local:29093",
+			"fakeKafka-50.fakeKafka-controller-headless.default.svc.cluster.local:29093",
+		}
+		if !reflect.DeepEqual(got, expected) {
+			t.Error("Expected:", expected, "Got:", got)
+		}
+	})
+}
+
 func TestMinControllerNodeBrokerID(t *testing.T) {
 	tests := []struct {
 		testName      string

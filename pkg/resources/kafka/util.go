@@ -83,10 +83,21 @@ func generateQuorumVoters(kafkaCluster *v1beta1.KafkaCluster, controllerListener
 	return quorumVoters, nil
 }
 
+// headlessListenerStatusName is the name CreateInternalListenerStatuses gives to the listener
+// status entry that carries the controller headless Service address rather than a per-pod one.
+const headlessListenerStatusName = "headless"
+
 // generateQuorumBootstrapServers generates the dynamic KRaft quorum bootstrap servers
 // (controller.quorum.bootstrap.servers, KIP-853) in the format of nodeAddress:listenerPort (no
-// broker ID prefix), in ascending order by broker ID.
+// broker ID prefix).
+// Uses headlessService if enabled, otherwise falls back to per-node addresses.
 func generateQuorumBootstrapServers(kafkaCluster *v1beta1.KafkaCluster, controllerListenerStatuses map[string]v1beta1.ListenerStatusList) ([]string, error) {
+	if kafkaCluster.Spec.HeadlessServiceEnabled {
+		if addr, ok := controllerHeadlessAddress(controllerListenerStatuses); ok {
+			return []string{addr}, nil
+		}
+	}
+
 	brokerIDs, idToListenerAddrMap, err := controllerNodeAddressesByID(kafkaCluster, controllerListenerStatuses)
 	if err != nil {
 		return nil, err
@@ -98,6 +109,23 @@ func generateQuorumBootstrapServers(kafkaCluster *v1beta1.KafkaCluster, controll
 	}
 
 	return bootstrapServers, nil
+}
+func controllerHeadlessAddress(controllerListenerStatuses map[string]v1beta1.ListenerStatusList) (string, bool) {
+	listenerNames := make([]string, 0, len(controllerListenerStatuses))
+	for name := range controllerListenerStatuses {
+		listenerNames = append(listenerNames, name)
+	}
+	sort.Strings(listenerNames)
+
+	for _, name := range listenerNames {
+		for _, status := range controllerListenerStatuses[name] {
+			if status.Name == headlessListenerStatusName {
+				return status.Address, true
+			}
+		}
+	}
+
+	return "", false
 }
 
 // minControllerNodeBrokerID returns the lowest broker ID among all controller-role brokers
