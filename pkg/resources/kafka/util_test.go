@@ -18,6 +18,7 @@ package kafka
 import (
 	"encoding/base64"
 	"reflect"
+	"slices"
 	"testing"
 
 	"github.com/go-logr/logr"
@@ -536,11 +537,11 @@ func TestGenerateQuorumBootstrapServersHeadless(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		kafkaCluster.Spec.Brokers = append(brokers, v1beta1.Broker{
+		kafkaCluster.Spec.Brokers = append(slices.Clone(brokers), v1beta1.Broker{
 			Id: int32(60), BrokerConfig: &v1beta1.BrokerConfig{Roles: []string{"controller"}},
 		})
 		grownStatuses := map[string]v1beta1.ListenerStatusList{
-			"test-listener": append(listenersStatuses["test-listener"], v1beta1.ListenerStatus{
+			"test-listener": append(slices.Clone(listenersStatuses["test-listener"]), v1beta1.ListenerStatus{
 				Name: "broker-60", Address: "fakeKafka-60.fakeKafka-controller-headless.default.svc.cluster.local:29093",
 			}),
 		}
