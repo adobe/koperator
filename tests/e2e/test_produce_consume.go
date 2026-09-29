@@ -33,11 +33,9 @@ func testProduceConsumeInternal() bool { //nolint:unparam // Note: respecting Gi
 
 		kubectlOptions.Namespace = koperatorLocalHelmDescriptor.Namespace
 
-		requireDeployingKcatPod(kubectlOptions, kcatName, "")
 		requireDeployingKafkaTopic(kubectlOptions, testInternalTopicName)
-		requireInternalProducingConsumingMessage(kubectlOptions, "", kcatName, testInternalTopicName, "")
+		requireInternalProducingConsumingMessage(kubectlOptions, "", testInternalTopicName, "")
 		requireDeleteKafkaTopic(kubectlOptions, testInternalTopicName)
-		requireDeleteKcatPod(kubectlOptions, kcatName)
 	})
 }
 
@@ -54,11 +52,9 @@ func testProduceConsumeInternalSSL(tlsSecretName string) bool {
 		kubectlOptions.Namespace = koperatorLocalHelmDescriptor.Namespace
 
 		requireDeployingKafkaUser(kubectlOptions, kafkaUserName, tlsSecretName)
-		requireDeployingKcatPod(kubectlOptions, kcatName, tlsSecretName)
 		requireDeployingKafkaTopic(kubectlOptions, testInternalTopicName)
-		requireInternalProducingConsumingMessage(kubectlOptions, "", kcatName, testInternalTopicName, tlsSecretName)
+		requireInternalProducingConsumingMessage(kubectlOptions, "", testInternalTopicName, tlsSecretName)
 		requireDeleteKafkaTopic(kubectlOptions, testInternalTopicName)
-		requireDeleteKcatPod(kubectlOptions, kcatName)
 		requireDeleteKafkaUser(kubectlOptions, kafkaUserName)
 	})
 }

@@ -29,4 +29,7 @@ const (
 
 	// ZookeeperOperatorVersion is the version of zookeeper-operator
 	ZookeeperOperatorVersion = "0.2.15-adobe-20260818" // renovate: datasource=docker depName=ghcr.io/adobe/helm-charts/zookeeper-operator
+
+	// KclVersion is the version of the kcl Kafka CLI image used by the internal produce/consume helpers
+	KclVersion = "v0.20.0" // renovate: datasource=docker depName=ghcr.io/twmb/kcl
 )
