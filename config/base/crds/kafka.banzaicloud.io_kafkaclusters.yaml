@@ -23845,6 +23845,13 @@ spec:
                 description: CruiseControlTopicStatus holds info about the CC topic
                   status
                 type: string
+              kRaftDynamicQuorumBootstrapped:
+                description: |-
+                  KRaftDynamicQuorumBootstrapped is set to true once the dynamic KRaft controller quorum has formed
+                  (a controller has reported a leader/follower raft state). Once set, Koperator stops formatting the
+                  lowest-ID controller with --standalone, so a controller that later loses its disk rejoins the
+                  existing quorum as an observer instead of bootstrapping a divergent single-voter quorum.
+                type: boolean
               listenerStatuses:
                 description: |-
                   ListenerStatuses holds information about the statuses of the configured listeners.

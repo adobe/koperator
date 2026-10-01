@@ -43,7 +43,7 @@ var (
 	envoySidecarScript string
 )
 
-func (r *Reconciler) pod(id int32, brokerConfig *v1beta1.BrokerConfig, pvcs []corev1.PersistentVolumeClaim, log logr.Logger) runtime.Object {
+func (r *Reconciler) pod(id int32, brokerConfig *v1beta1.BrokerConfig, pvcs []corev1.PersistentVolumeClaim, standaloneBootstrapControllerID int32, log logr.Logger) runtime.Object {
 	const kafkaContainerName = "kafka"
 
 	dataVolume, dataVolumeMount := generateDataVolumeAndVolumeMount(pvcs, brokerConfig.StorageConfigs)
@@ -181,6 +181,9 @@ fi`},
 						},
 					)
 				}
+
+				// see how these env vars are used in wait-for-envoy-sidecars.sh
+				addDynamicKRaftQuorumFormatEnv(r, pod, i, id, brokerConfig, standaloneBootstrapControllerID, log)
 				break
 			}
 		}
@@ -203,6 +206,57 @@ func addClusterIdEnv(r *Reconciler, pod *corev1.Pod, i int) {
 			Value: r.KafkaCluster.Status.ClusterID,
 		},
 	)
+}
+
+// addDynamicKRaftQuorumFormatEnv injects the storage-format env vars consumed by
+// wait-for-envoy-sidecar.sh when this broker has opted into a dynamic KRaft controller
+// quorum (see DynamicKRaftControllerQuorum / shouldUseDynamicKRaftQuorum). When the flag is absent
+// or false for this broker, nothing is changed from
+// the static-quorum behavior.
+func addDynamicKRaftQuorumFormatEnv(r *Reconciler, pod *corev1.Pod, i int, id int32, brokerConfig *v1beta1.BrokerConfig, standaloneBootstrapControllerID int32, log logr.Logger) {
+	var broker v1beta1.Broker
+	found := false
+	for _, b := range r.KafkaCluster.Spec.Brokers {
+		if b.Id == id {
+			broker = b
+			found = true
+			break
+		}
+	}
+	if !found {
+		return
+	}
+
+	brokerReadOnlyConfig := getBrokerReadOnlyConfig(broker, r.KafkaCluster, log)
+	if !shouldUseDynamicKRaftQuorum(brokerReadOnlyConfig) {
+		return
+	}
+
+	// The lowest-ID controller bootstraps the quorum standalone, but only until the quorum has formed;
+	// standaloneBootstrapControllerID is -1 once bootstrapped (see the reconcile loop), so a controller
+	// that later reformats a fresh disk joins with --no-initial-controllers and rejoins as an observer
+	// rather than bootstrapping a divergent single-voter quorum.
+	formatFlag := "--no-initial-controllers"
+	if brokerConfig.IsControllerNode() && id == standaloneBootstrapControllerID {
+		formatFlag = "--standalone"
+	}
+	pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env,
+		corev1.EnvVar{
+			Name:  kraftStorageFormatFlagEnvVarName,
+			Value: formatFlag,
+		},
+	)
+
+	// Per Kafka's docs, --feature kraft.version=1 must only be passed when formatting controllers,
+	// never brokers.
+	if brokerConfig.IsControllerNode() {
+		pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env,
+			corev1.EnvVar{
+				Name:  kraftEnforceDynamicQuorumEnvVarName,
+				Value: "true",
+			},
+		)
+	}
 }
 
 func (r *Reconciler) generateKafkaContainerPorts(log logr.Logger) []corev1.ContainerPort {
