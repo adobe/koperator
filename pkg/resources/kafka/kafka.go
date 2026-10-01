@@ -160,6 +160,7 @@ func getCreatedPvcForBroker(
 		return nil, err
 	}
 
+	foundPvcList.Items = dataPVCs(foundPvcList.Items)
 	var missing []string
 	for i := range storageConfigs {
 		if storageConfigs[i].PvcSpec == nil {
@@ -331,6 +332,9 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 		}
 
 		var brokerVolumes []*corev1.PersistentVolumeClaim
+		if err := r.reconcileMetadataStorage(ctx, broker, brokerConfig, log); err != nil {
+			return errors.WrapIfWithDetails(err, "failed to reconcile metadata storage", "brokerId", broker.Id)
+		}
 		for index, storage := range brokerConfig.StorageConfigs {
 			if storage.PvcSpec == nil && storage.EmptyDir == nil {
 				return errors.WrapIfWithDetails(err,
@@ -468,6 +472,16 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 		pvcs, err := getCreatedPvcForBroker(ctx, r.Client, brokerVolumeStates, broker.Id, brokerConfig.StorageConfigs, r.KafkaCluster.Namespace, r.KafkaCluster.Name)
 		if err != nil {
 			return errors.WrapIfWithDetails(err, "failed to list PVC's")
+		}
+		if brokerConfig.MetadataStorage != nil {
+			metadataPvc, err := r.metadataPVC(ctx, broker.Id)
+			if err != nil {
+				return err
+			}
+			if metadataPvc == nil {
+				return errors.New("metadata PVC is not created")
+			}
+			pvcs = append(pvcs, *metadataPvc)
 		}
 
 		if !r.KafkaCluster.Spec.HeadlessServiceEnabled {
@@ -1284,6 +1298,7 @@ func (r *Reconciler) reconcileKafkaPvc(ctx context.Context, log logr.Logger, bro
 		if err != nil {
 			return errorfactory.New(errorfactory.APIFailure{}, err, "getting resource failed", "kind", desiredType)
 		}
+		pvcList.Items = dataPVCs(pvcList.Items)
 
 		isController, err := r.isController(util.ConvertStringToInt32(brokerId))
 		if err != nil {
@@ -1318,6 +1333,7 @@ func (r *Reconciler) reconcileKafkaPvc(ctx context.Context, log logr.Logger, bro
 			if err != nil {
 				return errorfactory.New(errorfactory.APIFailure{}, err, "getting resource failed", "kind", desiredType)
 			}
+			pvcList.Items = dataPVCs(pvcList.Items)
 
 			mountPath := currentPvc.Annotations[mountPathAnnotationKey]
 			// Creating the first PersistentVolume For Pod

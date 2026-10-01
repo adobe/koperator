@@ -301,18 +301,23 @@ type BrokerConfig struct {
 	// +kubebuilder:validation:Items:Type=string
 	// +kubebuilder:validation:Items:Enum=controller;broker
 	// +optional
-	Roles                []string                      `json:"processRoles,omitempty"`
-	Image                string                        `json:"image,omitempty"`
-	MetricsReporterImage string                        `json:"metricsReporterImage,omitempty"`
-	Config               string                        `json:"config,omitempty"`
-	StorageConfigs       []StorageConfig               `json:"storageConfigs,omitempty"`
-	ServiceAccountName   string                        `json:"serviceAccountName,omitempty"`
-	Resources            *corev1.ResourceRequirements  `json:"resourceRequirements,omitempty"`
-	ImagePullSecrets     []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
-	NodeSelector         map[string]string             `json:"nodeSelector,omitempty"`
-	Tolerations          []corev1.Toleration           `json:"tolerations,omitempty"`
-	KafkaHeapOpts        string                        `json:"kafkaHeapOpts,omitempty"`
-	KafkaJVMPerfOpts     string                        `json:"kafkaJvmPerfOpts,omitempty"`
+	Roles                []string        `json:"processRoles,omitempty"`
+	Image                string          `json:"image,omitempty"`
+	MetricsReporterImage string          `json:"metricsReporterImage,omitempty"`
+	Config               string          `json:"config,omitempty"`
+	StorageConfigs       []StorageConfig `json:"storageConfigs,omitempty"`
+	// MetadataStorage optionally isolates KRaft metadata on a dedicated PVC.
+	// Only broker-only KRaft nodes may use it. It is not a data or Cruise Control disk.
+	// Once enabled it cannot be removed or relocated; reverse migration is not supported.
+	// +optional
+	MetadataStorage    *StorageConfig                `json:"metadataStorage,omitempty"`
+	ServiceAccountName string                        `json:"serviceAccountName,omitempty"`
+	Resources          *corev1.ResourceRequirements  `json:"resourceRequirements,omitempty"`
+	ImagePullSecrets   []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
+	NodeSelector       map[string]string             `json:"nodeSelector,omitempty"`
+	Tolerations        []corev1.Toleration           `json:"tolerations,omitempty"`
+	KafkaHeapOpts      string                        `json:"kafkaHeapOpts,omitempty"`
+	KafkaJVMPerfOpts   string                        `json:"kafkaJvmPerfOpts,omitempty"`
 	// Override for the default log4j configuration
 	Log4jConfig string `json:"log4jConfig,omitempty"`
 	// Custom annotations for the broker pods - e.g.: Prometheus scraping annotations:
@@ -1300,12 +1305,24 @@ func (b *Broker) GetBrokerConfig(kafkaClusterSpec KafkaClusterSpec) (*BrokerConf
 	}
 	envs := mergeEnvs(kafkaClusterSpec, &groupConfig, bConfig)
 
+	// A broker override replaces this single storage object, rather than merging
+	// half of a group PVC spec into a broker-local mount.
+	metadataStorage := bConfig.MetadataStorage
+	if metadataStorage == nil {
+		metadataStorage = groupConfig.MetadataStorage
+	}
+	if metadataStorage != nil {
+		metadataStorage = metadataStorage.DeepCopy()
+	}
 	err = mergo.Merge(bConfig, groupConfig, mergo.WithAppendSlice)
 	if err != nil {
 		return nil, errors.WrapIf(err, "could not merge brokerConfig with ConfigGroup")
 	}
 
 	bConfig.StorageConfigs = dedupStorageConfigs(bConfig.StorageConfigs)
+	if metadataStorage != nil {
+		bConfig.MetadataStorage = metadataStorage.DeepCopy()
+	}
 	if groupConfig.Affinity != nil || bConfig.Affinity != nil {
 		bConfig.Affinity = dstAffinity
 	}
