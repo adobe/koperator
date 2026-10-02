@@ -156,6 +156,8 @@ func generateBrokerState(brokerIDs []string, cluster *banzaicloudv1beta1.KafkaCl
 			brokerState.ConfigurationState = s
 		case banzaicloudv1beta1.PerBrokerConfigurationState:
 			brokerState.PerBrokerConfigurationState = s
+		case banzaicloudv1beta1.MetadataStorageState:
+			brokerState.MetadataStorageState = s
 		case map[string]banzaicloudv1beta1.VolumeState:
 			if brokerState.GracefulActionState.VolumeStates == nil {
 				brokerState.GracefulActionState.VolumeStates = make(map[string]banzaicloudv1beta1.VolumeState)

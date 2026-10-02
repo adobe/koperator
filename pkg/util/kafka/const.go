@@ -25,8 +25,9 @@ const (
 	KafkaConfigBoostrapServers  = "bootstrap.servers"
 	KafkaConfigZooKeeperConnect = "zookeeper.connect"
 	// KafkaConfigBrokerID is used in ZooKeeper mode
-	KafkaConfigBrokerID           = "broker.id"
-	KafkaConfigBrokerLogDirectory = "log.dirs"
+	KafkaConfigBrokerID             = "broker.id"
+	KafkaConfigBrokerLogDirectory   = "log.dirs"
+	KafkaConfigMetadataLogDirectory = "metadata.log.dir"
 
 	// Configuration keys for KRaft
 	KafkaConfigNodeID                 = "node.id"

@@ -24329,6 +24329,11 @@ spec:
                       description: Image specifies the current docker image of the
                         broker
                       type: string
+                    metadataStorageState:
+                      description: |-
+                        MetadataStorageState is Ready once the broker runs from its dedicated metadata storage.
+                        Data disks of a broker with metadataStorage can be removed only after that.
+                      type: string
                     perBrokerConfigurationState:
                       description: PerBrokerConfigurationState holds info about the
                         per-broker (dynamically updatable) config

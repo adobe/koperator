@@ -16,10 +16,13 @@ package kafka
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
+	"emperror.dev/errors"
 	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,7 +32,11 @@ import (
 
 	apiutil "github.com/banzaicloud/koperator/api/util"
 	"github.com/banzaicloud/koperator/api/v1beta1"
+	"github.com/banzaicloud/koperator/pkg/errorfactory"
+	"github.com/banzaicloud/koperator/pkg/kafkaclient"
 	"github.com/banzaicloud/koperator/pkg/resources"
+	"github.com/banzaicloud/koperator/pkg/resources/kafka/mocks"
+	kafkautils "github.com/banzaicloud/koperator/pkg/util/kafka"
 	properties "github.com/banzaicloud/koperator/properties/pkg"
 )
 
@@ -191,6 +198,7 @@ func TestDataDiskRemovalRetainsMetadataPVC(t *testing.T) {
 	}
 	broker.BrokerConfig.StorageConfigs = []v1beta1.StorageConfig{*second}
 	require.ErrorContains(t, r.reconcileMetadataStorage(ctx, broker, broker.BrokerConfig, log), "keep all existing data disks")
+	require.Empty(t, r.KafkaCluster.Status.BrokersState["1"].MetadataStorageState)
 	require.NoError(t, r.Get(ctx, client.ObjectKey{Namespace: "test", Name: "data-1"}, &corev1.PersistentVolumeClaim{}))
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -217,6 +225,17 @@ func TestDataDiskRemovalRetainsMetadataPVC(t *testing.T) {
 	metadataPVC, err = r.metadataPVC(ctx, 1)
 	require.NoError(t, err)
 	require.Equal(t, "true", metadataPVC.Annotations[metadataReadyAnnotation])
+	stored := &v1beta1.KafkaCluster{}
+	require.NoError(t, r.Get(ctx, client.ObjectKeyFromObject(r.KafkaCluster), stored))
+	require.Equal(t, v1beta1.MetadataStorageReady, stored.Status.BrokersState["1"].MetadataStorageState)
+
+	// The PVC annotation is durable: a lost status is projected again without the pod.
+	require.NoError(t, r.Delete(ctx, pod))
+	r.KafkaCluster.Status.BrokersState = nil
+	require.NoError(t, r.Client.Status().Update(ctx, r.KafkaCluster))
+	require.NoError(t, r.reconcileMetadataStorage(ctx, broker, broker.BrokerConfig, log))
+	require.Equal(t, v1beta1.MetadataStorageReady, r.KafkaCluster.Status.BrokersState["1"].MetadataStorageState)
+
 	r.KafkaCluster.Status.BrokersState = map[string]v1beta1.BrokerState{"1": {
 		GracefulActionState: v1beta1.GracefulActionState{VolumeStates: map[string]v1beta1.VolumeState{
 			"/csi-kafka-logs1": {CruiseControlVolumeState: v1beta1.GracefulDiskRemovalSucceeded},
@@ -234,6 +253,51 @@ func TestDataDiskRemovalRetainsMetadataPVC(t *testing.T) {
 	require.Len(t, pvcs, 1)
 	require.Equal(t, "data-2", pvcs[0].Name)
 	require.NotContains(t, r.KafkaCluster.Status.BrokersState["1"].GracefulActionState.VolumeStates, "/csi-kafka-metadata")
+}
+
+func TestBrokerRemovalDeletesMetadataPVC(t *testing.T) {
+	r, broker := metadataTestReconciler(t)
+	ctx, log := context.Background(), logr.Discard()
+	require.NoError(t, r.reconcileMetadataStorage(ctx, broker, broker.BrokerConfig, log))
+	other := broker.DeepCopy()
+	other.Id = 2
+	require.NoError(t, r.reconcileMetadataStorage(ctx, *other, other.BrokerConfig, log))
+	data, err := r.pvc(1, 0, broker.BrokerConfig.StorageConfigs[0], broker.BrokerConfig, true)
+	require.NoError(t, err)
+	data.Name, data.GenerateName = "data", ""
+	require.NoError(t, r.Create(ctx, data))
+
+	require.NoError(t, r.deleteMetadataPVC(ctx, "1", log))
+	require.NoError(t, r.deleteMetadataPVC(ctx, "1", log))
+	removed, err := r.metadataPVC(ctx, 1)
+	require.NoError(t, err)
+	require.Nil(t, removed)
+	kept, err := r.metadataPVC(ctx, 2)
+	require.NoError(t, err)
+	require.NotNil(t, kept)
+	require.NoError(t, r.Get(ctx, client.ObjectKey{Namespace: "test", Name: "data"}, &corev1.PersistentVolumeClaim{}))
+
+	// A data PVC that is already gone must not prevent metadata PVC cleanup.
+	require.NoError(t, r.reconcileMetadataStorage(ctx, broker, broker.BrokerConfig, log))
+	pod := corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "removed", Namespace: "test", Labels: map[string]string{v1beta1.BrokerIdLabelKey: "1"}},
+		Spec: corev1.PodSpec{Volumes: []corev1.Volume{
+			{Name: kafkaDataVolumeMount + "-0", VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "already-deleted"}}},
+			{Name: kafkaDataVolumeMount + "-1", VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "data"}}},
+		}},
+	}
+	require.NoError(t, r.deleteBrokerPVCs(ctx, pod, log))
+	removed, err = r.metadataPVC(ctx, 1)
+	require.NoError(t, err)
+	require.Nil(t, removed)
+	require.Error(t, r.Get(ctx, client.ObjectKey{Namespace: "test", Name: "data"}, &corev1.PersistentVolumeClaim{}))
+
+	// The broker ID can be reused without metadata storage.
+	withoutMetadata := broker.BrokerConfig.DeepCopy()
+	withoutMetadata.MetadataStorage = nil
+	require.NoError(t, r.reconcileMetadataStorage(ctx, broker, withoutMetadata, log))
 }
 
 func TestMetadataMigrationRecoveryGate(t *testing.T) {
@@ -285,4 +349,184 @@ func TestMetadataMigrationClusterIDEnvironment(t *testing.T) {
 		pod := r.pod(broker.Id, broker.BrokerConfig, []corev1.PersistentVolumeClaim{*pvc}, log).(*corev1.Pod)
 		require.Contains(t, pod.Spec.InitContainers[len(pod.Spec.InitContainers)-1].Env, clusterID)
 	}
+}
+
+func TestMetadataLogDirDeferredWhilePodWithoutMetadataVolumeExists(t *testing.T) {
+	r, broker := metadataTestReconciler(t)
+	ctx, log := context.Background(), logr.Discard()
+	metadataLogDir := func() (string, bool) {
+		props, err := properties.NewFromString(r.generateBrokerConfig(broker, broker.BrokerConfig, nil, nil, nil, nil, nil, "", nil, log))
+		require.NoError(t, err)
+		value, found := props.Get(kafkautils.KafkaConfigMetadataLogDirectory)
+		if !found {
+			return "", false
+		}
+		return value.Value(), true
+	}
+	labels := apiutil.MergeLabels(apiutil.LabelsForKafka("test"), map[string]string{v1beta1.BrokerIdLabelKey: "1"})
+
+	// The running pre-migration pod live-mounts the ConfigMap but has no metadata volume.
+	oldPod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-1-old", Namespace: "test", Labels: labels}}
+	require.NoError(t, r.Create(ctx, oldPod))
+	_, found := metadataLogDir()
+	require.False(t, found)
+
+	// No ConfigMap yet (rack awareness creates it after the pod): creation is allowed.
+	require.NoError(t, r.ensureMetadataLogDirConfigured(ctx, "1", broker.BrokerConfig))
+	configMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-config-1", Namespace: "test"},
+		Data:       map[string]string{kafkautils.ConfigPropertyName: "log.dirs=/csi-kafka-logs1/kafka\n"},
+	}
+	require.NoError(t, r.Create(ctx, configMap))
+	err := r.ensureMetadataLogDirConfigured(ctx, "1", broker.BrokerConfig)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "metadata.log.dir")
+	require.NoError(t, r.ensureMetadataLogDirConfigured(ctx, "1", &v1beta1.BrokerConfig{}))
+
+	// Once the old pod is gone, the replacement is created with the setting.
+	require.NoError(t, r.Delete(ctx, oldPod))
+	value, found := metadataLogDir()
+	require.True(t, found)
+	require.Equal(t, "/csi-kafka-metadata/kafka", value)
+	configMap.Data[kafkautils.ConfigPropertyName] = "log.dirs=/csi-kafka-logs1/kafka\nmetadata.log.dir=" + value + "\n"
+	require.NoError(t, r.Update(ctx, configMap))
+	require.NoError(t, r.ensureMetadataLogDirConfigured(ctx, "1", broker.BrokerConfig))
+
+	// Once published it is never withdrawn, even if pod listing would defer it.
+	stray := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-1-stray", Namespace: "test", Labels: labels}}
+	require.NoError(t, r.Create(ctx, stray))
+	_, found = metadataLogDir()
+	require.True(t, found)
+
+	// A pod that mounts the metadata volume does not defer the setting.
+	require.NoError(t, r.Delete(ctx, stray))
+	require.NoError(t, r.Delete(ctx, configMap))
+	newPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-1-new", Namespace: "test", Labels: labels},
+		Spec: corev1.PodSpec{Volumes: []corev1.Volume{{Name: metadataVolumeName, VolumeSource: corev1.VolumeSource{
+			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "test-1-metadata"},
+		}}}},
+	}
+	require.NoError(t, r.Create(ctx, newPod))
+	_, found = metadataLogDir()
+	require.True(t, found)
+}
+
+func TestMetadataMigrationGate(t *testing.T) {
+	ctx := context.Background()
+	labelsFor := func(id string) map[string]string {
+		return apiutil.MergeLabels(apiutil.LabelsForKafka("test"), map[string]string{v1beta1.BrokerIdLabelKey: id})
+	}
+	oldPod := func(id string) *corev1.Pod {
+		return &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-" + id, Namespace: "test", Labels: labelsFor(id)}}
+	}
+	migratedPod := func(id string) *corev1.Pod {
+		pod := oldPod(id)
+		pod.Spec.Volumes = []corev1.Volume{{Name: metadataVolumeName, VolumeSource: corev1.VolumeSource{
+			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "test-" + id + "-metadata"},
+		}}}
+		return pod
+	}
+	for _, tc := range []struct {
+		name      string
+		setup     func(*Reconciler)
+		pods      []*corev1.Pod
+		outOfSync []int32
+		blocked   bool
+	}{
+		{name: "no migration in progress", pods: []*corev1.Pod{oldPod("2"), oldPod("3")}},
+		{name: "migration already started in this pass", pods: []*corev1.Pod{oldPod("2"), oldPod("3")},
+			setup: func(r *Reconciler) { r.metadataMigrationStarted = true }, blocked: true},
+		{name: "replacement pod not Ready yet", pods: []*corev1.Pod{migratedPod("2"), oldPod("3")}, blocked: true},
+		{name: "previous migration Ready", pods: []*corev1.Pod{migratedPod("2"), oldPod("3")},
+			setup: func(r *Reconciler) {
+				r.KafkaCluster.Status.BrokersState = map[string]v1beta1.BrokerState{"2": {MetadataStorageState: v1beta1.MetadataStorageReady}}
+			}},
+		{name: "old pod deleted, replacement missing", pods: []*corev1.Pod{oldPod("3")}, blocked: true},
+		{name: "old pod terminating", pods: []*corev1.Pod{oldPod("2"), func() *corev1.Pod {
+			pod := oldPod("3")
+			pod.Finalizers = []string{"test"}
+			pod.DeletionTimestamp = &metav1.Time{}
+			return pod
+		}()}, blocked: true},
+		{name: "broker without metadata storage is ignored", pods: []*corev1.Pod{oldPod("2")},
+			setup: func(r *Reconciler) {
+				r.KafkaCluster.Spec.Brokers[2].BrokerConfig = &v1beta1.BrokerConfig{Roles: []string{"broker"}}
+			}},
+		{name: "another broker out of sync", pods: []*corev1.Pod{oldPod("2"), oldPod("3")}, outOfSync: []int32{2}, blocked: true},
+		{name: "only the migrating broker out of sync", pods: []*corev1.Pod{oldPod("2"), oldPod("3")}, outOfSync: []int32{1}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r, broker := metadataTestReconciler(t)
+			r.KafkaCluster.Spec.Brokers = []v1beta1.Broker{broker, {Id: 2, BrokerConfig: broker.BrokerConfig.DeepCopy()}, {Id: 3, BrokerConfig: broker.BrokerConfig.DeepCopy()}}
+			if tc.setup != nil {
+				tc.setup(r)
+			}
+			current := oldPod("1")
+			require.NoError(t, r.Create(ctx, current))
+			for _, pod := range tc.pods {
+				deleting := pod.DeletionTimestamp
+				pod.DeletionTimestamp = nil
+				require.NoError(t, r.Create(ctx, pod))
+				if deleting != nil {
+					require.NoError(t, r.Delete(ctx, pod))
+				}
+			}
+			kafkaClient := mocks.NewMockKafkaClient(gomock.NewController(t))
+			kafkaClient.EXPECT().AllOfflineReplicas().Return(nil, nil).AnyTimes()
+			kafkaClient.EXPECT().OutOfSyncReplicas().Return(tc.outOfSync, nil).AnyTimes()
+			provider := new(kafkaclient.MockedProvider)
+			provider.On("NewFromCluster", r.Client, r.KafkaCluster).Return(kafkaClient, func() {}, nil)
+			r.kafkaClientProvider = provider
+
+			err := r.metadataMigrationGate(ctx, current)
+			if tc.blocked {
+				require.Error(t, err)
+				require.True(t, errors.As(err, &errorfactory.ReconcileRollingUpgrade{}))
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestMetadataMigrationRestartSerializedWithinPass(t *testing.T) {
+	r, broker := metadataTestReconciler(t)
+	ctx := context.Background()
+	r.KafkaCluster.Spec.Brokers = []v1beta1.Broker{broker, {Id: 2, BrokerConfig: broker.BrokerConfig.DeepCopy()}}
+	kafkaClient := mocks.NewMockKafkaClient(gomock.NewController(t))
+	kafkaClient.EXPECT().AllOfflineReplicas().Return(nil, nil).AnyTimes()
+	kafkaClient.EXPECT().OutOfSyncReplicas().Return(nil, nil).AnyTimes()
+	provider := new(kafkaclient.MockedProvider)
+	provider.On("NewFromCluster", r.Client, r.KafkaCluster).Return(kafkaClient, func() {}, nil)
+	r.kafkaClientProvider = provider
+
+	podFor := func(id string, metadata bool) *corev1.Pod {
+		pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-" + id, Namespace: "test",
+			Labels: apiutil.MergeLabels(apiutil.LabelsForKafka("test"), map[string]string{v1beta1.BrokerIdLabelKey: id})}}
+		if metadata {
+			pod.Spec.Volumes = []corev1.Volume{{Name: metadataVolumeName, VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "test-" + id + "-metadata"},
+			}}}
+		}
+		return pod
+	}
+	require.True(t, isMetadataMigrationRestart(podFor("1", false), podFor("1", true)))
+	require.False(t, isMetadataMigrationRestart(podFor("1", true), podFor("1", true)))
+	require.False(t, isMetadataMigrationRestart(podFor("1", false), podFor("1", false)))
+
+	// Crashed containers bypass the generic rolling-upgrade gates, not the migration gate.
+	crashed := func(pod *corev1.Pod) *corev1.Pod {
+		pod.Status.ContainerStatuses = []corev1.ContainerStatus{{Name: "kafka", State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: 1}}}}
+		return pod
+	}
+	first, second := crashed(podFor("1", false)), crashed(podFor("2", false))
+	require.NoError(t, r.Create(ctx, first))
+	require.NoError(t, r.Create(ctx, second))
+	require.NoError(t, r.handleRollingUpgrade(logr.Discard(), podFor("1", true), first, reflect.TypeOf(first)))
+	require.True(t, r.metadataMigrationStarted)
+	err := r.handleRollingUpgrade(logr.Discard(), podFor("2", true), second, reflect.TypeOf(second))
+	require.Error(t, err)
+	require.True(t, errors.As(err, &errorfactory.ReconcileRollingUpgrade{}))
+	require.NoError(t, r.Get(ctx, client.ObjectKeyFromObject(second), &corev1.Pod{}))
 }

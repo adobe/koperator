@@ -29,6 +29,7 @@ type metadataFixture struct {
 	t                           *testing.T
 	root, metadata, config, bin string
 	data                        []string
+	meta                        []string
 	env                         []string
 }
 
@@ -89,7 +90,7 @@ fi
 		"PATH="+f.bin+":"+os.Getenv("PATH"))
 	if source >= 0 {
 		for i := range f.data {
-			f.write(filepath.Join(f.data[i], "kafka/meta.properties"), fmt.Sprintf("version=1\ncluster.id=cluster-one\nnode.id=1\ndirectory.id=BBBBBBBBBBBBBBBBBBBBB%d\n", i))
+			f.setMeta(i, fmt.Sprintf("version=1\ncluster.id=cluster-one\nnode.id=1\ndirectory.id=BBBBBBBBBBBBBBBBBBBBB%d\n", i))
 			f.write(filepath.Join(f.data[i], "kafka/orders-0/00000000000000000000.log"), "original-topic-replica")
 		}
 		f.addSource(source)
@@ -101,6 +102,25 @@ func (f *metadataFixture) write(path, content string) {
 	f.t.Helper()
 	require.NoError(f.t, os.MkdirAll(filepath.Dir(path), 0o755))
 	require.NoError(f.t, os.WriteFile(path, []byte(content), 0o755))
+}
+
+func (f *metadataFixture) setMeta(i int, content string) {
+	f.t.Helper()
+	for len(f.meta) <= i {
+		f.meta = append(f.meta, "")
+	}
+	f.meta[i] = content
+	f.write(filepath.Join(f.data[i], "kafka/meta.properties"), content)
+}
+
+// zkMigrated mimics a broker migrated from ZooKeeper: V0 data directories
+// (broker.id, optionally without version) and no bootstrap.checkpoint.
+func (f *metadataFixture) zkMigrated(source int, versionLine string) {
+	f.t.Helper()
+	for i := range f.data {
+		f.setMeta(i, versionLine+"cluster.id=cluster-one\nbroker.id=1\n")
+	}
+	require.NoError(f.t, os.Remove(filepath.Join(f.data[source], "kafka/bootstrap.checkpoint")))
 }
 
 func (f *metadataFixture) addSource(i int) {
@@ -128,7 +148,7 @@ func (f *metadataFixture) assertRecovered(source int) {
 		require.Equal(f.t, "original-topic-replica", string(data))
 		meta, err := os.ReadFile(filepath.Join(f.data[i], "kafka/meta.properties"))
 		require.NoError(f.t, err)
-		require.Contains(f.t, string(meta), fmt.Sprintf("directory.id=BBBBBBBBBBBBBBBBBBBBB%d", i))
+		require.Equal(f.t, f.meta[i], string(meta))
 	}
 	backup := filepath.Join(f.data[source], ".koperator-metadata-backup-1")
 	entries, err := os.ReadDir(backup)
@@ -140,9 +160,15 @@ func (f *metadataFixture) assertRecovered(source int) {
 		require.NoError(f.t, err)
 		require.Equal(f.t, original, copied)
 	}
+	sourceBootstrap, err := os.ReadFile(filepath.Join(f.data[source], "kafka/bootstrap.checkpoint"))
+	if os.IsNotExist(err) {
+		require.NoFileExists(f.t, filepath.Join(dest, "bootstrap.checkpoint"))
+		return
+	}
+	require.NoError(f.t, err)
 	bootstrap, err := os.ReadFile(filepath.Join(dest, "bootstrap.checkpoint"))
 	require.NoError(f.t, err)
-	require.Equal(f.t, "original-bootstrap", string(bootstrap))
+	require.Equal(f.t, sourceBootstrap, bootstrap)
 }
 
 func TestMetadataMigrationAndRecovery(t *testing.T) {
@@ -164,6 +190,29 @@ func TestMetadataMigrationAndRecovery(t *testing.T) {
 	for _, fault := range []string{"manifest", "stage-owner", "format", "partial-format", "copy", "publish", "backup", "complete"} {
 		t.Run("interrupted-"+fault, func(t *testing.T) {
 			f := newMetadataFixture(t, 1)
+			output, err := f.run(fault)
+			require.Error(t, err, string(output))
+			output, err = f.run("")
+			require.NoError(t, err, string(output))
+			f.assertRecovered(1)
+		})
+	}
+	for _, tc := range []struct{ name, version string }{{"zk-migrated-v0", "version=0\n"}, {"zk-migrated-unversioned", ""}} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newMetadataFixture(t, 1)
+			f.zkMigrated(1, tc.version)
+			output, err := f.run("")
+			require.NoError(t, err, string(output))
+			f.assertRecovered(1)
+			output, err = f.run("")
+			require.NoError(t, err, string(output))
+			f.assertRecovered(1)
+		})
+	}
+	for _, fault := range []string{"format", "copy", "publish", "backup"} {
+		t.Run("zk-migrated-interrupted-"+fault, func(t *testing.T) {
+			f := newMetadataFixture(t, 1)
+			f.zkMigrated(1, "version=0\n")
 			output, err := f.run(fault)
 			require.Error(t, err, string(output))
 			output, err = f.run("")
@@ -195,6 +244,25 @@ func TestMetadataMigrationFailsClosed(t *testing.T) {
 		}},
 		{"wrong source cluster", func(f *metadataFixture) {
 			f.write(filepath.Join(f.data[0], "kafka/meta.properties"), "version=1\ncluster.id=cluster-two\nnode.id=1\n")
+		}},
+		{"wrong V0 source broker", func(f *metadataFixture) {
+			f.zkMigrated(0, "version=0\n")
+			f.setMeta(0, "version=0\ncluster.id=cluster-one\nbroker.id=2\n")
+		}},
+		{"V0 source without cluster", func(f *metadataFixture) {
+			f.zkMigrated(0, "version=0\n")
+			f.setMeta(0, "version=0\nbroker.id=1\n")
+		}},
+		{"unsupported source version", func(f *metadataFixture) {
+			f.setMeta(0, "version=2\ncluster.id=cluster-one\nnode.id=1\n")
+		}},
+		{"duplicate source version", func(f *metadataFixture) {
+			f.setMeta(0, "version=1\nversion=1\ncluster.id=cluster-one\nnode.id=1\n")
+		}},
+		{"symlinked source bootstrap", func(f *metadataFixture) {
+			bootstrap := filepath.Join(f.data[0], "kafka/bootstrap.checkpoint")
+			require.NoError(f.t, os.Remove(bootstrap))
+			require.NoError(f.t, os.Symlink(filepath.Join(f.root, "broker-config"), bootstrap))
 		}},
 		{"combined", func(f *metadataFixture) { f.write(f.config, "process.roles=broker,controller\nnode.id=1\n") }},
 		{"empty source", func(f *metadataFixture) {

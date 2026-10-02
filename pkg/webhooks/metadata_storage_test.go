@@ -87,3 +87,48 @@ func TestMetadataStorageAdmission(t *testing.T) {
 	_, err = validator.ValidateUpdate(context.Background(), old, changedData)
 	require.Error(t, err)
 }
+
+func TestMetadataStorageDataDiskRemovalAdmission(t *testing.T) {
+	cluster := &v1beta1.KafkaCluster{Spec: v1beta1.KafkaClusterSpec{
+		KRaftMode: true,
+		Brokers: []v1beta1.Broker{{Id: 1, BrokerConfig: &v1beta1.BrokerConfig{
+			Roles: []string{"broker"},
+			StorageConfigs: []v1beta1.StorageConfig{
+				{MountPath: "/csi-kafka-logs1", PvcSpec: &corev1.PersistentVolumeClaimSpec{}},
+				{MountPath: "/csi-kafka-logs2", PvcSpec: &corev1.PersistentVolumeClaimSpec{}},
+			},
+			MetadataStorage: &v1beta1.StorageConfig{MountPath: "/csi-kafka-metadata", PvcSpec: &corev1.PersistentVolumeClaimSpec{}},
+		}}},
+	}}
+	validator := KafkaClusterValidator{Log: logr.Discard()}
+	removed := cluster.DeepCopy()
+	removed.Spec.Brokers[0].BrokerConfig.StorageConfigs = removed.Spec.Brokers[0].BrokerConfig.StorageConfigs[1:]
+	added := cluster.DeepCopy()
+	added.Spec.Brokers[0].BrokerConfig.StorageConfigs = append(added.Spec.Brokers[0].BrokerConfig.StorageConfigs,
+		v1beta1.StorageConfig{MountPath: "/csi-kafka-logs3", PvcSpec: &corev1.PersistentVolumeClaimSpec{}})
+
+	_, err := validator.ValidateUpdate(context.Background(), cluster, removed)
+	require.ErrorContains(t, err, "metadataStorageState")
+	_, err = validator.ValidateUpdate(context.Background(), cluster, added)
+	require.NoError(t, err)
+
+	ready := cluster.DeepCopy()
+	ready.Status.BrokersState = map[string]v1beta1.BrokerState{"1": {MetadataStorageState: v1beta1.MetadataStorageReady}}
+	_, err = validator.ValidateUpdate(context.Background(), ready, removed)
+	require.NoError(t, err)
+
+	otherReady := cluster.DeepCopy()
+	otherReady.Status.BrokersState = map[string]v1beta1.BrokerState{"2": {MetadataStorageState: v1beta1.MetadataStorageReady}}
+	_, err = validator.ValidateUpdate(context.Background(), otherReady, removed)
+	require.Error(t, err)
+
+	_, err = validator.ValidateCreate(context.Background(), &v1beta1.KafkaCluster{Spec: v1beta1.KafkaClusterSpec{
+		KRaftMode: true,
+		Brokers: []v1beta1.Broker{{Id: 1, BrokerConfig: &v1beta1.BrokerConfig{
+			Roles:           []string{"broker"},
+			StorageConfigs:  []v1beta1.StorageConfig{{MountPath: "/kafka-logs", EmptyDir: &corev1.EmptyDirVolumeSource{}}},
+			MetadataStorage: &v1beta1.StorageConfig{MountPath: "/csi-kafka-metadata", PvcSpec: &corev1.PersistentVolumeClaimSpec{}},
+		}}},
+	}})
+	require.ErrorContains(t, err, "PVC-backed")
+}

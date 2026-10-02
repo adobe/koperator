@@ -40,6 +40,13 @@ func TestMetadataStorageValidationAndMapping(t *testing.T) {
 		{"combined", true, func(b *BrokerConfig) { b.Roles = []string{"broker", "controller"} }, false},
 		{"emptydir", true, func(b *BrokerConfig) { b.MetadataStorage.EmptyDir = &corev1.EmptyDirVolumeSource{} }, false},
 		{"missing pvc", true, func(b *BrokerConfig) { b.MetadataStorage.PvcSpec = nil }, false},
+		{"emptydir data", true, func(b *BrokerConfig) {
+			b.StorageConfigs = append(b.StorageConfigs, StorageConfig{MountPath: "/kafka-logs", EmptyDir: &corev1.EmptyDirVolumeSource{}})
+		}, false},
+		{"emptydir data without metadata storage", true, func(b *BrokerConfig) {
+			b.MetadataStorage = nil
+			b.StorageConfigs = []StorageConfig{{MountPath: "/kafka-logs", EmptyDir: &corev1.EmptyDirVolumeSource{}}}
+		}, true},
 		{"block pvc", true, func(b *BrokerConfig) {
 			mode := corev1.PersistentVolumeBlock
 			b.MetadataStorage.PvcSpec.VolumeMode = &mode

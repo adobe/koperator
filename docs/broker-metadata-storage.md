@@ -3,12 +3,21 @@
 `brokerConfig.metadataStorage` is **opt-in**. Omit it to preserve the existing
 storage and startup behavior. It is supported only for KRaft nodes with exactly
 `processRoles: [broker]`, not controllers, combined nodes, ZooKeeper nodes, or
-brokers still using ZooKeeper during a ZK-to-KRaft migration.
+brokers still using ZooKeeper during a ZK-to-KRaft migration. Brokers whose
+ZK-to-KRaft migration is finalized are supported: their data directories keep
+version 0 `meta.properties` (`broker.id`) and usually have no
+`bootstrap.checkpoint`, which the migration accepts.
 
 The setting uses the existing `StorageConfig` shape, but requires `pvcSpec` and
-disallows `emptyDir` and block-mode PVCs. It creates a separate `<cluster>-<node-id>-metadata` PVC,
+disallows `emptyDir` and block-mode PVCs. Every data `storageConfigs` entry of
+the broker must be PVC-backed as well: an `emptyDir` data directory is lost on
+pod replacement, so it cannot be a migration source, and durable metadata gains
+nothing beside ephemeral replicas. It creates a separate `<cluster>-<node-id>-metadata` PVC,
 mounts it at `mountPath`, and generates
-`metadata.log.dir=<mountPath>/kafka`. It **does not** add that path to `log.dirs`,
+`metadata.log.dir=<mountPath>/kafka`. Because the broker ConfigMap is live-mounted,
+the operator adds `metadata.log.dir` only once no broker pod without the metadata
+volume remains, and never creates a metadata-storage pod whose ConfigMap lacks it;
+once published the setting is kept. It **does not** add that path to `log.dirs`,
 Cruise Control capacity/add/remove/rebalance operations, or topic storage
 assignments. `storageConfigs` remain topic-data disks.
 
@@ -19,30 +28,31 @@ group value. Do not put this setting in a group used by controllers.
 
 ## Opt-in configuration
 
-For an existing broker, add **only** this field to its existing configuration;
-keep its broker ID, role, config group and all data storage unchanged:
+Enable it once in the broker-only config group; keep broker IDs, roles and all
+data storage unchanged. The operator migrates the brokers itself, one at a time
+(see [Automatic rollout](#automatic-rollout)):
 
 ```yaml
 spec:
   kRaft: true
-  rollingUpgradeConfig:
-    failureThreshold: 1
-    concurrentBrokerRestartCountPerRack: 1
-  brokers:
-    # Keep every existing broker/controller entry; this is the selected broker.
-    - id: 100
-      brokerConfigGroup: broker
-      brokerConfig:
-        metadataStorage:
-          mountPath: /csi-kafka-metadata
-          pvcSpec:
-            accessModes:
-              - ReadWriteOnce
-            storageClassName: YOUR_EXISTING_CSI_STORAGE_CLASS
-            resources:
-              requests:
-                storage: 20Gi
+  brokerConfigGroups:
+    # Keep every existing field of the group used only by broker-only nodes.
+    broker:
+      processRoles:
+        - broker
+      metadataStorage:
+        mountPath: /csi-kafka-metadata
+        pvcSpec:
+          accessModes:
+            - ReadWriteOnce
+          storageClassName: YOUR_EXISTING_CSI_STORAGE_CLASS
+          resources:
+            requests:
+              storage: 20Gi
 ```
+
+To pilot on a single broker first, put the same `metadataStorage` object in that
+broker's `brokerConfig` instead, then move it to the group once satisfied.
 
 The storage class, size and availability-zone topology are examples, not sizing
 recommendations. The metadata mount must not equal, contain, or be contained by
@@ -63,10 +73,13 @@ operator, or bypassing admission is not a rollback procedure.
 
 ## Preconditions for a live migration
 
+These are checked once, before enabling the flag; the operator automates the
+per-broker steps.
+
 1. Install the updated operator, admission webhook and both the installed CRD
    and chart CRD before opting in. Verify that admission is enabled and working.
    Helm does not automatically upgrade existing CRDs.
-2. Use the broker's existing Kafka **3.7 or newer** image with the static-quorum
+2. Use the broker's existing Kafka **3.9 or newer** image with the static-quorum
    formatter used by the existing operator. The image must provide Bash, Kafka's
    `kafka-storage.sh`, `cp -a`, `mv`, `cmp`, and `sync`. Formatting must produce a
    valid unique `directory.id`. Rehearse against that exact image and CSI driver
@@ -88,8 +101,10 @@ operator, or bypassing admission is not a rollback procedure.
 6. Verify that all source data PVCs are mounted and readable, and that exactly
    one contains `<data-mount>/kafka/__cluster_metadata-0`. The source may be
    `/csi-kafka-logs1/kafka`, `/csi-kafka-logs2/kafka`, or another mounted data
-   directory. Validate its `meta.properties` node/cluster IDs and the source
-   `bootstrap.checkpoint`. Take CSI snapshots/backups using your existing
+   directory. Validate its `meta.properties` cluster ID and node ID (`node.id`
+   for version 1, `broker.id` for version 0 or unversioned files). The source
+   `bootstrap.checkpoint` is copied when present; brokers migrated from
+   ZooKeeper normally have none, and the destination then has none either. Take CSI snapshots/backups using your existing
    application-consistent procedure. Do not copy or move metadata while Kafka
    is running.
 7. Size the metadata PVC for the current complete metadata log, snapshots,
@@ -102,67 +117,67 @@ operator, or bypassing admission is not a rollback procedure.
    tiny reporter-copy init limit), with a 256 MiB maximum Java heap for formatting;
    allow JVM/native overhead as well.
 
-## One broker at a time
+## Automatic rollout
 
-Use a **broker-local** setting for the live rollout. Updating the shared group
-would opt in every broker at once; do not rely on concurrency settings alone as
-a substitute for staged observation.
+Enabling `metadataStorage` is the only required change. The operator:
 
-1. Record the selected broker's old pod UID/name, PVCs, source path and IDs.
-   Check all preconditions above.
-2. Apply the selected broker's `metadataStorage` field without changing its
-   data storage or any controller configuration. Do not replace the whole
-   brokers list with the illustrative YAML fragment.
-3. The operator creates the dedicated PVC and changes that broker's desired
-   pod/config. Normal rolling-upgrade gates select a restart, delete the old
-   pod **gracefully**, and create a replacement only after no matching old pod
-   remains. The `migrate-broker-metadata` init container runs before Kafka.
-   Monitor the old pod's termination and confirm it is not still running.
-4. Monitor the init container and PVC:
+1. Creates every opted-in broker's metadata PVC up front.
+2. Replaces at most **one** broker pod per cluster for migration at a time, using
+   graceful deletion and the normal rolling-upgrade gates. Before each
+   migration restart it additionally requires that no other opted-in broker's
+   migration is in progress (old pod terminating/missing, or replacement not
+   yet `Ready`) and that no **other** broker has offline or out-of-sync replicas.
+   This applies regardless of `concurrentBrokerRestartCountPerRack`, and also to
+   crashed pods that would otherwise bypass the rolling-upgrade gates.
+3. Runs the `migrate-broker-metadata` init container in the replacement pod,
+   which copies the stopped broker's metadata onto the new PVC before Kafka
+   starts. A failure keeps the pod in its init container and halts the rollout;
+   nothing else is migrated until it is resolved.
+4. Records `status.brokersState["<id>"].metadataStorageState: Ready` once the
+   replacement pod is Ready, then waits for in-sync replicas to recover before
+   migrating the next broker.
 
-   ```sh
-   kubectl -n "$NAMESPACE" get pods,pvc -l "kafka_cr=$CLUSTER,brokerId=$BROKER_ID"
-   kubectl -n "$NAMESPACE" logs "$NEW_POD" -c migrate-broker-metadata
-   kubectl -n "$NAMESPACE" logs "$NEW_POD" -c kafka
-   ```
+Monitor progress:
 
-   Success includes `KRaft metadata storage ready for broker <id>`. Failure
-   blocks Kafka startup; diagnose it before proceeding, without deleting source
-   metadata, destination ownership markers or backups.
-5. Verify the new ConfigMap has metadata storage only in `metadata.log.dir`,
-   and topic volumes only in `log.dirs`. Verify destination identities and
-   migration completion marker, the retained source backup, and absence of
-   `__cluster_metadata-0` from **all** mounted data `kafka` roots. Do not modify
-   live metadata during verification.
-6. Verify broker registration, actual partition ISR restoration, no offline/
-   under-replicated partitions, controller-quorum health, client error rates and
-   disk capacity. Pod `Ready` or the init success message alone is insufficient.
-   Keep the source disk until recovery is proven. Optionally rehearse a second
-   normal restart of this broker and repeat recovery checks.
-   Reconciliation retains every existing data PVC until it observes a Ready
-   replacement pod using the metadata PVC with a successful migration init
-   container. It persists that observation on the metadata PVC. This protects
-   against a subsequent data-removal update racing the initial migration;
-   it does not replace the full ISR and client-health checks above.
-7. Only then opt in the next broker, repeating the same checks. After every
-   broker has recovered, a later, separate change may remove old **data** disks
-   through the existing Cruise Control drain workflow. Back up retained metadata
-   before deleting the source PVC.
+```sh
+kubectl -n "$NAMESPACE" get kafkacluster "$CLUSTER" \
+  -o jsonpath='{range .status.brokersState.*}{.metadataStorageState}{"\n"}{end}'
+kubectl -n "$NAMESPACE" get pods,pvc -l "kafka_cr=$CLUSTER"
+kubectl -n "$NAMESPACE" logs "$POD" -c migrate-broker-metadata
+```
 
-### What the existing rollout gates do (and do not do)
+The init container logs each phase (validation, format, copy, publish, source
+retirement, completion), so a slow copy is distinguishable from a hung one.
+Success includes `KRaft metadata storage ready for broker <id>`. A failure
+blocks Kafka startup; diagnose it without deleting source metadata,
+destination ownership markers or backups.
 
-With AUS5-style `failureThreshold: 1` and
-`concurrentBrokerRestartCountPerRack: 1`, the existing normal path waits on
-missing/terminating/pending pods and rejects further normal restarts when it
-observes a broker with offline/out-of-sync replicas (or the recorded error
-threshold). This is not a new global maintenance coordinator. The existing
-terminated-container/unschedulable-pod repair paths have different gates.
+Readiness is recorded durably as an annotation on the metadata PVC and projected
+to the status. Admission rejects removing any data disk of a broker with
+`metadataStorage` until that state is `Ready`, so a data-removal update cannot
+race the migration. If admission was bypassed, reconciliation keeps every data
+PVC and stops with an error naming the disk to restore. After every broker is
+`Ready`, a later, separate change may remove old **data** disks through the
+existing Cruise Control drain workflow. Back up retained metadata before
+deleting a source PVC.
+
+The gates check broker registration and replica health, not client error rates
+or capacity headroom; keep watching those during the rollout.
+
+### What the rollout gates do (and do not do)
+
+The normal rolling-upgrade path waits on missing/terminating/pending pods and
+rejects further restarts when it observes offline/out-of-sync replicas beyond
+`failureThreshold`. Migration restarts additionally pass the dedicated
+one-per-cluster migration gate described above, including on the
+terminated-container repair path. The unschedulable-pod repair path (a pod
+pinned to a removed PVC) is not gated, because waiting cannot fix it.
 Broker-only pods do not gain a new metadata-readiness probe in this change.
 
 No setting guarantees full ISR, spare capacity, client availability, or zero
 transient client errors under all failure scenarios. Leader election/retries
 can cause transient errors. Broker-only restarts do not use the controller
-quorum-readiness gate, so explicitly check controller quorum before each step.
+quorum-readiness gate, so check controller quorum health before enabling the flag.
 
 **Fencing limitation:** ordinary graceful Kubernetes pod deletion waits for
 container shutdown, which is the offline-copy precondition. RWO is **not**
@@ -185,8 +200,9 @@ On the metadata PVC:
 * `.koperator-metadata-migration` records immutable node ID, cluster ID and source
   mount (or `fresh`) before mutation.
 * `.koperator-metadata-stage` is formatted by Kafka with a **new** directory ID.
-  Only the complete stopped-source `__cluster_metadata-0` and
-  `bootstrap.checkpoint` are copied. Source `meta.properties` and topic replicas
+  Only the complete stopped-source `__cluster_metadata-0` and, when present,
+  `bootstrap.checkpoint` are copied. Without a source bootstrap, the
+  formatter's bootstrap is removed so the destination mirrors the source. Source `meta.properties` and topic replicas
   are never copied/reformatted. Partial copies can be retried from the intact
   stopped source.
 * The owned staging directory is synced and atomically renamed to `kafka`.
@@ -213,6 +229,13 @@ PVC is drained/deleted. Nothing automatically prunes backups. There is no safe
 automatic reverse migration, operator downgrade, or failback to this stale
 backup. Recovery after destination loss requires a separately reviewed, offline
 broker recovery procedure. Controller disaster recovery remains unchanged.
+
+## Broker removal
+
+Removing a broker from `spec.brokers` uses the existing graceful downscale. When
+the broker pod is deleted, the operator deletes its data PVCs **and** its
+metadata PVC, so the broker ID can later be reused with or without metadata
+storage. Back up the metadata PVC first if your recovery policy requires it.
 
 ## Kafka 3.9.2 migration smoke test
 

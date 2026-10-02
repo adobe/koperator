@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -31,6 +32,7 @@ import (
 
 	banzaicloudv1beta1 "github.com/banzaicloud/koperator/api/v1beta1"
 	"github.com/banzaicloud/koperator/pkg/util"
+	kafkautils "github.com/banzaicloud/koperator/pkg/util/kafka"
 	properties "github.com/banzaicloud/koperator/properties/pkg"
 )
 
@@ -99,7 +101,7 @@ func checkMetadataStorage(cluster, old *banzaicloudv1beta1.KafkaCluster) field.E
 			props, parseErr := properties.NewFromString(cluster.Spec.ReadOnlyConfig + "\n" + broker.ReadOnlyConfig + "\n" + config.Config)
 			if parseErr != nil {
 				errs = append(errs, field.Invalid(p, nil, parseErr.Error()))
-			} else if mode, found := props.Get("migration.broker.kRaftMode"); found && mode.Value() != "true" {
+			} else if mode, found := props.Get(kafkautils.MigrationBrokerKRaftMode); found && mode.Value() != "true" {
 				errs = append(errs, field.Invalid(p, nil, "metadataStorage cannot be used by a ZooKeeper migration broker"))
 			}
 		}
@@ -121,9 +123,29 @@ func checkMetadataStorage(cluster, old *banzaicloudv1beta1.KafkaCluster) field.E
 				!reflect.DeepEqual(before.StorageConfigs, config.StorageConfigs) {
 				errs = append(errs, field.Forbidden(p, "enable metadataStorage without changing existing data storageConfigs"))
 			}
+			if before != nil && before.MetadataStorage != nil && config.MetadataStorage != nil &&
+				removesDataDisk(before.StorageConfigs, config.StorageConfigs) &&
+				old.Status.BrokersState[strconv.Itoa(int(broker.Id))].MetadataStorageState != banzaicloudv1beta1.MetadataStorageReady {
+				errs = append(errs, field.Forbidden(field.NewPath("spec", "brokers").Index(i).Child("brokerConfig", "storageConfigs"),
+					"data disks cannot be removed until status.brokersState metadataStorageState of this broker is Ready; "+
+						"the disks may still hold the only copy of the broker metadata"))
+			}
 		}
 	}
 	return errs
+}
+
+func removesDataDisk(before, after []banzaicloudv1beta1.StorageConfig) bool {
+	kept := make(map[string]struct{}, len(after))
+	for _, storage := range after {
+		kept[storage.MountPath] = struct{}{}
+	}
+	for _, storage := range before {
+		if _, ok := kept[storage.MountPath]; !ok {
+			return true
+		}
+	}
+	return false
 }
 
 func hasMetadataStorage(cluster *banzaicloudv1beta1.KafkaCluster) bool {

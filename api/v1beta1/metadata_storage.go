@@ -22,6 +22,9 @@ import (
 	"strings"
 )
 
+// MetadataStorageVolumeName is the pod volume name reserved for the dedicated metadata PVC.
+const MetadataStorageVolumeName = "kraft-metadata"
+
 var metadataMountPathPattern = regexp.MustCompile(`^/[a-zA-Z0-9_./-]+$`)
 
 // ValidateMetadataStorage validates the effective (group-merged) broker configuration.
@@ -44,17 +47,22 @@ func (b *BrokerConfig) ValidateMetadataStorage(kraft bool) error {
 	}
 	paths := []string{"/config", "/opt", "/etc", "/var/run", "/run", "/dev", "/proc", "/sys", "/usr", "/bin", "/sbin", "/lib", "/lib64", "/tmp"}
 	for _, s := range b.StorageConfigs {
+		// Ephemeral data cannot be a migration source, and durable metadata gains nothing
+		// beside ephemeral replicas.
+		if s.PvcSpec == nil || s.EmptyDir != nil {
+			return fmt.Errorf("metadataStorage requires all data storageConfigs to be PVC-backed; %q is not", s.MountPath)
+		}
 		paths = append(paths, s.MountPath)
 	}
 	for _, v := range b.VolumeMounts {
-		if v.Name == "kraft-metadata" {
-			return fmt.Errorf("kraft-metadata is a reserved volume name")
+		if v.Name == MetadataStorageVolumeName {
+			return fmt.Errorf("%s is a reserved volume name", MetadataStorageVolumeName)
 		}
 		paths = append(paths, v.MountPath)
 	}
 	for _, v := range b.Volumes {
-		if v.Name == "kraft-metadata" {
-			return fmt.Errorf("kraft-metadata is a reserved volume name")
+		if v.Name == MetadataStorageVolumeName {
+			return fmt.Errorf("%s is a reserved volume name", MetadataStorageVolumeName)
 		}
 	}
 	for _, p := range paths {

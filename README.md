@@ -202,7 +202,7 @@ kubectl -n kafka run kafka-consumer -it --image=adobe/kafka:2.13-3.9.1 --rm=true
 
 ## Documentation
 
-For opt-in, broker-only KRaft metadata PVCs and a staged live migration procedure,
+For opt-in, broker-only KRaft metadata PVCs with an automatic, one-broker-at-a-time live migration,
 see [dedicated broker metadata storage](docs/broker-metadata-storage.md).
 
 For detailed documentation on the Koperator project, see the [Koperator documentation website](https://opensource.adobe.com/koperator/).

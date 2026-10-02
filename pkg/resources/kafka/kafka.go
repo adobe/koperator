@@ -106,6 +106,9 @@ type Reconciler struct {
 	resources.Reconciler
 	kafkaClientProvider        kafkaclient.Provider
 	CruiseControlScalerFactory func(ctx context.Context, kafkaCluster *banzaiv1beta1.KafkaCluster) (scale.CruiseControlScaler, error)
+	// metadataMigrationStarted serializes metadata migrations within one reconcile pass,
+	// before the pod deletion is visible to listers.
+	metadataMigrationStarted bool
 }
 
 // New creates a new reconciler for Kafka
@@ -709,27 +712,39 @@ func (r *Reconciler) reconcileKafkaPodDelete(ctx context.Context, log logr.Logge
 				}
 				log.V(1).Info("service for broker deleted", "service name", serviceName, banzaiv1beta1.BrokerIdLabelKey, broker.Labels[banzaiv1beta1.BrokerIdLabelKey])
 			}
-			for _, volume := range broker.Spec.Volumes {
-				if strings.HasPrefix(volume.Name, kafkaDataVolumeMount) {
-					err = r.Delete(context.TODO(), &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
-						Name:      volume.PersistentVolumeClaim.ClaimName,
-						Namespace: r.KafkaCluster.Namespace,
-					}})
-					if err != nil {
-						if apierrors.IsNotFound(err) {
-							// can happen when broker was not fully initialized and now is deleted
-							log.Info(fmt.Sprintf("PVC for Broker %s not found. Continue", broker.Labels[banzaiv1beta1.BrokerIdLabelKey]))
-						}
-						return errors.WrapIfWithDetails(err, "could not delete pvc for broker", "id", broker.Labels[banzaiv1beta1.BrokerIdLabelKey])
-					}
-					log.V(1).Info("pvc for broker deleted", "pvc name", volume.PersistentVolumeClaim.ClaimName, banzaiv1beta1.BrokerIdLabelKey, broker.Labels[banzaiv1beta1.BrokerIdLabelKey])
-				}
+			if err = r.deleteBrokerPVCs(ctx, broker, log); err != nil {
+				return err
 			}
 			err = k8sutil.DeleteBrokerStatus(r.Client, broker.Labels[banzaiv1beta1.BrokerIdLabelKey], r.KafkaCluster, log)
 			if err != nil {
 				return errors.WrapIfWithDetails(err, "could not delete status for broker", "id", broker.Labels[banzaiv1beta1.BrokerIdLabelKey])
 			}
 		}
+	}
+	return nil
+}
+
+// deleteBrokerPVCs deletes the data PVCs mounted by a removed broker pod and its metadata PVC.
+func (r *Reconciler) deleteBrokerPVCs(ctx context.Context, broker corev1.Pod, log logr.Logger) error {
+	for _, volume := range broker.Spec.Volumes {
+		if strings.HasPrefix(volume.Name, kafkaDataVolumeMount) {
+			err := r.Delete(ctx, &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
+				Name:      volume.PersistentVolumeClaim.ClaimName,
+				Namespace: r.KafkaCluster.Namespace,
+			}})
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					// can happen when broker was not fully initialized and now is deleted
+					log.Info(fmt.Sprintf("PVC for Broker %s not found. Continue", broker.Labels[banzaiv1beta1.BrokerIdLabelKey]))
+					continue
+				}
+				return errors.WrapIfWithDetails(err, "could not delete pvc for broker", "id", broker.Labels[banzaiv1beta1.BrokerIdLabelKey])
+			}
+			log.V(1).Info("pvc for broker deleted", "pvc name", volume.PersistentVolumeClaim.ClaimName, banzaiv1beta1.BrokerIdLabelKey, broker.Labels[banzaiv1beta1.BrokerIdLabelKey])
+		}
+	}
+	if err := r.deleteMetadataPVC(ctx, broker.Labels[banzaiv1beta1.BrokerIdLabelKey], log); err != nil {
+		return errors.WrapIfWithDetails(err, "could not delete metadata pvc for broker", "id", broker.Labels[banzaiv1beta1.BrokerIdLabelKey])
 	}
 	return nil
 }
@@ -899,6 +914,9 @@ func (r *Reconciler) reconcileKafkaPod(log logr.Logger, desiredPod *corev1.Pod, 
 	}
 	switch {
 	case len(podList.Items) == 0:
+		if err := r.ensureMetadataLogDirConfigured(context.TODO(), desiredPod.Labels[banzaiv1beta1.BrokerIdLabelKey], bConfig); err != nil {
+			return err
+		}
 		if err := patch.DefaultAnnotator.SetLastAppliedAnnotation(desiredPod); err != nil {
 			return errors.WrapIf(err, "could not apply last state to annotation")
 		}
@@ -1073,7 +1091,15 @@ func (r *Reconciler) handleRollingUpgrade(log logr.Logger, desiredPod, currentPo
 		return errors.WrapIf(err, "could not apply last state to annotation")
 	}
 
-	if podUnschedulableReferencingRemovedPVC(currentPod, desiredPod) {
+	unschedulable := podUnschedulableReferencingRemovedPVC(currentPod, desiredPod)
+	migratesMetadata := isMetadataMigrationRestart(currentPod, desiredPod)
+	if migratesMetadata && !unschedulable {
+		if err := r.metadataMigrationGate(context.TODO(), currentPod); err != nil {
+			return err
+		}
+	}
+
+	if unschedulable {
 		// Self-heal: a broker pod stuck Pending because it references a PVC for a disk that was
 		// removed while the pod was being (re)created can never schedule ("persistentvolumeclaim ...
 		// not found"), and a never-started broker keeps the rolling-upgrade health check below
@@ -1179,6 +1205,10 @@ func (r *Reconciler) handleRollingUpgrade(log logr.Logger, desiredPod, currentPo
 	err = r.Delete(context.TODO(), currentPod)
 	if err != nil {
 		return errorfactory.New(errorfactory.APIFailure{}, err, "deleting resource failed", "kind", desiredType)
+	}
+	if migratesMetadata {
+		r.metadataMigrationStarted = true
+		log.Info("broker pod deleted to migrate metadata to dedicated storage", banzaiv1beta1.BrokerIdLabelKey, currentPod.Labels[banzaiv1beta1.BrokerIdLabelKey])
 	}
 
 	// Print terminated container's statuses
