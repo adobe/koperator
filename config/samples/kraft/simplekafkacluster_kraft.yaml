@@ -33,6 +33,15 @@ spec:
               requests:
                 storage: 10Gi
     broker:
+      # Optional for NEW clusters; for live migration enable on ONE broker at a time.
+      # See docs/broker-metadata-storage.md. Never add this to the controller group.
+      # metadataStorage:
+      #   mountPath: /csi-kafka-metadata
+      #   pvcSpec:
+      #     accessModes: [ReadWriteOnce]
+      #     resources:
+      #       requests:
+      #         storage: 20Gi
       kafkaJvmPerfOpts: >-
         -Dcom.sun.management.jmxremote.port=1090 -Dcom.sun.management.jmxremote.rmi.port=1090
         -Dcom.sun.management.jmxremote.local.only=false -Djava.rmi.server.hostname=127.0.0.1 -Djute.maxbuffer=0x9fffff
@@ -73,6 +82,7 @@ spec:
       brokerConfigGroup: "broker"
   rollingUpgradeConfig:
     failureThreshold: 1
+    concurrentBrokerRestartCountPerRack: 1
   listenersConfig:
     internalListeners:
       - type: "plaintext"

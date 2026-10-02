@@ -38,18 +38,42 @@ import (
 	pkicommon "github.com/banzaicloud/koperator/pkg/util/pki"
 )
 
+const (
+	bashCommand        = "bash"
+	exitFileVolumeName = "exitfile"
+)
+
 var (
 	//go:embed wait-for-envoy-sidecar.sh
 	envoySidecarScript string
+	//go:embed migrate-broker-metadata.sh
+	metadataMigrationScript string
 )
 
 func (r *Reconciler) pod(id int32, brokerConfig *v1beta1.BrokerConfig, pvcs []corev1.PersistentVolumeClaim, log logr.Logger) runtime.Object {
 	const kafkaContainerName = "kafka"
 
-	dataVolume, dataVolumeMount := generateDataVolumeAndVolumeMount(pvcs, brokerConfig.StorageConfigs)
+	dataVolume, dataVolumeMount := generateDataVolumeAndVolumeMount(dataPVCs(pvcs), brokerConfig.StorageConfigs)
+	dataMountPaths := make([]string, 0, len(dataVolumeMount))
+	allowFreshMetadata := "false"
+	for _, mount := range dataVolumeMount {
+		dataMountPaths = append(dataMountPaths, mount.MountPath)
+	}
+	if brokerConfig.MetadataStorage != nil {
+		for _, pvc := range pvcs {
+			if isMetadataPVC(pvc) {
+				allowFreshMetadata = pvc.Annotations[metadataFreshAnnotation]
+				dataVolume = append(dataVolume, corev1.Volume{
+					Name:         metadataVolumeName,
+					VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pvc.Name}},
+				})
+				dataVolumeMount = append(dataVolumeMount, corev1.VolumeMount{Name: metadataVolumeName, MountPath: brokerConfig.MetadataStorage.MountPath})
+			}
+		}
+	}
 
 	// TODO remove this bash envoy sidecar checker script once sidecar precedence becomes available to Kubernetes(baluchicken)
-	command := []string{"bash", "-c", envoySidecarScript}
+	command := []string{bashCommand, "-c", envoySidecarScript}
 
 	// Updating Controller pod names to say "controller"
 	podname := fmt.Sprintf("%s-%d-", r.KafkaCluster.Name, id)
@@ -63,7 +87,7 @@ func (r *Reconciler) pod(id int32, brokerConfig *v1beta1.BrokerConfig, pvcs []co
 		Lifecycle: &corev1.Lifecycle{
 			PreStop: &corev1.LifecycleHandler{
 				Exec: &corev1.ExecAction{
-					Command: []string{"bash", "-c", `
+					Command: []string{bashCommand, "-c", `
 if [[ -n "$ENVOY_SIDECAR_STATUS" ]]; then
   HEALTHYSTATUSCODE="200"
   SC=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:15000/ready)
@@ -154,6 +178,35 @@ fi`},
 			NodeSelector:                  brokerConfig.GetNodeSelector(),
 			PriorityClassName:             brokerConfig.GetPriorityClassName(),
 		},
+	}
+	if brokerConfig.MetadataStorage != nil {
+		clusterID := corev1.EnvVar{Name: clusterIDEnvVarName, Value: r.KafkaCluster.Status.ClusterID}
+		for _, env := range r.KafkaCluster.Spec.Envs {
+			if env.Name == clusterIDEnvVarName {
+				clusterID = env
+			}
+		}
+		mounts := append([]corev1.VolumeMount{}, dataVolumeMount...)
+		mounts = append(mounts,
+			corev1.VolumeMount{Name: brokerConfigMapVolumeMount, MountPath: "/config", ReadOnly: true},
+			corev1.VolumeMount{Name: exitFileVolumeName, MountPath: "/var/run/wait"})
+		pod.Spec.InitContainers = append(pod.Spec.InitContainers, corev1.Container{
+			Name:    "migrate-broker-metadata",
+			Image:   kafkaContainer.Image,
+			Command: []string{bashCommand, "-c", metadataMigrationScript},
+			Env: []corev1.EnvVar{
+				clusterID,
+				{Name: "NODE_ID", Value: strconv.Itoa(int(id))},
+				{Name: "METADATA_MOUNT", Value: brokerConfig.MetadataStorage.MountPath},
+				{Name: "DATA_MOUNTS", Value: strings.Join(dataMountPaths, ",")},
+				{Name: "ALLOW_FRESH", Value: allowFreshMetadata},
+				{Name: "KAFKA_HEAP_OPTS", Value: "-Xms64m -Xmx256m"},
+			},
+			VolumeMounts:    mounts,
+			SecurityContext: brokerConfig.SecurityContext,
+			Resources:       *brokerConfig.GetResources(),
+		})
+		pod.Spec.Containers[0].Env = append(pod.Spec.Containers[0].Env, corev1.EnvVar{Name: "METADATA_STORAGE_ENABLED", Value: configValueTrue})
 	}
 	if r.KafkaCluster.Spec.HeadlessServiceEnabled {
 		pod.Spec.Hostname = fmt.Sprintf("%s-%d", r.KafkaCluster.Name, id)
@@ -321,7 +374,7 @@ func getVolumeMounts(brokerConfigVolumeMounts, dataVolumeMount []corev1.VolumeMo
 			MountPath: "/etc/jmx-exporter/",
 		},
 		{
-			Name:      "exitfile",
+			Name:      exitFileVolumeName,
 			MountPath: "/var/run/wait",
 		},
 	}...)
@@ -346,7 +399,7 @@ func getVolumes(brokerConfigVolumes, dataVolume []corev1.Volume, kafkaClusterSpe
 	volumes = append(volumes, generateVolumesForListenerCerts(kafkaClusterSpec.ListenersConfig, kafkaClusterName)...)
 	volumes = append(volumes, []corev1.Volume{
 		{
-			Name: "exitfile",
+			Name: exitFileVolumeName,
 			VolumeSource: corev1.VolumeSource{
 				EmptyDir: &corev1.EmptyDirVolumeSource{},
 			},

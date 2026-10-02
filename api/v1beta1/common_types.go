@@ -50,6 +50,9 @@ type SSLClientAuthentication string
 // PerBrokerConfigurationState holds info about the per-broker configuration state
 type PerBrokerConfigurationState string
 
+// MetadataStorageState holds info about the dedicated KRaft metadata storage of a broker
+type MetadataStorageState string
+
 // ExternalListenerConfigNames type describes a collection of external listener names
 type ExternalListenerConfigNames []string
 
@@ -253,7 +256,16 @@ type BrokerState struct {
 	Image string `json:"image,omitempty"`
 	// Compressed data from broker configuration to restore broker pod in specific cases
 	ConfigurationBackup string `json:"configurationBackup,omitempty"`
+	// MetadataStorageState is Ready once the broker runs from its dedicated metadata storage.
+	// Data disks of a broker with metadataStorage can be removed only after that.
+	MetadataStorageState MetadataStorageState `json:"metadataStorageState,omitempty"`
 }
+
+const (
+	// MetadataStorageReady states that a replacement broker pod became ready using its
+	// dedicated metadata storage, so the metadata no longer lives on any data disk
+	MetadataStorageReady MetadataStorageState = "Ready"
+)
 
 const (
 	// Configured states the broker is running

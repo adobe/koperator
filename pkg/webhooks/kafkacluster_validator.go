@@ -18,6 +18,8 @@ package webhooks
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -30,14 +32,17 @@ import (
 
 	banzaicloudv1beta1 "github.com/banzaicloud/koperator/api/v1beta1"
 	"github.com/banzaicloud/koperator/pkg/util"
+	kafkautils "github.com/banzaicloud/koperator/pkg/util/kafka"
+	properties "github.com/banzaicloud/koperator/properties/pkg"
 )
 
 type KafkaClusterValidator struct {
 	Log logr.Logger
 }
 
-func (s KafkaClusterValidator) ValidateUpdate(ctx context.Context, _, kafkaClusterNew *banzaicloudv1beta1.KafkaCluster) (warnings admission.Warnings, err error) {
+func (s KafkaClusterValidator) ValidateUpdate(ctx context.Context, kafkaClusterOld, kafkaClusterNew *banzaicloudv1beta1.KafkaCluster) (warnings admission.Warnings, err error) {
 	var allErrs field.ErrorList
+	allErrs = append(allErrs, checkMetadataStorage(kafkaClusterNew, kafkaClusterOld)...)
 	log := s.Log.WithValues("name", kafkaClusterNew.GetName(), "namespace", kafkaClusterNew.GetNamespace())
 
 	listenerErrs := checkInternalAndExternalListeners(&kafkaClusterNew.Spec)
@@ -57,6 +62,7 @@ func (s KafkaClusterValidator) ValidateUpdate(ctx context.Context, _, kafkaClust
 
 func (s KafkaClusterValidator) ValidateCreate(ctx context.Context, kafkaCluster *banzaicloudv1beta1.KafkaCluster) (warnings admission.Warnings, err error) {
 	var allErrs field.ErrorList
+	allErrs = append(allErrs, checkMetadataStorage(kafkaCluster, nil)...)
 	log := s.Log.WithValues("name", kafkaCluster.GetName(), "namespace", kafkaCluster.GetNamespace())
 
 	listenerErrs := checkInternalAndExternalListeners(&kafkaCluster.Spec)
@@ -67,11 +73,93 @@ func (s KafkaClusterValidator) ValidateCreate(ctx context.Context, kafkaCluster 
 	if len(allErrs) == 0 {
 		return nil, nil
 	}
-
 	log.Info("rejected", "invalid field(s)", allErrs.ToAggregate().Error())
 	return nil, apierrors.NewInvalid(
 		kafkaCluster.GroupVersionKind().GroupKind(),
 		kafkaCluster.Name, allErrs)
+}
+
+func checkMetadataStorage(cluster, old *banzaicloudv1beta1.KafkaCluster) field.ErrorList {
+	if !hasMetadataStorage(cluster) && (old == nil || !hasMetadataStorage(old)) {
+		return nil
+	}
+	var errs field.ErrorList
+	for i, broker := range cluster.Spec.Brokers {
+		p := field.NewPath("spec", "brokers").Index(i).Child("brokerConfig", "metadataStorage")
+		config, err := broker.GetBrokerConfig(cluster.Spec)
+		if err == nil {
+			err = config.ValidateMetadataStorage(cluster.Spec.KRaftMode)
+		}
+		if err != nil {
+			errs = append(errs, field.Invalid(p, nil, err.Error()))
+			continue
+		}
+		if config == nil {
+			config = &banzaicloudv1beta1.BrokerConfig{}
+		}
+		if config.MetadataStorage != nil {
+			props, parseErr := properties.NewFromString(cluster.Spec.ReadOnlyConfig + "\n" + broker.ReadOnlyConfig + "\n" + config.Config)
+			if parseErr != nil {
+				errs = append(errs, field.Invalid(p, nil, parseErr.Error()))
+			} else if mode, found := props.Get(kafkautils.MigrationBrokerKRaftMode); found && mode.Value() != "true" {
+				errs = append(errs, field.Invalid(p, nil, "metadataStorage cannot be used by a ZooKeeper migration broker"))
+			}
+		}
+		if old == nil {
+			continue
+		}
+		for _, previous := range old.Spec.Brokers {
+			if previous.Id != broker.Id {
+				continue
+			}
+			before, err := previous.GetBrokerConfig(old.Spec)
+			if err != nil {
+				errs = append(errs, field.Invalid(p, nil, err.Error()))
+			} else if before != nil && before.MetadataStorage != nil &&
+				!banzaicloudv1beta1.MetadataStorageLocationEqual(before.MetadataStorage, config.MetadataStorage) {
+				errs = append(errs, field.Forbidden(p, "enabled metadataStorage cannot be removed or relocated; reverse migration is unsupported"))
+			}
+			if before != nil && before.MetadataStorage == nil && config.MetadataStorage != nil &&
+				!reflect.DeepEqual(before.StorageConfigs, config.StorageConfigs) {
+				errs = append(errs, field.Forbidden(p, "enable metadataStorage without changing existing data storageConfigs"))
+			}
+			if before != nil && before.MetadataStorage != nil && config.MetadataStorage != nil &&
+				removesDataDisk(before.StorageConfigs, config.StorageConfigs) &&
+				old.Status.BrokersState[strconv.Itoa(int(broker.Id))].MetadataStorageState != banzaicloudv1beta1.MetadataStorageReady {
+				errs = append(errs, field.Forbidden(field.NewPath("spec", "brokers").Index(i).Child("brokerConfig", "storageConfigs"),
+					"data disks cannot be removed until status.brokersState metadataStorageState of this broker is Ready; "+
+						"the disks may still hold the only copy of the broker metadata"))
+			}
+		}
+	}
+	return errs
+}
+
+func removesDataDisk(before, after []banzaicloudv1beta1.StorageConfig) bool {
+	kept := make(map[string]struct{}, len(after))
+	for _, storage := range after {
+		kept[storage.MountPath] = struct{}{}
+	}
+	for _, storage := range before {
+		if _, ok := kept[storage.MountPath]; !ok {
+			return true
+		}
+	}
+	return false
+}
+
+func hasMetadataStorage(cluster *banzaicloudv1beta1.KafkaCluster) bool {
+	for _, group := range cluster.Spec.BrokerConfigGroups {
+		if group.MetadataStorage != nil {
+			return true
+		}
+	}
+	for _, broker := range cluster.Spec.Brokers {
+		if broker.BrokerConfig != nil && broker.BrokerConfig.MetadataStorage != nil {
+			return true
+		}
+	}
+	return false
 }
 
 func (s KafkaClusterValidator) ValidateDelete(_ context.Context, _ *banzaicloudv1beta1.KafkaCluster) (warnings admission.Warnings, err error) {

@@ -94,6 +94,11 @@ func (r *Reconciler) getConfigProperties(bConfig *v1beta1.BrokerConfig, broker v
 		if err := config.Set(kafkautils.KafkaConfigBrokerLogDirectory, strings.Join(mountPathsMerged, ",")); err != nil {
 			log.Error(err, fmt.Sprintf(kafkautils.BrokerConfigErrorMsgTemplate, kafkautils.KafkaConfigBrokerLogDirectory))
 		}
+		if bConfig.MetadataStorage != nil && r.metadataLogDirConfigurable(context.Background(), broker.Id, &brokerConfigMapOld, log) {
+			if err := config.Set(kafkautils.KafkaConfigMetadataLogDirectory, util.StorageConfigKafkaMountPath(bConfig.MetadataStorage.MountPath)); err != nil {
+				log.Error(err, fmt.Sprintf(kafkautils.BrokerConfigErrorMsgTemplate, kafkautils.KafkaConfigMetadataLogDirectory))
+			}
+		}
 	}
 
 	// Add superuser configuration

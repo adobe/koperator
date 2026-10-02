@@ -78,6 +78,11 @@ func (in *BrokerConfig) DeepCopyInto(out *BrokerConfig) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.MetadataStorage != nil {
+		in, out := &in.MetadataStorage, &out.MetadataStorage
+		*out = new(StorageConfig)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.Resources != nil {
 		in, out := &in.Resources, &out.Resources
 		*out = new(v1.ResourceRequirements)
