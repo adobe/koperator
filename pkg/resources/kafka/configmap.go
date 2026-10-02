@@ -285,10 +285,17 @@ func configureBrokerZKMode(brokerID int32, kafkaCluster *v1beta1.KafkaCluster, c
 	}
 }
 
+// getEffectiveLogDirsMountPaths merges the previously configured log.dirs mount paths with the
+// currently desired ones, without reordering any path that already existed in mountPathsOld.
+// Kafka itself doesn't care about log.dirs ordering for partition placement, but in KRaft mode an
+// unset "metadata.log.dir" defaults to log.dirs[0], so gratuitously reshuffling the list (e.g. moving
+// a to-be-removed path to the end) could silently change which directory holds the metadata log.
+// To avoid that, existing paths keep their original relative order - including a path being kept
+// while its disk removal/rebalance is still pending - and only genuinely new paths (not present
+// before) are appended at the end.
 func getEffectiveLogDirsMountPaths(mountPathsOld, mountPathsNew []string, brokerID string, kafkaCluster *v1beta1.KafkaCluster) []string {
-	mountPathsEffective := append([]string{}, mountPathsNew...)
 	if len(mountPathsOld) == 0 {
-		return mountPathsEffective
+		return append([]string{}, mountPathsNew...)
 	}
 
 	newMountPathsSet := make(map[string]struct{}, len(mountPathsNew))
@@ -296,14 +303,32 @@ func getEffectiveLogDirsMountPaths(mountPathsOld, mountPathsNew []string, broker
 		newMountPathsSet[path] = struct{}{}
 	}
 
+	oldMountPathsSet := make(map[string]struct{}, len(mountPathsOld))
+	for _, path := range mountPathsOld {
+		oldMountPathsSet[path] = struct{}{}
+	}
+
+	mountPathsEffective := make([]string, 0, len(mountPathsOld)+len(mountPathsNew))
+
+	// Keep the existing order for paths already present in the old config, whether still
+	// declared or kept temporarily during a pending disk removal/rebalance.
 	for _, oldPath := range mountPathsOld {
-		if _, found := newMountPathsSet[oldPath]; found {
+		if _, stillDeclared := newMountPathsSet[oldPath]; stillDeclared {
+			mountPathsEffective = append(mountPathsEffective, oldPath)
 			continue
 		}
 
 		if shouldKeepRemovedLogDirInConfig(oldPath, brokerID, kafkaCluster) {
 			mountPathsEffective = append(mountPathsEffective, oldPath)
 		}
+	}
+
+	// Append newly added paths (absent from the old config) at the end, in spec order.
+	for _, newPath := range mountPathsNew {
+		if _, alreadyPresent := oldMountPathsSet[newPath]; alreadyPresent {
+			continue
+		}
+		mountPathsEffective = append(mountPathsEffective, newPath)
 	}
 
 	return mountPathsEffective
