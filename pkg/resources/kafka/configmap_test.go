@@ -802,7 +802,7 @@ zookeeper.connect=example.zk:2181/`,
 				superUsers = []string{"CN=kafka-headless.kafka.svc.cluster.local"}
 			}
 
-			generatedConfig := r.generateBrokerConfig(r.KafkaCluster.Spec.Brokers[0], r.KafkaCluster.Spec.Brokers[0].BrokerConfig, nil, map[string]v1beta1.ListenerStatusList{},
+			generatedConfig := r.generateBrokerConfig(r.KafkaCluster.Spec.Brokers[0], r.KafkaCluster.Spec.Brokers[0].BrokerConfig, nil, nil, map[string]v1beta1.ListenerStatusList{},
 				map[string]v1beta1.ListenerStatusList{}, controllerListenerStatus, serverPasses, clientPass, superUsers, logr.Discard())
 
 			generated, err := properties.NewFromString(generatedConfig)
@@ -1298,6 +1298,160 @@ node.id=300
 process.roles=broker
 `},
 		},
+		{
+			testName: "a Kafka cluster with dynamic KRaft controller quorum enabled renders controller.quorum.bootstrap.servers instead of controller.quorum.voters",
+			brokers: []v1beta1.Broker{
+				{
+					Id: 0,
+					BrokerConfig: &v1beta1.BrokerConfig{
+						Roles:          []string{"broker"},
+						StorageConfigs: []v1beta1.StorageConfig{{MountPath: "/test-kafka-logs"}},
+					},
+					ReadOnlyConfig: "kraft.dynamicControllerQuorum.enabled=true",
+				},
+				{
+					Id: 50,
+					BrokerConfig: &v1beta1.BrokerConfig{
+						Roles:          []string{"controller"},
+						StorageConfigs: []v1beta1.StorageConfig{{MountPath: "/test-kafka-logs"}},
+					},
+					ReadOnlyConfig: "kraft.dynamicControllerQuorum.enabled=true",
+				},
+			},
+			listenersConfig: v1beta1.ListenersConfig{
+				InternalListeners: []v1beta1.InternalListenerConfig{
+					{
+						CommonListenerSpec: v1beta1.CommonListenerSpec{
+							Type:                            v1beta1.SecurityProtocol("PLAINTEXT"),
+							Name:                            "internal",
+							ContainerPort:                   9092,
+							UsedForInnerBrokerCommunication: true,
+						},
+					},
+					{
+						CommonListenerSpec: v1beta1.CommonListenerSpec{
+							Type:          v1beta1.SecurityProtocol("PLAINTEXT"),
+							Name:          "controller",
+							ContainerPort: 9093,
+						},
+						UsedForControllerCommunication: true,
+					},
+				},
+			},
+			internalListenerStatuses: map[string]v1beta1.ListenerStatusList{
+				"internal": {
+					{Name: "broker-0", Address: "kafka-0.kafka.svc.cluster.local:9092"},
+					{Name: "broker-50", Address: "kafka-50.kafka.svc.cluster.local:9092"},
+				},
+			},
+			controllerListenerStatus: map[string]v1beta1.ListenerStatusList{
+				"controller": {
+					{Name: "broker-0", Address: "kafka-0.kafka.svc.cluster.local:9093"},
+					{Name: "broker-50", Address: "kafka-50.kafka.svc.cluster.local:9093"},
+				},
+			},
+			expectedBrokerConfigs: []string{
+				`advertised.listeners=INTERNAL://kafka-0.kafka.svc.cluster.local:9092
+controller.listener.names=CONTROLLER
+controller.quorum.bootstrap.servers=kafka-50.kafka.svc.cluster.local:9093
+cruise.control.metrics.reporter.bootstrap.servers=kafka-all-broker.kafka.svc.cluster.local:9092
+cruise.control.metrics.reporter.kubernetes.mode=true
+inter.broker.listener.name=INTERNAL
+listener.security.protocol.map=INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+listeners=INTERNAL://:9092
+log.dirs=/test-kafka-logs/kafka
+metric.reporters=com.linkedin.kafka.cruisecontrol.metricsreporter.CruiseControlMetricsReporter
+node.id=0
+process.roles=broker
+`,
+				`controller.listener.names=CONTROLLER
+controller.quorum.bootstrap.servers=kafka-50.kafka.svc.cluster.local:9093
+inter.broker.listener.name=INTERNAL
+listener.security.protocol.map=INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+listeners=CONTROLLER://:9093
+log.dirs=/test-kafka-logs/kafka
+node.id=50
+process.roles=controller
+`},
+		},
+		{
+			testName: "dynamic KRaft controller quorum flag composes with the ZK-migration bridge flags (broker still bridging to ZK, controller fully on dynamic quorum)",
+			brokers: []v1beta1.Broker{
+				{
+					Id: 0,
+					BrokerConfig: &v1beta1.BrokerConfig{
+						Roles:          []string{"broker"},
+						StorageConfigs: []v1beta1.StorageConfig{{MountPath: "/test-kafka-logs"}},
+					},
+					ReadOnlyConfig: "kraft.dynamicControllerQuorum.enabled=true\nmigration.broker.kRaftMode=false",
+				},
+				{
+					Id: 50,
+					BrokerConfig: &v1beta1.BrokerConfig{
+						Roles:          []string{"controller"},
+						StorageConfigs: []v1beta1.StorageConfig{{MountPath: "/test-kafka-logs"}},
+					},
+					ReadOnlyConfig: "kraft.dynamicControllerQuorum.enabled=true",
+				},
+			},
+			listenersConfig: v1beta1.ListenersConfig{
+				InternalListeners: []v1beta1.InternalListenerConfig{
+					{
+						CommonListenerSpec: v1beta1.CommonListenerSpec{
+							Type:                            v1beta1.SecurityProtocol("PLAINTEXT"),
+							Name:                            "internal",
+							ContainerPort:                   9092,
+							UsedForInnerBrokerCommunication: true,
+						},
+					},
+					{
+						CommonListenerSpec: v1beta1.CommonListenerSpec{
+							Type:          v1beta1.SecurityProtocol("PLAINTEXT"),
+							Name:          "controller",
+							ContainerPort: 9093,
+						},
+						UsedForControllerCommunication: true,
+					},
+				},
+			},
+			internalListenerStatuses: map[string]v1beta1.ListenerStatusList{
+				"internal": {
+					{Name: "broker-0", Address: "kafka-0.kafka.svc.cluster.local:9092"},
+					{Name: "broker-50", Address: "kafka-50.kafka.svc.cluster.local:9092"},
+				},
+			},
+			controllerListenerStatus: map[string]v1beta1.ListenerStatusList{
+				"controller": {
+					{Name: "broker-0", Address: "kafka-0.kafka.svc.cluster.local:9093"},
+					{Name: "broker-50", Address: "kafka-50.kafka.svc.cluster.local:9093"},
+				},
+			},
+			zkAddresses: []string{"example.zk:2181"},
+			zkPath:      "/kafka",
+			expectedBrokerConfigs: []string{
+				`advertised.listeners=INTERNAL://kafka-0.kafka.svc.cluster.local:9092
+broker.id=0
+controller.listener.names=CONTROLLER
+controller.quorum.bootstrap.servers=kafka-50.kafka.svc.cluster.local:9093
+cruise.control.metrics.reporter.bootstrap.servers=kafka-all-broker.kafka.svc.cluster.local:9092
+cruise.control.metrics.reporter.kubernetes.mode=true
+inter.broker.listener.name=INTERNAL
+listener.security.protocol.map=INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+listeners=INTERNAL://:9092
+log.dirs=/test-kafka-logs/kafka
+metric.reporters=com.linkedin.kafka.cruisecontrol.metricsreporter.CruiseControlMetricsReporter
+zookeeper.connect=example.zk:2181/kafka
+`,
+				`controller.listener.names=CONTROLLER
+controller.quorum.bootstrap.servers=kafka-50.kafka.svc.cluster.local:9093
+inter.broker.listener.name=INTERNAL
+listener.security.protocol.map=INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+listeners=CONTROLLER://:9093
+log.dirs=/test-kafka-logs/kafka
+node.id=50
+process.roles=controller
+`},
+		},
 	}
 
 	t.Parallel()
@@ -1332,8 +1486,12 @@ process.roles=broker
 				if err != nil {
 					t.Error(err)
 				}
+				quorumBootstrapServers, err := generateQuorumBootstrapServers(r.KafkaCluster, test.controllerListenerStatus)
+				if err != nil {
+					t.Error(err)
+				}
 
-				generatedConfig := r.generateBrokerConfig(b, b.BrokerConfig, quorumVoters, map[string]v1beta1.ListenerStatusList{},
+				generatedConfig := r.generateBrokerConfig(b, b.BrokerConfig, quorumVoters, quorumBootstrapServers, map[string]v1beta1.ListenerStatusList{},
 					test.internalListenerStatuses, test.controllerListenerStatus, nil, "", nil, logr.Discard())
 
 				require.Equal(t, test.expectedBrokerConfigs[i], generatedConfig)
@@ -1647,7 +1805,11 @@ process.roles=controller
 				if err != nil {
 					t.Error(err)
 				}
-				generatedConfig := r.generateBrokerConfig(b, b.BrokerConfig, quorumVoters, map[string]v1beta1.ListenerStatusList{},
+				quorumBootstrapServers, err := generateQuorumBootstrapServers(r.KafkaCluster, test.controllerListenerStatus)
+				if err != nil {
+					t.Error(err)
+				}
+				generatedConfig := r.generateBrokerConfig(b, b.BrokerConfig, quorumVoters, quorumBootstrapServers, map[string]v1beta1.ListenerStatusList{},
 					test.internalListenerStatuses, test.controllerListenerStatus, nil, "", nil, logr.Discard())
 
 				require.Equal(t, test.expectedBrokerConfigs[i], generatedConfig)

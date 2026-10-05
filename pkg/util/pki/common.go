@@ -149,6 +149,19 @@ func clusterDNSNames(cluster *v1beta1.KafkaCluster) []string {
 		// service name only
 		names = append(names,
 			fmt.Sprintf(kafka.HeadlessServiceTemplate, cluster.Name))
+
+		// Controller headless service, used as controller.quorum.bootstrap.servers and by the
+		// per-pod controller listener addresses.
+		controllerHeadless := fmt.Sprintf(kafka.HeadlessControllerServiceTemplate, cluster.Name)
+		names = append(names,
+			fmt.Sprintf("*.%s.%s.svc.%s", controllerHeadless, cluster.Namespace, cluster.Spec.GetKubernetesClusterDomain()),
+			fmt.Sprintf("%s.%s.svc.%s", controllerHeadless, cluster.Namespace, cluster.Spec.GetKubernetesClusterDomain()),
+			fmt.Sprintf("*.%s.%s.svc", controllerHeadless, cluster.Namespace),
+			fmt.Sprintf("%s.%s.svc", controllerHeadless, cluster.Namespace),
+			fmt.Sprintf("*.%s.%s", controllerHeadless, cluster.Namespace),
+			fmt.Sprintf("%s.%s", controllerHeadless, cluster.Namespace),
+			controllerHeadless,
+		)
 	} else {
 		// FQDN
 		names = append(names, fmt.Sprintf("*.%s", GetCommonName(cluster)))

@@ -107,6 +107,13 @@ func TestGetInternalDNSNames(t *testing.T) {
 		"*.test-cluster-headless.test-namespace",
 		"test-cluster-headless.test-namespace",
 		"test-cluster-headless",
+		"*.test-cluster-controller-headless.test-namespace.svc.cluster.local",
+		"test-cluster-controller-headless.test-namespace.svc.cluster.local",
+		"*.test-cluster-controller-headless.test-namespace.svc",
+		"test-cluster-controller-headless.test-namespace.svc",
+		"*.test-cluster-controller-headless.test-namespace",
+		"test-cluster-controller-headless.test-namespace",
+		"test-cluster-controller-headless",
 	}
 	if !reflect.DeepEqual(expected, headlessNames) {
 		t.Error("Expected:", expected, "got:", headlessNames)
