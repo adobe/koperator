@@ -12,12 +12,12 @@ crd:
   technical_name: kafkaclusters.kafka.banzaicloud.io
   scope: Namespaced
   source_repository: https://github.com/adobe/koperator
-  source_repository_ref: 0.28.0-adobe-20260731
+  source_repository_ref: 0.32.0
   versions:
     - v1beta1
   topics:
 layout: crd
-# This schema has 2143 properties, all rendered as <h3>: Hugo/Docsy's
+# This schema has 2208 properties, all rendered as <h3>: Hugo/Docsy's
 # "on this page" TOC would otherwise try to list every single one.
 notoc: true
 owner:
@@ -26,12 +26,12 @@ aliases:
   - /reference/cp-k8s-api/kafkaclusters.kafka.banzaicloud.io/
 technical_name: kafkaclusters.kafka.banzaicloud.io
 source_repository: https://github.com/adobe/koperator
-source_repository_ref: 0.28.0-adobe-20260731
+source_repository_ref: 0.32.0
 ---
 
 ## KafkaCluster
 
-> 📖 **Browse this schema interactively**: [doc.crds.dev](https://doc.crds.dev/github.com/adobe/koperator/kafka.banzaicloud.io/KafkaCluster/v1beta1@0.28.0-adobe-20260731)
+> 📖 **Browse this schema interactively**: [doc.crds.dev](https://doc.crds.dev/github.com/adobe/koperator/kafka.banzaicloud.io/KafkaCluster/v1beta1@0.32.0)
 
 KafkaCluster is the Schema for the kafkaclusters API
 <dl class="crd-meta">
@@ -3513,7 +3513,8 @@ Defaults to &ldquo;&rdquo;.</p>
 </div>
 
 <div class="property-description">
-<p>The key to select.</p>
+<p>The key to select from the ConfigMap&rsquo;s Data field.
+Keys in the BinaryData field are not currently propagated to container env vars.</p>
 
 </div>
 
@@ -4150,6 +4151,25 @@ Name must be an IANA_SVC_NAME.</p>
 
 <div class="property depth-9">
 <div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.containers[*].lifecycle.postStart.httpGet.protocol">.spec.brokers[*].brokerConfig.containers[*].lifecycle.postStart.httpGet.protocol</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">string</span>
+
+</div>
+
+<div class="property-description">
+<p>Protocol selects the wire protocol for the probe connection.
+Nil defaults to HTTP/1.1.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-9">
+<div class="property-header">
 <h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.containers[*].lifecycle.postStart.httpGet.scheme">.spec.brokers[*].brokerConfig.containers[*].lifecycle.postStart.httpGet.scheme</h3>
 </div>
 <div class="property-body">
@@ -4490,6 +4510,25 @@ Name must be an IANA_SVC_NAME.</p>
 
 <div class="property depth-9">
 <div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.containers[*].lifecycle.preStop.httpGet.protocol">.spec.brokers[*].brokerConfig.containers[*].lifecycle.preStop.httpGet.protocol</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">string</span>
+
+</div>
+
+<div class="property-description">
+<p>Protocol selects the wire protocol for the probe connection.
+Nil defaults to HTTP/1.1.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-9">
+<div class="property-header">
 <h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.containers[*].lifecycle.preStop.httpGet.scheme">.spec.brokers[*].brokerConfig.containers[*].lifecycle.preStop.httpGet.scheme</h3>
 </div>
 <div class="property-body">
@@ -4734,6 +4773,27 @@ Defaults to 3. Minimum value is 1.</p>
 
 <div class="property depth-8">
 <div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.containers[*].livenessProbe.grpc.mode">.spec.brokers[*].brokerConfig.containers[*].livenessProbe.grpc.mode</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">string</span>
+
+</div>
+
+<div class="property-description">
+<p>mode specifies the connection mode for the gRPC health probe.
+Set to &ldquo;TLS&rdquo; to use TLS without certificate verification.
+Set to &ldquo;Plaintext&rdquo; to use a plaintext (insecure) connection explicitly.
+If not specified, the probe uses a plaintext (insecure) connection.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-8">
+<div class="property-header">
 <h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.containers[*].livenessProbe.grpc.port">.spec.brokers[*].brokerConfig.containers[*].livenessProbe.grpc.port</h3>
 </div>
 <div class="property-body">
@@ -4913,6 +4973,25 @@ This will be canonicalized upon output, so case-variant names will be understood
 <p>Name or number of the port to access on the container.
 Number must be in the range 1 to 65535.
 Name must be an IANA_SVC_NAME.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-8">
+<div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.containers[*].livenessProbe.httpGet.protocol">.spec.brokers[*].brokerConfig.containers[*].livenessProbe.httpGet.protocol</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">string</span>
+
+</div>
+
+<div class="property-description">
+<p>Protocol selects the wire protocol for the probe connection.
+Nil defaults to HTTP/1.1.</p>
 
 </div>
 
@@ -5370,6 +5449,27 @@ Defaults to 3. Minimum value is 1.</p>
 
 <div class="property depth-8">
 <div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.containers[*].readinessProbe.grpc.mode">.spec.brokers[*].brokerConfig.containers[*].readinessProbe.grpc.mode</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">string</span>
+
+</div>
+
+<div class="property-description">
+<p>mode specifies the connection mode for the gRPC health probe.
+Set to &ldquo;TLS&rdquo; to use TLS without certificate verification.
+Set to &ldquo;Plaintext&rdquo; to use a plaintext (insecure) connection explicitly.
+If not specified, the probe uses a plaintext (insecure) connection.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-8">
+<div class="property-header">
 <h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.containers[*].readinessProbe.grpc.port">.spec.brokers[*].brokerConfig.containers[*].readinessProbe.grpc.port</h3>
 </div>
 <div class="property-body">
@@ -5549,6 +5649,25 @@ This will be canonicalized upon output, so case-variant names will be understood
 <p>Name or number of the port to access on the container.
 Number must be in the range 1 to 65535.
 Name must be an IANA_SVC_NAME.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-8">
+<div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.containers[*].readinessProbe.httpGet.protocol">.spec.brokers[*].brokerConfig.containers[*].readinessProbe.httpGet.protocol</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">string</span>
+
+</div>
+
+<div class="property-description">
+<p>Protocol selects the wire protocol for the probe connection.
+Nil defaults to HTTP/1.1.</p>
 
 </div>
 
@@ -6826,6 +6945,27 @@ Defaults to 3. Minimum value is 1.</p>
 
 <div class="property depth-8">
 <div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.containers[*].startupProbe.grpc.mode">.spec.brokers[*].brokerConfig.containers[*].startupProbe.grpc.mode</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">string</span>
+
+</div>
+
+<div class="property-description">
+<p>mode specifies the connection mode for the gRPC health probe.
+Set to &ldquo;TLS&rdquo; to use TLS without certificate verification.
+Set to &ldquo;Plaintext&rdquo; to use a plaintext (insecure) connection explicitly.
+If not specified, the probe uses a plaintext (insecure) connection.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-8">
+<div class="property-header">
 <h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.containers[*].startupProbe.grpc.port">.spec.brokers[*].brokerConfig.containers[*].startupProbe.grpc.port</h3>
 </div>
 <div class="property-body">
@@ -7005,6 +7145,25 @@ This will be canonicalized upon output, so case-variant names will be understood
 <p>Name or number of the port to access on the container.
 Number must be in the range 1 to 65535.
 Name must be an IANA_SVC_NAME.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-8">
+<div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.containers[*].startupProbe.httpGet.protocol">.spec.brokers[*].brokerConfig.containers[*].startupProbe.httpGet.protocol</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">string</span>
+
+</div>
+
+<div class="property-description">
+<p>Protocol selects the wire protocol for the probe connection.
+Nil defaults to HTTP/1.1.</p>
 
 </div>
 
@@ -7412,6 +7571,42 @@ Cannot be updated.</p>
 
 <div class="property depth-8">
 <div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.containers[*].volumeMounts[*].bindMountOptions">.spec.brokers[*].brokerConfig.containers[*].volumeMounts[*].bindMountOptions</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">array</span>
+
+</div>
+
+<div class="property-description">
+<p>bindMountOptions is the list of additional bind mount options to apply when
+mounting this volume into the container. Allowed values are noexec,
+nodev, and nosuid. These are Linux mount options and have no effect on
+Windows nodes.
+This field is not supported with image volumes.
+This is an alpha field and requires enabling the VolumeBindMountOptions feature gate.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-9">
+<div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.containers[*].volumeMounts[*].bindMountOptions[*]">.spec.brokers[*].brokerConfig.containers[*].volumeMounts[*].bindMountOptions[*]</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">string</span>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-8">
+<div class="property-header">
 <h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.containers[*].volumeMounts[*].mountPath">.spec.brokers[*].brokerConfig.containers[*].volumeMounts[*].mountPath</h3>
 </div>
 <div class="property-body">
@@ -7421,8 +7616,7 @@ Cannot be updated.</p>
 </div>
 
 <div class="property-description">
-<p>Path within the container at which the volume should be mounted.  Must
-not contain &lsquo;:&rsquo;.</p>
+<p>Path within the container at which the volume should be mounted.</p>
 
 </div>
 
@@ -7713,7 +7907,8 @@ Defaults to &ldquo;&rdquo;.</p>
 </div>
 
 <div class="property-description">
-<p>The key to select.</p>
+<p>The key to select from the ConfigMap&rsquo;s Data field.
+Keys in the BinaryData field are not currently propagated to container env vars.</p>
 
 </div>
 
@@ -8548,7 +8743,8 @@ Defaults to &ldquo;&rdquo;.</p>
 </div>
 
 <div class="property-description">
-<p>The key to select.</p>
+<p>The key to select from the ConfigMap&rsquo;s Data field.
+Keys in the BinaryData field are not currently propagated to container env vars.</p>
 
 </div>
 
@@ -9185,6 +9381,25 @@ Name must be an IANA_SVC_NAME.</p>
 
 <div class="property depth-9">
 <div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.initContainers[*].lifecycle.postStart.httpGet.protocol">.spec.brokers[*].brokerConfig.initContainers[*].lifecycle.postStart.httpGet.protocol</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">string</span>
+
+</div>
+
+<div class="property-description">
+<p>Protocol selects the wire protocol for the probe connection.
+Nil defaults to HTTP/1.1.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-9">
+<div class="property-header">
 <h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.initContainers[*].lifecycle.postStart.httpGet.scheme">.spec.brokers[*].brokerConfig.initContainers[*].lifecycle.postStart.httpGet.scheme</h3>
 </div>
 <div class="property-body">
@@ -9525,6 +9740,25 @@ Name must be an IANA_SVC_NAME.</p>
 
 <div class="property depth-9">
 <div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.initContainers[*].lifecycle.preStop.httpGet.protocol">.spec.brokers[*].brokerConfig.initContainers[*].lifecycle.preStop.httpGet.protocol</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">string</span>
+
+</div>
+
+<div class="property-description">
+<p>Protocol selects the wire protocol for the probe connection.
+Nil defaults to HTTP/1.1.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-9">
+<div class="property-header">
 <h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.initContainers[*].lifecycle.preStop.httpGet.scheme">.spec.brokers[*].brokerConfig.initContainers[*].lifecycle.preStop.httpGet.scheme</h3>
 </div>
 <div class="property-body">
@@ -9769,6 +10003,27 @@ Defaults to 3. Minimum value is 1.</p>
 
 <div class="property depth-8">
 <div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.initContainers[*].livenessProbe.grpc.mode">.spec.brokers[*].brokerConfig.initContainers[*].livenessProbe.grpc.mode</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">string</span>
+
+</div>
+
+<div class="property-description">
+<p>mode specifies the connection mode for the gRPC health probe.
+Set to &ldquo;TLS&rdquo; to use TLS without certificate verification.
+Set to &ldquo;Plaintext&rdquo; to use a plaintext (insecure) connection explicitly.
+If not specified, the probe uses a plaintext (insecure) connection.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-8">
+<div class="property-header">
 <h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.initContainers[*].livenessProbe.grpc.port">.spec.brokers[*].brokerConfig.initContainers[*].livenessProbe.grpc.port</h3>
 </div>
 <div class="property-body">
@@ -9948,6 +10203,25 @@ This will be canonicalized upon output, so case-variant names will be understood
 <p>Name or number of the port to access on the container.
 Number must be in the range 1 to 65535.
 Name must be an IANA_SVC_NAME.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-8">
+<div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.initContainers[*].livenessProbe.httpGet.protocol">.spec.brokers[*].brokerConfig.initContainers[*].livenessProbe.httpGet.protocol</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">string</span>
+
+</div>
+
+<div class="property-description">
+<p>Protocol selects the wire protocol for the probe connection.
+Nil defaults to HTTP/1.1.</p>
 
 </div>
 
@@ -10405,6 +10679,27 @@ Defaults to 3. Minimum value is 1.</p>
 
 <div class="property depth-8">
 <div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.initContainers[*].readinessProbe.grpc.mode">.spec.brokers[*].brokerConfig.initContainers[*].readinessProbe.grpc.mode</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">string</span>
+
+</div>
+
+<div class="property-description">
+<p>mode specifies the connection mode for the gRPC health probe.
+Set to &ldquo;TLS&rdquo; to use TLS without certificate verification.
+Set to &ldquo;Plaintext&rdquo; to use a plaintext (insecure) connection explicitly.
+If not specified, the probe uses a plaintext (insecure) connection.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-8">
+<div class="property-header">
 <h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.initContainers[*].readinessProbe.grpc.port">.spec.brokers[*].brokerConfig.initContainers[*].readinessProbe.grpc.port</h3>
 </div>
 <div class="property-body">
@@ -10584,6 +10879,25 @@ This will be canonicalized upon output, so case-variant names will be understood
 <p>Name or number of the port to access on the container.
 Number must be in the range 1 to 65535.
 Name must be an IANA_SVC_NAME.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-8">
+<div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.initContainers[*].readinessProbe.httpGet.protocol">.spec.brokers[*].brokerConfig.initContainers[*].readinessProbe.httpGet.protocol</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">string</span>
+
+</div>
+
+<div class="property-description">
+<p>Protocol selects the wire protocol for the probe connection.
+Nil defaults to HTTP/1.1.</p>
 
 </div>
 
@@ -11861,6 +12175,27 @@ Defaults to 3. Minimum value is 1.</p>
 
 <div class="property depth-8">
 <div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.initContainers[*].startupProbe.grpc.mode">.spec.brokers[*].brokerConfig.initContainers[*].startupProbe.grpc.mode</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">string</span>
+
+</div>
+
+<div class="property-description">
+<p>mode specifies the connection mode for the gRPC health probe.
+Set to &ldquo;TLS&rdquo; to use TLS without certificate verification.
+Set to &ldquo;Plaintext&rdquo; to use a plaintext (insecure) connection explicitly.
+If not specified, the probe uses a plaintext (insecure) connection.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-8">
+<div class="property-header">
 <h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.initContainers[*].startupProbe.grpc.port">.spec.brokers[*].brokerConfig.initContainers[*].startupProbe.grpc.port</h3>
 </div>
 <div class="property-body">
@@ -12040,6 +12375,25 @@ This will be canonicalized upon output, so case-variant names will be understood
 <p>Name or number of the port to access on the container.
 Number must be in the range 1 to 65535.
 Name must be an IANA_SVC_NAME.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-8">
+<div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.initContainers[*].startupProbe.httpGet.protocol">.spec.brokers[*].brokerConfig.initContainers[*].startupProbe.httpGet.protocol</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">string</span>
+
+</div>
+
+<div class="property-description">
+<p>Protocol selects the wire protocol for the probe connection.
+Nil defaults to HTTP/1.1.</p>
 
 </div>
 
@@ -12447,6 +12801,42 @@ Cannot be updated.</p>
 
 <div class="property depth-8">
 <div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.initContainers[*].volumeMounts[*].bindMountOptions">.spec.brokers[*].brokerConfig.initContainers[*].volumeMounts[*].bindMountOptions</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">array</span>
+
+</div>
+
+<div class="property-description">
+<p>bindMountOptions is the list of additional bind mount options to apply when
+mounting this volume into the container. Allowed values are noexec,
+nodev, and nosuid. These are Linux mount options and have no effect on
+Windows nodes.
+This field is not supported with image volumes.
+This is an alpha field and requires enabling the VolumeBindMountOptions feature gate.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-9">
+<div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.initContainers[*].volumeMounts[*].bindMountOptions[*]">.spec.brokers[*].brokerConfig.initContainers[*].volumeMounts[*].bindMountOptions[*]</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">string</span>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-8">
+<div class="property-header">
 <h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.initContainers[*].volumeMounts[*].mountPath">.spec.brokers[*].brokerConfig.initContainers[*].volumeMounts[*].mountPath</h3>
 </div>
 <div class="property-body">
@@ -12456,8 +12846,7 @@ Cannot be updated.</p>
 </div>
 
 <div class="property-description">
-<p>Path within the container at which the volume should be mounted.  Must
-not contain &lsquo;:&rsquo;.</p>
+<p>Path within the container at which the volume should be mounted.</p>
 
 </div>
 
@@ -13002,12 +13391,9 @@ This requires all Pods that share the same volume to use the same SELinux label.
 It is not possible to share the same volume among privileged and unprivileged Pods.
 Eligible volumes are in-tree FibreChannel and iSCSI volumes, and all CSI volumes
 whose CSI driver announces SELinux support by setting spec.seLinuxMount: true in their
-CSIDriver instance. Other volumes are always re-labelled recursively.
-&ldquo;MountOption&rdquo; value is allowed only when SELinuxMount feature gate is enabled.</p>
+CSIDriver instance. Other volumes are always re-labelled recursively.</p>
 
-<p>If not specified and SELinuxMount feature gate is enabled, &ldquo;MountOption&rdquo; is used.
-If not specified and SELinuxMount feature gate is disabled, &ldquo;MountOption&rdquo; is used for ReadWriteOncePod volumes
-and &ldquo;Recursive&rdquo; for all other volumes.</p>
+<p>If not specified, &ldquo;MountOption&rdquo; is used.</p>
 
 <p>This field affects only Pods that have SELinux label set, either in PodSecurityContext or in SecurityContext of all containers.</p>
 
@@ -14281,6 +14667,31 @@ More info: <a href="https://kubernetes.io/docs/concepts/storage/volumes#emptydir
 
 <div class="property depth-7">
 <div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.storageConfigs[*].emptyDir.mode">.spec.brokers[*].brokerConfig.storageConfigs[*].emptyDir.mode</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">integer</span>
+
+</div>
+
+<div class="property-description">
+<p>mode specifies the permission bits for the emptyDir directory, in numeric
+notation (e.g., 0755, 01777). Must be a value between 0000 and 01777.
+If not specified, defaults to 0777.
+This might be in conflict with other options that affect the file
+mode, like fsGroup. If fsGroup is specified, the fsGroup permissions
+will override the mode specified here.
+This field has no effect on Windows.
+This field is alpha and requires EmptyDirVolumeMode featuregate to be enabled.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-7">
+<div class="property-header">
 <h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.storageConfigs[*].emptyDir.sizeLimit">.spec.brokers[*].brokerConfig.storageConfigs[*].emptyDir.sizeLimit</h3>
 </div>
 <div class="property-body">
@@ -14384,8 +14795,8 @@ More info: <a href="https://kubernetes.io/docs/concepts/storage/persistent-volum
 * An existing PVC (PersistentVolumeClaim)
 If the provisioner or an external controller can support the specified data source,
 it will create a new volume based on the contents of the specified data source.
-When the AnyVolumeDataSource feature gate is enabled, dataSource contents will be copied to dataSourceRef,
-and dataSourceRef contents will be copied to dataSource when dataSourceRef.namespace is not specified.
+dataSource contents will be copied to dataSourceRef, and dataSourceRef contents will be
+copied to dataSource when dataSourceRef.namespace is not specified.
 If the namespace is specified, then dataSourceRef will not be copied to dataSource.</p>
 
 </div>
@@ -14481,7 +14892,6 @@ There are three important differences between dataSource and dataSourceRef:
   specified.
 * While dataSource only allows local objects, dataSourceRef allows objects
   in any namespaces.
-(Beta) Using this field requires the AnyVolumeDataSource feature gate to be enabled.
 (Alpha) Using the namespace field of dataSourceRef requires the CrossNamespaceVolumeDataSource feature gate to be enabled.</p>
 
 </div>
@@ -15044,6 +15454,42 @@ If the operator is Exists, the value should be empty, otherwise just a regular s
 
 <div class="property depth-6">
 <div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.volumeMounts[*].bindMountOptions">.spec.brokers[*].brokerConfig.volumeMounts[*].bindMountOptions</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">array</span>
+
+</div>
+
+<div class="property-description">
+<p>bindMountOptions is the list of additional bind mount options to apply when
+mounting this volume into the container. Allowed values are noexec,
+nodev, and nosuid. These are Linux mount options and have no effect on
+Windows nodes.
+This field is not supported with image volumes.
+This is an alpha field and requires enabling the VolumeBindMountOptions feature gate.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-7">
+<div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.volumeMounts[*].bindMountOptions[*]">.spec.brokers[*].brokerConfig.volumeMounts[*].bindMountOptions[*]</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">string</span>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-6">
+<div class="property-header">
 <h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.volumeMounts[*].mountPath">.spec.brokers[*].brokerConfig.volumeMounts[*].mountPath</h3>
 </div>
 <div class="property-body">
@@ -15053,8 +15499,7 @@ If the operator is Exists, the value should be empty, otherwise just a regular s
 </div>
 
 <div class="property-description">
-<p>Path within the container at which the volume should be mounted.  Must
-not contain &lsquo;:&rsquo;.</p>
+<p>Path within the container at which the volume should be mounted.</p>
 
 </div>
 
@@ -15872,6 +16317,26 @@ mode, like fsGroup, and the result can be other mode bits set.</p>
 
 <div class="property depth-7">
 <div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.volumes[*].configMap.defaultUser">.spec.brokers[*].brokerConfig.volumes[*].configMap.defaultUser</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">integer</span>
+
+</div>
+
+<div class="property-description">
+<p>defaultUser is Optional: The owner UID of the created files by default.
+The defaultUser field is only used as a fallback when the item-level user field is unset.
+(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-7">
+<div class="property-header">
 <h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.volumes[*].configMap.items">.spec.brokers[*].brokerConfig.volumes[*].configMap.items</h3>
 </div>
 <div class="property-body">
@@ -15968,6 +16433,26 @@ mode, like fsGroup, and the result can be other mode bits set.</p>
 May not be an absolute path.
 May not contain the path element &lsquo;..&rsquo;.
 May not start with the string &lsquo;..&rsquo;.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-9">
+<div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.volumes[*].configMap.items[*].user">.spec.brokers[*].brokerConfig.volumes[*].configMap.items[*].user</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">integer</span>
+
+</div>
+
+<div class="property-description">
+<p>user is Optional: The owner UID of the created file.
+If specified, the item-level user field takes precedence over defaultUser.
+(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.</p>
 
 </div>
 
@@ -16198,6 +16683,26 @@ mode, like fsGroup, and the result can be other mode bits set.</p>
 
 <div class="property depth-7">
 <div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.volumes[*].downwardAPI.defaultUser">.spec.brokers[*].brokerConfig.volumes[*].downwardAPI.defaultUser</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">integer</span>
+
+</div>
+
+<div class="property-description">
+<p>defaultUser is Optional: The owner UID of the created files by default.
+The defaultUser field is only used as a fallback when the item-level user field is unset.
+(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-7">
+<div class="property-header">
 <h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.volumes[*].downwardAPI.items">.spec.brokers[*].brokerConfig.volumes[*].downwardAPI.items</h3>
 </div>
 <div class="property-body">
@@ -16400,6 +16905,26 @@ mode, like fsGroup, and the result can be other mode bits set.</p>
 </div>
 </div>
 
+<div class="property depth-9">
+<div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.volumes[*].downwardAPI.items[*].user">.spec.brokers[*].brokerConfig.volumes[*].downwardAPI.items[*].user</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">integer</span>
+
+</div>
+
+<div class="property-description">
+<p>user is Optional: The owner UID of the created file.
+If specified, the item-level user field takes precedence over defaultUser.
+(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.</p>
+
+</div>
+
+</div>
+</div>
+
 <div class="property depth-6">
 <div class="property-header">
 <h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.volumes[*].emptyDir">.spec.brokers[*].brokerConfig.volumes[*].emptyDir</h3>
@@ -16434,6 +16959,31 @@ More info: <a href="https://kubernetes.io/docs/concepts/storage/volumes#emptydir
 The default is &ldquo;&rdquo; which means to use the node&rsquo;s default medium.
 Must be an empty string (default) or Memory.
 More info: <a href="https://kubernetes.io/docs/concepts/storage/volumes#emptydir">https://kubernetes.io/docs/concepts/storage/volumes#emptydir</a></p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-7">
+<div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.volumes[*].emptyDir.mode">.spec.brokers[*].brokerConfig.volumes[*].emptyDir.mode</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">integer</span>
+
+</div>
+
+<div class="property-description">
+<p>mode specifies the permission bits for the emptyDir directory, in numeric
+notation (e.g., 0755, 01777). Must be a value between 0000 and 01777.
+If not specified, defaults to 0777.
+This might be in conflict with other options that affect the file
+mode, like fsGroup. If fsGroup is specified, the fsGroup permissions
+will override the mode specified here.
+This field has no effect on Windows.
+This field is alpha and requires EmptyDirVolumeMode featuregate to be enabled.</p>
 
 </div>
 
@@ -16631,8 +17181,8 @@ More info: <a href="https://kubernetes.io/docs/concepts/storage/persistent-volum
 * An existing PVC (PersistentVolumeClaim)
 If the provisioner or an external controller can support the specified data source,
 it will create a new volume based on the contents of the specified data source.
-When the AnyVolumeDataSource feature gate is enabled, dataSource contents will be copied to dataSourceRef,
-and dataSourceRef contents will be copied to dataSource when dataSourceRef.namespace is not specified.
+dataSource contents will be copied to dataSourceRef, and dataSourceRef contents will be
+copied to dataSource when dataSourceRef.namespace is not specified.
 If the namespace is specified, then dataSourceRef will not be copied to dataSource.</p>
 
 </div>
@@ -16728,7 +17278,6 @@ There are three important differences between dataSource and dataSourceRef:
   specified.
 * While dataSource only allows local objects, dataSourceRef allows objects
   in any namespaces.
-(Beta) Using this field requires the AnyVolumeDataSource feature gate to be enabled.
 (Alpha) Using the namespace field of dataSourceRef requires the CrossNamespaceVolumeDataSource feature gate to be enabled.</p>
 
 </div>
@@ -18428,6 +18977,26 @@ mode, like fsGroup, and the result can be other mode bits set.</p>
 
 <div class="property depth-7">
 <div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.volumes[*].projected.defaultUser">.spec.brokers[*].brokerConfig.volumes[*].projected.defaultUser</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">integer</span>
+
+</div>
+
+<div class="property-description">
+<p>defaultUser is Optional: The owner UID of the created files by default.
+The defaultUser field is only used as a fallback when the item-level user field is unset.
+(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-7">
+<div class="property-header">
 <h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.volumes[*].projected.sources">.spec.brokers[*].brokerConfig.volumes[*].projected.sources</h3>
 </div>
 <div class="property-body">
@@ -18722,6 +19291,26 @@ ClusterTrustBundles will be unified and deduplicated.</p>
 </div>
 </div>
 
+<div class="property depth-10">
+<div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.volumes[*].projected.sources[*].clusterTrustBundle.user">.spec.brokers[*].brokerConfig.volumes[*].projected.sources[*].clusterTrustBundle.user</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">integer</span>
+
+</div>
+
+<div class="property-description">
+<p>user is Optional: The owner UID of the created file.
+If specified, the item-level user field takes precedence over defaultUser.
+(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.</p>
+
+</div>
+
+</div>
+</div>
+
 <div class="property depth-9">
 <div class="property-header">
 <h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.volumes[*].projected.sources[*].configMap">.spec.brokers[*].brokerConfig.volumes[*].projected.sources[*].configMap</h3>
@@ -18838,6 +19427,26 @@ mode, like fsGroup, and the result can be other mode bits set.</p>
 May not be an absolute path.
 May not contain the path element &lsquo;..&rsquo;.
 May not start with the string &lsquo;..&rsquo;.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-12">
+<div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.volumes[*].projected.sources[*].configMap.items[*].user">.spec.brokers[*].brokerConfig.volumes[*].projected.sources[*].configMap.items[*].user</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">integer</span>
+
+</div>
+
+<div class="property-description">
+<p>user is Optional: The owner UID of the created file.
+If specified, the item-level user field takes precedence over defaultUser.
+(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.</p>
 
 </div>
 
@@ -19106,6 +19715,26 @@ mode, like fsGroup, and the result can be other mode bits set.</p>
 </div>
 </div>
 
+<div class="property depth-12">
+<div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.volumes[*].projected.sources[*].downwardAPI.items[*].user">.spec.brokers[*].brokerConfig.volumes[*].projected.sources[*].downwardAPI.items[*].user</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">integer</span>
+
+</div>
+
+<div class="property-description">
+<p>user is Optional: The owner UID of the created file.
+If specified, the item-level user field takes precedence over defaultUser.
+(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.</p>
+
+</div>
+
+</div>
+</div>
+
 <div class="property depth-9">
 <div class="property-header">
 <h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.volumes[*].projected.sources[*].podCertificate">.spec.brokers[*].brokerConfig.volumes[*].projected.sources[*].podCertificate</h3>
@@ -19306,6 +19935,26 @@ longer than 24 hours.</p>
 
 <div class="property depth-10">
 <div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.volumes[*].projected.sources[*].podCertificate.user">.spec.brokers[*].brokerConfig.volumes[*].projected.sources[*].podCertificate.user</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">integer</span>
+
+</div>
+
+<div class="property-description">
+<p>user is Optional: The owner UID of the created file.
+If specified, the item-level user field takes precedence over defaultUser.
+(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-10">
+<div class="property-header">
 <h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.volumes[*].projected.sources[*].podCertificate.userAnnotations">.spec.brokers[*].brokerConfig.volumes[*].projected.sources[*].podCertificate.userAnnotations</h3>
 </div>
 <div class="property-body">
@@ -19456,6 +20105,26 @@ May not start with the string &lsquo;..&rsquo;.</p>
 </div>
 </div>
 
+<div class="property depth-12">
+<div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.volumes[*].projected.sources[*].secret.items[*].user">.spec.brokers[*].brokerConfig.volumes[*].projected.sources[*].secret.items[*].user</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">integer</span>
+
+</div>
+
+<div class="property-description">
+<p>user is Optional: The owner UID of the created file.
+If specified, the item-level user field takes precedence over defaultUser.
+(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.</p>
+
+</div>
+
+</div>
+</div>
+
 <div class="property depth-10">
 <div class="property-header">
 <h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.volumes[*].projected.sources[*].secret.name">.spec.brokers[*].brokerConfig.volumes[*].projected.sources[*].secret.name</h3>
@@ -19571,6 +20240,26 @@ and must be at least 10 minutes.</p>
 <div class="property-description">
 <p>path is the path relative to the mount point of the file to project the
 token into.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-10">
+<div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.volumes[*].projected.sources[*].serviceAccountToken.user">.spec.brokers[*].brokerConfig.volumes[*].projected.sources[*].serviceAccountToken.user</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">integer</span>
+
+</div>
+
+<div class="property-description">
+<p>user is Optional: The owner UID of the created file.
+If specified, the item-level user field takes precedence over defaultUser.
+(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.</p>
 
 </div>
 
@@ -20197,6 +20886,26 @@ mode, like fsGroup, and the result can be other mode bits set.</p>
 
 <div class="property depth-7">
 <div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.volumes[*].secret.defaultUser">.spec.brokers[*].brokerConfig.volumes[*].secret.defaultUser</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">integer</span>
+
+</div>
+
+<div class="property-description">
+<p>defaultUser is Optional: The owner UID of the created files by default.
+The defaultUser field is only used as a fallback when the item-level user field is unset.
+(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-7">
+<div class="property-header">
 <h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.volumes[*].secret.items">.spec.brokers[*].brokerConfig.volumes[*].secret.items</h3>
 </div>
 <div class="property-body">
@@ -20293,6 +21002,26 @@ mode, like fsGroup, and the result can be other mode bits set.</p>
 May not be an absolute path.
 May not contain the path element &lsquo;..&rsquo;.
 May not start with the string &lsquo;..&rsquo;.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-9">
+<div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.brokers[*].brokerConfig.volumes[*].secret.items[*].user">.spec.brokers[*].brokerConfig.volumes[*].secret.items[*].user</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">integer</span>
+
+</div>
+
+<div class="property-description">
+<p>user is Optional: The owner UID of the created file.
+If specified, the item-level user field takes precedence over defaultUser.
+(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.</p>
 
 </div>
 
@@ -24017,7 +24746,8 @@ Defaults to &ldquo;&rdquo;.</p>
 </div>
 
 <div class="property-description">
-<p>The key to select.</p>
+<p>The key to select from the ConfigMap&rsquo;s Data field.
+Keys in the BinaryData field are not currently propagated to container env vars.</p>
 
 </div>
 
@@ -24654,6 +25384,25 @@ Name must be an IANA_SVC_NAME.</p>
 
 <div class="property depth-7">
 <div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.cruiseControlConfig.initContainers[*].lifecycle.postStart.httpGet.protocol">.spec.cruiseControlConfig.initContainers[*].lifecycle.postStart.httpGet.protocol</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">string</span>
+
+</div>
+
+<div class="property-description">
+<p>Protocol selects the wire protocol for the probe connection.
+Nil defaults to HTTP/1.1.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-7">
+<div class="property-header">
 <h3 class="property-path" id="v1beta1-.spec.cruiseControlConfig.initContainers[*].lifecycle.postStart.httpGet.scheme">.spec.cruiseControlConfig.initContainers[*].lifecycle.postStart.httpGet.scheme</h3>
 </div>
 <div class="property-body">
@@ -24994,6 +25743,25 @@ Name must be an IANA_SVC_NAME.</p>
 
 <div class="property depth-7">
 <div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.cruiseControlConfig.initContainers[*].lifecycle.preStop.httpGet.protocol">.spec.cruiseControlConfig.initContainers[*].lifecycle.preStop.httpGet.protocol</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">string</span>
+
+</div>
+
+<div class="property-description">
+<p>Protocol selects the wire protocol for the probe connection.
+Nil defaults to HTTP/1.1.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-7">
+<div class="property-header">
 <h3 class="property-path" id="v1beta1-.spec.cruiseControlConfig.initContainers[*].lifecycle.preStop.httpGet.scheme">.spec.cruiseControlConfig.initContainers[*].lifecycle.preStop.httpGet.scheme</h3>
 </div>
 <div class="property-body">
@@ -25238,6 +26006,27 @@ Defaults to 3. Minimum value is 1.</p>
 
 <div class="property depth-6">
 <div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.cruiseControlConfig.initContainers[*].livenessProbe.grpc.mode">.spec.cruiseControlConfig.initContainers[*].livenessProbe.grpc.mode</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">string</span>
+
+</div>
+
+<div class="property-description">
+<p>mode specifies the connection mode for the gRPC health probe.
+Set to &ldquo;TLS&rdquo; to use TLS without certificate verification.
+Set to &ldquo;Plaintext&rdquo; to use a plaintext (insecure) connection explicitly.
+If not specified, the probe uses a plaintext (insecure) connection.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-6">
+<div class="property-header">
 <h3 class="property-path" id="v1beta1-.spec.cruiseControlConfig.initContainers[*].livenessProbe.grpc.port">.spec.cruiseControlConfig.initContainers[*].livenessProbe.grpc.port</h3>
 </div>
 <div class="property-body">
@@ -25417,6 +26206,25 @@ This will be canonicalized upon output, so case-variant names will be understood
 <p>Name or number of the port to access on the container.
 Number must be in the range 1 to 65535.
 Name must be an IANA_SVC_NAME.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-6">
+<div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.cruiseControlConfig.initContainers[*].livenessProbe.httpGet.protocol">.spec.cruiseControlConfig.initContainers[*].livenessProbe.httpGet.protocol</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">string</span>
+
+</div>
+
+<div class="property-description">
+<p>Protocol selects the wire protocol for the probe connection.
+Nil defaults to HTTP/1.1.</p>
 
 </div>
 
@@ -25874,6 +26682,27 @@ Defaults to 3. Minimum value is 1.</p>
 
 <div class="property depth-6">
 <div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.cruiseControlConfig.initContainers[*].readinessProbe.grpc.mode">.spec.cruiseControlConfig.initContainers[*].readinessProbe.grpc.mode</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">string</span>
+
+</div>
+
+<div class="property-description">
+<p>mode specifies the connection mode for the gRPC health probe.
+Set to &ldquo;TLS&rdquo; to use TLS without certificate verification.
+Set to &ldquo;Plaintext&rdquo; to use a plaintext (insecure) connection explicitly.
+If not specified, the probe uses a plaintext (insecure) connection.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-6">
+<div class="property-header">
 <h3 class="property-path" id="v1beta1-.spec.cruiseControlConfig.initContainers[*].readinessProbe.grpc.port">.spec.cruiseControlConfig.initContainers[*].readinessProbe.grpc.port</h3>
 </div>
 <div class="property-body">
@@ -26053,6 +26882,25 @@ This will be canonicalized upon output, so case-variant names will be understood
 <p>Name or number of the port to access on the container.
 Number must be in the range 1 to 65535.
 Name must be an IANA_SVC_NAME.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-6">
+<div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.cruiseControlConfig.initContainers[*].readinessProbe.httpGet.protocol">.spec.cruiseControlConfig.initContainers[*].readinessProbe.httpGet.protocol</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">string</span>
+
+</div>
+
+<div class="property-description">
+<p>Protocol selects the wire protocol for the probe connection.
+Nil defaults to HTTP/1.1.</p>
 
 </div>
 
@@ -27330,6 +28178,27 @@ Defaults to 3. Minimum value is 1.</p>
 
 <div class="property depth-6">
 <div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.cruiseControlConfig.initContainers[*].startupProbe.grpc.mode">.spec.cruiseControlConfig.initContainers[*].startupProbe.grpc.mode</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">string</span>
+
+</div>
+
+<div class="property-description">
+<p>mode specifies the connection mode for the gRPC health probe.
+Set to &ldquo;TLS&rdquo; to use TLS without certificate verification.
+Set to &ldquo;Plaintext&rdquo; to use a plaintext (insecure) connection explicitly.
+If not specified, the probe uses a plaintext (insecure) connection.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-6">
+<div class="property-header">
 <h3 class="property-path" id="v1beta1-.spec.cruiseControlConfig.initContainers[*].startupProbe.grpc.port">.spec.cruiseControlConfig.initContainers[*].startupProbe.grpc.port</h3>
 </div>
 <div class="property-body">
@@ -27509,6 +28378,25 @@ This will be canonicalized upon output, so case-variant names will be understood
 <p>Name or number of the port to access on the container.
 Number must be in the range 1 to 65535.
 Name must be an IANA_SVC_NAME.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-6">
+<div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.cruiseControlConfig.initContainers[*].startupProbe.httpGet.protocol">.spec.cruiseControlConfig.initContainers[*].startupProbe.httpGet.protocol</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">string</span>
+
+</div>
+
+<div class="property-description">
+<p>Protocol selects the wire protocol for the probe connection.
+Nil defaults to HTTP/1.1.</p>
 
 </div>
 
@@ -27916,6 +28804,42 @@ Cannot be updated.</p>
 
 <div class="property depth-6">
 <div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.cruiseControlConfig.initContainers[*].volumeMounts[*].bindMountOptions">.spec.cruiseControlConfig.initContainers[*].volumeMounts[*].bindMountOptions</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">array</span>
+
+</div>
+
+<div class="property-description">
+<p>bindMountOptions is the list of additional bind mount options to apply when
+mounting this volume into the container. Allowed values are noexec,
+nodev, and nosuid. These are Linux mount options and have no effect on
+Windows nodes.
+This field is not supported with image volumes.
+This is an alpha field and requires enabling the VolumeBindMountOptions feature gate.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-7">
+<div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.cruiseControlConfig.initContainers[*].volumeMounts[*].bindMountOptions[*]">.spec.cruiseControlConfig.initContainers[*].volumeMounts[*].bindMountOptions[*]</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">string</span>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-6">
+<div class="property-header">
 <h3 class="property-path" id="v1beta1-.spec.cruiseControlConfig.initContainers[*].volumeMounts[*].mountPath">.spec.cruiseControlConfig.initContainers[*].volumeMounts[*].mountPath</h3>
 </div>
 <div class="property-body">
@@ -27925,8 +28849,7 @@ Cannot be updated.</p>
 </div>
 
 <div class="property-description">
-<p>Path within the container at which the volume should be mounted.  Must
-not contain &lsquo;:&rsquo;.</p>
+<p>Path within the container at which the volume should be mounted.</p>
 
 </div>
 
@@ -28340,12 +29263,9 @@ This requires all Pods that share the same volume to use the same SELinux label.
 It is not possible to share the same volume among privileged and unprivileged Pods.
 Eligible volumes are in-tree FibreChannel and iSCSI volumes, and all CSI volumes
 whose CSI driver announces SELinux support by setting spec.seLinuxMount: true in their
-CSIDriver instance. Other volumes are always re-labelled recursively.
-&ldquo;MountOption&rdquo; value is allowed only when SELinuxMount feature gate is enabled.</p>
+CSIDriver instance. Other volumes are always re-labelled recursively.</p>
 
-<p>If not specified and SELinuxMount feature gate is enabled, &ldquo;MountOption&rdquo; is used.
-If not specified and SELinuxMount feature gate is disabled, &ldquo;MountOption&rdquo; is used for ReadWriteOncePod volumes
-and &ldquo;Recursive&rdquo; for all other volumes.</p>
+<p>If not specified, &ldquo;MountOption&rdquo; is used.</p>
 
 <p>This field affects only Pods that have SELinux label set, either in PodSecurityContext or in SecurityContext of all containers.</p>
 
@@ -29724,6 +30644,42 @@ If the operator is Exists, the value should be empty, otherwise just a regular s
 
 <div class="property depth-4">
 <div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.cruiseControlConfig.volumeMounts[*].bindMountOptions">.spec.cruiseControlConfig.volumeMounts[*].bindMountOptions</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">array</span>
+
+</div>
+
+<div class="property-description">
+<p>bindMountOptions is the list of additional bind mount options to apply when
+mounting this volume into the container. Allowed values are noexec,
+nodev, and nosuid. These are Linux mount options and have no effect on
+Windows nodes.
+This field is not supported with image volumes.
+This is an alpha field and requires enabling the VolumeBindMountOptions feature gate.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-5">
+<div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.cruiseControlConfig.volumeMounts[*].bindMountOptions[*]">.spec.cruiseControlConfig.volumeMounts[*].bindMountOptions[*]</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">string</span>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-4">
+<div class="property-header">
 <h3 class="property-path" id="v1beta1-.spec.cruiseControlConfig.volumeMounts[*].mountPath">.spec.cruiseControlConfig.volumeMounts[*].mountPath</h3>
 </div>
 <div class="property-body">
@@ -29733,8 +30689,7 @@ If the operator is Exists, the value should be empty, otherwise just a regular s
 </div>
 
 <div class="property-description">
-<p>Path within the container at which the volume should be mounted.  Must
-not contain &lsquo;:&rsquo;.</p>
+<p>Path within the container at which the volume should be mounted.</p>
 
 </div>
 
@@ -30552,6 +31507,26 @@ mode, like fsGroup, and the result can be other mode bits set.</p>
 
 <div class="property depth-5">
 <div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.cruiseControlConfig.volumes[*].configMap.defaultUser">.spec.cruiseControlConfig.volumes[*].configMap.defaultUser</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">integer</span>
+
+</div>
+
+<div class="property-description">
+<p>defaultUser is Optional: The owner UID of the created files by default.
+The defaultUser field is only used as a fallback when the item-level user field is unset.
+(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-5">
+<div class="property-header">
 <h3 class="property-path" id="v1beta1-.spec.cruiseControlConfig.volumes[*].configMap.items">.spec.cruiseControlConfig.volumes[*].configMap.items</h3>
 </div>
 <div class="property-body">
@@ -30648,6 +31623,26 @@ mode, like fsGroup, and the result can be other mode bits set.</p>
 May not be an absolute path.
 May not contain the path element &lsquo;..&rsquo;.
 May not start with the string &lsquo;..&rsquo;.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-7">
+<div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.cruiseControlConfig.volumes[*].configMap.items[*].user">.spec.cruiseControlConfig.volumes[*].configMap.items[*].user</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">integer</span>
+
+</div>
+
+<div class="property-description">
+<p>user is Optional: The owner UID of the created file.
+If specified, the item-level user field takes precedence over defaultUser.
+(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.</p>
 
 </div>
 
@@ -30878,6 +31873,26 @@ mode, like fsGroup, and the result can be other mode bits set.</p>
 
 <div class="property depth-5">
 <div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.cruiseControlConfig.volumes[*].downwardAPI.defaultUser">.spec.cruiseControlConfig.volumes[*].downwardAPI.defaultUser</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">integer</span>
+
+</div>
+
+<div class="property-description">
+<p>defaultUser is Optional: The owner UID of the created files by default.
+The defaultUser field is only used as a fallback when the item-level user field is unset.
+(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-5">
+<div class="property-header">
 <h3 class="property-path" id="v1beta1-.spec.cruiseControlConfig.volumes[*].downwardAPI.items">.spec.cruiseControlConfig.volumes[*].downwardAPI.items</h3>
 </div>
 <div class="property-body">
@@ -31080,6 +32095,26 @@ mode, like fsGroup, and the result can be other mode bits set.</p>
 </div>
 </div>
 
+<div class="property depth-7">
+<div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.cruiseControlConfig.volumes[*].downwardAPI.items[*].user">.spec.cruiseControlConfig.volumes[*].downwardAPI.items[*].user</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">integer</span>
+
+</div>
+
+<div class="property-description">
+<p>user is Optional: The owner UID of the created file.
+If specified, the item-level user field takes precedence over defaultUser.
+(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.</p>
+
+</div>
+
+</div>
+</div>
+
 <div class="property depth-4">
 <div class="property-header">
 <h3 class="property-path" id="v1beta1-.spec.cruiseControlConfig.volumes[*].emptyDir">.spec.cruiseControlConfig.volumes[*].emptyDir</h3>
@@ -31114,6 +32149,31 @@ More info: <a href="https://kubernetes.io/docs/concepts/storage/volumes#emptydir
 The default is &ldquo;&rdquo; which means to use the node&rsquo;s default medium.
 Must be an empty string (default) or Memory.
 More info: <a href="https://kubernetes.io/docs/concepts/storage/volumes#emptydir">https://kubernetes.io/docs/concepts/storage/volumes#emptydir</a></p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-5">
+<div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.cruiseControlConfig.volumes[*].emptyDir.mode">.spec.cruiseControlConfig.volumes[*].emptyDir.mode</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">integer</span>
+
+</div>
+
+<div class="property-description">
+<p>mode specifies the permission bits for the emptyDir directory, in numeric
+notation (e.g., 0755, 01777). Must be a value between 0000 and 01777.
+If not specified, defaults to 0777.
+This might be in conflict with other options that affect the file
+mode, like fsGroup. If fsGroup is specified, the fsGroup permissions
+will override the mode specified here.
+This field has no effect on Windows.
+This field is alpha and requires EmptyDirVolumeMode featuregate to be enabled.</p>
 
 </div>
 
@@ -31311,8 +32371,8 @@ More info: <a href="https://kubernetes.io/docs/concepts/storage/persistent-volum
 * An existing PVC (PersistentVolumeClaim)
 If the provisioner or an external controller can support the specified data source,
 it will create a new volume based on the contents of the specified data source.
-When the AnyVolumeDataSource feature gate is enabled, dataSource contents will be copied to dataSourceRef,
-and dataSourceRef contents will be copied to dataSource when dataSourceRef.namespace is not specified.
+dataSource contents will be copied to dataSourceRef, and dataSourceRef contents will be
+copied to dataSource when dataSourceRef.namespace is not specified.
 If the namespace is specified, then dataSourceRef will not be copied to dataSource.</p>
 
 </div>
@@ -31408,7 +32468,6 @@ There are three important differences between dataSource and dataSourceRef:
   specified.
 * While dataSource only allows local objects, dataSourceRef allows objects
   in any namespaces.
-(Beta) Using this field requires the AnyVolumeDataSource feature gate to be enabled.
 (Alpha) Using the namespace field of dataSourceRef requires the CrossNamespaceVolumeDataSource feature gate to be enabled.</p>
 
 </div>
@@ -33108,6 +34167,26 @@ mode, like fsGroup, and the result can be other mode bits set.</p>
 
 <div class="property depth-5">
 <div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.cruiseControlConfig.volumes[*].projected.defaultUser">.spec.cruiseControlConfig.volumes[*].projected.defaultUser</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">integer</span>
+
+</div>
+
+<div class="property-description">
+<p>defaultUser is Optional: The owner UID of the created files by default.
+The defaultUser field is only used as a fallback when the item-level user field is unset.
+(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-5">
+<div class="property-header">
 <h3 class="property-path" id="v1beta1-.spec.cruiseControlConfig.volumes[*].projected.sources">.spec.cruiseControlConfig.volumes[*].projected.sources</h3>
 </div>
 <div class="property-body">
@@ -33402,6 +34481,26 @@ ClusterTrustBundles will be unified and deduplicated.</p>
 </div>
 </div>
 
+<div class="property depth-8">
+<div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.cruiseControlConfig.volumes[*].projected.sources[*].clusterTrustBundle.user">.spec.cruiseControlConfig.volumes[*].projected.sources[*].clusterTrustBundle.user</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">integer</span>
+
+</div>
+
+<div class="property-description">
+<p>user is Optional: The owner UID of the created file.
+If specified, the item-level user field takes precedence over defaultUser.
+(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.</p>
+
+</div>
+
+</div>
+</div>
+
 <div class="property depth-7">
 <div class="property-header">
 <h3 class="property-path" id="v1beta1-.spec.cruiseControlConfig.volumes[*].projected.sources[*].configMap">.spec.cruiseControlConfig.volumes[*].projected.sources[*].configMap</h3>
@@ -33518,6 +34617,26 @@ mode, like fsGroup, and the result can be other mode bits set.</p>
 May not be an absolute path.
 May not contain the path element &lsquo;..&rsquo;.
 May not start with the string &lsquo;..&rsquo;.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-10">
+<div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.cruiseControlConfig.volumes[*].projected.sources[*].configMap.items[*].user">.spec.cruiseControlConfig.volumes[*].projected.sources[*].configMap.items[*].user</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">integer</span>
+
+</div>
+
+<div class="property-description">
+<p>user is Optional: The owner UID of the created file.
+If specified, the item-level user field takes precedence over defaultUser.
+(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.</p>
 
 </div>
 
@@ -33786,6 +34905,26 @@ mode, like fsGroup, and the result can be other mode bits set.</p>
 </div>
 </div>
 
+<div class="property depth-10">
+<div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.cruiseControlConfig.volumes[*].projected.sources[*].downwardAPI.items[*].user">.spec.cruiseControlConfig.volumes[*].projected.sources[*].downwardAPI.items[*].user</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">integer</span>
+
+</div>
+
+<div class="property-description">
+<p>user is Optional: The owner UID of the created file.
+If specified, the item-level user field takes precedence over defaultUser.
+(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.</p>
+
+</div>
+
+</div>
+</div>
+
 <div class="property depth-7">
 <div class="property-header">
 <h3 class="property-path" id="v1beta1-.spec.cruiseControlConfig.volumes[*].projected.sources[*].podCertificate">.spec.cruiseControlConfig.volumes[*].projected.sources[*].podCertificate</h3>
@@ -33986,6 +35125,26 @@ longer than 24 hours.</p>
 
 <div class="property depth-8">
 <div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.cruiseControlConfig.volumes[*].projected.sources[*].podCertificate.user">.spec.cruiseControlConfig.volumes[*].projected.sources[*].podCertificate.user</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">integer</span>
+
+</div>
+
+<div class="property-description">
+<p>user is Optional: The owner UID of the created file.
+If specified, the item-level user field takes precedence over defaultUser.
+(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-8">
+<div class="property-header">
 <h3 class="property-path" id="v1beta1-.spec.cruiseControlConfig.volumes[*].projected.sources[*].podCertificate.userAnnotations">.spec.cruiseControlConfig.volumes[*].projected.sources[*].podCertificate.userAnnotations</h3>
 </div>
 <div class="property-body">
@@ -34136,6 +35295,26 @@ May not start with the string &lsquo;..&rsquo;.</p>
 </div>
 </div>
 
+<div class="property depth-10">
+<div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.cruiseControlConfig.volumes[*].projected.sources[*].secret.items[*].user">.spec.cruiseControlConfig.volumes[*].projected.sources[*].secret.items[*].user</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">integer</span>
+
+</div>
+
+<div class="property-description">
+<p>user is Optional: The owner UID of the created file.
+If specified, the item-level user field takes precedence over defaultUser.
+(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.</p>
+
+</div>
+
+</div>
+</div>
+
 <div class="property depth-8">
 <div class="property-header">
 <h3 class="property-path" id="v1beta1-.spec.cruiseControlConfig.volumes[*].projected.sources[*].secret.name">.spec.cruiseControlConfig.volumes[*].projected.sources[*].secret.name</h3>
@@ -34251,6 +35430,26 @@ and must be at least 10 minutes.</p>
 <div class="property-description">
 <p>path is the path relative to the mount point of the file to project the
 token into.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-8">
+<div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.cruiseControlConfig.volumes[*].projected.sources[*].serviceAccountToken.user">.spec.cruiseControlConfig.volumes[*].projected.sources[*].serviceAccountToken.user</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">integer</span>
+
+</div>
+
+<div class="property-description">
+<p>user is Optional: The owner UID of the created file.
+If specified, the item-level user field takes precedence over defaultUser.
+(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.</p>
 
 </div>
 
@@ -34877,6 +36076,26 @@ mode, like fsGroup, and the result can be other mode bits set.</p>
 
 <div class="property depth-5">
 <div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.cruiseControlConfig.volumes[*].secret.defaultUser">.spec.cruiseControlConfig.volumes[*].secret.defaultUser</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">integer</span>
+
+</div>
+
+<div class="property-description">
+<p>defaultUser is Optional: The owner UID of the created files by default.
+The defaultUser field is only used as a fallback when the item-level user field is unset.
+(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-5">
+<div class="property-header">
 <h3 class="property-path" id="v1beta1-.spec.cruiseControlConfig.volumes[*].secret.items">.spec.cruiseControlConfig.volumes[*].secret.items</h3>
 </div>
 <div class="property-body">
@@ -34973,6 +36192,26 @@ mode, like fsGroup, and the result can be other mode bits set.</p>
 May not be an absolute path.
 May not contain the path element &lsquo;..&rsquo;.
 May not start with the string &lsquo;..&rsquo;.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-7">
+<div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.cruiseControlConfig.volumes[*].secret.items[*].user">.spec.cruiseControlConfig.volumes[*].secret.items[*].user</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">integer</span>
+
+</div>
+
+<div class="property-description">
+<p>user is Optional: The owner UID of the created file.
+If specified, the item-level user field takes precedence over defaultUser.
+(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.</p>
 
 </div>
 
@@ -38512,12 +39751,9 @@ This requires all Pods that share the same volume to use the same SELinux label.
 It is not possible to share the same volume among privileged and unprivileged Pods.
 Eligible volumes are in-tree FibreChannel and iSCSI volumes, and all CSI volumes
 whose CSI driver announces SELinux support by setting spec.seLinuxMount: true in their
-CSIDriver instance. Other volumes are always re-labelled recursively.
-&ldquo;MountOption&rdquo; value is allowed only when SELinuxMount feature gate is enabled.</p>
+CSIDriver instance. Other volumes are always re-labelled recursively.</p>
 
-<p>If not specified and SELinuxMount feature gate is enabled, &ldquo;MountOption&rdquo; is used.
-If not specified and SELinuxMount feature gate is disabled, &ldquo;MountOption&rdquo; is used for ReadWriteOncePod volumes
-and &ldquo;Recursive&rdquo; for all other volumes.</p>
+<p>If not specified, &ldquo;MountOption&rdquo; is used.</p>
 
 <p>This field affects only Pods that have SELinux label set, either in PodSecurityContext or in SecurityContext of all containers.</p>
 
@@ -39774,7 +41010,8 @@ Defaults to &ldquo;&rdquo;.</p>
 </div>
 
 <div class="property-description">
-<p>The key to select.</p>
+<p>The key to select from the ConfigMap&rsquo;s Data field.
+Keys in the BinaryData field are not currently propagated to container env vars.</p>
 
 </div>
 
@@ -41116,6 +42353,30 @@ Affinity definition overrides this behavior</p>
 
 <div class="property depth-1">
 <div class="property-header">
+<h3 class="property-path" id="v1beta1-.spec.publishNotReadyAddresses">.spec.publishNotReadyAddresses</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">boolean</span>
+
+</div>
+
+<div class="property-description">
+<p>PublishNotReadyAddresses controls whether the non-headless broker Services
+(kafka-{id} and kafka-all-broker) include the pod IP in their endpoints even
+when the pod fails its readiness probe.
+Enable this when using a custom readiness sidecar that checks Under-Replicated
+Partitions (URP) combined with a PodDisruptionBudget, so that brokers continue
+serving existing partition traffic while the PDB holds eviction.
+Headless services always publish not-ready addresses regardless of this field.</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-1">
+<div class="property-header">
 <h3 class="property-path" id="v1beta1-.spec.rackAwareness">.spec.rackAwareness</h3>
 </div>
 <div class="property-body">
@@ -41527,6 +42788,27 @@ If set under KRaft mode, Koperator ignores this configuration.</p>
 
 <div class="property-description">
 <p>CruiseControlTopicStatus holds info about the CC topic status</p>
+
+</div>
+
+</div>
+</div>
+
+<div class="property depth-1">
+<div class="property-header">
+<h3 class="property-path" id="v1beta1-.status.kRaftDynamicQuorumBootstrapped">.status.kRaftDynamicQuorumBootstrapped</h3>
+</div>
+<div class="property-body">
+<div class="property-meta">
+<span class="property-type">boolean</span>
+
+</div>
+
+<div class="property-description">
+<p>KRaftDynamicQuorumBootstrapped is set to true once the dynamic KRaft controller quorum has formed
+(a controller has reported a leader/follower raft state). Once set, Koperator stops formatting the
+lowest-ID controller with &ndash;standalone, so a controller that later loses its disk rejoins the
+existing quorum as an observer instead of bootstrapping a divergent single-voter quorum.</p>
 
 </div>
 
