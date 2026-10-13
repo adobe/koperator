@@ -14,7 +14,7 @@
 # limitations under the License.
 
 
-KUSTOMIZE_VERSION=5.8.2 # renovate: datasource=github-releases depName=kubernetes-sigs/kustomize extractVersion=^kustomize/v(?<version>.+)$
+KUSTOMIZE_VERSION=5.8.3 # renovate: datasource=github-releases depName=kubernetes-sigs/kustomize extractVersion=^kustomize/v(?<version>.+)$
 opsys=$(echo "$(uname -s)" | awk '{print tolower($0)}')
 
 # download the release
