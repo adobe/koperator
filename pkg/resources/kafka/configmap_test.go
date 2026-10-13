@@ -216,6 +216,58 @@ func TestGetEffectiveLogDirsMountPaths(t *testing.T) {
 			},
 			expectedEffective: []string{"/kafka-logs/kafka", "/kafka-logs2/kafka"},
 		},
+		{
+			testName:          "reordering existing paths in storageConfigs does not reorder log.dirs",
+			mountPathsOld:     []string{"/kafka-logs/kafka", "/kafka-logs2/kafka", "/kafka-logs3/kafka"},
+			mountPathsNew:     []string{"/kafka-logs3/kafka", "/kafka-logs/kafka", "/kafka-logs2/kafka"},
+			brokerID:          "0",
+			kafkaCluster:      nil,
+			expectedEffective: []string{"/kafka-logs/kafka", "/kafka-logs2/kafka", "/kafka-logs3/kafka"},
+		},
+		{
+			testName:          "newly added paths are appended at the end in their declared relative order",
+			mountPathsOld:     []string{"/kafka-logs/kafka"},
+			mountPathsNew:     []string{"/kafka-logs2/kafka", "/kafka-logs/kafka", "/kafka-logs3/kafka"},
+			brokerID:          "0",
+			kafkaCluster:      nil,
+			expectedEffective: []string{"/kafka-logs/kafka", "/kafka-logs2/kafka", "/kafka-logs3/kafka"},
+		},
+		{
+			testName:          "path with pending disk removal re-declared in a swapped position keeps its original position",
+			mountPathsOld:     []string{"/kafka-logs/kafka", "/kafka-logs2/kafka"},
+			mountPathsNew:     []string{"/kafka-logs2/kafka", "/kafka-logs/kafka"},
+			brokerID:          "0",
+			kafkaCluster:      nil,
+			expectedEffective: []string{"/kafka-logs/kafka", "/kafka-logs2/kafka"},
+		},
+		{
+			testName:          "path re-added after its removal was already confirmed is appended at the end, ignoring its declared position",
+			mountPathsOld:     []string{"/kafka-logs2/kafka"},
+			mountPathsNew:     []string{"/kafka-logs/kafka", "/kafka-logs2/kafka"},
+			brokerID:          "0",
+			kafkaCluster:      nil,
+			expectedEffective: []string{"/kafka-logs2/kafka", "/kafka-logs/kafka"},
+		},
+		{
+			testName:      "mixed: pending-removal path keeps its position while a confirmed-removed-then-readded path is appended at the end",
+			mountPathsOld: []string{"/kafka-logs2/kafka", "/kafka-logs3/kafka"},
+			mountPathsNew: []string{"/kafka-logs/kafka", "/kafka-logs2/kafka"},
+			brokerID:      "0",
+			kafkaCluster: &v1beta1.KafkaCluster{
+				Status: v1beta1.KafkaClusterStatus{
+					BrokersState: map[string]v1beta1.BrokerState{
+						"0": {
+							GracefulActionState: v1beta1.GracefulActionState{
+								VolumeStates: map[string]v1beta1.VolumeState{
+									"/kafka-logs3": {CruiseControlVolumeState: v1beta1.GracefulDiskRemovalRequired},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedEffective: []string{"/kafka-logs2/kafka", "/kafka-logs3/kafka", "/kafka-logs/kafka"},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.testName, func(t *testing.T) {
