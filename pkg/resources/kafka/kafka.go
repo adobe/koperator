@@ -434,6 +434,10 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 		controllerID = -1
 	}
 
+	if !r.KafkaCluster.Spec.KRaftMode {
+		r.KafkaCluster.Status.KRaftDynamicQuorumBootstrapped = false
+	}
+
 	reorderedBrokers := reorderBrokers(runningBrokers, boundPersistentVolumeClaims, r.KafkaCluster.Spec.Brokers, r.KafkaCluster.Status.BrokersState, controllerID, log)
 
 	allBrokerDynamicConfigSucceeded := true
