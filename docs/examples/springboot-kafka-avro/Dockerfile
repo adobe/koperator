@@ -1,4 +1,4 @@
-FROM maven:3.10-eclipse-temurin-21-alpine@sha256:e2359c0c326fc120e375affa68bcab2fc16fca7acf7385a50dd6071da736d281 as build
+FROM maven:3.10-eclipse-temurin-21-alpine@sha256:2ac8cace93acab0f3261103a8c17f391ad836b23ac6899d894d3cf0611cf779b as build
 
 # Set working directory
 WORKDIR /usr/src/myapp
@@ -12,7 +12,7 @@ COPY src ./src
 RUN mvn clean package -DskipTests
 
 # The final image should have minimal layers
-FROM eclipse-temurin:27-jre-alpine@sha256:9d76de111573e77ac415d8344271a2e57dd19bd59c48725fa3bac38c101bd0ba
+FROM eclipse-temurin:27-jre-alpine@sha256:0faf24c1d1e778bbc0700fc71c53b081c9432f1e51e6e41c86c63840e8b89ac1
 RUN apk add --no-cache curl
 COPY --from=build /usr/src/myapp/target/kafka-avro-0.0.1-SNAPSHOT.jar app.jar
 ENTRYPOINT ["java", "-jar", "app.jar"]
