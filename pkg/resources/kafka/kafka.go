@@ -398,6 +398,21 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 	// divergent single-voter quorum.
 	standaloneBootstrapControllerID := int32(-1)
 	dynamicQuorum := false
+	if !r.KafkaCluster.Spec.KRaftMode && r.KafkaCluster.Status.KRaftDynamicQuorumBootstrapped {
+		r.KafkaCluster.Status.KRaftDynamicQuorumBootstrapped = false
+		if updateErr := r.Client.Status().Update(ctx, r.KafkaCluster); updateErr != nil {
+			if apierrors.IsNotFound(updateErr) {
+				updateErr = r.Update(ctx, r.KafkaCluster)
+			}
+			if updateErr != nil {
+				return errors.WrapIfWithDetails(updateErr, "could not update KRaftDynamicQuorumBootstrapped status",
+					"component", componentName,
+					"clusterName", r.KafkaCluster.Name,
+					"clusterNamespace", r.KafkaCluster.Namespace)
+			}
+		}
+	}
+
 	if r.KafkaCluster.Spec.KRaftMode {
 		// all broker nodes under the same Kafka cluster must use the same cluster UUID
 		if r.KafkaCluster.Status.ClusterID == "" {
