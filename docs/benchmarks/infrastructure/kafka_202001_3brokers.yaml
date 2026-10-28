@@ -269,8 +269,8 @@ spec:
       # The zk path to store failed broker information.
       failed.brokers.zk.path=/CruiseControlBrokerList
       # Topic config provider class
-      topic.config.provider.class=com.linkedin.kafka.cruisecontrol.config.KafkaTopicConfigProvider
-      # The cluster configurations for the KafkaTopicConfigProvider
+      topic.config.provider.class=com.linkedin.kafka.cruisecontrol.config.KafkaAdminTopicConfigProvider
+      # Legacy cluster configurations (unused by the Admin topic config provider).
       cluster.configs.file=config/clusterConfigs.json
       # The maximum time in milliseconds to store the response and access details of a completed user task.
       completed.user.task.retention.time.ms=21600000

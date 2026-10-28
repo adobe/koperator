@@ -172,6 +172,7 @@ zookeeper.connect=/
     ]
 }`))
 	Expect(configMap.Data).To(HaveKeyWithValue("clusterConfigs.json", ""))
+	Expect(configMap.Data).To(HaveKeyWithValue("log4j2.properties", configMap.Data["log4j.properties"]))
 	Expect(configMap.Data).To(HaveKeyWithValue("log4j.properties", `rootLogger.level=INFO
 appenders=console, kafkaCruiseControlAppender, operationAppender, requestAppender
 
@@ -377,7 +378,7 @@ func expectCruiseControlDeployment(ctx context.Context, kafkaCluster *v1beta1.Ka
 	userProvidedCCPodAnnotations := kafkaCluster.Spec.CruiseControlConfig.GetCruiseControlAnnotations()
 	ccConfigHash := sha256.Sum256([]byte(configMap.Data["cruisecontrol.properties"]))
 	ccClusterConfigHash := sha256.Sum256([]byte(configMap.Data["clusterConfigs.json"]))
-	ccLogConfigHash := sha256.Sum256([]byte(configMap.Data["log4j.properties"]))
+	ccLogConfigHash := sha256.Sum256([]byte(configMap.Data["log4j.properties"] + "\n" + configMap.Data["log4j2.properties"]))
 	ccBrokerCapacityConfigHash := sha256.Sum256([]byte(configMap.Data["capacity.json"]))
 	expectedPodAnnotations := util.MergeAnnotations(
 		userProvidedCCPodAnnotations,

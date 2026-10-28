@@ -28,7 +28,99 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 
 	"github.com/banzaicloud/koperator/api/v1beta1"
+	properties "github.com/banzaicloud/koperator/properties/pkg"
 )
+
+func TestConfigMapTopicConfigProvider(t *testing.T) {
+	const legacyProvider = "com.linkedin.kafka.cruisecontrol.config.KafkaTopicConfigProvider"
+	const adminProvider = "com.linkedin.kafka.cruisecontrol.config.KafkaAdminTopicConfigProvider"
+	testCases := []struct {
+		name     string
+		kraft    bool
+		provider string
+		want     string
+	}{
+		{name: "ZooKeeper migrates removed provider", provider: legacyProvider, want: adminProvider},
+		{name: "ZooKeeper preserves custom provider", provider: "example.CustomTopicConfigProvider", want: "example.CustomTopicConfigProvider"},
+		{name: "KRaft still uses Admin provider", kraft: true, provider: legacyProvider, want: adminProvider},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			cluster := &v1beta1.KafkaCluster{
+				Spec: v1beta1.KafkaClusterSpec{
+					KRaftMode: test.kraft,
+					ListenersConfig: v1beta1.ListenersConfig{
+						InternalListeners: []v1beta1.InternalListenerConfig{
+							{ContainerPort: 9092, UsedForInnerBrokerCommunication: true},
+						},
+					},
+					CruiseControlConfig: v1beta1.CruiseControlConfig{
+						Config: "topic.config.provider.class=" + test.provider,
+					},
+				},
+			}
+			config := New(nil, cluster, nil).configMap("", "", logr.Discard()).(*v1.ConfigMap)
+			generated, err := properties.NewFromString(config.Data["cruisecontrol.properties"])
+			if err != nil {
+				t.Fatal(err)
+			}
+			provider, found := generated.Get("topic.config.provider.class")
+			if !found || provider.Value() != test.want {
+				t.Errorf("topic config provider = %q, want %q", provider.Value(), test.want)
+			}
+		})
+	}
+}
+
+func TestConfigMapLog4jCompatibility(t *testing.T) {
+	cluster := &v1beta1.KafkaCluster{
+		Spec: v1beta1.KafkaClusterSpec{
+			ListenersConfig: v1beta1.ListenersConfig{
+				InternalListeners: []v1beta1.InternalListenerConfig{
+					{ContainerPort: 9092, UsedForInnerBrokerCommunication: true},
+				},
+			},
+		},
+	}
+	reconciler := New(nil, cluster, nil)
+	defaultConfig := reconciler.configMap("", "", logr.Discard()).(*v1.ConfigMap)
+	defaultLogging := defaultConfig.Data["log4j2.properties"]
+	if defaultLogging == "" {
+		t.Fatal("default logging configuration must be mounted as log4j2.properties")
+	}
+	if defaultConfig.Data["log4j.properties"] != defaultLogging {
+		t.Fatal("legacy logging filename must contain the same configuration")
+	}
+
+	const customLogging = "rootLogger.level=DEBUG\n"
+	cluster.Spec.CruiseControlConfig.Log4jConfig = customLogging
+	customConfig := reconciler.configMap("", "", logr.Discard()).(*v1.ConfigMap)
+	for _, filename := range []string{"log4j2.properties", "log4j.properties"} {
+		if got := customConfig.Data[filename]; got != customLogging {
+			t.Errorf("%s = %q, want custom logging configuration", filename, got)
+		}
+	}
+	defaultAnnotations := GeneratePodAnnotations(nil, defaultConfig.Data)
+	customAnnotations := GeneratePodAnnotations(nil, customConfig.Data)
+	if defaultAnnotations["cruiseControlLogConfig.json"] == customAnnotations["cruiseControlLogConfig.json"] {
+		t.Error("changing logging configuration must change the deployment rollout hash")
+	}
+}
+
+func TestGeneratePodAnnotationsLog4j2Rollout(t *testing.T) {
+	const logging = "rootLogger.level=INFO\n"
+	legacy := GeneratePodAnnotations(nil, map[string]string{
+		"log4j.properties": logging,
+	})
+	current := GeneratePodAnnotations(nil, map[string]string{
+		"log4j.properties":  logging,
+		"log4j2.properties": logging,
+	})
+	if legacy["cruiseControlLogConfig.json"] == current["cruiseControlLogConfig.json"] {
+		t.Error("adding the current logging filename must trigger a deployment rollout")
+	}
+}
 
 //nolint:funlen
 func TestGenerateCapacityConfig_JBOD(t *testing.T) {

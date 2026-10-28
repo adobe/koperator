@@ -187,7 +187,7 @@ fi`},
 func GeneratePodAnnotations(cruiseControlAnnotations, cruiseControlConfig map[string]string) map[string]string {
 	hashedCruiseControlConfigJson := sha256.Sum256([]byte(cruiseControlConfig["cruisecontrol.properties"]))
 	hashedCruiseControlClusterConfigJson := sha256.Sum256([]byte(cruiseControlConfig["clusterConfigs.json"]))
-	hashedCruiseControlLogConfigJson := sha256.Sum256([]byte(cruiseControlConfig["log4j.properties"]))
+	hashedCruiseControlLogConfigJson := sha256.Sum256([]byte(cruiseControlConfig["log4j.properties"] + "\n" + cruiseControlConfig["log4j2.properties"]))
 
 	annotations := []map[string]string{
 		cruiseControlAnnotations,
