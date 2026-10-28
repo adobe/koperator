@@ -70,9 +70,14 @@ func (r *Reconciler) configMap(clientPass string, capacityConfig string, log log
 
 	// The Admin provider also works with ZooKeeper-backed Kafka clusters.
 	topicConfigProvider, _ := ccConfig.Get(kafkautils.CruiseControlConfigTopicConfigProviderClass)
-	if r.KafkaCluster.Spec.KRaftMode || topicConfigProvider.Value() == "com.linkedin.kafka.cruisecontrol.config.KafkaTopicConfigProvider" {
+	usesLegacyTopicConfigProvider := topicConfigProvider.Value() == "com.linkedin.kafka.cruisecontrol.config.KafkaTopicConfigProvider"
+	if r.KafkaCluster.Spec.KRaftMode || usesLegacyTopicConfigProvider {
 		if err = ccConfig.Set(kafkautils.CruiseControlConfigTopicConfigProviderClass, kafkautils.CruiseControlConfigTopicConfigProviderClassVal); err != nil {
 			log.Error(err, fmt.Sprintf("setting '%s' in Cruise Control configuration failed", kafkautils.CruiseControlConfigTopicConfigProviderClass), "config", kafkautils.CruiseControlConfigTopicConfigProviderClassVal)
+		} else if usesLegacyTopicConfigProvider {
+			log.V(warnLevel).Info("WARNING: automatically replacing deprecated Cruise Control topic config provider; update cruiseControlConfig.config",
+				"configuredProvider", topicConfigProvider.Value(),
+				"replacementProvider", kafkautils.CruiseControlConfigTopicConfigProviderClassVal)
 		}
 	}
 

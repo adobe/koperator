@@ -39,10 +39,12 @@ func TestConfigMapTopicConfigProvider(t *testing.T) {
 		kraft    bool
 		provider string
 		want     string
+		warn     bool
 	}{
-		{name: "ZooKeeper migrates removed provider", provider: legacyProvider, want: adminProvider},
+		{name: "ZooKeeper migrates removed provider", provider: legacyProvider, want: adminProvider, warn: true},
 		{name: "ZooKeeper preserves custom provider", provider: "example.CustomTopicConfigProvider", want: "example.CustomTopicConfigProvider"},
-		{name: "KRaft still uses Admin provider", kraft: true, provider: legacyProvider, want: adminProvider},
+		{name: "ZooKeeper preserves Admin provider", provider: adminProvider, want: adminProvider},
+		{name: "KRaft still uses Admin provider", kraft: true, provider: legacyProvider, want: adminProvider, warn: true},
 	}
 
 	for _, test := range testCases {
@@ -60,7 +62,8 @@ func TestConfigMapTopicConfigProvider(t *testing.T) {
 					},
 				},
 			}
-			config := New(nil, cluster, nil).configMap("", "", logr.Discard()).(*v1.ConfigMap)
+			logger, captured := newCapturingLogger()
+			config := New(nil, cluster, nil).configMap("", "", logger).(*v1.ConfigMap)
 			generated, err := properties.NewFromString(config.Data["cruisecontrol.properties"])
 			if err != nil {
 				t.Fatal(err)
@@ -68,6 +71,12 @@ func TestConfigMapTopicConfigProvider(t *testing.T) {
 			provider, found := generated.Get("topic.config.provider.class")
 			if !found || provider.Value() != test.want {
 				t.Errorf("topic config provider = %q, want %q", provider.Value(), test.want)
+			}
+			if got := strings.Contains(captured.String(), "WARNING:"); got != test.warn {
+				t.Errorf("migration warning = %t, want %t; logs:\n%s", got, test.warn, captured.String())
+			}
+			if test.warn && (!strings.Contains(captured.String(), legacyProvider) || !strings.Contains(captured.String(), adminProvider)) {
+				t.Errorf("migration warning must identify the configured and replacement providers; logs:\n%s", captured.String())
 			}
 		})
 	}
