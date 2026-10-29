@@ -168,6 +168,18 @@
       ]
     },
     {
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["maven"],
+      "allowedVersions": "/^3(?:\\.\\d+)*-(?:amazoncorretto-25|eclipse-temurin-25-alpine)$/",
+      "description": "Keep Maven builders on Java 25 LTS while allowing Maven 3 updates and image digest refreshes."
+    },
+    {
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["eclipse-temurin"],
+      "allowedVersions": "/^25-jre-alpine$/",
+      "description": "Keep the Spring example runtime on Java 25 LTS; continue refreshing its image digest."
+    },
+    {
       "matchPackageNames": [
         "apache/kafka"
       ],
@@ -194,8 +206,9 @@
         "ghcr.io/adobe/koperator/kafka"
       ],
       "matchCurrentValue": "/^\\d+\\.\\d+-\\d+\\.\\d+\\.\\d+(-jdk\\d+\\.\\d+\\.\\d+)?$/",
+      "allowedVersions": "/^\\d+\\.\\d+-3\\.\\d+\\.\\d+-jdk25\\.\\d+\\.\\d+$/",
       "versioning": "regex:^(?<compatibility>\\d+\\.\\d+)-(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)(?:-jdk(?<build>\\d+)\\.\\d+\\.(?<revision>\\d+))?$",
-      "description": "Tag format is <scala_version>-<kafka_version>[-jdk<jdk_version>], e.g. 2.13-3.9.1 or 2.13-3.9.2-jdk21.0.11 (the latter shape shipped starting with the 3.9.2 release tag). Verified live against ghcr.io: default docker versioning parses currentVersion as just '2.13' and silently drops everything after the first hyphen, so Renovate can never see a real 3.9.1->3.9.2 bump (only digest-pin updates fire, via the docker pinDigests rule below) - this affects every '# renovate:' annotated occurrence of this image. Pinning the scala prefix as 'compatibility' (never auto-changed) and parsing the kafka release as major.minor.patch fixes real version comparison. The optional '-jdk<major>.<interim>.<update>' suffix maps jdk major to 'build' and jdk update to 'revision' (Renovate's regex versioning caps out at 5 numeric levels: major/minor/patch/build/revision, each required to be purely numeric, so the always-0 jdk interim segment is matched but not captured); tags without the suffix default build/revision to 0 and still compare correctly against suffixed ones since a differing kafka patch alone already resolves ordering. This does NOT gate jdk-major jumps (e.g. jdk21.x -> jdk25.x) the way 'compatibility' gates scala - that's covered by the same operator-side migration as the apache/kafka 4.x bump below (see docker/kafka/Dockerfile's java_version comment); revisit if jdk25 lands before that migration."
+      "description": "Tag format is <scala_version>-<kafka_version>[-jdk<jdk_version>]. Preserve the Scala compatibility prefix and compare Kafka major/minor/patch followed by JDK major/update. Only propose Kafka 3.x images on Java 25 LTS, independently of the Kafka 4.x migration. Existing Java 21 pins remain usable until a Java 25 image is published."
     },
     {
       "groupName": "kafka docker images (major)",
