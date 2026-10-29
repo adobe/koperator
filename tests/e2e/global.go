@@ -39,7 +39,7 @@ var (
 		},
 	}
 	// contour ingress controller
-	// Envoy service is set to NodePort so Helm --atomic does not wait for a LoadBalancer
+	// Envoy service is set to NodePort so Helm does not wait for a LoadBalancer
 	// ingress IP (which never comes on kind without MetalLB).
 	contourIngressControllerHelmDescriptor = helmDescriptor{
 		Repository:   "https://projectcontour.github.io/helm-charts",
