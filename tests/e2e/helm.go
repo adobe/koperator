@@ -241,7 +241,7 @@ func (helmDescriptor *helmDescriptor) installHelmChart(kubectlOptions k8s.Kubect
 
 		fixedArguments := []string{
 			"--create-namespace",
-			"--atomic",
+			"--rollback-on-failure",
 		}
 
 		// Only add --debug flag if verbose logging is enabled

@@ -89,7 +89,7 @@ jobs:
           IMG_E2E=$REPOSITORY:$GITHUB_SHA make test-e2e
 
       # Dump cluster diagnostics on failure so e2e failures (e.g. a dependency Helm
-      # install that times out under `--atomic`) are debuggable from the job log
+      # install that times out under `--rollback-on-failure`) are debuggable from the job log
       # without needing a live tmate session.
       - name: Dump diagnostics on failure
         if: failure()
