@@ -2,9 +2,8 @@ ARG scala_version=2.13
 # Renovate is pinned to the 3.x line (see the apache/kafka packageRule in renovate.json).
 # Kafka 4.x removes ZooKeeper support entirely (KRaft-only) and needs an operator-side
 # migration; when this repo is ready for that, drop the allowedVersions constraint too.
-# Also bump java_version to 25 (next LTS after 21) as part of that migration.
 ARG KAFKA_VERSION=3.9.2 # renovate: datasource=github-tags depName=apache/kafka
-ARG java_version=21
+ARG java_version=25
 
 FROM alpine:latest@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6 AS kafka_dist
 
@@ -34,7 +33,7 @@ RUN apk add --no-cache gnupg wget && \
 
 
 # backported from https://github.com/docker-library/openjdk/blob/master/18/jdk/slim-bullseye/Dockerfile
-FROM debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f
+FROM debian:stable-slim@sha256:13e0a2e78aa0554ad5ff66e4e260c6dbcdff807eb1f39d43b9fb0288aae88b04
 
 ARG scala_version
 ARG KAFKA_VERSION
@@ -56,6 +55,9 @@ ENV PATH=$JAVA_HOME/bin:$PATH
 # Default to UTF-8 file.encoding
 ENV LANG=C.UTF-8
 ENV JAVA_VERSION=${java_version}
+
+# Apply Java 25 defaults before generating the CDS archive.
+ENV JDK_JAVA_OPTIONS="--enable-native-access=ALL-UNNAMED --illegal-native-access=deny -XX:+UseCompactObjectHeaders"
 
 RUN set -eux; \
 	\
