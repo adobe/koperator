@@ -6,7 +6,7 @@ require (
 	emperror.dev/errors v0.8.1
 	github.com/evanphx/json-patch v5.9.11+incompatible
 	github.com/json-iterator/go v1.1.12
-	k8s.io/apimachinery v0.37.1
+	k8s.io/apimachinery v0.37.2
 )
 
 require (
