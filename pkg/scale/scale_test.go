@@ -16,10 +16,101 @@
 package scale
 
 import (
+	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
+
+func TestPartitionReplicasByBroker(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		statusCode int
+		body       string
+		wantErr    bool
+	}{
+		{
+			name:       "replica counts rather than leader counts",
+			statusCode: http.StatusOK,
+			body:       `{"KafkaBrokerState":{"ReplicaCountByBrokerId":{"101":18,"102":9,"303":0},"LeaderCountByBrokerId":{"101":6,"102":3,"303":0}}}`,
+		},
+		{
+			name:       "lookup failure",
+			statusCode: http.StatusInternalServerError,
+			body:       `{"errorMessage":"cluster state unavailable"}`,
+			wantErr:    true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			mux := http.NewServeMux()
+			mux.HandleFunc("GET /kafkacruisecontrol/kafka_cluster_state", func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(tc.statusCode)
+				_, _ = w.Write([]byte(tc.body))
+			})
+			server := httptest.NewServer(mux)
+			defer server.Close()
+
+			cc, err := NewCruiseControlScaler(context.Background(), server.URL+"/kafkacruisecontrol")
+			require.NoError(t, err)
+
+			replicas, err := cc.PartitionReplicasByBroker(context.Background())
+			if tc.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, map[string]int32{"101": 18, "102": 9, "303": 0}, replicas)
+		})
+	}
+}
+
+func TestBrokerWithLeastPartitionReplicas(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		body    string
+		wantErr bool
+	}{
+		{
+			name: "zero replica broker",
+			body: `{"KafkaBrokerState":{"ReplicaCountByBrokerId":{"101":18,"102":9,"303":0}}}`,
+		},
+		{
+			name:    "empty replica map",
+			body:    `{"KafkaBrokerState":{"ReplicaCountByBrokerId":{}}}`,
+			wantErr: true,
+		},
+		{
+			name:    "missing replica map",
+			body:    `{"KafkaBrokerState":{}}`,
+			wantErr: true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			mux := http.NewServeMux()
+			mux.HandleFunc("GET /kafkacruisecontrol/kafka_cluster_state", func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(tc.body))
+			})
+			server := httptest.NewServer(mux)
+			defer server.Close()
+
+			cc, err := NewCruiseControlScaler(context.Background(), server.URL+"/kafkacruisecontrol")
+			require.NoError(t, err)
+
+			brokerID, err := cc.BrokerWithLeastPartitionReplicas(context.Background())
+			if tc.wantErr {
+				require.Error(t, err)
+				require.Empty(t, brokerID)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, "303", brokerID)
+		})
+	}
+}
 
 func TestParseBrokerIDsAndLogDirToMap(t *testing.T) {
 	testCases := []struct {

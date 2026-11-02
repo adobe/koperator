@@ -71,24 +71,16 @@ spec:
   groups:
   - name: KafkaAlerts
     rules:
-    - alert: BrokerOverLoaded
-      expr: avg(sum by(brokerId, kafka_cr, namespace) (rate(kafka_network_requestmetrics_requests_total[15m]))) by (kafka_cr, namespace) > 30
+    # Broker alerts are diagnostic only. These example thresholds are not capacity limits.
+    - alert: BrokerRequestRateHigh
+      expr: sum by(brokerId, kafka_cr, namespace) (rate(kafka_network_requestmetrics_requests_total[15m])) > 30
       for: 5m
       labels:
         severity: alert
         alertGroup: kafka
       annotations:
-        description: 'broker {{ $labels.brokerId }} overloaded (current value is: {{ $value }})'
-        summary: 'broker overloaded'
-        # If brokerConfigGroup is defined it will override scaled broker config
-        # brokerConfigGroup: 'default_group'
-        storageClass: 'gp2'
-        mountPath: '/kafkalog'
-        diskSize: '10G'
-        image: 'ghcr.io/adobe/koperator/kafka:2.13-3.9.2-jdk21.0.12' # renovate: datasource=docker depName=ghcr.io/adobe/koperator/kafka
-        # annotations to be applied onto the broker pod
-        # brokerAnnotations: '{ "sidecar.istio.io/logLevel": "trace", "sidecar.istio.io/proxyCPULimit": "50m" }'
-        command: 'upScale'
+        description: 'broker {{ $labels.brokerId }} request rate is high (current value is: {{ $value | printf "%.2f" }} requests/s); verify capacity and latency before scaling'
+        summary: 'high broker request rate (diagnostic only)'
     - alert: BrokerUnderReplicated
       expr: kafka_server_replicamanager_underreplicatedpartitions > 0
       for: 5m
@@ -98,15 +90,8 @@ spec:
       annotations:
         description: 'broker {{ $labels.brokerId }} underreplicated'
         summary: 'broker underreplicated'
-        storageClass: 'gp2'
-        mountPath: '/kafkalog'
-        diskSize: '10G'
-        image: 'ghcr.io/adobe/koperator/kafka:2.13-3.9.2-jdk21.0.12' # renovate: datasource=docker depName=ghcr.io/adobe/koperator/kafka
-        # annotations to be applied onto the broker pod
-        # brokerAnnotations: '{ "sidecar.istio.io/logLevel": "trace", "sidecar.istio.io/proxyCPULimit": "50m" }'
-        command: 'upScale'
     - alert: PartitionCountHigh
-      expr: max(kafka_server_replicamanager_partitioncount)  by (namespace, kafka_cr) > 100
+      expr: kafka_server_replicamanager_partitioncount > 100
       for: 3m
       labels:
         severity: alert
@@ -114,13 +99,6 @@ spec:
       annotations:
         description: 'broker {{ $labels.brokerId }} has high partition count'
         summary: 'high partition count'
-        storageClass: 'gp2'
-        mountPath: '/kafkalog'
-        diskSize: '10G'
-        image: 'ghcr.io/adobe/koperator/kafka:2.13-3.9.2-jdk21.0.12' # renovate: datasource=docker depName=ghcr.io/adobe/koperator/kafka
-        # annotations to be applied onto the broker pod
-        # brokerAnnotations: '{ "sidecar.istio.io/logLevel": "trace", "sidecar.istio.io/proxyCPULimit": "50m" }'
-        command: 'upScale'
     - alert: PartitionCountLow
       expr: bottomk(1, kafka_server_replicamanager_partitioncount) by (namespace, kafka_cr) < 40
       for: 3m
@@ -130,7 +108,6 @@ spec:
       annotations:
         description: 'broker {{ $labels.brokerId }} has low partition count'
         summary: 'low partition count'
-        command: 'downScale'
     - alert: RemainingDiskSpaceLow
       expr: (kubelet_volume_stats_available_bytes{job="kubelet",metrics_path="/metrics",namespace=~".*",persistentvolumeclaim=~"kafka-.*"}/ kubelet_volume_stats_capacity_bytes{job="kubelet",metrics_path="/metrics",namespace=~".*",persistentvolumeclaim=~"kafka-.*"})< 0.15 and predict_linear(kubelet_volume_stats_available_bytes{job="kubelet",metrics_path="/metrics",namespace=~".*",persistentvolumeclaim=~"kafka-.*"}[6h], 4 * 24 * 3600) < 0
       for: 2m
@@ -192,8 +169,8 @@ spec:
   alerting:
     alertmanagers:
     - namespace: kafka
-      name: kafka-operator-alertmanager
-      port: http-alerts
+      name: kafka-alertmanager
+      port: web
   serviceMonitorSelector:
     matchLabels:
       kafka_cr: kafka
@@ -205,3 +182,51 @@ spec:
     requests:
       memory: 400Mi
   enableAdminAPI: false
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: alertmanager-kafka-alertmanager
+stringData:
+  alertmanager.yaml: |
+    route:
+      receiver: monitoring
+      group_by: [alertname, namespace, kafka_cr]
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 4h
+      routes:
+      - receiver: koperator-storage
+        matchers:
+        - alertname="RemainingDiskSpaceLow"
+        - alertGroup="kafka"
+    receivers:
+    # Configure your human notification integration here before using this sample.
+    - name: monitoring
+    - name: koperator-storage
+      webhook_configs:
+      # Assumes the Helm release is named kafka-operator in the kafka namespace.
+      - url: http://kafka-operator-alertmanager.kafka.svc:9001/
+        send_resolved: true
+---
+apiVersion: monitoring.coreos.com/v1
+kind: Alertmanager
+metadata:
+  name: kafka-alertmanager
+spec:
+  replicas: 1
+  resources:
+    requests:
+      memory: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-alertmanager
+spec:
+  selector:
+    alertmanager: kafka-alertmanager
+  ports:
+  - name: web
+    port: 9093
+    targetPort: 9093

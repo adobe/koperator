@@ -17,6 +17,7 @@ package receiver
 import (
 	"context"
 	"encoding/json"
+	"errors"
 
 	"github.com/go-logr/logr"
 	"github.com/prometheus/common/model"
@@ -29,7 +30,16 @@ func alertReciever(ctx context.Context, log logr.Logger, alert []byte, client cl
 	promAlerts := make([]model.Alert, 0)
 	err := json.Unmarshal(alert, &promAlerts)
 	if err != nil {
-		return err
+		var webhook struct {
+			Alerts []model.Alert `json:"alerts"`
+		}
+		if err := json.Unmarshal(alert, &webhook); err != nil {
+			return err
+		}
+		if webhook.Alerts == nil {
+			return errors.New("missing alerts in Alertmanager webhook")
+		}
+		promAlerts = webhook.Alerts
 	}
 
 	dispatcher.Dispatcher(ctx, promAlerts, log, client)
