@@ -1,6 +1,6 @@
 module github.com/banzaicloud/koperator/properties
 
-go 1.27.2
+go 1.27.3
 
 require (
 	emperror.dev/errors v0.8.1
