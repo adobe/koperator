@@ -26,12 +26,17 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/banzaicloud/koperator/api/v1alpha1"
@@ -55,6 +60,64 @@ type PvcTestCase struct {
 	expectedDeletePvc   bool
 	expectedCreatePvc   bool
 	expectedVolumeState map[string]v1beta1.CruiseControlVolumeState
+}
+
+func TestReconcileClearsKRaftBootstrapStatus(t *testing.T) {
+	for _, updateFails := range []bool{false, true} {
+		name := "persists reset"
+		if updateFails {
+			name = "returns status update failure"
+		}
+		t.Run(name, func(t *testing.T) {
+			ctx := context.Background()
+			scheme := runtime.NewScheme()
+			require.NoError(t, corev1.AddToScheme(scheme))
+			require.NoError(t, v1beta1.AddToScheme(scheme))
+			cluster := &v1beta1.KafkaCluster{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: "kafka"},
+				Status:     v1beta1.KafkaClusterStatus{KRaftDynamicQuorumBootstrapped: true},
+			}
+			updateErr := errors.New("status update failed")
+			resetAttempted := false
+			c := fake.NewClientBuilder().WithScheme(scheme).
+				WithStatusSubresource(cluster).WithObjects(cluster).
+				WithInterceptorFuncs(interceptor.Funcs{
+					SubResourceUpdate: func(ctx context.Context, c client.Client, subResource string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+						if kc, ok := obj.(*v1beta1.KafkaCluster); ok && subResource == "status" && !kc.Status.KRaftDynamicQuorumBootstrapped {
+							resetAttempted = true
+							if updateFails {
+								return updateErr
+							}
+						}
+						return c.SubResource(subResource).Update(ctx, obj, opts...)
+					},
+				}).Build()
+			require.NoError(t, c.Get(ctx, client.ObjectKeyFromObject(cluster), cluster))
+
+			provider := &kafkaclient.MockedProvider{}
+			stopErr := errors.New("stop after status reset")
+			if !updateFails {
+				kafkaClient := mocks.NewMockKafkaClient(gomock.NewController(t))
+				provider.On("NewFromCluster", mock.Anything, cluster).Return(kafkaClient, func() {}, stopErr).Once()
+			}
+			r := New(c, c, cluster, provider)
+			err := r.Reconcile(logr.Discard())
+			require.Error(t, err)
+			require.True(t, resetAttempted)
+			if updateFails {
+				assert.ErrorContains(t, err, "could not update KRaftDynamicQuorumBootstrapped status")
+				assert.ErrorIs(t, err, updateErr)
+				provider.AssertNotCalled(t, "NewFromCluster", mock.Anything, cluster)
+			} else {
+				assert.ErrorContains(t, err, stopErr.Error())
+				provider.AssertExpectations(t)
+			}
+
+			stored := &v1beta1.KafkaCluster{}
+			require.NoError(t, c.Get(ctx, client.ObjectKeyFromObject(cluster), stored))
+			assert.Equal(t, updateFails, stored.Status.KRaftDynamicQuorumBootstrapped)
+		})
+	}
 }
 
 func TestGetBrokersWithPendingOrRunningCCTask(t *testing.T) {
