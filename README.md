@@ -204,6 +204,9 @@ kubectl -n kafka run kafka-consumer -it --image=adobe/kafka:2.13-3.9.1 --rm=true
 
 For detailed documentation on the Koperator project, see the [Koperator documentation website](https://opensource.adobe.com/koperator/).
 
+- [Monitoring Kafka clusters](docs/monitoring.md)
+- [Broker autoscaling](docs/autoscale.md)
+
 ## Issues and contributions
 
 We use GitHub to track issues and accept contributions.

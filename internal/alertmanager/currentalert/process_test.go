@@ -18,14 +18,20 @@ package currentalert
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/go-logr/logr"
 	"github.com/onsi/gomega"
 	"github.com/prometheus/common/model"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -36,6 +42,183 @@ import (
 	//nolint:staticcheck
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
+
+func TestDownScaleWithoutBrokerID(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		statusCode  int
+		body        string
+		wantErr     bool
+		wantBrokers []int32
+	}{
+		{
+			name:        "removes only the least replicated broker",
+			statusCode:  http.StatusOK,
+			body:        `{"KafkaBrokerState":{"ReplicaCountByBrokerId":{"101":18,"102":9,"303":0}}}`,
+			wantBrokers: []int32{101, 102},
+		},
+		{
+			name:        "lookup failure leaves brokers unchanged",
+			statusCode:  http.StatusInternalServerError,
+			body:        `{"errorMessage":"cluster state unavailable"}`,
+			wantErr:     true,
+			wantBrokers: []int32{101, 102, 303},
+		},
+		{
+			name:        "empty replica map leaves brokers unchanged",
+			statusCode:  http.StatusOK,
+			body:        `{"KafkaBrokerState":{"ReplicaCountByBrokerId":{}}}`,
+			wantErr:     true,
+			wantBrokers: []int32{101, 102, 303},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var requests atomic.Int32
+			mux := http.NewServeMux()
+			mux.HandleFunc("GET /kafkacruisecontrol/kafka_cluster_state", func(w http.ResponseWriter, _ *http.Request) {
+				requests.Add(1)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(tc.statusCode)
+				_, _ = w.Write([]byte(tc.body))
+			})
+			server := httptest.NewServer(mux)
+			defer server.Close()
+
+			cluster := newDownScaleTestCluster()
+			cluster.Spec.CruiseControlConfig.CruiseControlEndpoint = strings.TrimPrefix(server.URL, "http://")
+			kubeClient := newDownScaleTestClient(t, cluster)
+
+			err := downScale(context.Background(), logr.Discard(), model.LabelSet{
+				"namespace":             "kafka",
+				v1beta1.KafkaCRLabelKey: "kafka",
+			}, kubeClient)
+			if tc.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			require.Equal(t, int32(1), requests.Load())
+			assertDownScaleBrokers(t, kubeClient, tc.wantBrokers)
+		})
+	}
+}
+
+func TestDownScaleWithBrokerID(t *testing.T) {
+	var requests atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		requests.Add(1)
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	cluster := newDownScaleTestCluster()
+	cluster.Spec.CruiseControlConfig.CruiseControlEndpoint = strings.TrimPrefix(server.URL, "http://")
+	kubeClient := newDownScaleTestClient(t, cluster)
+
+	err := downScale(context.Background(), logr.Discard(), model.LabelSet{
+		"namespace":              "kafka",
+		v1beta1.KafkaCRLabelKey:  "kafka",
+		v1beta1.BrokerIdLabelKey: "102",
+	}, kubeClient)
+	require.NoError(t, err)
+	require.Zero(t, requests.Load())
+	assertDownScaleBrokers(t, kubeClient, []int32{101, 303})
+}
+
+func TestDownScaleWithPendingTask(t *testing.T) {
+	for _, state := range []v1beta1.GracefulActionState{
+		{CruiseControlState: v1beta1.GracefulUpscaleRequired},
+		{
+			CruiseControlState:              v1beta1.GracefulUpscaleRunning,
+			CruiseControlOperationReference: &corev1.LocalObjectReference{Name: "add-broker"},
+		},
+	} {
+		t.Run(string(state.CruiseControlState), func(t *testing.T) {
+			var requests atomic.Int32
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				requests.Add(1)
+				w.WriteHeader(http.StatusInternalServerError)
+			}))
+			defer server.Close()
+
+			cluster := newDownScaleTestCluster()
+			cluster.Spec.CruiseControlConfig.CruiseControlEndpoint = strings.TrimPrefix(server.URL, "http://")
+			cluster.Status.BrokersState = map[string]v1beta1.BrokerState{
+				"303": {GracefulActionState: state},
+			}
+			kubeClient := newDownScaleTestClient(t, cluster)
+
+			err := downScale(context.Background(), logr.Discard(), model.LabelSet{
+				"namespace":             "kafka",
+				v1beta1.KafkaCRLabelKey: "kafka",
+			}, kubeClient)
+			require.NoError(t, err)
+			require.Zero(t, requests.Load())
+			assertDownScaleBrokers(t, kubeClient, []int32{101, 102, 303})
+		})
+	}
+}
+
+func TestExamineAlertDownscaleLimit(t *testing.T) {
+	var requests atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		requests.Add(1)
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	cluster := newDownScaleTestCluster()
+	cluster.Spec.CruiseControlConfig.CruiseControlEndpoint = strings.TrimPrefix(server.URL, "http://")
+	cluster.Spec.AlertManagerConfig = &v1beta1.AlertManagerConfig{DownScaleLimit: 3}
+	cluster.Status.State = v1beta1.KafkaClusterRunning
+	kubeClient := newDownScaleTestClient(t, cluster)
+	e := &examiner{
+		Alert: &currentAlertStruct{
+			Status: model.AlertFiring,
+			Labels: model.LabelSet{
+				"namespace":             "kafka",
+				v1beta1.KafkaCRLabelKey: "kafka",
+			},
+			Annotations: model.LabelSet{"command": DownScaleCommand},
+		},
+		Client: kubeClient,
+		Log:    logr.Discard(),
+	}
+
+	processed, err := e.examineAlert(context.Background(), 0)
+	require.NoError(t, err)
+	require.False(t, processed)
+	require.Zero(t, requests.Load())
+	assertDownScaleBrokers(t, kubeClient, []int32{101, 102, 303})
+}
+
+func newDownScaleTestCluster() *v1beta1.KafkaCluster {
+	return &v1beta1.KafkaCluster{
+		ObjectMeta: v1.ObjectMeta{Name: "kafka", Namespace: "kafka"},
+		Spec: v1beta1.KafkaClusterSpec{
+			Brokers: []v1beta1.Broker{{Id: 101}, {Id: 102}, {Id: 303}},
+		},
+	}
+}
+
+func newDownScaleTestClient(t *testing.T, cluster *v1beta1.KafkaCluster) client.Client {
+	t.Helper()
+	testScheme := runtime.NewScheme()
+	require.NoError(t, v1beta1.AddToScheme(testScheme))
+	return fake.NewClientBuilder().WithScheme(testScheme).
+		WithStatusSubresource(&v1beta1.KafkaCluster{}).WithObjects(cluster).Build()
+}
+
+func assertDownScaleBrokers(t *testing.T, kubeClient client.Client, want []int32) {
+	t.Helper()
+	cluster := &v1beta1.KafkaCluster{}
+	require.NoError(t, kubeClient.Get(context.Background(), types.NamespacedName{Name: "kafka", Namespace: "kafka"}, cluster))
+	var ids []int32
+	for _, broker := range cluster.Spec.Brokers {
+		ids = append(ids, broker.Id)
+	}
+	require.Equal(t, want, ids)
+}
 
 func Test_resizePvc(t *testing.T) {
 	testClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()

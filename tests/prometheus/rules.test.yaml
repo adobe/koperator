@@ -1,0 +1,161 @@
+# Copyright 2026 Adobe. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+rule_files:
+  - rules.yaml
+evaluation_interval: 1m
+tests:
+  - name: idle brokers do not signal request pressure or replication failure
+    interval: 1m
+    input_series:
+      - series: 'kafka_network_requestmetrics_requests_total{brokerId="100",kafka_cr="kafka",namespace="kafka",request="FetchFollower"}'
+        values: '0+600x20'
+      - series: 'kafka_server_replicamanager_partitioncount{brokerId="100",kafka_cr="kafka",namespace="kafka"}'
+        values: '60+0x20'
+      - series: 'kafka_server_replicamanager_underreplicatedpartitions{brokerId="100",kafka_cr="kafka",namespace="kafka"}'
+        values: '0+0x20'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: BrokerRequestRateHigh
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: BrokerUnderReplicated
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: PartitionCountLow
+        exp_alerts: []
+
+  - name: skew and opposing signals remain diagnostics without action annotations
+    interval: 1m
+    input_series:
+      - series: 'kafka_network_requestmetrics_requests_total{brokerId="100",kafka_cr="kafka",namespace="kafka",request="Produce"}'
+        values: '0+3600x20'
+      - series: 'kafka_network_requestmetrics_requests_total{brokerId="100",kafka_cr="kafka",namespace="kafka",request="FetchFollower"}'
+        values: '0+2400x20'
+      - series: 'kafka_network_requestmetrics_requests_total{brokerId="101",kafka_cr="kafka",namespace="kafka",request="Produce"}'
+        values: '0+300x20'
+      - series: 'kafka_network_requestmetrics_requests_total{brokerId="102",kafka_cr="kafka",namespace="kafka",request="Produce"}'
+        values: '0+0x20'
+      - series: 'kafka_network_requestmetrics_requests_total{brokerId="103",kafka_cr="kafka",namespace="kafka",request="Produce"}'
+        values: '0+0x20'
+      - series: 'kafka_server_replicamanager_partitioncount{brokerId="100",kafka_cr="kafka",namespace="kafka"}'
+        values: '120+0x20'
+      - series: 'kafka_server_replicamanager_partitioncount{brokerId="101",kafka_cr="kafka",namespace="kafka"}'
+        values: '0+0x20'
+      - series: 'kafka_server_replicamanager_underreplicatedpartitions{brokerId="100",kafka_cr="kafka",namespace="kafka"}'
+        values: '1+0x20'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: BrokerRequestRateHigh
+        exp_alerts:
+          - exp_labels:
+              brokerId: "100"
+              kafka_cr: kafka
+              namespace: kafka
+              severity: alert
+              alertGroup: kafka
+            exp_annotations:
+              description: 'broker 100 request rate is high (current value is: 100.00 requests/s); verify capacity and latency before scaling'
+              summary: high broker request rate (diagnostic only)
+      - eval_time: 8m
+        alertname: BrokerUnderReplicated
+        exp_alerts:
+          - exp_labels:
+              brokerId: "100"
+              kafka_cr: kafka
+              namespace: kafka
+              severity: alert
+              alertGroup: kafka
+            exp_annotations:
+              description: broker 100 underreplicated
+              summary: broker underreplicated
+      - eval_time: 8m
+        alertname: PartitionCountHigh
+        exp_alerts:
+          - exp_labels:
+              brokerId: "100"
+              kafka_cr: kafka
+              namespace: kafka
+              severity: alert
+              alertGroup: kafka
+            exp_annotations:
+              description: broker 100 has high partition count
+              summary: high partition count
+      - eval_time: 8m
+        alertname: PartitionCountLow
+        exp_alerts:
+          - exp_labels:
+              brokerId: "101"
+              kafka_cr: kafka
+              namespace: kafka
+              severity: alert
+              alertGroup: kafka
+            exp_annotations:
+              description: broker 101 has low partition count
+              summary: low partition count
+
+  - name: brief empty new broker does not fire before the hold period
+    interval: 1m
+    input_series:
+      - series: 'kafka_server_replicamanager_partitioncount{brokerId="101",kafka_cr="kafka",namespace="kafka"}'
+        values: '0+0x1 60+0x10'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: PartitionCountLow
+        exp_alerts: []
+
+  - name: missing and stale metrics do not become low utilization signals
+    interval: 1m
+    input_series:
+      - series: 'kafka_network_requestmetrics_requests_total{brokerId="100",kafka_cr="kafka",namespace="kafka"}'
+        values: '0+6000x5 stale'
+      - series: 'kafka_server_replicamanager_partitioncount{brokerId="100",kafka_cr="kafka",namespace="kafka"}'
+        values: '0+0x5 stale'
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: BrokerRequestRateHigh
+        exp_alerts: []
+      - eval_time: 25m
+        alertname: BrokerUnderReplicated
+        exp_alerts: []
+      - eval_time: 25m
+        alertname: PartitionCountHigh
+        exp_alerts: []
+      - eval_time: 25m
+        alertname: PartitionCountLow
+        exp_alerts: []
+
+  - name: storage expansion action remains available for projected disk exhaustion
+    interval: 1m
+    input_series:
+      - series: 'kubelet_volume_stats_available_bytes{job="kubelet",metrics_path="/metrics",namespace="kafka",persistentvolumeclaim="kafka-100"}'
+        values: '1000-2x20'
+      - series: 'kubelet_volume_stats_capacity_bytes{job="kubelet",metrics_path="/metrics",namespace="kafka",persistentvolumeclaim="kafka-100"}'
+        values: '10000+0x20'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: RemainingDiskSpaceLow
+        exp_alerts:
+          - exp_labels:
+              job: kubelet
+              metrics_path: /metrics
+              namespace: kafka
+              persistentvolumeclaim: kafka-100
+              severity: alert
+              alertGroup: kafka
+            exp_annotations:
+              description: broker has low disk space
+              summary: low diskspace
+              command: resizePvc
+              incrementBy: 10G
