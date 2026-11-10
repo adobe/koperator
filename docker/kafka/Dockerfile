@@ -1,9 +1,6 @@
 ARG scala_version=2.13
-# Renovate is pinned to the 3.x line (see the apache/kafka packageRule in renovate.json).
-# Kafka 4.x removes ZooKeeper support entirely (KRaft-only) and needs an operator-side
-# migration; when this repo is ready for that, drop the allowedVersions constraint too.
-# Also bump java_version to 25 (next LTS after 21) as part of that migration.
-ARG KAFKA_VERSION=3.9.2 # renovate: datasource=github-tags depName=apache/kafka
+# Kafka 4 is KRaft-only.
+ARG KAFKA_VERSION=4.0.2 # renovate: datasource=github-tags depName=apache/kafka
 ARG java_version=21
 
 FROM alpine:latest@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a AS kafka_dist
@@ -21,9 +18,12 @@ WORKDIR /var/tmp
 
 # Download, verify, extract and clean up Kafka in single layer
 RUN apk add --no-cache gnupg wget && \
-    wget -q $kafka_distro_base_url/$KAFKA_VERSION/$kafka_distro && \
-    wget -q $kafka_distro_base_url/$KAFKA_VERSION/$kafka_distro_asc && \
-    wget -q $kafka_distro_base_url/KEYS && \
+    wget --timeout=30 --tries=3 --progress=dot:mega \
+        "$kafka_distro_base_url/$KAFKA_VERSION/$kafka_distro" && \
+    wget --timeout=30 --tries=3 --progress=dot:mega \
+        "$kafka_distro_base_url/$KAFKA_VERSION/$kafka_distro_asc" && \
+    wget --timeout=30 --tries=3 --progress=dot:mega \
+        "$kafka_distro_base_url/KEYS" && \
     gpg --import KEYS && \
     gpg --verify $kafka_distro_asc $kafka_distro && \
     tar -xzf $kafka_distro && \
@@ -62,12 +62,12 @@ RUN set -eux; \
 	arch="$(dpkg --print-architecture)"; \
 	case "$arch" in \
 		'amd64') \
-			downloadUrl="https://download.oracle.com/java/${java_version}/latest/jdk-${java_version}_linux-x64_bin.tar.gz"; \
-			downloadSha256="https://download.oracle.com/java/${java_version}/latest/jdk-${java_version}_linux-x64_bin.tar.gz.sha256"; \
+			downloadUrl="https://corretto.aws/downloads/latest/amazon-corretto-${java_version}-x64-linux-jdk.tar.gz"; \
+			downloadSha256="https://corretto.aws/downloads/latest_sha256/amazon-corretto-${java_version}-x64-linux-jdk.tar.gz"; \
 			;; \
 		'arm64') \
-			downloadUrl="https://download.oracle.com/java/${java_version}/latest/jdk-${java_version}_linux-aarch64_bin.tar.gz"; \
-			downloadSha256="https://download.oracle.com/java/${java_version}/latest/jdk-${java_version}_linux-aarch64_bin.tar.gz.sha256"; \
+			downloadUrl="https://corretto.aws/downloads/latest/amazon-corretto-${java_version}-aarch64-linux-jdk.tar.gz"; \
+			downloadSha256="https://corretto.aws/downloads/latest_sha256/amazon-corretto-${java_version}-aarch64-linux-jdk.tar.gz"; \
 			;; \
 		*) echo >&2 "error: unsupported architecture: '$arch'"; exit 1 ;; \
 	esac; \
@@ -80,7 +80,7 @@ RUN set -eux; \
 	rm -rf /var/lib/apt/lists/*; \
 	\
 	wget --progress=dot:giga -O openjdk.tgz "$downloadUrl"; \
-    SHA256=$(wget -qO- $downloadSha256) ; \
+	SHA256="$(wget -qO- "$downloadSha256")"; \
 	echo "$SHA256 *openjdk.tgz" | sha256sum --strict --check -; \
 	\
 	mkdir -p "$JAVA_HOME"; \
@@ -139,7 +139,9 @@ RUN apt-get update && \
     mkdir -p ${KAFKA_HOME}/libs/extensions
 
 COPY --from=kafka_dist /var/tmp/kafka_$scala_version-$KAFKA_VERSION ${KAFKA_HOME}
-COPY opt/kafka/config/log4j.properties ${KAFKA_HOME}/config/log4j.properties
+COPY opt/kafka/config/log4j2.properties ${KAFKA_HOME}/config/log4j2.properties
+
+ENV KAFKA_LOG4J_OPTS="-Dlog4j2.configurationFile=/opt/kafka/config/log4j2.properties"
 
 # Optimize Kafka installation: remove unnecessary files and set permissions
 RUN chmod a+x ${KAFKA_HOME}/bin/*.sh && \
@@ -149,9 +151,9 @@ RUN chmod a+x ${KAFKA_HOME}/bin/*.sh && \
 
 # Add metadata labels
 LABEL org.opencontainers.image.title="Apache Kafka"
-LABEL org.opencontainers.image.description="Apache Kafka with Oracle JDK ${java_version}"
+LABEL org.opencontainers.image.description="Apache Kafka with Amazon Corretto ${java_version} (OpenJDK)"
 LABEL org.opencontainers.image.vendor="Adobe"
-LABEL org.opencontainers.image.licenses="Apache-2.0"
+LABEL org.opencontainers.image.licenses="Apache-2.0 AND GPL-2.0-only WITH Classpath-exception-2.0"
 LABEL org.opencontainers.image.source="https://github.com/adobe/koperator"
 LABEL org.opencontainers.image.documentation="https://github.com/adobe/koperator/blob/main/docker/kafka/README.md"
 LABEL org.opencontainers.image.version="${VERSION}"

@@ -171,8 +171,8 @@
       "matchPackageNames": [
         "apache/kafka"
       ],
-      "allowedVersions": "<4.0.0",
-      "description": "Kafka 4.x drops ZooKeeper support (KRaft-only) and needs an operator-side migration. Keep Renovate on the 3.x line until docker/kafka/Dockerfile is ready for that jump, then remove this rule."
+      "allowedVersions": ">=4.0.2 <4.1.0",
+      "description": "Kafka 4.0.2 is the OR2 dev upgrade target. Keep distribution updates on the 4.0 line; later minor/major versions require separate validation."
     },
     {
       "matchCurrentValue": "/^\\d+\\.\\d+\\.\\d+-ado?be-\\d+$/",
@@ -195,7 +195,7 @@
       ],
       "matchCurrentValue": "/^\\d+\\.\\d+-\\d+\\.\\d+\\.\\d+(-jdk\\d+\\.\\d+\\.\\d+)?$/",
       "versioning": "regex:^(?<compatibility>\\d+\\.\\d+)-(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)(?:-jdk(?<build>\\d+)\\.\\d+\\.(?<revision>\\d+))?$",
-      "description": "Tag format is <scala_version>-<kafka_version>[-jdk<jdk_version>], e.g. 2.13-3.9.1 or 2.13-3.9.2-jdk21.0.11 (the latter shape shipped starting with the 3.9.2 release tag). Verified live against ghcr.io: default docker versioning parses currentVersion as just '2.13' and silently drops everything after the first hyphen, so Renovate can never see a real 3.9.1->3.9.2 bump (only digest-pin updates fire, via the docker pinDigests rule below) - this affects every '# renovate:' annotated occurrence of this image. Pinning the scala prefix as 'compatibility' (never auto-changed) and parsing the kafka release as major.minor.patch fixes real version comparison. The optional '-jdk<major>.<interim>.<update>' suffix maps jdk major to 'build' and jdk update to 'revision' (Renovate's regex versioning caps out at 5 numeric levels: major/minor/patch/build/revision, each required to be purely numeric, so the always-0 jdk interim segment is matched but not captured); tags without the suffix default build/revision to 0 and still compare correctly against suffixed ones since a differing kafka patch alone already resolves ordering. This does NOT gate jdk-major jumps (e.g. jdk21.x -> jdk25.x) the way 'compatibility' gates scala - that's covered by the same operator-side migration as the apache/kafka 4.x bump below (see docker/kafka/Dockerfile's java_version comment); revisit if jdk25 lands before that migration."
+      "description": "Tag format is <scala_version>-<kafka_version>[-jdk<jdk_version>], e.g. 2.13-3.9.2-jdk21.0.11 or 2.13-4.0.2. Pinning the scala prefix as compatibility and parsing the Kafka release as major.minor.patch permits real Kafka version comparisons. The optional JDK suffix maps its major version to build and update to revision. JDK major upgrades require separate validation; the Kafka 4.0.2 image retains Java 21."
     },
     {
       "groupName": "kafka docker images (major)",

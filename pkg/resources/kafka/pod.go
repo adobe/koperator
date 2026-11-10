@@ -656,9 +656,11 @@ func generateEnvConfig(brokerConfig *v1beta1.BrokerConfig, defaultEnvVars []core
 	}
 
 	if brokerConfig.Log4jConfig != "" {
-		envs["KAFKA_LOG4J_OPTS"] = corev1.EnvVar{
-			Name:  "KAFKA_LOG4J_OPTS",
-			Value: "-Dlog4j.configuration=file:/config/log4j.properties",
+		if _, configured := envs["KAFKA_LOG4J_OPTS"]; !configured {
+			envs["KAFKA_LOG4J_OPTS"] = corev1.EnvVar{
+				Name:  "KAFKA_LOG4J_OPTS",
+				Value: "-Dlog4j.configuration=file:/config/log4j.properties",
+			}
 		}
 	}
 

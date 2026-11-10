@@ -188,6 +188,52 @@ func Test_generateEnvConfig(t *testing.T) {
 	}
 }
 
+func TestGenerateEnvConfigLogging(t *testing.T) {
+	for _, test := range []struct {
+		name        string
+		config      string
+		envs        []corev1.EnvVar
+		expected    corev1.EnvVar
+		expectFound bool
+	}{
+		{
+			name:        "legacy logging default",
+			config:      "log4j.rootLogger=INFO, stdout",
+			expected:    corev1.EnvVar{Name: "KAFKA_LOG4J_OPTS", Value: "-Dlog4j.configuration=file:/config/log4j.properties"},
+			expectFound: true,
+		},
+		{
+			name:        "explicit Log4j 2 option",
+			config:      "rootLogger.level=info",
+			envs:        []corev1.EnvVar{{Name: "KAFKA_LOG4J_OPTS", Value: "-Dlog4j2.configurationFile=/config/log4j.properties"}},
+			expected:    corev1.EnvVar{Name: "KAFKA_LOG4J_OPTS", Value: "-Dlog4j2.configurationFile=/config/log4j.properties"},
+			expectFound: true,
+		},
+		{
+			name:        "explicit option from secret",
+			config:      "rootLogger.level=info",
+			envs:        []corev1.EnvVar{{Name: "KAFKA_LOG4J_OPTS", ValueFrom: &corev1.EnvVarSource{SecretKeyRef: &corev1.SecretKeySelector{LocalObjectReference: corev1.LocalObjectReference{Name: "logging"}, Key: "opts"}}}},
+			expected:    corev1.EnvVar{Name: "KAFKA_LOG4J_OPTS", ValueFrom: &corev1.EnvVarSource{SecretKeyRef: &corev1.SecretKeySelector{LocalObjectReference: corev1.LocalObjectReference{Name: "logging"}, Key: "opts"}}},
+			expectFound: true,
+		},
+		{
+			name: "image logging default without custom config",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			result := generateEnvConfig(&v1beta1.BrokerConfig{Log4jConfig: test.config, Envs: test.envs}, nil)
+			found := false
+			for _, env := range result {
+				if env.Name == "KAFKA_LOG4J_OPTS" {
+					found = true
+					assert.DeepEqual(t, env, test.expected)
+				}
+			}
+			assert.Equal(t, found, test.expectFound)
+		})
+	}
+}
+
 func TestAddDynamicKRaftQuorumFormatEnv(t *testing.T) {
 	brokers := []v1beta1.Broker{
 		{Id: 0, BrokerConfig: &v1beta1.BrokerConfig{Roles: []string{"controller"}}},
