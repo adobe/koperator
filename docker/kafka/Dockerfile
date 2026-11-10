@@ -1,9 +1,6 @@
 ARG scala_version=2.13
-# Renovate is pinned to the 3.x line (see the apache/kafka packageRule in renovate.json).
-# Kafka 4.x removes ZooKeeper support entirely (KRaft-only) and needs an operator-side
-# migration; when this repo is ready for that, drop the allowedVersions constraint too.
-# Also bump java_version to 25 (next LTS after 21) as part of that migration.
-ARG KAFKA_VERSION=3.9.2 # renovate: datasource=github-tags depName=apache/kafka
+# Kafka 4 is KRaft-only.
+ARG KAFKA_VERSION=4.0.2 # renovate: datasource=github-tags depName=apache/kafka
 ARG java_version=21
 
 FROM alpine:latest@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a AS kafka_dist
@@ -139,7 +136,9 @@ RUN apt-get update && \
     mkdir -p ${KAFKA_HOME}/libs/extensions
 
 COPY --from=kafka_dist /var/tmp/kafka_$scala_version-$KAFKA_VERSION ${KAFKA_HOME}
-COPY opt/kafka/config/log4j.properties ${KAFKA_HOME}/config/log4j.properties
+COPY opt/kafka/config/log4j2.properties ${KAFKA_HOME}/config/log4j2.properties
+
+ENV KAFKA_LOG4J_OPTS="-Dlog4j2.configurationFile=/opt/kafka/config/log4j2.properties"
 
 # Optimize Kafka installation: remove unnecessary files and set permissions
 RUN chmod a+x ${KAFKA_HOME}/bin/*.sh && \

@@ -53,6 +53,23 @@ jobs:
         run: |
           KAFKA_VERSION=$(echo "${{ needs.prepare.outputs.tag }}" | sed 's/kafka-//')
           echo "kafka_version=$KAFKA_VERSION" >> $GITHUB_OUTPUT
+      - name: Validate tagged Kafka distribution
+        env:
+          IMAGE_VERSION: ${{ steps.kafka_version.outputs.kafka_version }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$IMAGE_VERSION" =~ ^([0-9]+\.[0-9]+)-([0-9]+\.[0-9]+\.[0-9]+)(-jdk[0-9]+\.[0-9]+\.[0-9]+)?$ ]]; then
+            echo "::error::Expected kafka-<scala>-<kafka>[-jdk<version>] release tag"
+            exit 1
+          fi
+          TAG_SCALA="${BASH_REMATCH[1]}"
+          TAG_KAFKA="${BASH_REMATCH[2]}"
+          DIST_SCALA=$(sed -nE 's/^ARG scala_version=([^[:space:]]+).*$/\1/p' docker/kafka/Dockerfile)
+          DIST_KAFKA=$(sed -nE 's/^ARG KAFKA_VERSION=([^[:space:]]+).*$/\1/p' docker/kafka/Dockerfile)
+          if [[ "$TAG_SCALA" != "$DIST_SCALA" || "$TAG_KAFKA" != "$DIST_KAFKA" ]]; then
+            echo "::error::Tag $IMAGE_VERSION does not match Dockerfile distribution $DIST_SCALA-$DIST_KAFKA"
+            exit 1
+          fi
       - name: Check if Kafka image already exists
         id: image_exists
         run: |
