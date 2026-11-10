@@ -1,6 +1,7 @@
 ARG JMX_EXPORTER_VERSION=1.7.0 # renovate: datasource=github-releases depName=prometheus/jmx_exporter
 
-FROM maven:3-amazoncorretto-21@sha256:f64fd4f0363c918004816d83d2589495b622a8d2fc5c5602c135cb4124c7ea12 AS build
+# The Java agent JAR is architecture-independent; compile and test without QEMU.
+FROM --platform=$BUILDPLATFORM maven:3-amazoncorretto-21@sha256:f64fd4f0363c918004816d83d2589495b622a8d2fc5c5602c135cb4124c7ea12 AS build
 ARG JMX_EXPORTER_VERSION
 
 # Install wget to download the release tarball
