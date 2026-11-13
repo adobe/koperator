@@ -20,6 +20,7 @@ import (
 	"math"
 	"sort"
 
+	"emperror.dev/errors"
 	envoyaccesslog "github.com/envoyproxy/go-control-plane/envoy/config/accesslog/v3"
 	envoybootstrap "github.com/envoyproxy/go-control-plane/envoy/config/bootstrap/v3"
 	envoycluster "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
@@ -27,6 +28,7 @@ import (
 	envoyendpoint "github.com/envoyproxy/go-control-plane/envoy/config/endpoint/v3"
 	envoylistener "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
 	envoyroute "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
+	envoyfileaccesslog "github.com/envoyproxy/go-control-plane/envoy/extensions/access_loggers/file/v3"
 	envoystdoutaccesslog "github.com/envoyproxy/go-control-plane/envoy/extensions/access_loggers/stream/v3"
 	envoyhttphealthcheck "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/health_check/v3"
 	envoyhttprouter "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/router/v3"
@@ -57,6 +59,101 @@ import (
 
 // bindAddressAny is the wildcard address Envoy listeners and clusters bind to.
 const bindAddressAny = "0.0.0.0"
+
+// Runtime keys for the access-log samplers rendered when
+// EnvoyConfig.EnableAccesslogSampling is set. Each is independently settable at
+// runtime through the Envoy admin API, e.g.
+//
+//	curl -X POST 'localhost:8081/runtime_modify?access_log.broker_sample_rate=10000'
+//
+// Values are numerators over accessLogSampleDenominator, so 10000 is 100% and
+// 0 (the rendered default) disables the log entirely.
+const (
+	// AccessLogRuntimeKeyBroker samples the per-broker TLS filter chains.
+	AccessLogRuntimeKeyBroker = "access_log.broker_sample_rate"
+	// AccessLogRuntimeKeyAnycast samples the anycast filter chain.
+	AccessLogRuntimeKeyAnycast = "access_log.anycast_sample_rate"
+	// AccessLogRuntimeKeyUnmatched samples the catch-all filter chain, which
+	// receives every connection no more specific chain claimed.
+	AccessLogRuntimeKeyUnmatched = "access_log.unmatched_sample_rate"
+)
+
+// accessLogSampleDenominator gives the runtime knobs a 0-10000 range, so a
+// sample rate can be expressed to two decimal places (1 == 0.01%).
+const accessLogSampleDenominator = envoytypes.FractionalPercent_TEN_THOUSAND
+
+// Access-log line format, split around the chain name. These are deliberately
+// concatenated rather than passed through fmt.Sprintf: Envoy's command
+// operators (%START_TIME%, %DURATION%, ...) look like format verbs, and go vet
+// fails the build with "unknown verb" if they reach a formatting function.
+//
+// The trailing newline is required - Envoy does not append one, so without it
+// every log line would run into the next.
+const (
+	accessLogFormatPrefix = "[%START_TIME%] chain="
+	accessLogFormatSuffix = " src=%DOWNSTREAM_REMOTE_ADDRESS% local=%DOWNSTREAM_LOCAL_ADDRESS%" +
+		" sni=\"%REQUESTED_SERVER_NAME%\" bytes_recv=%BYTES_RECEIVED% bytes_sent=%BYTES_SENT%" +
+		" duration=%DURATION% flags=%RESPONSE_FLAGS%\n"
+)
+
+// newRuntimeSampledAccessLog builds a file access log to /dev/stdout, gated by
+// a runtime-settable sampling percentage, for the filter chain named chainName.
+//
+// The rendered sampler is inert: PercentSampled carries only a denominator, so
+// the numerator defaults to 0 and nothing is logged until an operator raises
+// runtimeKey through the admin API. Per Envoy's RuntimeFilter contract a value
+// found at runtimeKey overrides PercentSampled, which is why the rendered
+// config only ever needs to express the "off" fallback.
+//
+// chainName is embedded in every emitted line so the three chains stay
+// distinguishable in a single stdout stream.
+func newRuntimeSampledAccessLog(chainName, runtimeKey string) (*envoyaccesslog.AccessLog, error) {
+	fileAccessLog := &envoyfileaccesslog.FileAccessLog{
+		Path: "/dev/stdout",
+		AccessLogFormat: &envoyfileaccesslog.FileAccessLog_LogFormat{
+			LogFormat: &envoycore.SubstitutionFormatString{
+				Format: &envoycore.SubstitutionFormatString_TextFormatSource{
+					TextFormatSource: &envoycore.DataSource{
+						Specifier: &envoycore.DataSource_InlineString{
+							InlineString: accessLogFormatPrefix + chainName + accessLogFormatSuffix,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	pbstFileAccessLog, err := anypb.New(fileAccessLog)
+	if err != nil {
+		return nil, errors.WrapIf(err, "could not marshall envoy file access log config")
+	}
+
+	return &envoyaccesslog.AccessLog{
+		Name: wellknown.FileAccessLog,
+		Filter: &envoyaccesslog.AccessLogFilter{
+			FilterSpecifier: &envoyaccesslog.AccessLogFilter_RuntimeFilter{
+				RuntimeFilter: &envoyaccesslog.RuntimeFilter{
+					RuntimeKey: runtimeKey,
+					// Numerator is intentionally left unset: protojson omits
+					// zero scalars, so this renders as a bare denominator and
+					// means "sample nothing".
+					PercentSampled: &envoytypes.FractionalPercent{
+						Denominator: accessLogSampleDenominator,
+					},
+					// A documented no-op on TCP listeners (there is no
+					// x-request-id to pivot on, which already forces
+					// independent randomness), kept because it states the
+					// intent explicitly and matches the config validated
+					// against a live Envoy.
+					UseIndependentRandomness: true,
+				},
+			},
+		},
+		ConfigType: &envoyaccesslog.AccessLog_TypedConfig{
+			TypedConfig: pbstFileAccessLog,
+		},
+	}, nil
+}
 
 func (r *Reconciler) configMap(log logr.Logger, extListener v1beta1.ExternalListenerConfig,
 	ingressConfig v1beta1.IngressConfig, ingressConfigName, defaultIngressConfigName string) runtime.Object {
