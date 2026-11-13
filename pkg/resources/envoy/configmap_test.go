@@ -17,6 +17,7 @@ package envoy
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -30,6 +31,7 @@ import (
 
 	"github.com/banzaicloud/koperator/api/v1beta1"
 	"github.com/banzaicloud/koperator/pkg/util"
+	envoyutils "github.com/banzaicloud/koperator/pkg/util/envoy"
 )
 
 func TestNewRuntimeSampledAccessLog(t *testing.T) {
@@ -464,6 +466,10 @@ func TestGenerateEnvoyConfigChainSamplers(t *testing.T) {
 			for _, brokerID := range testBrokerIDs {
 				want[fmt.Sprintf("broker_%d", brokerID)] = AccessLogRuntimeKeyBroker
 			}
+			if testCase.tlsEnabled {
+				// The catch-all exists only where chains are selected by SNI.
+				want[catchallFilterChainName] = AccessLogRuntimeKeyUnmatched
+			}
 			got := make(map[string]string, len(want))
 
 			for _, chain := range allFilterChains(config) {
@@ -532,6 +538,8 @@ func TestGenerateEnvoyConfigFlagOffAddsNothing(t *testing.T) {
 			}
 
 			delete(on, "layeredRuntime")
+			dropFilterChain(on, catchallFilterChainName)
+			dropCluster(on, blackholeClusterName)
 			for _, chain := range allFilterChains(on) {
 				if _, named := chain["name"]; !named {
 					continue
@@ -556,4 +564,295 @@ func mustMarshal(t *testing.T, config map[string]any) string {
 	}
 
 	return string(marshalled)
+}
+
+// dropFilterChain removes a named filter chain from every listener, and reports
+// how many it removed.
+func dropFilterChain(config map[string]any, name string) int {
+	removed := 0
+
+	staticResources, _ := config["staticResources"].(map[string]any)
+	listeners, _ := staticResources["listeners"].([]any)
+
+	for _, listener := range listeners {
+		listenerMap, _ := listener.(map[string]any)
+		chains, _ := listenerMap["filterChains"].([]any)
+
+		kept := make([]any, 0, len(chains))
+		for _, entry := range chains {
+			if chain, ok := entry.(map[string]any); ok && chain["name"] == name {
+				removed++
+				continue
+			}
+			kept = append(kept, entry)
+		}
+		if len(kept) != len(chains) {
+			listenerMap["filterChains"] = kept
+		}
+	}
+
+	return removed
+}
+
+// dropCluster removes a named cluster, and reports how many it removed.
+func dropCluster(config map[string]any, name string) int {
+	removed := 0
+
+	staticResources, _ := config["staticResources"].(map[string]any)
+	clusters, _ := staticResources["clusters"].([]any)
+
+	kept := make([]any, 0, len(clusters))
+	for _, entry := range clusters {
+		if cluster, ok := entry.(map[string]any); ok && cluster["name"] == name {
+			removed++
+			continue
+		}
+		kept = append(kept, entry)
+	}
+	if len(kept) != len(clusters) {
+		staticResources["clusters"] = kept
+	}
+
+	return removed
+}
+
+// clusterNames lists the clusters in rendered order.
+func clusterNames(config map[string]any) []string {
+	staticResources, _ := config["staticResources"].(map[string]any)
+	clusters, _ := staticResources["clusters"].([]any)
+
+	names := make([]string, 0, len(clusters))
+	for _, entry := range clusters {
+		cluster, _ := entry.(map[string]any)
+		name, _ := cluster["name"].(string)
+		names = append(names, name)
+	}
+
+	return names
+}
+
+// tlsListenerChainNames returns the chain names of the SNI listener, in
+// rendered order, using "" for an unnamed chain. The TLS listener is the one
+// carrying tls_inspector, which is the same way the Step 0 script found it.
+func tlsListenerChainNames(t *testing.T, config map[string]any) []string {
+	t.Helper()
+
+	staticResources, _ := config["staticResources"].(map[string]any)
+	listeners, _ := staticResources["listeners"].([]any)
+
+	var names []string
+	found := 0
+
+	for _, listener := range listeners {
+		listenerMap, _ := listener.(map[string]any)
+		listenerFilters, _ := listenerMap["listenerFilters"].([]any)
+
+		hasTLSInspector := false
+		for _, entry := range listenerFilters {
+			listenerFilter, _ := entry.(map[string]any)
+			if name, _ := listenerFilter["name"].(string); strings.Contains(name, "tls_inspector") {
+				hasTLSInspector = true
+			}
+		}
+		if !hasTLSInspector {
+			continue
+		}
+
+		found++
+		names = nil
+		chains, _ := listenerMap["filterChains"].([]any)
+		for _, entry := range chains {
+			chain, _ := entry.(map[string]any)
+			name, _ := chain["name"].(string)
+			names = append(names, name)
+		}
+	}
+
+	if found != 1 {
+		t.Fatalf("expected exactly one tls_inspector listener, found %d", found)
+	}
+
+	return names
+}
+
+// TestGenerateEnvoyConfigCatchallChain covers the one part of this feature that
+// changes behaviour rather than just adding logging: connections that today die
+// unmatched are instead claimed by a chain and routed to an endpoint-less
+// cluster.
+//
+// The ordering assertion is the important one. Envoy selects the most specific
+// matching chain, so a chain with no match rules only ever receives what the
+// broker and anycast chains declined - but the rendered order still has to put
+// it last, both because that is the config that was validated against a live
+// Envoy and because a reader should not have to know Envoy's matching rules to
+// see that the broker chains win.
+func TestGenerateEnvoyConfigCatchallChain(t *testing.T) {
+	t.Parallel()
+
+	config := parseRendered(t, renderEnvoyConfig(t, true, true))
+
+	chainNames := tlsListenerChainNames(t, config)
+	if len(chainNames) == 0 || chainNames[len(chainNames)-1] != catchallFilterChainName {
+		t.Fatalf("the catch-all chain must be rendered last on the TLS listener, got %v", chainNames)
+	}
+	// It must not be the only chain either, or the brokers stopped rendering
+	// and everything would fall through to the blackhole.
+	if len(chainNames) != len(testBrokerIDs)+2 {
+		t.Fatalf("expected %d broker chains plus anycast plus the catch-all, got %v", len(testBrokerIDs), chainNames)
+	}
+
+	var catchall map[string]any
+	for _, chain := range allFilterChains(config) {
+		if chain["name"] == catchallFilterChainName {
+			catchall = chain
+		}
+	}
+	if catchall == nil {
+		t.Fatal("no catch-all chain was rendered")
+	}
+
+	// No match rules: that is what makes it a catch-all. With one it would
+	// silently catch nothing, and the knob would look broken rather than unused.
+	if match, ok := catchall["filterChainMatch"]; ok {
+		t.Errorf("the catch-all chain carries a filterChainMatch %v, so it would no longer catch unmatched traffic", match)
+	}
+	// No transport socket: traffic landing here is frequently not valid TLS for
+	// us, and a failed handshake would kill the connection before the access log
+	// could fire - losing exactly the line we added it for.
+	if _, ok := catchall["transportSocket"]; ok {
+		t.Error("the catch-all chain terminates TLS, which would drop unmatched connections before they are logged")
+	}
+
+	tcpProxy := chainNetworkFilterConfig(catchall)
+	if tcpProxy["cluster"] != blackholeClusterName {
+		t.Errorf("the catch-all routes to %v, want the blackhole cluster %q", tcpProxy["cluster"], blackholeClusterName)
+	}
+	if tcpProxy["statPrefix"] != catchallFilterChainName {
+		t.Errorf("the catch-all has stat prefix %v, want %q", tcpProxy["statPrefix"], catchallFilterChainName)
+	}
+	// Nothing to connect to, so neither knob means anything here. They are
+	// asserted absent because the validated config did not carry them.
+	for _, unwanted := range []string{"idleTimeout", "maxConnectAttempts"} {
+		if _, ok := tcpProxy[unwanted]; ok {
+			t.Errorf("the catch-all TcpProxy carries %q, which has no meaning without an upstream", unwanted)
+		}
+	}
+}
+
+// TestGenerateEnvoyConfigBlackholeCluster checks the cluster the catch-all
+// points at. Its emptiness is the feature: the connection fails, but only after
+// the access log has fired.
+func TestGenerateEnvoyConfigBlackholeCluster(t *testing.T) {
+	t.Parallel()
+
+	config := parseRendered(t, renderEnvoyConfig(t, true, true))
+
+	names := clusterNames(config)
+	blackhole := slices.Index(names, blackholeClusterName)
+	if blackhole < 0 {
+		t.Fatalf("no blackhole cluster was rendered, so the catch-all would point at nothing: %v", names)
+	}
+	// Ordering is not meaningful to Envoy, but it is to the byte comparison
+	// against the validated artifact.
+	if anycast := slices.Index(names, envoyutils.AllBrokerEnvoyConfigName); blackhole != anycast-1 {
+		t.Errorf("expected the blackhole cluster immediately before %q, got %v", envoyutils.AllBrokerEnvoyConfigName, names)
+	}
+
+	staticResources, _ := config["staticResources"].(map[string]any)
+	clusters, _ := staticResources["clusters"].([]any)
+	cluster, _ := clusters[blackhole].(map[string]any)
+
+	if cluster["type"] != "STATIC" {
+		t.Errorf("the blackhole cluster is of type %v, want STATIC: any other type would make Envoy resolve or discover endpoints", cluster["type"])
+	}
+
+	// A load assignment naming the cluster but listing no endpoints. Envoy
+	// rejects a STATIC cluster with no load assignment at all, so this cannot
+	// simply be omitted.
+	loadAssignment, ok := cluster["loadAssignment"].(map[string]any)
+	if !ok {
+		t.Fatal("the blackhole cluster has no loadAssignment, which Envoy rejects for a STATIC cluster")
+	}
+	if loadAssignment["clusterName"] != blackholeClusterName {
+		t.Errorf("the blackhole loadAssignment names %v, want %q", loadAssignment["clusterName"], blackholeClusterName)
+	}
+	if endpoints, ok := loadAssignment["endpoints"]; ok {
+		t.Errorf("the blackhole cluster has endpoints %v, so unmatched traffic would be proxied somewhere real", endpoints)
+	}
+}
+
+// TestGenerateEnvoyConfigCatchallIsTLSOnly pins the catch-all to the SNI
+// listener.
+//
+// On the plaintext path every broker has its own port and a single chain with
+// no match rules, so adding a second unrestricted chain would give one listener
+// two chains with identical match rules - which Envoy rejects outright, taking
+// the whole ingress down rather than degrading.
+func TestGenerateEnvoyConfigCatchallIsTLSOnly(t *testing.T) {
+	t.Parallel()
+
+	config := parseRendered(t, renderEnvoyConfig(t, false, true))
+
+	for _, chain := range allFilterChains(config) {
+		if chain["name"] == catchallFilterChainName {
+			t.Error("a catch-all chain was rendered on the plaintext path, where it would collide with the per-broker chains")
+		}
+	}
+	// The cluster is pointless without the chain, and an unused cluster is
+	// still a cluster an operator has to explain.
+	if slices.Contains(clusterNames(config), blackholeClusterName) {
+		t.Error("the blackhole cluster was rendered on the plaintext path, where nothing routes to it")
+	}
+}
+
+// TestGenerateEnvoyConfigHealthCheckListenerUntouched is an explicit check that
+// this feature stays off the health-check listener.
+//
+// It is separate from the flag-off test because it has to hold with the flag
+// *on*: the health-check listener is what the load balancer polls, so a stray
+// catch-all chain or sampler there would affect traffic admission rather than
+// just logging.
+func TestGenerateEnvoyConfigHealthCheckListenerUntouched(t *testing.T) {
+	t.Parallel()
+
+	for _, tlsEnabled := range []bool{true, false} {
+		off := parseRendered(t, renderEnvoyConfig(t, tlsEnabled, false))
+		on := parseRendered(t, renderEnvoyConfig(t, tlsEnabled, true))
+
+		if got, want := mustMarshal(t, healthCheckListener(t, on)), mustMarshal(t, healthCheckListener(t, off)); got != want {
+			t.Errorf("enabling the flag changed the health-check listener (tlsEnabled=%v)\n--- flag off ---\n%s\n--- flag on ---\n%s", tlsEnabled, want, got)
+		}
+	}
+}
+
+// healthCheckListener returns the listener the load balancer polls, identified
+// by its HTTP connection manager rather than by a port number.
+func healthCheckListener(t *testing.T, config map[string]any) map[string]any {
+	t.Helper()
+
+	staticResources, _ := config["staticResources"].(map[string]any)
+	listeners, _ := staticResources["listeners"].([]any)
+
+	var found map[string]any
+	for _, entry := range listeners {
+		listener, _ := entry.(map[string]any)
+		chains, _ := listener["filterChains"].([]any)
+
+		for _, chainEntry := range chains {
+			chain, _ := chainEntry.(map[string]any)
+			filters, _ := chain["filters"].([]any)
+			for _, filterEntry := range filters {
+				filter, _ := filterEntry.(map[string]any)
+				if name, _ := filter["name"].(string); strings.Contains(name, "http_connection_manager") {
+					found = listener
+				}
+			}
+		}
+	}
+
+	if found == nil {
+		t.Fatal("no health-check listener was rendered")
+	}
+
+	return found
 }

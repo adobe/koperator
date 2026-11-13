@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"time"
 
 	"emperror.dev/errors"
 	envoyaccesslog "github.com/envoyproxy/go-control-plane/envoy/config/accesslog/v3"
@@ -219,6 +220,70 @@ func attachAccessLogSampler(tcpProxy *envoytcpproxy.TcpProxy, enabled bool, chai
 	tcpProxy.AccessLog = []*envoyaccesslog.AccessLog{accessLog}
 
 	return nil
+}
+
+// catchallFilterChainName names the chain that claims whatever no more specific
+// chain matched. It is also its TcpProxy stat prefix, so the stat tree and the
+// log lines agree.
+//
+// "unmatched" describes the traffic, not a failure: a connection reaching this
+// chain did not match any broker or anycast chain. Plaintext sent to the TLS
+// port, an unknown or absent SNI, and a truncated ClientHello all land here.
+const catchallFilterChainName = "catchall_unmatched"
+
+// blackholeClusterName is the cluster the catch-all chain routes to. It has no
+// endpoints, so the connection fails immediately - but only after the access
+// log has fired, which is the entire point. That is also why its log lines
+// always read bytes_recv=0 and flags=UH: TcpProxy counts proxied bytes and
+// nothing is ever proxied.
+const blackholeClusterName = "blackhole_catchall"
+
+// newCatchallFilterChain builds the catch-all chain.
+//
+// Two absences are deliberate and load-bearing:
+//
+//   - No FilterChainMatch. That is what makes it the catch-all; Envoy picks the
+//     most specific matching chain and falls back to an unrestricted one.
+//   - No TransportSocket, so TLS is not terminated here. Traffic reaching this
+//     chain frequently is not valid TLS for us, and attempting a handshake
+//     would fail the connection before the log line could be written.
+//
+// The TcpProxy carries only a cluster and a stat prefix: no idle timeout and no
+// connect attempts, since there is nothing to connect to.
+func newCatchallFilterChain(log logr.Logger) (*envoylistener.FilterChain, error) {
+	tcpProxy := &envoytcpproxy.TcpProxy{
+		StatPrefix: catchallFilterChainName,
+		ClusterSpecifier: &envoytcpproxy.TcpProxy_Cluster{
+			Cluster: blackholeClusterName,
+		},
+	}
+
+	if err := attachAccessLogSampler(tcpProxy, true, catchallFilterChainName, AccessLogRuntimeKeyUnmatched); err != nil {
+		return nil, err
+	}
+
+	filterChain, err := GenerateEnvoyFilterChain(tcpProxy, log)
+	if err != nil {
+		return nil, err
+	}
+	filterChain.Name = catchallFilterChainName
+
+	return filterChain, nil
+}
+
+// newBlackholeCluster builds the endpoint-less cluster the catch-all routes to.
+// The LoadAssignment is present but carries no endpoints: Envoy rejects a STATIC
+// cluster that has no load assignment at all, whereas an empty one is valid and
+// means "nowhere to send this".
+func newBlackholeCluster() *envoycluster.Cluster {
+	return &envoycluster.Cluster{
+		Name:                 blackholeClusterName,
+		ClusterDiscoveryType: &envoycluster.Cluster_Type{Type: envoycluster.Cluster_STATIC},
+		ConnectTimeout:       durationpb.New(100 * time.Millisecond),
+		LoadAssignment: &envoyendpoint.ClusterLoadAssignment{
+			ClusterName: blackholeClusterName,
+		},
+	}
 }
 
 func (r *Reconciler) configMap(log logr.Logger, extListener v1beta1.ExternalListenerConfig,
@@ -641,6 +706,23 @@ func GenerateEnvoyConfig(kc *v1beta1.KafkaCluster, elistener v1beta1.ExternalLis
 
 	tempListeners[elistener.GetAnyCastPort()] = append(tempListeners[elistener.GetAnyCastPort()], filterChain)
 
+	// The catch-all goes last: Envoy prefers the most specific matching chain,
+	// so an unrestricted chain anywhere else in the slice would still only pick
+	// up what the broker and anycast chains declined. Appending it last keeps
+	// the rendered order honest about that.
+	//
+	// TLS only. On the plaintext path each broker already listens on its own
+	// port with a single unrestricted chain, so a second one would collide -
+	// Envoy rejects a listener holding two chains with identical match rules.
+	if ingressConfig.EnvoyConfig.EnableAccesslogSampling && elistener.TLSEnabled() {
+		catchallChain, err := newCatchallFilterChain(log)
+		if err != nil {
+			log.Error(err, "Unable to generate catch-all envoy filter chain")
+			return ""
+		}
+		tempListeners[elistener.GetAnyCastPort()] = append(tempListeners[elistener.GetAnyCastPort()], catchallChain)
+	}
+
 	// sort the tempListeners map for consistent results
 	ports := make([]int, 0, len(tempListeners))
 	for p := range tempListeners {
@@ -686,6 +768,13 @@ func GenerateEnvoyConfig(kc *v1beta1.KafkaCluster, elistener v1beta1.ExternalLis
 		return ""
 	}
 	listeners = append(listeners, healthCheckListener)
+
+	// Appended before the anycast cluster so the rendered slice order matches
+	// the config this was validated against. Envoy does not care about cluster
+	// order; the byte-level comparison against that artifact does.
+	if ingressConfig.EnvoyConfig.EnableAccesslogSampling && elistener.TLSEnabled() {
+		clusters = append(clusters, newBlackholeCluster())
+	}
 
 	clusters = append(clusters, &envoycluster.Cluster{
 		Name:           envoyutils.AllBrokerEnvoyConfigName,
