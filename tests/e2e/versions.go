@@ -25,10 +25,10 @@ const (
 	ContourVersion = "0.9.0" // renovate: datasource=helm depName=contour registryUrl=https://projectcontour.github.io/helm-charts
 
 	// PrometheusOperatorVersion is the version of kube-prometheus-stack Helm chart
-	PrometheusOperatorVersion = "92.17.0" // renovate: datasource=helm depName=kube-prometheus-stack registryUrl=https://prometheus-community.github.io/helm-charts
+	PrometheusOperatorVersion = "92.22.0" // renovate: datasource=helm depName=kube-prometheus-stack registryUrl=https://prometheus-community.github.io/helm-charts
 
 	// ZookeeperOperatorVersion is the version of zookeeper-operator
-	ZookeeperOperatorVersion = "0.2.15-adobe-20260924" // renovate: datasource=docker depName=ghcr.io/adobe/helm-charts/zookeeper-operator
+	ZookeeperOperatorVersion = "0.2.15-adobe-20261101" // renovate: datasource=docker depName=ghcr.io/adobe/helm-charts/zookeeper-operator
 
 	// KclVersion is the version of the kcl Kafka CLI image used by the internal produce/consume helpers
 	KclVersion = "v0.20.0" // renovate: datasource=docker depName=ghcr.io/twmb/kcl

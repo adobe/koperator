@@ -61,7 +61,7 @@ const (
 	DefaultKafkaImage = "ghcr.io/adobe/koperator/kafka:2.13-3.9.2-jdk21.0.12" // renovate: datasource=docker depName=ghcr.io/adobe/koperator/kafka
 
 	// DefaultMonitorImage is the default JMX monitor image used when users don't specify it in MonitoringConfig.JmxImage
-	DefaultMonitorImage = "ghcr.io/adobe/koperator/jmx-javaagent:1.5.0" // renovate: datasource=docker depName=ghcr.io/adobe/koperator/jmx-javaagent
+	DefaultMonitorImage = "ghcr.io/adobe/koperator/jmx-javaagent:1.7.0" // renovate: datasource=docker depName=ghcr.io/adobe/koperator/jmx-javaagent
 
 	// DefaultEnvoyImage is the default Envoy proxy image used when users don't specify it in EnvoyConfig.Image
 	DefaultEnvoyImage = "envoyproxy/envoy:v1.40.2" // renovate: datasource=docker depName=envoyproxy/envoy
