@@ -19,11 +19,16 @@ import (
 	"strings"
 	"testing"
 
+	envoybootstrap "github.com/envoyproxy/go-control-plane/envoy/config/bootstrap/v3"
 	envoyfileaccesslog "github.com/envoyproxy/go-control-plane/envoy/extensions/access_loggers/file/v3"
 	envoytypes "github.com/envoyproxy/go-control-plane/envoy/type/v3"
 	"github.com/envoyproxy/go-control-plane/pkg/wellknown"
+	"github.com/go-logr/logr"
 	"google.golang.org/protobuf/encoding/protojson"
 	"sigs.k8s.io/yaml"
+
+	"github.com/banzaicloud/koperator/api/v1beta1"
+	"github.com/banzaicloud/koperator/pkg/util"
 )
 
 func TestNewRuntimeSampledAccessLog(t *testing.T) {
@@ -159,4 +164,147 @@ typedConfig:
 	if string(got) != want {
 		t.Errorf("rendered access log does not match the validated config\n--- got ---\n%s\n--- want ---\n%s", got, want)
 	}
+}
+
+func TestNewAccessLogRuntimeLayer(t *testing.T) {
+	t.Parallel()
+
+	layeredRuntime := newAccessLogRuntimeLayer()
+
+	layers := layeredRuntime.GetLayers()
+	if len(layers) != 1 {
+		t.Fatalf("layers = %d, want exactly 1", len(layers))
+	}
+
+	if layers[0].GetName() != "admin" {
+		t.Errorf("layer name = %q, want admin", layers[0].GetName())
+	}
+
+	// Without an admin layer specifically, /runtime_modify has nowhere to write
+	// and the sampling keys can never be raised.
+	if layers[0].GetAdminLayer() == nil {
+		t.Error("layer is not an admin layer, so runtime_modify would have nowhere to write")
+	}
+}
+
+// TestNewAccessLogRuntimeLayerRendersAsValidated pins the bootstrap block
+// against work/envoy configs/envoy-dev-az1-cm.debug.yaml, the config that was
+// booted on a live Envoy and whose knobs were toggled through the admin API.
+func TestNewAccessLogRuntimeLayerRendersAsValidated(t *testing.T) {
+	t.Parallel()
+
+	const want = `layeredRuntime:
+  layers:
+  - adminLayer: {}
+    name: admin
+`
+
+	marshalledJSON, err := (&protojson.MarshalOptions{}).Marshal(&envoybootstrap.Bootstrap{
+		LayeredRuntime: newAccessLogRuntimeLayer(),
+	})
+	if err != nil {
+		t.Fatalf("could not marshal bootstrap: %v", err)
+	}
+
+	got, err := yaml.JSONToYAML(marshalledJSON)
+	if err != nil {
+		t.Fatalf("could not convert bootstrap to YAML: %v", err)
+	}
+
+	if string(got) != want {
+		t.Errorf("rendered runtime layer does not match the validated config\n--- got ---\n%s\n--- want ---\n%s", got, want)
+	}
+}
+
+// testKafkaCluster is the smallest cluster that renders a complete Envoy
+// config: one broker, one external listener, envoy as the ingress controller.
+func testKafkaCluster() (*v1beta1.KafkaCluster, v1beta1.ExternalListenerConfig) {
+	kafkaCluster := &v1beta1.KafkaCluster{
+		Spec: v1beta1.KafkaClusterSpec{
+			IngressController: "envoy",
+			Brokers:           []v1beta1.Broker{{Id: 101}},
+			ListenersConfig: v1beta1.ListenersConfig{
+				ExternalListeners: []v1beta1.ExternalListenerConfig{{
+					CommonListenerSpec: v1beta1.CommonListenerSpec{
+						Name:          "external",
+						ContainerPort: 9094,
+					},
+					ExternalStartingPort: 19090,
+				}},
+			},
+		},
+	}
+
+	return kafkaCluster, kafkaCluster.Spec.ListenersConfig.ExternalListeners[0]
+}
+
+func renderEnvoyConfig(t *testing.T, enableAccesslogSampling bool) string {
+	t.Helper()
+
+	kafkaCluster, externalListener := testKafkaCluster()
+	ingressConfig := v1beta1.IngressConfig{
+		EnvoyConfig: &v1beta1.EnvoyConfig{
+			EnableAccesslogSampling: enableAccesslogSampling,
+		},
+	}
+
+	rendered := GenerateEnvoyConfig(kafkaCluster, externalListener, ingressConfig,
+		util.IngressConfigGlobalName, util.IngressConfigGlobalName, logr.Discard())
+	if rendered == "" {
+		t.Fatal("GenerateEnvoyConfig returned an empty config")
+	}
+
+	return rendered
+}
+
+// TestGenerateEnvoyConfigRuntimeLayerIsGated is the safety net for this feature:
+// koperator is a public fork, so the rendered config must not move for clusters
+// that have not opted in.
+func TestGenerateEnvoyConfigRuntimeLayerIsGated(t *testing.T) {
+	t.Parallel()
+
+	t.Run("flag off omits the runtime layer", func(t *testing.T) {
+		t.Parallel()
+
+		if got := renderEnvoyConfig(t, false); strings.Contains(got, "layeredRuntime") {
+			t.Errorf("flag off rendered a runtime layer, which would change the config of every existing cluster:\n%s", got)
+		}
+	})
+
+	t.Run("flag on renders the admin runtime layer", func(t *testing.T) {
+		t.Parallel()
+
+		got := renderEnvoyConfig(t, true)
+
+		// Indented exactly as it appears at the top level of the bootstrap,
+		// between admin and staticResources.
+		const want = `layeredRuntime:
+  layers:
+  - adminLayer: {}
+    name: admin
+`
+
+		if !strings.Contains(got, want) {
+			t.Errorf("flag on did not render the expected runtime layer\n--- want ---\n%s\n--- got ---\n%s", want, got)
+		}
+	})
+
+	t.Run("the flag changes nothing else", func(t *testing.T) {
+		t.Parallel()
+
+		off, on := renderEnvoyConfig(t, false), renderEnvoyConfig(t, true)
+
+		const runtimeLayer = `layeredRuntime:
+  layers:
+  - adminLayer: {}
+    name: admin
+`
+
+		// Removing the runtime layer from the flag-on render must give back the
+		// flag-off render exactly. Anything else means the flag leaked into a
+		// part of the config it has no business touching.
+		if stripped := strings.Replace(on, runtimeLayer, "", 1); stripped != off {
+			t.Errorf("enabling the flag changed more than the runtime layer\n--- flag off ---\n%s\n--- flag on, layer removed ---\n%s", off, stripped)
+		}
+	})
 }

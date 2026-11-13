@@ -96,6 +96,33 @@ const (
 		" duration=%DURATION% flags=%RESPONSE_FLAGS%\n"
 )
 
+// accessLogRuntimeLayerName is the name of the admin runtime layer. It is
+// cosmetic to Envoy but appears in the /runtime admin endpoint output, where it
+// tells an operator which layer a value came from.
+const accessLogRuntimeLayerName = "admin"
+
+// newAccessLogRuntimeLayer builds the bootstrap runtime layering that lets the
+// access-log sampling keys be changed at runtime, e.g.
+//
+//	curl -X POST 'localhost:8081/runtime_modify?access_log.anycast_sample_rate=10000'
+//
+// A single admin layer is enough: it is writable through the admin API and
+// overlays the values compiled into the config. Note that values set this way
+// live only in the Envoy process, so they are lost on restart - the rendered
+// config always comes back as "sample nothing".
+func newAccessLogRuntimeLayer() *envoybootstrap.LayeredRuntime {
+	return &envoybootstrap.LayeredRuntime{
+		Layers: []*envoybootstrap.RuntimeLayer{{
+			Name: accessLogRuntimeLayerName,
+			// RuntimeLayer_AdminLayer_ (with the trailing underscore) is the
+			// oneof wrapper; RuntimeLayer_AdminLayer is the message it holds.
+			LayerSpecifier: &envoybootstrap.RuntimeLayer_AdminLayer_{
+				AdminLayer: &envoybootstrap.RuntimeLayer_AdminLayer{},
+			},
+		}},
+	}
+}
+
 // newRuntimeSampledAccessLog builds a file access log to /dev/stdout, gated by
 // a runtime-settable sampling percentage, for the filter chain named chainName.
 //
@@ -681,6 +708,14 @@ func GenerateEnvoyConfig(kc *v1beta1.KafkaCluster, elistener v1beta1.ExternalLis
 		Admin:           &adminConfig,
 		StaticResources: &config,
 	}
+
+	// The admin runtime layer is what makes the access-log knobs settable at
+	// all: /runtime_modify needs a writable layer to put values in. Without it
+	// the sampling keys would be stuck at their rendered default forever.
+	if ingressConfig.EnvoyConfig.EnableAccesslogSampling {
+		generatedConfig.LayeredRuntime = newAccessLogRuntimeLayer()
+	}
+
 	marshaller := &protojson.MarshalOptions{}
 	marshalledProtobufConfig, err := marshaller.Marshal(&generatedConfig)
 	if err != nil {
