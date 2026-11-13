@@ -7,7 +7,7 @@ metadata:
 spec:
   kRaft: true
   monitoringConfig:
-    jmxImage: "ghcr.io/adobe/koperator/jmx-javaagent:1.5.0" # renovate: datasource=docker depName=ghcr.io/adobe/koperator/jmx-javaagent
+    jmxImage: "ghcr.io/adobe/koperator/jmx-javaagent:1.7.0" # renovate: datasource=docker depName=ghcr.io/adobe/koperator/jmx-javaagent
   headlessServiceEnabled: true
   propagateLabels: false
   oneBrokerPerNode: false

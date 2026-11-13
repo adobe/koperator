@@ -7,7 +7,7 @@ metadata:
 spec:
   kRaft: false
   monitoringConfig:
-    jmxImage: "ghcr.io/adobe/koperator/jmx-javaagent:1.5.0" # renovate: datasource=docker depName=ghcr.io/adobe/koperator/jmx-javaagent
+    jmxImage: "ghcr.io/adobe/koperator/jmx-javaagent:1.7.0" # renovate: datasource=docker depName=ghcr.io/adobe/koperator/jmx-javaagent
   headlessServiceEnabled: true
   zkAddresses:
     - "zookeeper-server-client.zookeeper:2181"
