@@ -503,6 +503,14 @@ type EnvoyConfig struct {
 	// +optional
 	EnableHealthCheckHttp10 bool `json:"enableHealthCheckHttp10,omitempty"`
 
+	// EnableAccesslogSampling is a toggle for rendering runtime-gated Envoy
+	// access-log sampling, default false.
+	// When true each filter chain gets a runtime-driven sampler (default 0, so
+	// nothing is logged until an operator raises it through the admin API) plus
+	// a layered_runtime/admin_layer bootstrap block.
+	// +optional
+	EnableAccesslogSampling bool `json:"enableAccesslogSampling,omitempty"`
+
 	// PodSecurityContext holds pod-level security attributes and common container
 	// settings for the Envoy pods.
 	PodSecurityContext *corev1.PodSecurityContext `json:"podSecurityContext,omitempty"`

@@ -20907,6 +20907,14 @@ spec:
                         - maxUnavailable
                         type: string
                     type: object
+                  enableAccesslogSampling:
+                    description: |-
+                      EnableAccesslogSampling is a toggle for rendering runtime-gated Envoy
+                      access-log sampling, default false.
+                      When true each filter chain gets a runtime-driven sampler (default 0, so
+                      nothing is logged until an operator raises it through the admin API) plus
+                      a layered_runtime/admin_layer bootstrap block.
+                    type: boolean
                   enableHealthCheckHttp10:
                     description: EnableHealthCheckHttp10 is a toggle for adding HTTP1.0
                       support to Envoy health-check, default false
@@ -22725,6 +22733,14 @@ spec:
                                             - maxUnavailable
                                             type: string
                                         type: object
+                                      enableAccesslogSampling:
+                                        description: |-
+                                          EnableAccesslogSampling is a toggle for rendering runtime-gated Envoy
+                                          access-log sampling, default false.
+                                          When true each filter chain gets a runtime-driven sampler (default 0, so
+                                          nothing is logged until an operator raises it through the admin API) plus
+                                          a layered_runtime/admin_layer bootstrap block.
+                                        type: boolean
                                       enableHealthCheckHttp10:
                                         description: EnableHealthCheckHttp10 is a
                                           toggle for adding HTTP1.0 support to Envoy
