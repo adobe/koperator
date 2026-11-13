@@ -856,3 +856,99 @@ func healthCheckListener(t *testing.T, config map[string]any) map[string]any {
 
 	return found
 }
+
+// TestNewBlackholeClusterRendersAsValidated is the byte oracle for the
+// blackhole cluster, in the same style as the access-log and runtime-layer
+// oracles above: the expected bytes are lifted verbatim from
+// envoy-int-va7-a1-az1-cm.debug.yaml (L66-76), which a real Envoy accepted on
+// v1.36.2 and v1.40.2.
+//
+// TestGenerateEnvoyConfigBlackholeCluster already asserts the cluster's type,
+// load assignment, absent endpoints and position. What it does not assert is
+// connectTimeout, and a mutation of 100ms -> 250ms survived the entire repo
+// test suite. Values copied from a validated artifact need a byte comparison
+// against that artifact; restating them as individual field assertions just
+// moves the same literal somewhere else.
+func TestNewBlackholeClusterRendersAsValidated(t *testing.T) {
+	t.Parallel()
+
+	const want = `connectTimeout: 0.100s
+loadAssignment:
+  clusterName: blackhole_catchall
+name: blackhole_catchall
+type: STATIC
+`
+
+	marshalledJSON, err := (&protojson.MarshalOptions{}).Marshal(newBlackholeCluster())
+	if err != nil {
+		t.Fatalf("could not marshal the blackhole cluster: %v", err)
+	}
+
+	got, err := yaml.JSONToYAML(marshalledJSON)
+	if err != nil {
+		t.Fatalf("could not convert the blackhole cluster to YAML: %v", err)
+	}
+
+	if string(got) != want {
+		t.Errorf("rendered blackhole cluster does not match the validated config\n--- got ---\n%s\n--- want ---\n%s", got, want)
+	}
+}
+
+// TestNewCatchallFilterChainRendersAsValidated is the byte oracle for the
+// catch-all chain, lifted from envoy-int-va7-a1-az1-cm.debug.yaml (L246-268).
+//
+// It exists because the structural tests are self-referential: they build their
+// expectations from catchallFilterChainName, so renaming that constant kept the
+// whole suite green. The name is not cosmetic - it is the stat prefix, so
+// tcp.catchall_unmatched.* is the signal that replaces no_filter_chain_match on
+// the dashboards. A silent rename would take that signal with it, and pinning
+// the literal here is the only thing that catches it.
+//
+// Being a whole-object comparison, this also pins the three deliberate absences
+// - no filterChainMatch, no transportSocket, no idleTimeout.
+func TestNewCatchallFilterChainRendersAsValidated(t *testing.T) {
+	t.Parallel()
+
+	const want = `filters:
+- name: envoy.filters.network.tcp_proxy
+  typedConfig:
+    '@type': type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+    accessLog:
+    - filter:
+        runtimeFilter:
+          percentSampled:
+            denominator: TEN_THOUSAND
+          runtimeKey: access_log.unmatched_sample_rate
+          useIndependentRandomness: true
+      name: envoy.access_loggers.file
+      typedConfig:
+        '@type': type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+        logFormat:
+          textFormatSource:
+            inlineString: |
+              [%START_TIME%] chain=catchall_unmatched src=%DOWNSTREAM_REMOTE_ADDRESS% local=%DOWNSTREAM_LOCAL_ADDRESS% sni="%REQUESTED_SERVER_NAME%" bytes_recv=%BYTES_RECEIVED% bytes_sent=%BYTES_SENT% duration=%DURATION% flags=%RESPONSE_FLAGS%
+        path: /dev/stdout
+    cluster: blackhole_catchall
+    statPrefix: catchall_unmatched
+name: catchall_unmatched
+`
+
+	filterChain, err := newCatchallFilterChain(logr.Discard())
+	if err != nil {
+		t.Fatalf("could not build the catch-all filter chain: %v", err)
+	}
+
+	marshalledJSON, err := (&protojson.MarshalOptions{}).Marshal(filterChain)
+	if err != nil {
+		t.Fatalf("could not marshal the catch-all filter chain: %v", err)
+	}
+
+	got, err := yaml.JSONToYAML(marshalledJSON)
+	if err != nil {
+		t.Fatalf("could not convert the catch-all filter chain to YAML: %v", err)
+	}
+
+	if string(got) != want {
+		t.Errorf("rendered catch-all chain does not match the validated config\n--- got ---\n%s\n--- want ---\n%s", got, want)
+	}
+}
