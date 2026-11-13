@@ -16,6 +16,7 @@
 package envoy
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -127,6 +128,11 @@ func TestNewRuntimeSampledAccessLogFormat(t *testing.T) {
 // work/envoy configs/envoy-dev-az1-cm.debug.yaml, and is rendered through the
 // same protojson -> YAML path GenerateEnvoyConfig uses, so a mismatch here
 // means the reconciler would emit something other than what was proven to work.
+//
+// "broker_101" here is a literal copied from that artifact, not a claim about
+// how chain names are built. Whether a name actually tracks its broker ID is
+// checked by TestGenerateEnvoyConfigChainSamplers, which renders several
+// brokers.
 func TestNewRuntimeSampledAccessLogRendersAsValidated(t *testing.T) {
 	t.Parallel()
 
@@ -218,18 +224,45 @@ func TestNewAccessLogRuntimeLayerRendersAsValidated(t *testing.T) {
 
 // testKafkaCluster is the smallest cluster that renders a complete Envoy
 // config: one broker, one external listener, envoy as the ingress controller.
-func testKafkaCluster() (*v1beta1.KafkaCluster, v1beta1.ExternalListenerConfig) {
+// testKafkaCluster is the smallest cluster that still renders a complete Envoy
+// config: an anycast listener, a per-broker listener and the health-check
+// listener.
+//
+// BrokerConfig must be non-nil. util.ShouldIncludeBroker returns false for a
+// broker with a nil config and no status, and the broker's filter chain is then
+// silently dropped from the render - leaving a config that looks plausible but
+// exercises none of the per-broker code.
+//
+// tlsEnabled drives ExternalListenerConfig.TLSEnabled, which is
+// ExternalStartingPort == -1. The two values select different chain builders
+// (GenerateEnvoyTLSFilterChain vs GenerateEnvoyFilterChain), so anything
+// attached to a chain has to be tested both ways.
+//
+// brokerIDs are variadic so a caller can ask for more than one broker. Prefer
+// testBrokerIDs over a single broker: with one broker, anything derived from a
+// broker ID is indistinguishable from a constant.
+func testKafkaCluster(tlsEnabled bool, brokerIDs ...int32) (*v1beta1.KafkaCluster, v1beta1.ExternalListenerConfig) {
+	externalStartingPort := int32(19090)
+	if tlsEnabled {
+		externalStartingPort = -1
+	}
+
+	brokers := make([]v1beta1.Broker, 0, len(brokerIDs))
+	for _, brokerID := range brokerIDs {
+		brokers = append(brokers, v1beta1.Broker{Id: brokerID, BrokerConfig: &v1beta1.BrokerConfig{}})
+	}
+
 	kafkaCluster := &v1beta1.KafkaCluster{
 		Spec: v1beta1.KafkaClusterSpec{
 			IngressController: "envoy",
-			Brokers:           []v1beta1.Broker{{Id: 101}},
+			Brokers:           brokers,
 			ListenersConfig: v1beta1.ListenersConfig{
 				ExternalListeners: []v1beta1.ExternalListenerConfig{{
 					CommonListenerSpec: v1beta1.CommonListenerSpec{
 						Name:          "external",
 						ContainerPort: 9094,
 					},
-					ExternalStartingPort: 19090,
+					ExternalStartingPort: externalStartingPort,
 				}},
 			},
 		},
@@ -238,12 +271,29 @@ func testKafkaCluster() (*v1beta1.KafkaCluster, v1beta1.ExternalListenerConfig) 
 	return kafkaCluster, kafkaCluster.Spec.ListenersConfig.ExternalListeners[0]
 }
 
-func renderEnvoyConfig(t *testing.T, enableAccesslogSampling bool) string {
+// testBrokerIDs is the default broker set for render tests.
+//
+// It is deliberately not a single broker, and deliberately not 101 alone. The
+// cluster this feature was validated against happens to run brokers 101 and
+// 102, and a fixture that mirrors it cannot tell a per-broker value apart from
+// a hard-coded one: a brokerFilterChainName that ignored its argument and
+// always returned "broker_101" passed the entire suite.
+//
+// The IDs are non-contiguous and do not start at 1, so an off-by-one or an
+// index-for-ID mix-up shows up as a wrong chain name rather than a coincidence.
+var testBrokerIDs = []int32{0, 7, 102}
+
+func renderEnvoyConfig(t *testing.T, tlsEnabled, enableAccesslogSampling bool) string {
 	t.Helper()
 
-	kafkaCluster, externalListener := testKafkaCluster()
+	kafkaCluster, externalListener := testKafkaCluster(tlsEnabled, testBrokerIDs...)
 	ingressConfig := v1beta1.IngressConfig{
+		// Both hostnames are needed for the TLS path to render a config Envoy
+		// will accept: they become the chains' SNI match, and Envoy rejects a
+		// listener whose chains share identical matching rules.
+		HostnameOverride: "kafka-all-brokers.test",
 		EnvoyConfig: &v1beta1.EnvoyConfig{
+			BrokerHostnameTemplate:  "kafka-%id.test",
 			EnableAccesslogSampling: enableAccesslogSampling,
 		},
 	}
@@ -266,7 +316,7 @@ func TestGenerateEnvoyConfigRuntimeLayerIsGated(t *testing.T) {
 	t.Run("flag off omits the runtime layer", func(t *testing.T) {
 		t.Parallel()
 
-		if got := renderEnvoyConfig(t, false); strings.Contains(got, "layeredRuntime") {
+		if got := renderEnvoyConfig(t, true, false); strings.Contains(got, "layeredRuntime") {
 			t.Errorf("flag off rendered a runtime layer, which would change the config of every existing cluster:\n%s", got)
 		}
 	})
@@ -274,7 +324,7 @@ func TestGenerateEnvoyConfigRuntimeLayerIsGated(t *testing.T) {
 	t.Run("flag on renders the admin runtime layer", func(t *testing.T) {
 		t.Parallel()
 
-		got := renderEnvoyConfig(t, true)
+		got := renderEnvoyConfig(t, true, true)
 
 		// Indented exactly as it appears at the top level of the bootstrap,
 		// between admin and staticResources.
@@ -288,23 +338,222 @@ func TestGenerateEnvoyConfigRuntimeLayerIsGated(t *testing.T) {
 			t.Errorf("flag on did not render the expected runtime layer\n--- want ---\n%s\n--- got ---\n%s", want, got)
 		}
 	})
+}
 
-	t.Run("the flag changes nothing else", func(t *testing.T) {
-		t.Parallel()
+// parseRendered unmarshals a rendered Envoy config so the tests below can
+// assert on structure instead of on YAML formatting.
+func parseRendered(t *testing.T, rendered string) map[string]any {
+	t.Helper()
 
-		off, on := renderEnvoyConfig(t, false), renderEnvoyConfig(t, true)
+	var config map[string]any
+	if err := yaml.Unmarshal([]byte(rendered), &config); err != nil {
+		t.Fatalf("could not parse the rendered config: %v", err)
+	}
 
-		const runtimeLayer = `layeredRuntime:
-  layers:
-  - adminLayer: {}
-    name: admin
-`
+	return config
+}
 
-		// Removing the runtime layer from the flag-on render must give back the
-		// flag-off render exactly. Anything else means the flag leaked into a
-		// part of the config it has no business touching.
-		if stripped := strings.Replace(on, runtimeLayer, "", 1); stripped != off {
-			t.Errorf("enabling the flag changed more than the runtime layer\n--- flag off ---\n%s\n--- flag on, layer removed ---\n%s", off, stripped)
+// allFilterChains flattens every filter chain of every listener, which is where
+// both the health-check listener and the broker listeners end up. Keeping them
+// in one slice is deliberate: a sampler leaking onto the health-check chain
+// would otherwise go unnoticed.
+func allFilterChains(config map[string]any) []map[string]any {
+	var chains []map[string]any
+
+	staticResources, _ := config["staticResources"].(map[string]any)
+	listeners, _ := staticResources["listeners"].([]any)
+
+	for _, listener := range listeners {
+		listenerMap, _ := listener.(map[string]any)
+		filterChains, _ := listenerMap["filterChains"].([]any)
+
+		for _, filterChain := range filterChains {
+			if chain, ok := filterChain.(map[string]any); ok {
+				chains = append(chains, chain)
+			}
 		}
-	})
+	}
+
+	return chains
+}
+
+// chainNetworkFilterConfig returns the typed config of a chain's first network
+// filter, which is the TcpProxy on the broker and anycast chains.
+func chainNetworkFilterConfig(chain map[string]any) map[string]any {
+	filters, _ := chain["filters"].([]any)
+	if len(filters) == 0 {
+		return nil
+	}
+
+	filter, _ := filters[0].(map[string]any)
+	typedConfig, _ := filter["typedConfig"].(map[string]any)
+
+	return typedConfig
+}
+
+// chainHasRuntimeSampler reports whether a chain carries one of this feature's
+// samplers.
+//
+// Mere presence of an accessLog is not enough to tell: the health-check chain
+// already ships an unconditional stdout access log. The runtimeFilter is what
+// makes a log ours, so that is what gets looked for.
+func chainHasRuntimeSampler(chain map[string]any) bool {
+	accessLogs, _ := chainNetworkFilterConfig(chain)["accessLog"].([]any)
+
+	for _, entry := range accessLogs {
+		accessLog, _ := entry.(map[string]any)
+		filter, _ := accessLog["filter"].(map[string]any)
+		if _, ok := filter["runtimeFilter"]; ok {
+			return true
+		}
+	}
+
+	return false
+}
+
+// chainSampler digs out the runtime key and the log line format of a chain's
+// access log, so a test can check what the chain samples and what it writes.
+func chainSampler(t *testing.T, chain map[string]any) (runtimeKey, logFormat string) {
+	t.Helper()
+
+	accessLogs, _ := chainNetworkFilterConfig(chain)["accessLog"].([]any)
+	if len(accessLogs) != 1 {
+		t.Fatalf("chain %v: expected exactly one access log, got %d", chain["name"], len(accessLogs))
+	}
+
+	accessLog, _ := accessLogs[0].(map[string]any)
+
+	filter, _ := accessLog["filter"].(map[string]any)
+	runtimeFilter, _ := filter["runtimeFilter"].(map[string]any)
+	runtimeKey, _ = runtimeFilter["runtimeKey"].(string)
+
+	typedConfig, _ := accessLog["typedConfig"].(map[string]any)
+	format, _ := typedConfig["logFormat"].(map[string]any)
+	textFormatSource, _ := format["textFormatSource"].(map[string]any)
+	logFormat, _ = textFormatSource["inlineString"].(string)
+
+	return runtimeKey, logFormat
+}
+
+// TestGenerateEnvoyConfigChainSamplers checks the chains an operator will reach
+// for: which runtime key each one listens to, and that a chain's name matches
+// the name it writes into its own log lines.
+//
+// Both TLS modes are covered because they are built by different functions
+// (GenerateEnvoyTLSFilterChain and GenerateEnvoyFilterChain), and the sampler
+// has to survive either path.
+func TestGenerateEnvoyConfigChainSamplers(t *testing.T) {
+	t.Parallel()
+
+	for _, testCase := range []struct {
+		name       string
+		tlsEnabled bool
+	}{
+		{name: "tls listener", tlsEnabled: true},
+		{name: "plaintext listener", tlsEnabled: false},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			config := parseRendered(t, renderEnvoyConfig(t, testCase.tlsEnabled, true))
+
+			// Every broker gets its own chain, and all of them share a single
+			// runtime key: the knob is per chain *type*, not per broker, so one
+			// admin call covers the whole cluster.
+			want := map[string]string{anycastFilterChainName: AccessLogRuntimeKeyAnycast}
+			for _, brokerID := range testBrokerIDs {
+				want[fmt.Sprintf("broker_%d", brokerID)] = AccessLogRuntimeKeyBroker
+			}
+			got := make(map[string]string, len(want))
+
+			for _, chain := range allFilterChains(config) {
+				name, named := chain["name"].(string)
+				if !named {
+					// The health-check chain stays unnamed, and keeps its own
+					// pre-existing stdout log rather than gaining a sampler.
+					if chainHasRuntimeSampler(chain) {
+						t.Error("an unnamed filter chain carries a sampler, so its log lines could not be attributed to a chain")
+					}
+					continue
+				}
+
+				runtimeKey, logFormat := chainSampler(t, chain)
+				got[name] = runtimeKey
+
+				// The chain name is the only thing tying a log line back to the
+				// chain that emitted it, so the two must not drift apart.
+				if !strings.Contains(logFormat, "chain="+name+" ") {
+					t.Errorf("chain %q does not log its own name, making its lines untraceable: %q", name, logFormat)
+				}
+			}
+
+			if len(got) != len(want) {
+				t.Fatalf("expected the chains %v to be named and sampled, got %v", want, got)
+			}
+			for name, wantKey := range want {
+				if got[name] != wantKey {
+					t.Errorf("chain %q samples on %q, want %q", name, got[name], wantKey)
+				}
+			}
+		})
+	}
+}
+
+// TestGenerateEnvoyConfigFlagOffAddsNothing is the regression test that matters
+// most here. koperator is a public fork, so a cluster that has not opted in has
+// to render exactly what it rendered before.
+//
+// It works by removing everything the flag is allowed to add and requiring the
+// remainder to equal the flag-off render. A presence check could not do this:
+// it would pass even if the flag had also changed something elsewhere.
+func TestGenerateEnvoyConfigFlagOffAddsNothing(t *testing.T) {
+	t.Parallel()
+
+	for _, testCase := range []struct {
+		name       string
+		tlsEnabled bool
+	}{
+		{name: "tls listener", tlsEnabled: true},
+		{name: "plaintext listener", tlsEnabled: false},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			off := parseRendered(t, renderEnvoyConfig(t, testCase.tlsEnabled, false))
+			on := parseRendered(t, renderEnvoyConfig(t, testCase.tlsEnabled, true))
+
+			for _, chain := range allFilterChains(off) {
+				if name, named := chain["name"]; named {
+					t.Errorf("flag off named a filter chain %q, which moves the rendered config of every existing cluster", name)
+				}
+				if chainHasRuntimeSampler(chain) {
+					t.Error("flag off attached a sampler to a filter chain")
+				}
+			}
+
+			delete(on, "layeredRuntime")
+			for _, chain := range allFilterChains(on) {
+				if _, named := chain["name"]; !named {
+					continue
+				}
+				delete(chain, "name")
+				delete(chainNetworkFilterConfig(chain), "accessLog")
+			}
+
+			if stripped, want := mustMarshal(t, on), mustMarshal(t, off); stripped != want {
+				t.Errorf("enabling the flag changed more than the runtime layer, the chain names and the samplers\n--- flag off ---\n%s\n--- flag on, additions removed ---\n%s", want, stripped)
+			}
+		})
+	}
+}
+
+func mustMarshal(t *testing.T, config map[string]any) string {
+	t.Helper()
+
+	marshalled, err := yaml.Marshal(config)
+	if err != nil {
+		t.Fatalf("could not marshal the config: %v", err)
+	}
+
+	return string(marshalled)
 }

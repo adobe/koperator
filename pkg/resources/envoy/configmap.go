@@ -182,6 +182,45 @@ func newRuntimeSampledAccessLog(chainName, runtimeKey string) (*envoyaccesslog.A
 	}, nil
 }
 
+// brokerFilterChainName is the filter chain name used for a broker's chain, on
+// both the TLS and the plaintext path. It deliberately differs from the broker
+// cluster name ("broker-<id>") and from the TcpProxy stat prefix
+// ("broker_tcp-<id>"): all three appear in Envoy output and keeping them
+// distinct makes it obvious which one is being read.
+func brokerFilterChainName(brokerId int) string {
+	return fmt.Sprintf("broker_%d", brokerId)
+}
+
+// anycastFilterChainName names the chain serving the anycast hostname. The
+// chain's stat prefix stays "all-brokers" for continuity with existing
+// dashboards, so the two names differ on purpose.
+const anycastFilterChainName = "anycast"
+
+// attachAccessLogSampler adds the runtime-gated access log for chainName to
+// tcpProxy, and is a no-op unless sampling is enabled.
+//
+// It has to run before the TcpProxy is marshalled into a filter chain, since
+// marshalling snapshots the message. The caller must also set FilterChain.Name
+// to the same chainName - the log line carries the chain name, so without it
+// there is no way to trace a line back to the chain that emitted it.
+//
+// Both halves are gated on the same flag on purpose. Filter chain names are
+// unset in koperator's default output, so naming them unconditionally would
+// change the rendered config for every existing user.
+func attachAccessLogSampler(tcpProxy *envoytcpproxy.TcpProxy, enabled bool, chainName, runtimeKey string) error {
+	if !enabled {
+		return nil
+	}
+
+	accessLog, err := newRuntimeSampledAccessLog(chainName, runtimeKey)
+	if err != nil {
+		return err
+	}
+	tcpProxy.AccessLog = []*envoyaccesslog.AccessLog{accessLog}
+
+	return nil
+}
+
 func (r *Reconciler) configMap(log logr.Logger, extListener v1beta1.ExternalListenerConfig,
 	ingressConfig v1beta1.IngressConfig, ingressConfigName, defaultIngressConfigName string) runtime.Object {
 	eListenerLabelName := util.ConstructEListenerLabelName(ingressConfigName, extListener.Name)
@@ -467,6 +506,13 @@ func GenerateEnvoyConfig(kc *v1beta1.KafkaCluster, elistener v1beta1.ExternalLis
 				},
 			}
 
+			brokerChainName := brokerFilterChainName(brokerId)
+			if err := attachAccessLogSampler(tcpProxy, ingressConfig.EnvoyConfig.EnableAccesslogSampling,
+				brokerChainName, AccessLogRuntimeKeyBroker); err != nil {
+				log.Error(err, "Unable to generate broker envoy access log")
+				return ""
+			}
+
 			if elistener.TLSEnabled() {
 				filterChain, err = GenerateEnvoyTLSFilterChain(tcpProxy, func() string {
 					// Broker IDs are always within valid range for int32 conversion
@@ -487,6 +533,10 @@ func GenerateEnvoyConfig(kc *v1beta1.KafkaCluster, elistener v1beta1.ExternalLis
 					log.Error(err, "Unable to generate broker envoy filter chain")
 					return ""
 				}
+			}
+
+			if ingressConfig.EnvoyConfig.EnableAccesslogSampling {
+				filterChain.Name = brokerChainName
 			}
 
 			brokerPort := func() int32 {
@@ -564,6 +614,12 @@ func GenerateEnvoyConfig(kc *v1beta1.KafkaCluster, elistener v1beta1.ExternalLis
 		},
 	}
 
+	if err := attachAccessLogSampler(tcpProxy, ingressConfig.EnvoyConfig.EnableAccesslogSampling,
+		anycastFilterChainName, AccessLogRuntimeKeyAnycast); err != nil {
+		log.Error(err, "Unable to generate anycast envoy access log")
+		return ""
+	}
+
 	// Create TLS anycast broker listener
 	if elistener.TLSEnabled() {
 		filterChain, err = GenerateEnvoyTLSFilterChain(tcpProxy, ingressConfig.HostnameOverride, log)
@@ -577,6 +633,10 @@ func GenerateEnvoyConfig(kc *v1beta1.KafkaCluster, elistener v1beta1.ExternalLis
 			log.Error(err, "Unable to generate anycast envoy filter chain")
 			return ""
 		}
+	}
+
+	if ingressConfig.EnvoyConfig.EnableAccesslogSampling {
+		filterChain.Name = anycastFilterChainName
 	}
 
 	tempListeners[elistener.GetAnyCastPort()] = append(tempListeners[elistener.GetAnyCastPort()], filterChain)
