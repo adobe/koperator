@@ -38,3 +38,20 @@ Record cluster size, resource counts, workload, test duration, leader changes,
 and error rates with each measurement. These metrics establish instrumentation,
 not evidence that an optimization improves performance. This change does not
 alter metrics authentication, scraper routing, worker counts, or cache scope.
+
+## Cruise Control execution-result persistence
+
+After an external task is submitted, the operator retries conflicting status
+writes using fresh API-server reads. These persistence retries do not submit
+the external task again. They retain the task identity, response metadata,
+retry history, and selected stop-operation type. A replaced operation, removed
+current task, or different task identity produces an error rather than accepting
+a stale result.
+
+This is not exactly-once execution. If all writes fail, or the process stops
+after Cruise Control accepts a request but before its task ID is recorded, the
+external task can outlive the recorded operation state. Recorded task IDs allow
+subsequent reconciliation to query task progress. Automatic adoption of an
+unrecorded submission is not implemented; inspect Cruise Control's task history
+when investigating this window, and do not infer that a missing status means
+the external operation never ran.
