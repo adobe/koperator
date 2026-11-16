@@ -261,7 +261,6 @@
         "docker-compose",
         "custom.regex",
         "helm-values",
-        "docker",
         "gomod"
       ],
       "commitMessagePrefix": "chore(deps):",
