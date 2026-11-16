@@ -1,7 +1,7 @@
 ARG scala_version=2.13
 # Kafka 4 is KRaft-only.
-ARG KAFKA_VERSION=4.0.2 # renovate: datasource=github-tags depName=apache/kafka
-ARG java_version=21
+ARG KAFKA_VERSION=4.2.2 # renovate: datasource=github-tags depName=apache/kafka
+ARG java_version=25
 
 FROM alpine:latest@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a AS kafka_dist
 
@@ -57,17 +57,20 @@ ENV PATH=$JAVA_HOME/bin:$PATH
 ENV LANG=C.UTF-8
 ENV JAVA_VERSION=${java_version}
 
+# Match the Java 25 branch defaults before generating the CDS archive.
+ENV JDK_JAVA_OPTIONS="--enable-native-access=ALL-UNNAMED --illegal-native-access=deny -XX:+UseCompactObjectHeaders"
+
 RUN set -eux; \
 	\
 	arch="$(dpkg --print-architecture)"; \
 	case "$arch" in \
 		'amd64') \
-			downloadUrl="https://corretto.aws/downloads/latest/amazon-corretto-${java_version}-x64-linux-jdk.tar.gz"; \
-			downloadSha256="https://corretto.aws/downloads/latest_sha256/amazon-corretto-${java_version}-x64-linux-jdk.tar.gz"; \
+			downloadUrl="https://download.oracle.com/java/${java_version}/latest/jdk-${java_version}_linux-x64_bin.tar.gz"; \
+			downloadSha256="https://download.oracle.com/java/${java_version}/latest/jdk-${java_version}_linux-x64_bin.tar.gz.sha256"; \
 			;; \
 		'arm64') \
-			downloadUrl="https://corretto.aws/downloads/latest/amazon-corretto-${java_version}-aarch64-linux-jdk.tar.gz"; \
-			downloadSha256="https://corretto.aws/downloads/latest_sha256/amazon-corretto-${java_version}-aarch64-linux-jdk.tar.gz"; \
+			downloadUrl="https://download.oracle.com/java/${java_version}/latest/jdk-${java_version}_linux-aarch64_bin.tar.gz"; \
+			downloadSha256="https://download.oracle.com/java/${java_version}/latest/jdk-${java_version}_linux-aarch64_bin.tar.gz.sha256"; \
 			;; \
 		*) echo >&2 "error: unsupported architecture: '$arch'"; exit 1 ;; \
 	esac; \
@@ -151,9 +154,9 @@ RUN chmod a+x ${KAFKA_HOME}/bin/*.sh && \
 
 # Add metadata labels
 LABEL org.opencontainers.image.title="Apache Kafka"
-LABEL org.opencontainers.image.description="Apache Kafka with Amazon Corretto ${java_version} (OpenJDK)"
+LABEL org.opencontainers.image.description="Apache Kafka with Oracle JDK ${java_version}"
 LABEL org.opencontainers.image.vendor="Adobe"
-LABEL org.opencontainers.image.licenses="Apache-2.0 AND GPL-2.0-only WITH Classpath-exception-2.0"
+LABEL org.opencontainers.image.licenses="Apache-2.0 AND LicenseRef-Oracle-NFTC"
 LABEL org.opencontainers.image.source="https://github.com/adobe/koperator"
 LABEL org.opencontainers.image.documentation="https://github.com/adobe/koperator/blob/main/docker/kafka/README.md"
 LABEL org.opencontainers.image.version="${VERSION}"
