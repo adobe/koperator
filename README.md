@@ -62,9 +62,13 @@ If you want to learn more about our design motivations and the scenarios that dr
 
 This quick start guide will walk you through the process of deploying Koperator on an existing Kubernetes cluster and provisioning a Kafka cluster using its custom resources.
 
+### Kubernetes support
+
+Koperator requires **Kubernetes 1.35.0 or newer** and tracks upstream-maintained minor releases. CI tests 1.35.0 and 1.37.0 using envtest and Kind. Pins live in [config/kubernetes-versions.env](config/kubernetes-versions.env); the weekly dependency updater selects the oldest/newest supported minors and the newest patches available for both test tools. Kubernetes client-library versions do not change this policy.
+
 ### Prerequisites
 
-To complete this guide, you will need a Kubernetes cluster (with a suggested minimum of 6 vCPUs and 8 GB RAM). You can run the cluster locally using Kind or Minikube.
+To complete this guide, you will need a Kubernetes 1.35.0+ cluster (with a suggested minimum of 6 vCPUs and 8 GB RAM). You can run the cluster locally using Kind or Minikube.
 
 > The quick start will help you set up a functioning Kafka cluster on Kubernetes. However, it does not include guidance on the installation of Prometheus and cert-manager, which are necessary for some of the more advanced functionality.
 

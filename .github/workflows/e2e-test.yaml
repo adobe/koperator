@@ -14,8 +14,26 @@ env:
   REPOSITORY: koperator_e2e_test
 
 jobs:
-  build:
+  kubernetes-versions:
+    name: Read Kubernetes targets
     runs-on: ubuntu-26.04
+    outputs:
+      matrix: ${{ steps.versions.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: versions
+        run: |
+          source config/kubernetes-versions.env
+          echo "matrix=$(jq -cn --arg min "$KUBERNETES_MIN_VERSION" --arg max "$KUBERNETES_MAX_VERSION" '[$min, $max] | unique')" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: E2E (Kubernetes ${{ matrix.kubernetes-version }})
+    runs-on: ubuntu-26.04
+    needs: kubernetes-versions
+    strategy:
+      fail-fast: false
+      matrix:
+        kubernetes-version: ${{ fromJSON(needs.kubernetes-versions.outputs.matrix) }}
 
     steps:
       - name: Checkout code
@@ -65,6 +83,8 @@ jobs:
       - name: Setup Kind cluster
         id: setup-kind
         uses: ./.github/actions/kind-create
+        with:
+          kind_k8s_version: v${{ matrix.kubernetes-version }}
 
       - name: Load image into kind cluster
         run: |
@@ -72,13 +92,21 @@ jobs:
 
 
       - name: Download dependencies
+        timeout-minutes: 20
         run: |
-          # Download dependencies for all modules
-          go mod download
-          cd api && go mod download && cd ..
-          cd properties && go mod download && cd ..
-          cd tests/e2e && go mod download && cd ../..
-
+          for module in . api properties tests/e2e; do
+            attempt=1
+            until timeout --kill-after=10s 180s go -C "$module" mod download; do
+              if [ "$attempt" -ge 5 ]; then
+                echo "::error::Dependency download for ${module} failed after ${attempt} attempts"
+                exit 1
+              fi
+              delay=$((5 << (attempt - 1)))
+              echo "::warning::Dependency download for ${module} failed (attempt ${attempt}/5); retrying in ${delay}s"
+              sleep "$delay"
+              attempt=$((attempt + 1))
+            done
+          done
 
       - name: Run E2E tests
         env:

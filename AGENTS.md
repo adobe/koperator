@@ -7,6 +7,7 @@
 - **Language**: Go
 - **Framework**: Kubebuilder v2 with controller-runtime
 - **Primary CRD**: `KafkaCluster` (v1beta1)
+- **Minimum Kubernetes server version**: 1.35.0; CI targets: 1.35.0 and 1.37.0, managed in config/kubernetes-versions.env
 - **Key Features**: Fine-grained broker management, Cruise Control integration, multiple ingress options (Envoy, Istio, Contour)
 
 ## Architecture
@@ -27,7 +28,7 @@ This is a standard Kubernetes operator using:
 6. **AlertManagerForKafka** - Self-healing based on Prometheus alerts
 
 ### Multi-Module Structure
-Uses Go workspaces with 5+ modules:
+Uses multiple Go modules with local replacements:
 - Main: `/go.mod`
 - API: `/api/go.mod`
 - Properties parser: `/properties/go.mod`
@@ -88,7 +89,7 @@ make run                 # Run operator locally (outside cluster)
 
 ### Important Make Variables
 - `IMG` - Operator image name (default: `ghcr.io/adobe/koperator:latest`)
-- `ENVTEST_K8S_VERSION` - Kubernetes version for envtest assets (default: 1.36.2)
+- `ENVTEST_K8S_VERSION` - Defaults to KUBERNETES_MAX_VERSION from config/kubernetes-versions.env; use `make test ENVTEST_K8S_VERSION=1.35.0` for the lower CI boundary
 
 ## Development Workflows
 
@@ -421,11 +422,11 @@ GitHub Actions workflows (`.github/workflows/`):
 
 ## Key Dependencies
 
-- **controller-runtime** v0.22.4 - Operator framework
-- **k8s.io/*** v0.34.3 - Kubernetes client libraries
-- **IBM/sarama** v1.46.3 - Kafka client
+- **controller-runtime** v0.25.3 - Operator framework
+- **k8s.io/*** v0.37.1 - Kubernetes client libraries
+- **IBM/sarama** v1.61.1 - Kafka client
 - **Ginkgo** v2 - BDD testing framework
-- **cert-manager** v1.19.2 - Certificate management integration
+- **cert-manager** v1.21.2 - Certificate management integration
 
 ## Troubleshooting
 

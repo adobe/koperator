@@ -6,9 +6,8 @@ inputs: # adding these parameters to make this reusable later on
     required: true
     default: "e2e-kind"
   kind_k8s_version:
-    description: 'The k8s version to use'
+    description: 'The Kubernetes target from config/kubernetes-versions.env, prefixed with v'
     required: true
-    default: 'v1.37.0' # renovate: datasource=docker depName=kindest/node
   kind_config:
     description: 'Path to the kind config to use'
     required: true
@@ -30,6 +29,7 @@ runs:
       cluster_name: ${{ inputs.kind_cluster_name }}
       version: v0.33.0 # renovate: datasource=github-releases depName=kubernetes-sigs/kind
       node_image: kindest/node:${{ inputs.kind_k8s_version }}
+      kubectl_version: ${{ inputs.kind_k8s_version }}
       config: ${{ inputs.kind_config }}
 
   - name: Verify all nodes are healthy, recreating the cluster otherwise
