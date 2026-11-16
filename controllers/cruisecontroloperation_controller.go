@@ -243,22 +243,35 @@ func (r *CruiseControlOperationReconciler) Reconcile(ctx context.Context, reques
 		}
 	}
 
-	conflictRetryFunction := func() error {
-		if err = updateResult(log, cruseControlTaskResult, ccOperationExecution, true); err != nil {
-			return err
-		}
-		err = r.Status().Update(ctx, ccOperationExecution)
-		if apiErrors.IsConflict(err) {
-			err = r.Get(ctx, client.ObjectKey{Name: ccOperationExecution.GetName(), Namespace: ccOperationExecution.GetNamespace()}, ccOperationExecution)
-		}
-		return err
-	}
-	// Protection to avoid re-execution task when status update is failed
-	if err := util.RetryOnConflict(util.DefaultBackOffForConflict, conflictRetryFunction); err != nil {
+	// Retry persistence without resubmitting the external task.
+	if err := r.persistExecutionResult(ctx, log, ccOperationExecution, cruseControlTaskResult); err != nil {
 		return requeueWithError(log, "could not update the result of the Cruise Control user task execution to the CruiseControlOperation status", err)
 	}
 
 	return reconciled()
+}
+
+func (r *CruiseControlOperationReconciler) persistExecutionResult(
+	ctx context.Context,
+	log logr.Logger,
+	operation *banzaiv1alpha1.CruiseControlOperation,
+	result *scale.Result,
+) error {
+	return util.RetryOnConflict(util.DefaultBackOffForConflict, func() error {
+		latest := &banzaiv1alpha1.CruiseControlOperation{}
+		if err := r.DirectClient.Get(ctx, client.ObjectKeyFromObject(operation), latest); err != nil {
+			return err
+		}
+		if latest.UID != operation.UID || latest.CurrentTask() == nil || latest.CurrentTaskID() != operation.CurrentTaskID() {
+			return errors.New("CruiseControlOperation identity or current task changed after external task submission")
+		}
+		// Preserve the stop operation selected in memory during finalization.
+		latest.Status.CurrentTask.Operation = operation.CurrentTaskOperation()
+		if err := updateResult(log, result, latest, true); err != nil {
+			return err
+		}
+		return r.Status().Update(ctx, latest)
+	})
 }
 
 func (r *CruiseControlOperationReconciler) addFinalizer(ctx context.Context, currentCCOperation *banzaiv1alpha1.CruiseControlOperation) error {
