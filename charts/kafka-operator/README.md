@@ -4,8 +4,10 @@ The [Koperator](https://github.com/adobe/koperator) is a Kubernetes operator to 
 
 ## Prerequisites
 
-- Kubernetes 1.15.0+
+- Kubernetes 1.35.0+
 - Helm 3.8+ (for OCI registry support)
+
+CI covers Kubernetes 1.35.0 and 1.37.0. The chart's `kubeVersion` constraint also accepts distribution-specific version suffixes.
 
 ## Installing the chart
 
@@ -94,7 +96,7 @@ The command removes all the Kubernetes components associated with the chart and 
 | prometheusMetrics.authProxy.enabled | bool | `true` | If true, use auth proxy for Prometheus metrics |
 | prometheusMetrics.authProxy.image.pullPolicy | string | `"IfNotPresent"` | Auth proxy container image pull policy |
 | prometheusMetrics.authProxy.image.repository | string | `"quay.io/brancz/kube-rbac-proxy"` | Auth proxy container image repository |
-| prometheusMetrics.authProxy.image.tag | string | `"v0.22.1"` | Auth proxy container image tag |
+| prometheusMetrics.authProxy.image.tag | string | `"v0.23.1"` | Auth proxy container image tag |
 | prometheusMetrics.authProxy.serviceAccount.create | bool | `true` | If true, create the service account (see `prometheusMetrics.authProxy.serviceAccount.name`) used by prometheus auth proxy |
 | prometheusMetrics.authProxy.serviceAccount.name | string | `"kafka-operator-authproxy"` | ServiceAccount used by prometheus auth proxy |
 | prometheusMetrics.enabled | bool | `true` | If true, use direct access for Prometheus metrics |

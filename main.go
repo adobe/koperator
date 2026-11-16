@@ -39,6 +39,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
@@ -67,6 +68,15 @@ var (
 )
 
 func init() {
+	metrics.RegisterRESTClientMetrics(
+		metrics.MetricRequestLatency,
+		metrics.MetricDNSResolutionLatency,
+		metrics.MetricRequestSize,
+		metrics.MetricResponseSize,
+		metrics.MetricRateLimiterLatency,
+		metrics.MetricRequestRetry,
+	)
+
 	_ = clientgoscheme.AddToScheme(scheme)
 
 	_ = banzaicloudv1alpha1.AddToScheme(scheme)
