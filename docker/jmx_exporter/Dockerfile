@@ -1,10 +1,10 @@
 ARG JMX_EXPORTER_VERSION=1.7.0 # renovate: datasource=github-releases depName=prometheus/jmx_exporter
 
-FROM maven:3-amazoncorretto-21@sha256:f64fd4f0363c918004816d83d2589495b622a8d2fc5c5602c135cb4124c7ea12 AS build
+FROM maven:3-amazoncorretto-25@sha256:d96c6ff2e7a3258e6f0c447340d2284a3404917bb8c5f01c8660cc4066bd382c AS build
 ARG JMX_EXPORTER_VERSION
 
-# Install wget to download the release tarball
-RUN yum install -y wget && yum clean all
+# Install tools to download and extract the release tarball
+RUN yum install -y wget tar gzip && yum clean all
 
 # Download and extract the JMX exporter release
 RUN wget https://github.com/prometheus/jmx_exporter/archive/refs/tags/${JMX_EXPORTER_VERSION}.tar.gz \
@@ -14,6 +14,7 @@ RUN wget https://github.com/prometheus/jmx_exporter/archive/refs/tags/${JMX_EXPO
     rm /tmp/jmx_exporter.tar.gz
 
 WORKDIR /src
+# Keep the agent compatible with Java 21 consumers while building with JDK 25.
 RUN mvn -B -Dmaven.javadoc.skip=true -Dskip.javadoc=true \
     -Dmaven.compiler.source=21 -Dmaven.compiler.target=21 -Dmaven.compiler.release=21 \
     clean package -pl jmx_prometheus_javaagent -am && \
