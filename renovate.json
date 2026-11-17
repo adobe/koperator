@@ -171,8 +171,8 @@
       "matchPackageNames": [
         "apache/kafka"
       ],
-      "allowedVersions": ">=4.0.2 <4.1.0",
-      "description": "Kafka 4.0.2 is the OR2 dev upgrade target. Keep distribution updates on the 4.0 line; later minor/major versions require separate validation."
+      "allowedVersions": ">=4.2.2 <4.3.0",
+      "description": "Keep distribution updates on the 4.2 line; later minor/major versions require separate validation."
     },
     {
       "matchCurrentValue": "/^\\d+\\.\\d+\\.\\d+-ado?be-\\d+$/",
@@ -195,7 +195,7 @@
       ],
       "matchCurrentValue": "/^\\d+\\.\\d+-\\d+\\.\\d+\\.\\d+(-jdk\\d+\\.\\d+\\.\\d+)?$/",
       "versioning": "regex:^(?<compatibility>\\d+\\.\\d+)-(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)(?:-jdk(?<build>\\d+)\\.\\d+\\.(?<revision>\\d+))?$",
-      "description": "Tag format is <scala_version>-<kafka_version>[-jdk<jdk_version>], e.g. 2.13-3.9.2-jdk21.0.11 or 2.13-4.0.2. Pinning the scala prefix as compatibility and parsing the Kafka release as major.minor.patch permits real Kafka version comparisons. The optional JDK suffix maps its major version to build and update to revision. JDK major upgrades require separate validation; the Kafka 4.0.2 image retains Java 21."
+      "description": "Tag format is <scala_version>-<kafka_version>[-jdk<jdk_version>], e.g. 2.13-3.9.2-jdk21.0.11 or 2.13-4.2.2. Pinning the scala prefix as compatibility and parsing the Kafka release as major.minor.patch permits real Kafka version comparisons. The optional JDK suffix maps its major version to build and update to revision. The Kafka 4.2.2 candidate uses Oracle Java 25; keep published Java 21 defaults until replacement images are published and validated."
     },
     {
       "groupName": "kafka docker images (major)",
