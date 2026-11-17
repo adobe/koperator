@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/go-logr/logr"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -98,7 +99,7 @@ func (r *KafkaTopicReconciler) Reconcile(ctx context.Context, request reconcile.
 	var cluster *v1beta1.KafkaCluster
 	if cluster, err = k8sutil.LookupKafkaCluster(ctx, r.Client, instance.Spec.ClusterRef.Name, clusterNamespace); err != nil {
 		// This shouldn't trigger anymore, but leaving it here as a safetybelt
-		if k8sutil.IsMarkedForDeletion(instance.ObjectMeta) {
+		if apierrors.IsNotFound(err) && k8sutil.IsMarkedForDeletion(instance.ObjectMeta) {
 			reqLogger.Info("Cluster is already gone, there is nothing we can do")
 			if err = r.removeFinalizer(ctx, instance); err != nil {
 				return requeueWithError(reqLogger, "failed to remove finalizer", err)
@@ -108,6 +109,21 @@ func (r *KafkaTopicReconciler) Reconcile(ctx context.Context, request reconcile.
 
 		// the cluster does not exist - should have been caught pre-flight
 		return requeueWithError(reqLogger, "failed to lookup referenced cluster", err)
+	}
+
+	if k8sutil.IsMarkedForDeletion(instance.ObjectMeta) {
+		if !apiutil.StringSliceContains(instance.Finalizers, topicFinalizer) {
+			return reconciled()
+		}
+		if !isTopicManagedByKoperator(instance) {
+			return ctrl.Result{}, r.removeFinalizer(ctx, instance)
+		}
+		broker, close, err := newKafkaFromCluster(r.Client, cluster)
+		if err != nil {
+			return checkBrokerConnectionError(reqLogger, err)
+		}
+		defer close()
+		return r.checkFinalizers(ctx, broker, instance)
 	}
 
 	// Set managed status based on KafkaTopic managedBy annotation
@@ -123,23 +139,27 @@ func (r *KafkaTopicReconciler) Reconcile(ctx context.Context, request reconcile.
 		}
 	}
 
-	// Get a kafka connection
-	broker, close, err := newKafkaFromCluster(r.Client, cluster)
-	if err != nil {
-		return checkBrokerConnectionError(reqLogger, err)
-	}
-	defer close()
-
-	// Check if marked for deletion and if so run finalizers
-	if k8sutil.IsMarkedForDeletion(instance.ObjectMeta) {
-		return r.checkFinalizers(ctx, broker, instance)
-	}
-
 	// No need to do anything when the kafka topic is not managed by Koperator
 	if !isTopicManagedByKoperator(instance) {
 		reqLogger.Info(fmt.Sprintf("topic '%s' is not managed by %s it is managed by '%s' ==> nothing to reconcile here", instance.Spec.Name, webhooks.TopicManagedByKoperatorAnnotationValue, managedByStatus))
 		return reconciled()
 	}
+
+	if instance, err = r.ensureClusterLabel(ctx, cluster, instance); err != nil {
+		return requeueWithError(reqLogger, "failed to ensure kafkacluster label on topic", err)
+	}
+	if !apiutil.StringSliceContains(instance.GetFinalizers(), topicFinalizer) {
+		instance.SetFinalizers(append(instance.GetFinalizers(), topicFinalizer))
+		if instance, err = r.updateAndFetchLatest(ctx, instance); err != nil {
+			return requeueWithError(reqLogger, "failed to add Finalizer to KafkaTopic", err)
+		}
+	}
+
+	broker, close, err := newKafkaFromCluster(r.Client, cluster)
+	if err != nil {
+		return checkBrokerConnectionError(reqLogger, err)
+	}
+	defer close()
 
 	// Check if the topic already exists
 	existing, err := broker.GetTopic(instance.Spec.Name)
@@ -175,20 +195,6 @@ func (r *KafkaTopicReconciler) Reconcile(ctx context.Context, request reconcile.
 		Config:            util.MapStringStringPointer(instance.Spec.Config),
 	}); err != nil {
 		return requeueWithError(reqLogger, "failed to create kafka topic", err)
-	}
-
-	// ensure kafkaCluster label
-	if instance, err = r.ensureClusterLabel(ctx, cluster, instance); err != nil {
-		return requeueWithError(reqLogger, "failed to ensure kafkacluster label on topic", err)
-	}
-
-	// ensure a finalizer for cleanup on deletion
-	if !apiutil.StringSliceContains(instance.GetFinalizers(), topicFinalizer) {
-		reqLogger.Info("Adding Finalizer for the KafkaTopic")
-		instance.SetFinalizers(append(instance.GetFinalizers(), topicFinalizer))
-		if instance, err = r.updateAndFetchLatest(ctx, instance); err != nil {
-			return requeueWithError(reqLogger, "failed to add Finalizer to KafkaTopic", err)
-		}
 	}
 
 	// set topic status as created
@@ -230,8 +236,12 @@ func (r *KafkaTopicReconciler) checkFinalizers(ctx context.Context, broker kafka
 	if apiutil.StringSliceContains(topic.GetFinalizers(), topicFinalizer) {
 		// Remove topic from Kafka cluster when it is managed by Koperator
 		if isTopicManagedByKoperator(topic) {
-			if err = r.finalizeKafkaTopic(reqLogger, broker, topic); err != nil {
+			done, err := r.finalizeKafkaTopic(reqLogger, broker, topic)
+			if err != nil {
 				return requeueWithError(reqLogger, "failed to finalize kafkatopic", err)
+			}
+			if !done {
+				return ctrl.Result{RequeueAfter: 3 * time.Second}, nil
 			}
 		}
 		if err = r.removeFinalizer(ctx, topic); err != nil {
@@ -247,22 +257,17 @@ func (r *KafkaTopicReconciler) removeFinalizer(ctx context.Context, topic *v1alp
 	return err
 }
 
-func (r *KafkaTopicReconciler) finalizeKafkaTopic(reqLogger logr.Logger, broker kafkaclient.KafkaClient, topic *v1alpha1.KafkaTopic) error {
+func (r *KafkaTopicReconciler) finalizeKafkaTopic(reqLogger logr.Logger, broker kafkaclient.KafkaClient, topic *v1alpha1.KafkaTopic) (bool, error) {
 	exists, err := broker.GetTopic(topic.Spec.Name)
 	if err != nil {
-		return err
+		return false, err
 	}
-	if exists != nil {
-		// DeleteTopic with wait to make sure it goes down fully in case of cluster
-		// deletion.
-		// TODO (tinyzimmer): Perhaps this should only wait when it's the cluster
-		// being deleted, and use false when it's just the topic itself. Also,
-		// if delete.topic.enable=false this may hang forever, so should maybe
-		// check if that's the case during a wait.
-		if err = broker.DeleteTopic(topic.Spec.Name, true); err != nil {
-			return err
-		}
-		reqLogger.Info("Deleted topic")
+	if exists == nil {
+		return true, nil
 	}
-	return nil
+	if err = broker.DeleteTopic(topic.Spec.Name, false); err != nil {
+		return false, err
+	}
+	reqLogger.Info("Submitted topic deletion")
+	return false, nil
 }
