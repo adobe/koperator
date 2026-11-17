@@ -9,6 +9,63 @@ The [Koperator](https://github.com/adobe/koperator) is a Kubernetes operator to 
 
 CI covers Kubernetes 1.35.0 and 1.37.0. The chart's `kubeVersion` constraint also accepts distribution-specific version suffixes.
 
+## Alert routing, readiness, and election constraints
+
+The chart enables leader election. Its alert Service selects only the Pod
+whose elected listener publishes `kafka.banzaicloud.io/alert-leader: "true"`.
+Do not set this label statically on Pod templates. Webhook and metrics Services
+retain their own selectors; webhook-serving standby replicas remain ready.
+An elected replica is ready only after its alert listener and routing
+publication are usable. Enabled webhooks also require local serving readiness.
+Liveness does not depend on Kafka or leader status.
+
+The chart supplies `POD_NAMESPACE`, `POD_NAME`, and `POD_UID` through the downward
+API. The operator reads its own Pod and routing peers directly from the API,
+not the namespace-filtered Kafka cache. Managed routing requires:
+
+- The exact namespace/name/UID of the operator Pod, not a watched Kafka namespace.
+- The chart's installation selector labels: `control-plane=controller-manager`,
+  `controller-tools.k8s.io=1.0`, `app.kubernetes.io/component=operator`, and
+  matching `app.kubernetes.io/name` and `app.kubernetes.io/instance`.
+- Pod get/list/update permissions in the operator namespace, even when watched
+  Kafka resources are restricted to other namespaces. Existing chart RBAC
+  provides these permissions; custom/restricted RBAC must provide them.
+
+Before publication, the elected process removes stale active labels only from
+that installation and namespace. Identity or label-write failures fail closed.
+Observed manager cancellation closes admission, drains in-flight HTTP requests
+for up to five seconds, and attempts bounded removal of its own label. Cleanup
+failure cannot keep its listener open. Endpoint propagation is asynchronous;
+stale connections may fail or receive HTTP 503 during failover.
+
+For existing local/non-Helm use, absence of **both** `POD_NAME` and `POD_UID`
+preserves the legacy listener. `POD_NAMESPACE` alone does not enable managed
+routing. Partial new identity, or complete new identity without a namespace,
+is rejected. Non-Helm installations opting in must supply the complete identity,
+installation labels and matching alert Service selector above. The existing
+`alertManager.enable` value controls Service exposure, not listener startup.
+
+Leader-election identity is unchanged. Replicas sharing a mutation domain must
+enable election, use byte-identical raw namespace input, and share the election
+namespace. A nonempty `--namespaces` argument wins over `WATCH_NAMESPACE`.
+Order, whitespace and duplicates in that raw string can change the lock ID
+even when the cache watches equivalent sets. Do not normalize these inputs
+during a rolling upgrade. The election namespace defaults to the in-cluster
+service-account namespace, not the watched Kafka namespace set; `POD_NAMESPACE`
+does not override it.
+
+Partially overlapping watch sets, differently spelled equivalent sets,
+all-namespaces overlaps, and independent election namespaces are not supported
+concurrent mutation arrangements. Use replicas of one installation behind its
+alert Service, not separate releases with different Service selectors that
+happen to share a Lease. Distinct election domains do not fence each other.
+
+Neither Lease election nor routing labels provide external-action fencing or
+exactly-once execution. A process pause/partition before observed cancellation,
+already admitted work, or an ambiguous submit-then-crash window can outlive
+routing changes. HTTP draining and conflict retries do not resolve those
+execution semantics or automatically adopt external operations.
+
 ## Installing the chart
 
 Before installing the chart, you must first install the Koperator CustomResourceDefinition resources.

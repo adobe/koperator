@@ -216,6 +216,16 @@ spec:
               port: health-probes
               path: /readyz
           env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.name
+            - name: POD_UID
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.uid
             - name: POD_NAMESPACE
               valueFrom:
                 fieldRef:

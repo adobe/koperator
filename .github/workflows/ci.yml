@@ -49,6 +49,21 @@ jobs:
           for version in "$KUBERNETES_MIN_VERSION" "$KUBERNETES_MAX_VERSION"; do
             helm lint charts/kafka-operator --strict --kube-version "$version"
             helm template kafka-operator charts/kafka-operator --kube-version "$version" > /dev/null
+            deployment=$(helm template kafka-operator charts/kafka-operator \
+              --kube-version "$version" --set webhook.enabled=false \
+              --show-only templates/operator-deployment-with-webhook.yaml)
+            for identity in POD_NAMESPACE:metadata.namespace POD_NAME:metadata.name POD_UID:metadata.uid; do
+              echo "Checking downward Pod identity: $identity"
+              field=$(grep -A5 -Fx -- "            - name: ${identity%%:*}" <<< "$deployment")
+              grep -Fxq -- "                  fieldPath: ${identity#*:}" <<< "$field"
+            done
+            if grep -Fq 'kafka.banzaicloud.io/alert-leader:' <<< "$deployment"; then
+              echo "::error::Only the elected process may publish the alert routing label"
+              exit 1
+            fi
+            alerts=$(helm template kafka-operator charts/kafka-operator \
+              --kube-version "$version" --show-only templates/alertmanager-service.yaml)
+            grep -Fxq '    kafka.banzaicloud.io/alert-leader: "true"' <<< "$alerts"
             for metrics in true false; do
               for proxy in true false; do
                 for port in 8080 9090; do
