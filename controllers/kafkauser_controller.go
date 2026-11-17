@@ -313,6 +313,12 @@ func (r *KafkaUserReconciler) finalizeUser(ctx context.Context, cluster *v1beta1
 			if err != nil {
 				return ctrl.Result{}, err
 			}
+			if _, recorded := user.Annotations[userACLPrincipalAnnotation]; !recorded {
+				metav1.SetMetaDataAnnotation(&user.ObjectMeta, userACLPrincipalAnnotation, kafkaUser)
+				if user, err = r.updateAndFetchLatest(ctx, user); err != nil {
+					return ctrl.Result{}, err
+				}
+			}
 		}
 		if cluster.Spec.ListenersConfig.SSLSecrets != nil || user.Spec.PKIBackendSpec != nil {
 			backend := v1beta1.PKIBackendProvided

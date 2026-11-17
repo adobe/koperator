@@ -55,6 +55,7 @@ type protectedKafkaClient struct {
 	beforeMutation   func()
 	afterMutationErr error
 	deletedUsers     []string
+	deleteUserErr    error
 }
 
 func (c *protectedKafkaClient) CreateTopic(opts *kafkaclient.CreateTopicOptions) error {
@@ -75,6 +76,9 @@ func (c *protectedKafkaClient) CreateUserACLs(access v1alpha1.KafkaAccessType, p
 
 func (c *protectedKafkaClient) DeleteUserACLs(user string, pattern v1alpha1.KafkaPatternType) error {
 	c.deletedUsers = append(c.deletedUsers, user)
+	if c.deleteUserErr != nil {
+		return c.deleteUserErr
+	}
 	return c.KafkaClient.DeleteUserACLs(user, pattern)
 }
 
@@ -358,6 +362,121 @@ func TestDeletingUserUsesExistingCertificateIdentity(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []string{"CN=issued-principal,O=existing-organization"}, protectedBroker.deletedUsers)
 	require.True(t, apierrors.IsNotFound(c.Get(ctx, client.ObjectKeyFromObject(user), user)))
+}
+
+func TestDeletingLegacyUserCheckpointsACLIdentity(t *testing.T) {
+	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "legacy-principal", Organization: []string{"legacy-organization"}},
+	}
+	der, err := x509.CreateCertificate(rand.Reader, template, template, publicKey, privateKey)
+	require.NoError(t, err)
+	const principal = "CN=legacy-principal,O=legacy-organization"
+
+	for _, scenario := range []string{"acl-failure-then-restart", "checkpoint-failure"} {
+		t.Run(scenario, func(t *testing.T) {
+			ctx := context.Background()
+			scheme := runtime.NewScheme()
+			require.NoError(t, k8sscheme.AddToScheme(scheme))
+			require.NoError(t, certv1.AddToScheme(scheme))
+			require.NoError(t, v1alpha1.AddToScheme(scheme))
+			require.NoError(t, v1beta1.AddToScheme(scheme))
+			user := &v1alpha1.KafkaUser{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "legacy-user", Namespace: "default", UID: "legacy-user-uid",
+					Finalizers: []string{userFinalizer, "example.com/unrelated"}, DeletionTimestamp: &metav1.Time{Time: metav1.Now().Time},
+				},
+				Spec: v1alpha1.KafkaUserSpec{
+					SecretName: "legacy-secret", ClusterRef: v1alpha1.ClusterReference{Name: "cluster"},
+					CreateCert: util.BoolPointer(true),
+					TopicGrants: []v1alpha1.UserTopicGrant{{
+						TopicName: "topic", AccessType: v1alpha1.KafkaAccessTypeRead, PatternType: v1alpha1.KafkaPatternTypeLiteral,
+					}},
+				},
+				Status: v1alpha1.KafkaUserStatus{State: v1alpha1.UserStateCreated},
+			}
+			cluster := &v1beta1.KafkaCluster{
+				ObjectMeta: metav1.ObjectMeta{Name: "cluster", Namespace: "default"},
+				Spec: v1beta1.KafkaClusterSpec{ListenersConfig: v1beta1.ListenersConfig{
+					SSLSecrets: &v1beta1.SSLSecrets{PKIBackend: v1beta1.PKIBackendCertManager},
+				}},
+			}
+			owner := *metav1.NewControllerRef(user, v1alpha1.GroupVersion.WithKind("KafkaUser"))
+			cert := &certv1.Certificate{
+				ObjectMeta: metav1.ObjectMeta{Name: user.Name, Namespace: user.Namespace, OwnerReferences: []metav1.OwnerReference{owner}},
+				Spec:       certv1.CertificateSpec{SecretName: user.Spec.SecretName},
+			}
+			secret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: user.Spec.SecretName, Namespace: user.Namespace, OwnerReferences: []metav1.OwnerReference{owner}},
+				Data:       map[string][]byte{corev1.TLSCertKey: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})},
+			}
+			base := fake.NewClientBuilder().WithScheme(scheme).WithObjects(user, cluster, cert, secret).WithStatusSubresource(user).Build()
+			checkpointFailure := errors.New("injected ACL identity checkpoint failure")
+			failCheckpoint := scenario == "checkpoint-failure"
+			wrapped := interceptor.NewClient(base, interceptor.Funcs{
+				Update: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.UpdateOption) error {
+					if _, ok := obj.(*v1alpha1.KafkaUser); ok && failCheckpoint && obj.GetAnnotations()[userACLPrincipalAnnotation] == principal {
+						return checkpointFailure
+					}
+					return c.Update(ctx, obj, opts...)
+				},
+			})
+			broker, closeBroker, err := kafkaclient.NewMockFromCluster(base, cluster)
+			require.NoError(t, err)
+			t.Cleanup(closeBroker)
+			require.NoError(t, broker.CreateUserACLs(v1alpha1.KafkaAccessTypeRead, v1alpha1.KafkaPatternTypeLiteral, principal, "topic"))
+			aclFailure := errors.New("injected ACL deletion failure")
+			protectedBroker := &protectedKafkaClient{KafkaClient: broker}
+			if scenario == "acl-failure-then-restart" {
+				protectedBroker.deleteUserErr = aclFailure
+			}
+			SetNewKafkaFromCluster(func(client.Client, *v1beta1.KafkaCluster) (kafkaclient.KafkaClient, func(), error) {
+				return protectedBroker, func() {}, nil
+			})
+			t.Cleanup(func() { SetNewKafkaFromCluster(kafkaclient.NewFromCluster) })
+			req := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(user)}
+			_, err = (&KafkaUserReconciler{Client: wrapped, Scheme: scheme}).Reconcile(ctx, req)
+			if failCheckpoint {
+				require.ErrorIs(t, err, checkpointFailure)
+				require.NoError(t, base.Get(ctx, client.ObjectKeyFromObject(cert), cert), "failed checkpoint must preserve the Certificate")
+				require.NoError(t, base.Get(ctx, client.ObjectKeyFromObject(secret), secret), "failed checkpoint must preserve the identity Secret")
+				require.Empty(t, protectedBroker.deletedUsers, "failed checkpoint must stop ACL cleanup")
+			} else {
+				require.ErrorIs(t, err, aclFailure)
+				require.True(t, apierrors.IsNotFound(base.Get(ctx, client.ObjectKeyFromObject(cert), cert)))
+				require.True(t, apierrors.IsNotFound(base.Get(ctx, client.ObjectKeyFromObject(secret), secret)))
+			}
+			require.NoError(t, base.Get(ctx, req.NamespacedName, user))
+			require.Contains(t, user.Finalizers, userFinalizer)
+			require.Contains(t, user.Finalizers, "example.com/unrelated")
+			if failCheckpoint {
+				require.NotContains(t, user.Annotations, userACLPrincipalAnnotation)
+			}
+			acls, err := broker.ListUserACLs()
+			require.NoError(t, err)
+			require.NotEmpty(t, acls, "failed cleanup must leave ACLs available for retry")
+
+			failCheckpoint = false
+			protectedBroker.deleteUserErr = nil
+			_, err = (&KafkaUserReconciler{Client: wrapped, Scheme: scheme}).Reconcile(ctx, req)
+			require.NoError(t, err, "restart must recover the principal even after the owned Secret was deleted")
+			require.NoError(t, base.Get(ctx, req.NamespacedName, user))
+			require.Equal(t, principal, user.Annotations[userACLPrincipalAnnotation])
+			require.Equal(t, []string{"example.com/unrelated"}, user.Finalizers)
+			if scenario == "acl-failure-then-restart" {
+				require.Equal(t, []string{principal, principal}, protectedBroker.deletedUsers)
+			} else {
+				require.Equal(t, []string{principal}, protectedBroker.deletedUsers)
+			}
+			acls, err = broker.ListUserACLs()
+			require.NoError(t, err)
+			require.Empty(t, acls)
+			require.True(t, apierrors.IsNotFound(base.Get(ctx, client.ObjectKeyFromObject(cert), cert)))
+			require.True(t, apierrors.IsNotFound(base.Get(ctx, client.ObjectKeyFromObject(secret), secret)))
+		})
+	}
 }
 
 func TestDeletionRetainsFinalizerOnClusterReadFailure(t *testing.T) {
