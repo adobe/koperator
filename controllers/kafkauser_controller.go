@@ -31,6 +31,7 @@ import (
 	certv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	"github.com/go-logr/logr"
 	certsigningreqv1 "k8s.io/api/certificates/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -63,6 +64,7 @@ func SetupKafkaUserWithManager(mgr ctrl.Manager, certSigningEnabled bool, certMa
 		WithEventFilter(SkipClusterRegistryOwnedResourcePredicate{}).
 		Named("KafkaUser")
 	if certSigningEnabled {
+		builder.Owns(&corev1.Secret{})
 		csrMapper := csrMapper{
 			client: mgr.GetClient(),
 			log:    log,

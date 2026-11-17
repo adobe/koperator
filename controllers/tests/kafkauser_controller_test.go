@@ -361,5 +361,36 @@ x0eepFeUNacaeg7O1ftIrzNlYsSLi2Qm+tnu7odyxafZ65GJ9lcSLUqXuNDCrNOl
 			}
 			return user.Status.State, nil
 		}, 5*time.Second, 100*time.Millisecond).Should(Equal(v1alpha1.UserStateCreated))
+
+		By("waiting for outstanding certificate retries to drain after readiness")
+		Expect(k8sClient.Get(ctx, types.NamespacedName{
+			Namespace: user.Namespace,
+			Name:      user.Name,
+		}, &user)).To(Succeed())
+		readyVersion := user.ResourceVersion
+		Consistently(ctx, func() (string, error) {
+			current := &v1alpha1.KafkaUser{}
+			err := k8sClient.Get(ctx, types.NamespacedName{
+				Namespace: user.Namespace,
+				Name:      user.Name,
+			}, current)
+			return current.ResourceVersion, err
+		}, 16*time.Second, 100*time.Millisecond).Should(Equal(readyVersion))
+
+		By("recovering an owned certificate Secret from its deletion event alone")
+		Expect(k8sClient.Get(ctx, types.NamespacedName{
+			Namespace: user.Namespace,
+			Name:      user.Spec.SecretName,
+		}, secret)).To(Succeed())
+		originalUID := secret.UID
+		Expect(k8sClient.Delete(ctx, secret)).To(Succeed())
+		Eventually(ctx, func() (types.UID, error) {
+			recreated := &corev1.Secret{}
+			err := k8sClient.Get(ctx, types.NamespacedName{
+				Namespace: user.Namespace,
+				Name:      user.Spec.SecretName,
+			}, recreated)
+			return recreated.UID, err
+		}, 5*time.Second, 100*time.Millisecond).Should(And(Not(BeEmpty()), Not(Equal(originalUID))))
 	})
 })
