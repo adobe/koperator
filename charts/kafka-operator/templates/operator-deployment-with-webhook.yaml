@@ -1,3 +1,5 @@
+{{- $metricsPort := (.Values.metricEndpoint).port | default 8080 }}
+{{- $metricsProxyEnabled := and .Values.prometheusMetrics.enabled .Values.prometheusMetrics.authProxy.enabled }}
 {{- $tlsCrt := "" }}
 {{- $tlsKey := "" }}
 {{- $caCrt := "" }}
@@ -151,13 +153,13 @@ spec:
       {{ toYaml .Values.podSecurityContext | nindent 8 }}
       {{- end }}
       containers:
-      {{- if and .Values.prometheusMetrics.enabled .Values.prometheusMetrics.authProxy.enabled }}
+      {{- if $metricsProxyEnabled }}
         - name: kube-rbac-proxy
           image: "{{ .Values.prometheusMetrics.authProxy.image.repository }}:{{ .Values.prometheusMetrics.authProxy.image.tag }}"
           imagePullPolicy: {{ .Values.prometheusMetrics.authProxy.image.pullPolicy }}
           args:
             - "--secure-listen-address=0.0.0.0:8443"
-            - "--upstream=http://127.0.0.1:8080/"
+            - "--upstream=http://127.0.0.1:{{ $metricsPort }}/"
             - "--v=10"
           ports:
             - containerPort: 8443
@@ -192,9 +194,7 @@ spec:
           {{- if .Values.operator.developmentLogging }}
             - --development
           {{- end }}
-          {{- if (.Values.metricEndpoint).port }}
-            - --metrics-addr=":{{ .Values.metricEndpoint.port }}"
-          {{- end }}
+            - --metrics-addr={{ if $metricsProxyEnabled }}127.0.0.1{{ end }}:{{ $metricsPort }}
           {{- if .Values.healthProbes.port }}
             - --health-probes-addr=:{{ .Values.healthProbes.port }}
           {{- end }}
@@ -230,7 +230,7 @@ spec:
               name: webhook-server
               protocol: TCP
             {{- end}}
-            - containerPort: {{ (.Values.metricEndpoint).port | default 8080 }}
+            - containerPort: {{ $metricsPort }}
               name: metrics
               protocol: TCP
             - containerPort: {{ .Values.alertManager.port }}

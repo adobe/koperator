@@ -26,6 +26,12 @@ spec:
       app.kubernetes.io/component: operator
   podMetricsEndpoints:
   - interval: {{ .Values.prometheusMetrics.podMonitor.interval }}
+    {{- if and .Values.prometheusMetrics.enabled .Values.prometheusMetrics.authProxy.enabled }}
+    port: https
+    scheme: https
+    {{- else }}
     port: metrics
+    scheme: http
+    {{- end }}
     path: /metrics
 {{- end }}

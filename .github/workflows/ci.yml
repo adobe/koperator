@@ -49,6 +49,41 @@ jobs:
           for version in "$KUBERNETES_MIN_VERSION" "$KUBERNETES_MAX_VERSION"; do
             helm lint charts/kafka-operator --strict --kube-version "$version"
             helm template kafka-operator charts/kafka-operator --kube-version "$version" > /dev/null
+            for metrics in true false; do
+              for proxy in true false; do
+                for port in 8080 9090; do
+                  echo "Checking metrics wiring: Kubernetes=$version metrics=$metrics proxy=$proxy port=$port"
+                  args=(
+                    --namespace serving-check --kube-version "$version"
+                    --set webhook.enabled=false
+                    --set prometheusMetrics.enabled="$metrics"
+                    --set prometheusMetrics.authProxy.enabled="$proxy"
+                    --set prometheusMetrics.podMonitor.enabled=true
+                  )
+                  if [[ "$port" != 8080 ]]; then
+                    args+=(--set metricEndpoint.port="$port")
+                  fi
+                  helm lint charts/kafka-operator --strict "${args[@]}"
+                  rendered=$(helm template kafka-operator charts/kafka-operator "${args[@]}")
+                  if [[ "$metrics" == true && "$proxy" == true ]]; then
+                    bind="127.0.0.1:$port"
+                    grep -Fq -- "--upstream=http://127.0.0.1:$port/" <<< "$rendered"
+                    grep -Fxq '    port: https' <<< "$rendered"
+                    grep -Fxq '    scheme: https' <<< "$rendered"
+                  else
+                    bind=":$port"
+                    if grep -Fq -- '--upstream=' <<< "$rendered"; then
+                      echo "::error::Inactive metrics proxy must not be rendered"
+                      exit 1
+                    fi
+                    grep -Fxq '    port: metrics' <<< "$rendered"
+                    grep -Fxq '    scheme: http' <<< "$rendered"
+                  fi
+                  grep -Fxq "            - --metrics-addr=$bind" <<< "$rendered"
+                  grep -Fxq "            - containerPort: $port" <<< "$rendered"
+                done
+              done
+            done
           done
           IFS=. read -r major minor _ <<< "$KUBERNETES_MIN_VERSION"
           unsupported="${major}.$((minor - 1)).99"
