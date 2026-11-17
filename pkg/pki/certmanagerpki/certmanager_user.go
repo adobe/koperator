@@ -36,11 +36,61 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// FinalizeUserCertificate for cert-manager backend auto returns because controller references handle cleanup
-func (c *certManager) FinalizeUserCertificate(_ context.Context, _ *v1alpha1.KafkaUser) (err error) {
-	return
+// FinalizeUserCertificate stops issuance before removing generated user Secrets.
+func (c *certManager) FinalizeUserCertificate(ctx context.Context, user *v1alpha1.KafkaUser) error {
+	cert, err := c.getUserCertificate(ctx, user)
+	if apierrors.IsNotFound(err) {
+		return c.deleteOwnedUserSecret(ctx, user)
+	}
+	if err != nil {
+		return err
+	}
+	if !metav1.IsControlledBy(cert, user) {
+		return nil
+	}
+	secret, err := c.getUserSecretForCleanup(ctx, user)
+	if err != nil {
+		return err
+	}
+	if secret != nil && len(secret.OwnerReferences) == 0 && secret.Annotations[certv1.CertificateNameKey] == cert.Name {
+		secret.OwnerReferences = []metav1.OwnerReference{*metav1.NewControllerRef(user, v1alpha1.GroupVersion.WithKind("KafkaUser"))}
+		if err = c.client.Update(ctx, secret); err != nil {
+			return err
+		}
+	}
+	if err = c.client.Delete(ctx, cert, client.Preconditions{UID: &cert.UID, ResourceVersion: &cert.ResourceVersion}); client.IgnoreNotFound(err) != nil {
+		return err
+	}
+	if _, err = c.getUserCertificate(ctx, user); err == nil {
+		return errorfactory.New(errorfactory.ResourceNotReady{}, errors.New("certificate is still deleting"), "waiting for user certificate deletion")
+	} else if !apierrors.IsNotFound(err) {
+		return err
+	}
+	return c.deleteOwnedUserSecret(ctx, user)
+}
+
+func (c *certManager) getUserSecretForCleanup(ctx context.Context, user *v1alpha1.KafkaUser) (*corev1.Secret, error) {
+	secret := &corev1.Secret{}
+	err := c.client.Get(ctx, types.NamespacedName{Name: user.Spec.SecretName, Namespace: user.Namespace}, secret)
+	if apierrors.IsNotFound(err) {
+		return nil, nil
+	}
+	return secret, err
+}
+
+func (c *certManager) deleteOwnedUserSecret(ctx context.Context, user *v1alpha1.KafkaUser) error {
+	secret, err := c.getUserSecretForCleanup(ctx, user)
+	if err != nil || secret == nil {
+		return err
+	}
+	if !metav1.IsControlledBy(secret, user) || len(secret.OwnerReferences) != 1 {
+		return nil
+	}
+	err = c.client.Delete(ctx, secret, client.Preconditions{UID: &secret.UID, ResourceVersion: &secret.ResourceVersion})
+	return client.IgnoreNotFound(err)
 }
 
 // ReconcileUserCertificate ensures a certificate/secret combination using cert-manager

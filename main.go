@@ -48,6 +48,7 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	contour "github.com/projectcontour/contour/apis/projectcontour/v1"
 
@@ -207,9 +208,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	// User cleanup makes absence-based decisions about certificates and Secrets.
+	userClient, err := client.New(mgr.GetConfig(), client.Options{Scheme: mgr.GetScheme()})
+	if err != nil {
+		setupLog.Error(err, "unable to create direct KafkaUser client")
+		os.Exit(1)
+	}
+
 	// Create a new  kafka user reconciler
 	kafkaUserReconciler := &controllers.KafkaUserReconciler{
-		Client: mgr.GetClient(),
+		Client: userClient,
 		Scheme: mgr.GetScheme(),
 	}
 

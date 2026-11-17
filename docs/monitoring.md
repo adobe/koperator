@@ -55,3 +55,33 @@ subsequent reconciliation to query task progress. Automatic adoption of an
 unrecorded submission is not implemented; inspect Cruise Control's task history
 when investigating this window, and do not infer that a missing status means
 the external operation never ran.
+
+## Cleanup ownership during provisioning
+
+KafkaCluster, managed KafkaTopic, and KafkaUser resources acquire cleanup
+finalizers before provisioning. A failed finalizer write prevents protected
+side effects. Reconciliation continues after a successful write rather than
+depending on a finalizer-only watch event.
+
+KafkaUser records `kafka.banzaicloud.io/acl-principal` before attempting ACL
+creation. A nonempty value is the certificate-derived cleanup identity; an
+empty value records that ACL submission has not started. An absent annotation
+is legacy/unknown state, not evidence that no ACLs exist. Do not remove or edit
+this annotation. KafkaUser uses an uncached Kubernetes client so certificate
+and Secret absence used during initialization and cleanup is authoritative.
+This adds direct reads; it is a correctness change, not an API-traffic
+optimization.
+
+Deletion does not create certificates to discover a user's principal.
+Recorded principals survive a failed status write or an incomplete Secret
+cache. Legacy users without a recorded principal still require their existing
+certificate for ACL cleanup; if it is missing or invalid, restore the cleanup
+identity rather than removing the finalizer and abandoning ACLs. The annotation
+does not recover external work whose identity was never recorded by an older
+operator, and rolling back to an older operator stops recording these markers.
+
+For cert-manager users, cleanup stops the owned Certificate before deleting
+user-owned Secrets. Regenerated Secrets without owner references are adopted
+for cleanup only when they identify that owned Certificate. Shared or
+externally owned Secrets are preserved. Cleanup retries while the Certificate
+is still deleting; it does not wait synchronously for issuance or approval.
