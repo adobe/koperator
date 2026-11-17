@@ -24,8 +24,12 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.uber.org/mock/gomock"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/banzaicloud/koperator/controllers"
 	"github.com/banzaicloud/koperator/controllers/tests/mocks"
 
 	corev1 "k8s.io/api/core/v1"
@@ -42,6 +46,151 @@ const (
 	operationRetryTimeoutDuration    = time.Duration(v1alpha1.DefaultRetryBackOffDurationSec+10) * time.Second // timeout for retry operations
 	operationExtendedTimeoutDuration = 15 * time.Second                                                        // extended timeout for complex operations
 )
+
+type operationRetrievalHintClient struct {
+	client.Client
+	hint *v1alpha1.CruiseControlOperation
+	miss bool
+}
+
+func (c *operationRetrievalHintClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	if operation, ok := obj.(*v1alpha1.CruiseControlOperation); ok {
+		if c.miss {
+			return apierrors.NewNotFound(schema.GroupResource{Group: "kafka.banzaicloud.io", Resource: "cruisecontroloperations"}, key.Name)
+		}
+		if c.hint != nil {
+			c.hint.DeepCopyInto(operation)
+			return nil
+		}
+	}
+	return c.Client.Get(ctx, key, obj, opts...)
+}
+
+type operationRetrievalReader struct {
+	client.Reader
+	selectors []string
+	results   []v1alpha1.CruiseControlOperationList
+	gets      int
+}
+
+func (r *operationRetrievalReader) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	r.gets++
+	return r.Reader.Get(ctx, key, obj, opts...)
+}
+
+func (r *operationRetrievalReader) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
+	options := (&client.ListOptions{}).ApplyOptions(opts)
+	selector := ""
+	if options.LabelSelector != nil {
+		selector = options.LabelSelector.String()
+	}
+	r.selectors = append(r.selectors, selector)
+	if err := r.Reader.List(ctx, list, opts...); err != nil {
+		return err
+	}
+	r.results = append(r.results, *list.(*v1alpha1.CruiseControlOperationList).DeepCopy())
+	return nil
+}
+
+var _ = Describe("CruiseControlOperation scoped retrieval", Serial, func() {
+	DescribeTable("uses fresh API objects and preserves compatible fallback", func(ctx SpecContext, mode string) {
+		namespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{GenerateName: "operation-retrieval-"}}
+		Expect(k8sClient.Create(ctx, namespace)).To(Succeed())
+		DeferCleanup(func(ctx SpecContext) {
+			Expect(k8sClient.DeleteAllOf(ctx, &v1alpha1.CruiseControlOperation{}, client.InNamespace(namespace.Name))).To(Succeed())
+			Expect(k8sClient.Delete(ctx, namespace)).To(Succeed())
+		})
+		var current *v1alpha1.CruiseControlOperation
+		for _, name := range []string{"z-current", "a-peer", "unrelated"} {
+			cluster := "target"
+			if name == "unrelated" {
+				cluster = "old"
+			}
+			operation := generateCruiseControlOperation(name, namespace.Name, cluster)
+			Expect(k8sClient.Create(ctx, &operation)).To(Succeed())
+			operation.Status.CurrentTask = &v1alpha1.CruiseControlTask{Operation: v1alpha1.OperationStatus}
+			Expect(k8sClient.Status().Update(ctx, &operation)).To(Succeed())
+			if name == "z-current" {
+				current = operation.DeepCopy()
+			}
+		}
+		cached := &operationRetrievalHintClient{Client: cruiseControlOperationReconciler.Client}
+		Eventually(ctx, func(g Gomega) {
+			observed := &v1alpha1.CruiseControlOperation{}
+			g.Expect(cached.Get(ctx, client.ObjectKeyFromObject(current), observed)).To(Succeed())
+			g.Expect(observed.CurrentTaskOperation()).To(Equal(v1alpha1.OperationStatus))
+		}).Should(Succeed())
+		switch mode {
+		case "miss":
+			cached.miss = true
+		case "stale":
+			cached.hint = current.DeepCopy()
+			cached.hint.Labels[v1beta1.KafkaCRLabelKey] = "old"
+		case "unlabeled-hint":
+			cached.hint = current.DeepCopy()
+			cached.hint.Labels = nil
+		case "legacy":
+			current.Labels = nil
+			Expect(k8sClient.Update(ctx, current)).To(Succeed())
+			current.Status.CurrentTask.Operation = v1alpha1.OperationAddBroker
+			Expect(k8sClient.Status().Update(ctx, current)).To(Succeed())
+			cached.hint = current.DeepCopy()
+		case "recreated":
+			cached.hint = current.DeepCopy()
+			Expect(k8sClient.Delete(ctx, current)).To(Succeed())
+			replacement := generateCruiseControlOperation(current.Name, namespace.Name, "target")
+			Expect(k8sClient.Create(ctx, &replacement)).To(Succeed())
+			replacement.Status.CurrentTask = &v1alpha1.CruiseControlTask{Operation: v1alpha1.OperationStatus}
+			Expect(k8sClient.Status().Update(ctx, &replacement)).To(Succeed())
+			Expect(replacement.UID).NotTo(Equal(current.UID))
+			current = replacement.DeepCopy()
+		}
+		baseline := &v1alpha1.CruiseControlOperationList{}
+		Expect(k8sClient.List(ctx, baseline, client.InNamespace(namespace.Name))).To(Succeed())
+		reader := &operationRetrievalReader{Reader: k8sClient}
+		reconciler := &controllers.CruiseControlOperationReconciler{Client: cached, DirectClient: reader}
+		result, err := reconciler.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(current)})
+		if mode == "legacy" {
+			Expect(err).To(MatchError(ContainSubstring("could not find kafka cluster reference label")))
+		} else {
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result.RequeueAfter).To(BeZero())
+		}
+		scopedSelector := v1beta1.KafkaCRLabelKey + "=target"
+		switch mode {
+		case "miss", "unlabeled-hint", "legacy":
+			Expect(reader.selectors).To(Equal([]string{""}))
+		case "stale":
+			Expect(reader.selectors).To(Equal([]string{v1beta1.KafkaCRLabelKey + "=old", ""}))
+		default:
+			Expect(reader.selectors).To(Equal([]string{scopedSelector}))
+		}
+		expected := make([]string, 0)
+		for _, operation := range baseline.Items {
+			if len(reader.selectors) != 1 || reader.selectors[0] == "" || operation.GetClusterRef() == "target" {
+				expected = append(expected, operation.Name)
+			}
+		}
+		last := reader.results[len(reader.results)-1]
+		observed := make([]string, 0, len(last.Items))
+		for _, operation := range last.Items {
+			observed = append(observed, operation.Name)
+			if operation.Name == current.Name {
+				Expect(operation.UID).To(Equal(current.UID))
+				Expect(operation.Status).To(Equal(current.Status))
+			}
+		}
+		Expect(observed).To(Equal(expected))
+		Expect(reader.gets).To(BeZero())
+	},
+		Entry("warm cache", "cached"),
+		Entry("cache miss", "miss"),
+		Entry("reassigned label", "stale"),
+		Entry("unlabeled hint", "unlabeled-hint"),
+		Entry("unlabeled legacy object", "legacy"),
+		Entry("deleted and recreated object", "recreated"),
+	)
+})
 
 var _ = Describe("CruiseControlTaskReconciler", func() {
 	var (

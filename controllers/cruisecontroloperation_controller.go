@@ -83,8 +83,7 @@ func (r *CruiseControlOperationReconciler) Reconcile(ctx context.Context, reques
 	log := logr.FromContextOrDiscard(ctx)
 	log.V(1).Info("reconciling CruiseControlOperation custom resources")
 
-	ccOperationListClusterWide := banzaiv1alpha1.CruiseControlOperationList{}
-	err := r.DirectClient.List(ctx, &ccOperationListClusterWide, client.ListOption(client.InNamespace(request.Namespace)))
+	ccOperationListClusterWide, err := r.listOperations(ctx, request.NamespacedName)
 	if err != nil {
 		return requeueWithError(log, err.Error(), err)
 	}
@@ -249,6 +248,27 @@ func (r *CruiseControlOperationReconciler) Reconcile(ctx context.Context, reques
 	}
 
 	return reconciled()
+}
+
+func (r *CruiseControlOperationReconciler) listOperations(ctx context.Context, key client.ObjectKey) (banzaiv1alpha1.CruiseControlOperationList, error) {
+	operations := banzaiv1alpha1.CruiseControlOperationList{}
+	hint := &banzaiv1alpha1.CruiseControlOperation{}
+	// The cache supplies only a selector hint; scheduling always uses the direct LIST.
+	if err := r.Get(ctx, key, hint); err == nil && hint.GetClusterRef() != "" {
+		if err := r.DirectClient.List(ctx, &operations, client.InNamespace(key.Namespace),
+			client.MatchingLabels{banzaiv1beta1.KafkaCRLabelKey: hint.GetClusterRef()}); err != nil {
+			return operations, err
+		}
+		for i := range operations.Items {
+			if client.ObjectKeyFromObject(&operations.Items[i]) == key {
+				return operations, nil
+			}
+		}
+	}
+
+	operations = banzaiv1alpha1.CruiseControlOperationList{}
+	err := r.DirectClient.List(ctx, &operations, client.InNamespace(key.Namespace))
+	return operations, err
 }
 
 func (r *CruiseControlOperationReconciler) persistExecutionResult(
