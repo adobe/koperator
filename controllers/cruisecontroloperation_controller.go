@@ -257,11 +257,15 @@ func (r *CruiseControlOperationReconciler) persistExecutionResult(
 	operation *banzaiv1alpha1.CruiseControlOperation,
 	result *scale.Result,
 ) error {
+	firstAttempt := true
 	return util.RetryOnConflict(util.DefaultBackOffForConflict, func() error {
 		latest := &banzaiv1alpha1.CruiseControlOperation{}
-		if err := r.DirectClient.Get(ctx, client.ObjectKeyFromObject(operation), latest); err != nil {
+		if firstAttempt {
+			latest = operation.DeepCopy()
+		} else if err := r.DirectClient.Get(ctx, client.ObjectKeyFromObject(operation), latest); err != nil {
 			return err
 		}
+		firstAttempt = false
 		if latest.UID != operation.UID || latest.CurrentTask() == nil || latest.CurrentTaskID() != operation.CurrentTaskID() {
 			return errors.New("CruiseControlOperation identity or current task changed after external task submission")
 		}

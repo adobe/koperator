@@ -54,6 +54,9 @@ func TestOperationResultPersistsAcrossStatusConflicts(t *testing.T) {
 		wantFailed  int
 		wantOp      v1alpha1.CruiseControlTaskOperation
 	}{
+		{name: "first submission without conflict", wantOp: v1alpha1.OperationAddBroker},
+		{name: "retry without conflict preserves history once", retry: true, wantRetries: 3, wantFailed: 2, wantOp: v1alpha1.OperationAddBroker},
+		{name: "stop submission without conflict retains operation", deleting: true, wantOp: v1alpha1.OperationStopExecution},
 		{name: "first submission", conflicts: 1, wantOp: v1alpha1.OperationAddBroker},
 		{name: "retry preserves history once", retry: true, conflicts: 2, wantRetries: 3, wantFailed: 2, wantOp: v1alpha1.OperationAddBroker},
 		{name: "stop submission retains operation", deleting: true, conflicts: 1, wantOp: v1alpha1.OperationStopExecution},
@@ -163,8 +166,16 @@ func TestOperationResultPersistsAcrossStatusConflicts(t *testing.T) {
 						return c.SubResource(subresource).Update(ctx, obj, opts...)
 					},
 				}).Build()
+			var directReads int
+			directClient := interceptor.NewClient(kubeClient, interceptor.Funcs{
+				Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+					directReads++
+					assert.Positive(t, resultWrites, "direct GET must follow a conflicting result write")
+					return c.Get(ctx, key, obj, opts...)
+				},
+			})
 			reconciler := &CruiseControlOperationReconciler{
-				Client: kubeClient, DirectClient: kubeClient, Scheme: scheme,
+				Client: kubeClient, DirectClient: directClient, Scheme: scheme,
 				ScaleFactory: func(context.Context, *v1beta1.KafkaCluster) (scale.CruiseControlScaler, error) {
 					return scaler, nil
 				},
@@ -197,8 +208,11 @@ func TestOperationResultPersistsAcrossStatusConflicts(t *testing.T) {
 			assert.True(t, task.Started.Time.Equal(time.Date(2006, 1, 2, 15, 4, 5, 0, time.UTC)))
 			assert.Equal(t, tt.wantRetries, persisted.Status.RetryCount)
 			assert.Len(t, persisted.Status.FailedTasks, tt.wantFailed)
-			assert.Equal(t, "preserved", persisted.Annotations["other-writer"])
+			if tt.conflicts > 0 {
+				assert.Equal(t, "preserved", persisted.Annotations["other-writer"])
+			}
 			assert.Equal(t, tt.conflicts+1, resultWrites)
+			assert.Equal(t, tt.conflicts, directReads)
 		})
 	}
 }
