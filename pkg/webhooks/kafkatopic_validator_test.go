@@ -17,9 +17,13 @@ package webhooks
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
+	"github.com/IBM/sarama"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -89,6 +93,215 @@ func newMockClients(cluster *v1beta1.KafkaCluster) (runtimeClient.WithWatch, kaf
 		return kafkaClient, func() { _ = kafkaClient.Close() }, nil
 	}
 	return client, kafkaClient, returnMockedKafkaClient
+}
+
+type admissionCountingKafkaClient struct {
+	kafkaclient.KafkaClient
+	topicReads int
+}
+
+func (c *admissionCountingKafkaClient) GetTopic(name string) (*sarama.TopicDetail, error) {
+	c.topicReads++
+	return c.KafkaClient.GetTopic(name)
+}
+
+func TestKafkaTopicValidateUpdateDependencies(t *testing.T) {
+	testCases := []struct {
+		name               string
+		change             func(*v1alpha1.KafkaTopic)
+		validationRequired bool
+		withoutManager     bool
+	}{
+		{name: "finalizer addition", change: func(topic *v1alpha1.KafkaTopic) {
+			topic.Finalizers = append(topic.Finalizers, "example.com/cleanup")
+		}},
+		{name: "finalizer removal", change: func(topic *v1alpha1.KafkaTopic) {
+			topic.Finalizers = nil
+		}},
+		{name: "irrelevant label", change: func(topic *v1alpha1.KafkaTopic) {
+			topic.Labels = map[string]string{"example.com/team": "streaming"}
+		}},
+		{name: "irrelevant annotation", change: func(topic *v1alpha1.KafkaTopic) {
+			topic.Annotations["example.com/note"] = "updated"
+		}},
+		{name: "partition change", validationRequired: true, change: func(topic *v1alpha1.KafkaTopic) {
+			topic.Spec.Partitions++
+		}},
+		{name: "config change", validationRequired: true, change: func(topic *v1alpha1.KafkaTopic) {
+			topic.Spec.Config = map[string]string{"retention.ms": "1000"}
+		}},
+		{name: "cluster namespace default", validationRequired: true, change: func(topic *v1alpha1.KafkaTopic) {
+			topic.Spec.ClusterRef.Namespace = ""
+		}},
+		{name: "managedBy change", validationRequired: true, change: func(topic *v1alpha1.KafkaTopic) {
+			topic.Annotations[TopicManagedByAnnotationKey] = "external"
+		}},
+		{name: "managedBy removal", validationRequired: true, change: func(topic *v1alpha1.KafkaTopic) {
+			delete(topic.Annotations, TopicManagedByAnnotationKey)
+		}},
+		{name: "managedBy addition", validationRequired: true, withoutManager: true, change: func(topic *v1alpha1.KafkaTopic) {
+			topic.Annotations[TopicManagedByAnnotationKey] = TopicManagedByKoperatorAnnotationValue
+		}},
+		{name: "empty managedBy addition", validationRequired: true, withoutManager: true, change: func(topic *v1alpha1.KafkaTopic) {
+			topic.Annotations[TopicManagedByAnnotationKey] = ""
+		}},
+	}
+	for _, unavailable := range []bool{false, true} {
+		mode := "available"
+		if unavailable {
+			mode = "unavailable"
+		}
+		t.Run(mode, func(t *testing.T) {
+			for _, tc := range testCases {
+				t.Run(tc.name, func(t *testing.T) {
+					ctx := context.Background()
+					cluster := newMockCluster()
+					client, broker, _ := newMockClients(cluster)
+					if err := client.Create(ctx, cluster); err != nil {
+						t.Fatal(err)
+					}
+					oldTopic := newMockTopic()
+					oldTopic.Spec.Partitions = 2
+					oldTopic.Spec.ReplicationFactor = 1
+					oldTopic.Finalizers = []string{"finalizer.kafkatopics.kafka.banzaicloud.io"}
+					oldTopic.Annotations = map[string]string{TopicManagedByAnnotationKey: TopicManagedByKoperatorAnnotationValue}
+					if tc.withoutManager {
+						delete(oldTopic.Annotations, TopicManagedByAnnotationKey)
+					}
+					if err := client.Create(ctx, oldTopic); err != nil {
+						t.Fatal(err)
+					}
+					newTopic := oldTopic.DeepCopy()
+					tc.change(newTopic)
+					countingBroker := &admissionCountingKafkaClient{KafkaClient: broker}
+					connections, closes := 0, 0
+					validator := KafkaTopicValidator{
+						Client: client,
+						Log:    logr.Discard(),
+						NewKafkaFromCluster: func(runtimeClient.Client, *v1beta1.KafkaCluster) (kafkaclient.KafkaClient, func(), error) {
+							connections++
+							if unavailable {
+								return nil, nil, errors.New("Kafka unavailable")
+							}
+							return countingBroker, func() { closes++ }, nil
+						},
+					}
+					_, err := validator.ValidateUpdate(ctx, oldTopic, newTopic)
+					wantError := unavailable && tc.validationRequired
+					if (err != nil) != wantError {
+						t.Errorf("admission error = %v, want error = %v", err, wantError)
+					}
+					wantConnections, wantReads := 0, 0
+					if tc.validationRequired {
+						wantConnections = 1
+						if !unavailable {
+							wantReads = 1
+						}
+					}
+					if connections != wantConnections || countingBroker.topicReads != wantReads || closes != wantReads {
+						t.Errorf("Kafka connections/GetTopic/closes = %d/%d/%d, want %d/%d/%d",
+							connections, countingBroker.topicReads, closes, wantConnections, wantReads, wantReads)
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestKafkaTopicValidateUpdateRetainsKubernetesValidation(t *testing.T) {
+	for _, invalidInput := range []string{"partitions", "missing cluster", "duplicate topic"} {
+		t.Run(invalidInput, func(t *testing.T) {
+			ctx := context.Background()
+			cluster := newMockCluster()
+			client, _, _ := newMockClients(cluster)
+			oldTopic := newMockTopic()
+			oldTopic.Spec.Partitions = 2
+			oldTopic.Spec.ReplicationFactor = 1
+			if invalidInput == "partitions" {
+				oldTopic.Spec.Partitions = 0
+			}
+			if invalidInput != "missing cluster" {
+				if err := client.Create(ctx, cluster); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if invalidInput == "duplicate topic" {
+				duplicate := oldTopic.DeepCopy()
+				duplicate.Name = "duplicate"
+				if err := client.Create(ctx, duplicate); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := client.Create(ctx, oldTopic); err != nil {
+				t.Fatal(err)
+			}
+			newTopic := oldTopic.DeepCopy()
+			newTopic.Labels = map[string]string{"example.com/team": "streaming"}
+			connections := 0
+			validator := KafkaTopicValidator{
+				Client: client,
+				Log:    logr.Discard(),
+				NewKafkaFromCluster: func(runtimeClient.Client, *v1beta1.KafkaCluster) (kafkaclient.KafkaClient, func(), error) {
+					connections++
+					return nil, nil, errors.New("Kafka unavailable")
+				},
+			}
+			_, err := validator.ValidateUpdate(ctx, oldTopic, newTopic)
+			if !apierrors.IsInvalid(err) {
+				t.Errorf("admission error = %v, want Kubernetes validation error", err)
+			}
+			if connections != 0 {
+				t.Errorf("Kafka connections = %d, want 0", connections)
+			}
+		})
+	}
+}
+
+func TestKafkaTopicValidateCreateAdoptionDependencies(t *testing.T) {
+	for _, unavailable := range []bool{false, true} {
+		for _, adopt := range []bool{false, true} {
+			name := fmt.Sprintf("unavailable=%t/adopt=%t", unavailable, adopt)
+			t.Run(name, func(t *testing.T) {
+				ctx := context.Background()
+				cluster := newMockCluster()
+				client, broker, _ := newMockClients(cluster)
+				if err := client.Create(ctx, cluster); err != nil {
+					t.Fatal(err)
+				}
+				topic := newMockTopic()
+				topic.Spec.Partitions = 2
+				topic.Spec.ReplicationFactor = 1
+				if adopt {
+					topic.Annotations = map[string]string{TopicManagedByAnnotationKey: TopicManagedByKoperatorAnnotationValue}
+				}
+				if err := broker.CreateTopic(&kafkaclient.CreateTopicOptions{
+					Name: topic.Spec.Name, Partitions: 2, ReplicationFactor: 1,
+				}); err != nil {
+					t.Fatal(err)
+				}
+				connections := 0
+				validator := KafkaTopicValidator{
+					Client: client,
+					Log:    logr.Discard(),
+					NewKafkaFromCluster: func(runtimeClient.Client, *v1beta1.KafkaCluster) (kafkaclient.KafkaClient, func(), error) {
+						connections++
+						if unavailable {
+							return nil, nil, errors.New("Kafka unavailable")
+						}
+						return broker, func() {}, nil
+					},
+				}
+				_, err := validator.ValidateCreate(ctx, topic)
+				wantError := unavailable || !adopt
+				if (err != nil) != wantError {
+					t.Errorf("adoption error = %v, want error = %v", err, wantError)
+				}
+				if connections != 1 {
+					t.Errorf("Kafka connections = %d, want 1", connections)
+				}
+			})
+		}
+	}
 }
 
 func TestCheckKafkaTopicExist(t *testing.T) {
