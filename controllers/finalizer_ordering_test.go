@@ -628,6 +628,79 @@ func TestDeletingUserAfterACLsCreatedAndStatusWriteFails(t *testing.T) {
 	require.Equal(t, []string{principal}, protectedBroker.deletedUsers)
 }
 
+func TestDeletingUserAfterAsynchronousCertificateIssuance(t *testing.T) {
+	ctx := context.Background()
+	scheme := runtime.NewScheme()
+	require.NoError(t, k8sscheme.AddToScheme(scheme))
+	require.NoError(t, certv1.AddToScheme(scheme))
+	require.NoError(t, v1alpha1.AddToScheme(scheme))
+	require.NoError(t, v1beta1.AddToScheme(scheme))
+	// Subject of the fixture returned by certutil.GenerateTestCert.
+	const principal = "CN=test-cn,O=test-ou"
+	user := &v1alpha1.KafkaUser{
+		ObjectMeta: metav1.ObjectMeta{Name: "async-user", Namespace: "default", UID: "async-user-uid"},
+		Spec: v1alpha1.KafkaUserSpec{
+			SecretName: "async-secret", ClusterRef: v1alpha1.ClusterReference{Name: "cluster"},
+			TopicGrants: []v1alpha1.UserTopicGrant{{TopicName: "topic", AccessType: v1alpha1.KafkaAccessTypeRead}},
+		},
+	}
+	cluster := &v1beta1.KafkaCluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "cluster", Namespace: "default"},
+		Spec: v1beta1.KafkaClusterSpec{ListenersConfig: v1beta1.ListenersConfig{
+			SSLSecrets: &v1beta1.SSLSecrets{PKIBackend: v1beta1.PKIBackendCertManager},
+		}},
+	}
+	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(user, cluster).WithStatusSubresource(user).Build()
+	broker, closeBroker, err := kafkaclient.NewMockFromCluster(c, cluster)
+	require.NoError(t, err)
+	t.Cleanup(closeBroker)
+	req := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(user)}
+	protectedBroker := &protectedKafkaClient{KafkaClient: broker, beforeMutation: func() {
+		persisted := &v1alpha1.KafkaUser{}
+		require.NoError(t, c.Get(ctx, req.NamespacedName, persisted))
+		require.Equal(t, principal, persisted.Annotations[userACLPrincipalAnnotation],
+			"ACL creation must follow a durable record of the issued principal")
+	}}
+	SetNewKafkaFromCluster(func(client.Client, *v1beta1.KafkaCluster) (kafkaclient.KafkaClient, func(), error) {
+		return protectedBroker, func() {}, nil
+	})
+	t.Cleanup(func() { SetNewKafkaFromCluster(kafkaclient.NewFromCluster) })
+	r := &KafkaUserReconciler{Client: c, Scheme: scheme}
+
+	// cert-manager has not issued the Secret yet.
+	result, err := r.Reconcile(ctx, req)
+	require.NoError(t, err)
+	require.Positive(t, result.RequeueAfter)
+	acls, err := broker.ListUserACLs()
+	require.NoError(t, err)
+	require.Empty(t, acls)
+
+	certificatePEM, _, _, err := certutil.GenerateTestCert()
+	require.NoError(t, err)
+	require.NoError(t, c.Create(ctx, &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: user.Spec.SecretName, Namespace: user.Namespace},
+		Data: map[string][]byte{
+			corev1.TLSCertKey: certificatePEM, corev1.TLSPrivateKeyKey: []byte("key"), v1alpha1.CoreCACertKey: certificatePEM,
+		},
+	}))
+	_, err = r.Reconcile(ctx, req)
+	require.NoError(t, err)
+	acls, err = broker.ListUserACLs()
+	require.NoError(t, err)
+	require.NotEmpty(t, acls)
+
+	require.NoError(t, c.Delete(ctx, user))
+	for attempt := 0; attempt < 3 && !apierrors.IsNotFound(c.Get(ctx, req.NamespacedName, user)); attempt++ {
+		_, err = r.Reconcile(ctx, req)
+		require.NoError(t, err)
+	}
+	require.True(t, apierrors.IsNotFound(c.Get(ctx, req.NamespacedName, user)))
+	require.Equal(t, []string{principal}, protectedBroker.deletedUsers)
+	acls, err = broker.ListUserACLs()
+	require.NoError(t, err)
+	require.Empty(t, acls, "deleting an asynchronously issued user must not leak its ACLs")
+}
+
 type pendingTopicDeletionClient struct {
 	kafkaclient.KafkaClient
 	releaseWait <-chan struct{}
