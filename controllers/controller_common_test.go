@@ -16,8 +16,14 @@
 package controllers
 
 import (
+	"context"
 	"errors"
+	"fmt"
+	"io"
+	"net"
+	"net/http"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 
@@ -37,6 +43,122 @@ var log = logf.Log.WithName("controller_testing")
 const (
 	testNamespace = "test-namespace"
 )
+
+func TestAlertManagerReportsBindError(t *testing.T) {
+	listener, err := net.Listen("tcp", receiverAddr)
+	if err != nil {
+		t.Skipf("cannot reserve alert listener for bind-error regression: %v", err)
+	}
+	defer listener.Close()
+
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			t.Errorf("Start panicked instead of returning the bind error: %v", recovered)
+		}
+	}()
+
+	if err := (AController{}).Start(context.Background()); err == nil {
+		t.Error("Start returned nil for an occupied alert listener")
+	}
+}
+
+func TestAlertServerLifecycle(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		timeout     time.Duration
+		finish      bool
+		serveError  bool
+		expectedErr error
+	}{
+		{name: "drains in-flight request", timeout: 5 * time.Second, finish: true},
+		{name: "bounds shutdown and closes connection", timeout: 50 * time.Millisecond, expectedErr: context.DeadlineExceeded},
+		{name: "returns serve error and closes connection", serveError: true, expectedErr: net.ErrClosed},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			listener, err := net.Listen("tcp", "127.0.0.1:0")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer listener.Close()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			started, stopped, release := make(chan struct{}), make(chan struct{}), make(chan struct{})
+			finish := sync.OnceFunc(func() { close(release) })
+			defer finish()
+			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				defer close(stopped)
+				close(started)
+				select {
+				case <-release:
+					_, _ = w.Write([]byte("drained"))
+				case <-r.Context().Done():
+				}
+			})
+			serverDone := make(chan error, 1)
+			go func() { serverDone <- serveAlerts(ctx, listener, handler, tc.timeout) }()
+			requestDone := make(chan error, 1)
+			go func() {
+				httpClient := &http.Client{Timeout: 5 * time.Second}
+				response, requestErr := httpClient.Get("http://" + listener.Addr().String())
+				if requestErr == nil {
+					defer response.Body.Close()
+					body, readErr := io.ReadAll(response.Body)
+					requestErr = readErr
+					if requestErr == nil && (response.StatusCode != http.StatusOK || string(body) != "drained") {
+						requestErr = fmt.Errorf("unexpected response: status=%d body=%q", response.StatusCode, body)
+					}
+				}
+				requestDone <- requestErr
+			}()
+			select {
+			case <-started:
+			case <-time.After(2 * time.Second):
+				t.Fatal("alert handler did not start")
+			}
+			if tc.serveError {
+				if err := listener.Close(); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				cancel()
+			}
+			if tc.finish {
+				select {
+				case err := <-serverDone:
+					t.Fatalf("server returned before draining the request: %v", err)
+				case <-time.After(25 * time.Millisecond):
+				}
+				finish()
+			}
+			select {
+			case err := <-serverDone:
+				if !errors.Is(err, tc.expectedErr) {
+					t.Fatalf("server error = %v, want %v", err, tc.expectedErr)
+				}
+			case <-time.After(2 * time.Second):
+				t.Fatal("alert server did not stop")
+			}
+			select {
+			case <-stopped:
+			case <-time.After(2 * time.Second):
+				t.Fatal("alert handler connection was not closed")
+			}
+			select {
+			case err := <-requestDone:
+				if (err == nil) != tc.finish {
+					t.Fatalf("request error = %v, want successful drain = %t", err, tc.finish)
+				}
+			case <-time.After(2 * time.Second):
+				t.Fatal("alert request did not finish")
+			}
+			rebound, err := net.Listen("tcp", listener.Addr().String())
+			if err != nil {
+				t.Fatalf("alert listener was not released: %v", err)
+			}
+			_ = rebound.Close()
+		})
+	}
+}
 
 func TestRequeueAfter(t *testing.T) {
 	sec := 5

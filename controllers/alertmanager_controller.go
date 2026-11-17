@@ -16,8 +16,11 @@ package controllers
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net"
 	"net/http"
+	"time"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -47,7 +50,31 @@ func (c AController) Start(ctx context.Context) error {
 	logf.SetLogger(util.CreateLogger(false, false))
 	log := logf.Log.WithName("alertmanager")
 
-	ln, _ := net.Listen("tcp", receiverAddr)
-	httpServer := &http.Server{Handler: alertmanager.NewApp(log, c.Client)}
-	return httpServer.Serve(ln)
+	ln, err := net.Listen("tcp", receiverAddr)
+	if err != nil {
+		return fmt.Errorf("listen for alerts: %w", err)
+	}
+	return serveAlerts(ctx, ln, alertmanager.NewApp(log, c.Client), 5*time.Second)
+}
+
+func serveAlerts(ctx context.Context, ln net.Listener, handler http.Handler, shutdownTimeout time.Duration) error {
+	httpServer := &http.Server{Handler: handler}
+	defer httpServer.Close()
+	defer ln.Close()
+
+	serveDone := make(chan error, 1)
+	go func() { serveDone <- httpServer.Serve(ln) }()
+	select {
+	case err := <-serveDone:
+		return err
+	case <-ctx.Done():
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer cancel()
+		shutdownErr := httpServer.Shutdown(shutdownCtx)
+		serveErr := <-serveDone
+		if errors.Is(serveErr, http.ErrServerClosed) {
+			serveErr = nil
+		}
+		return errors.Join(shutdownErr, serveErr)
+	}
 }
