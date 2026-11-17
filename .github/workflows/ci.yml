@@ -64,6 +64,37 @@ jobs:
             alerts=$(helm template kafka-operator charts/kafka-operator \
               --kube-version "$version" --show-only templates/alertmanager-service.yaml)
             grep -Fxq '    kafka.banzaicloud.io/alert-leader: "true"' <<< "$alerts"
+            for accounts in kafka-operator:kafka-operator-authproxy:2 custom-operator:custom-proxy:2 shared:shared:1; do
+              IFS=: read -r operator_account proxy_account subject_count <<< "$accounts"
+              echo "Checking proxy review subjects: Kubernetes=$version operator=$operator_account proxy=$proxy_account"
+              args=(
+                --namespace serving-check --kube-version "$version"
+                --set webhook.enabled=false
+                --set operator.serviceAccount.name="$operator_account"
+                --set prometheusMetrics.authProxy.serviceAccount.name="$proxy_account"
+              )
+              if [[ "$operator_account" != kafka-operator ]]; then
+                args+=(--set operator.serviceAccount.create=false --set prometheusMetrics.authProxy.serviceAccount.create=false)
+              fi
+              deployment=$(helm template kafka-operator charts/kafka-operator "${args[@]}" \
+                --show-only templates/operator-deployment-with-webhook.yaml)
+              grep -Fxq "      serviceAccountName: $operator_account" <<< "$deployment"
+              binding=$(helm template kafka-operator charts/kafka-operator "${args[@]}" \
+                --show-only templates/authproxy-rbac.yaml)
+              subjects=$(sed -n '/^subjects:/,$p' <<< "$binding")
+              grep -Fxq "  name: $operator_account" <<< "$subjects"
+              grep -Fxq "  name: $proxy_account" <<< "$subjects"
+              [[ $(grep -c '^- kind: ServiceAccount$' <<< "$subjects") == "$subject_count" ]]
+              [[ $(grep -c '^  namespace: serving-check$' <<< "$subjects") == "$subject_count" ]]
+            done
+            echo "Checking externally supplied proxy RBAC: Kubernetes=$version"
+            external_rbac=$(helm template kafka-operator charts/kafka-operator \
+              --kube-version "$version" --set webhook.enabled=false --set rbac.enabled=false \
+              --show-only templates/authproxy-rbac.yaml)
+            if grep -Eq '^kind: ClusterRole(Binding)?$' <<< "$external_rbac"; then
+              echo "::error::rbac.enabled=false must leave proxy review permissions to the installer"
+              exit 1
+            fi
             for metrics in true false; do
               for proxy in true false; do
                 for port in 8080 9090; do

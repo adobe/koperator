@@ -18,6 +18,8 @@ retain their own selectors; webhook-serving standby replicas remain ready.
 An elected replica is ready only after its alert listener and routing
 publication are usable. Enabled webhooks also require local serving readiness.
 Liveness does not depend on Kafka or leader status.
+Upgrades from versions without the routing label have no alert endpoint until a
+label-aware replica becomes leader; plan alert retries during that handoff.
 
 The chart supplies `POD_NAMESPACE`, `POD_NAME`, and `POD_UID` through the downward
 API. The operator reads its own Pod and routing peers directly from the API,
@@ -65,6 +67,51 @@ exactly-once execution. A process pause/partition before observed cancellation,
 already admitted work, or an ambiguous submit-then-crash window can outlive
 routing changes. HTTP draining and conflict retries do not resolve those
 execution semantics or automatically adopt external operations.
+
+## Protected metrics prerequisites
+
+When metrics and the auth proxy are enabled, the manager's raw metrics listener
+binds to loopback. The proxy exposes HTTPS on port 8443, and the managed
+PodMonitor targets its `https` port rather than bypassing it. Port/protocol
+alignment alone does not establish a working authenticated scrape.
+
+All containers in the operator Pod share `operator.serviceAccount.name`
+(`default` if the name is empty).
+`prometheusMetrics.authProxy.serviceAccount.name` does not give the sidecar a
+separate identity. With `rbac.enabled=true`, the proxy review-role binding
+includes the actual Pod account and preserves the configured proxy account,
+without duplicating a shared account. This also applies when account creation
+is disabled. With `rbac.enabled=false`, the installer must grant the actual Pod
+account `create` on `authentication.k8s.io/tokenreviews` and
+`authorization.k8s.io/subjectaccessreviews`.
+
+A working protected scrape separately requires a scraping identity authorized
+to `get` the non-resource URL `/metrics`, usable proxy HTTPS serving credentials,
+and scraper trust in that certificate's CA and expected DNS/server name. Review
+permissions for the proxy do not authorize the scraper. The webhook certificate
+is not automatically wired into the metrics proxy.
+
+Managed PodMonitor authentication/CA/server-name integration is **deferred**:
+the chart has no managed monitor fields for bearer-token/client-certificate
+credentials, trusted CA, or TLS server name, and does not configure proxy
+certificate arguments or mounts. Supply caller-owned external workload and
+scrape configuration for these requirements; enabling chart values or adding
+`additionalVolumes` alone does not solve them. `additionalSidecars` does not
+configure the existing proxy. Do not disable TLS verification to work around
+missing trust configuration. Validate authenticated scraping and rejection of
+unauthorized requests against the actual endpoint before relying on it.
+
+### Existing webhook certificate renewal limits
+
+Helm-generated webhook serving certificates last 365 days (the generated CA
+lasts 3650 days). The chart has no continuous renewal controller. A Helm upgrade
+with generation enabled regenerates CA and serving material; it is not a
+guaranteed zero-downtime rotation. Plan renewal before expiry and coordinate the
+Secret, webhook CA bundle, and serving Pod rollout. With
+`webhook.certs.generate=false`, the caller must refresh the supplied CA,
+certificate, and key through the existing certificate values and deployment
+process. No metrics certificate reuse, issuance, or automatic renewal is added
+by the proxy wiring/RBAC fixes.
 
 ## Installing the chart
 
