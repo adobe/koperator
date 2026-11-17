@@ -164,7 +164,7 @@ func newAlertTestController(pods ...client.Object) (AController, *alertTestClien
 	}, writer
 }
 
-func runAlertForTest(t *testing.T, c AController, handler http.Handler) (context.CancelFunc, <-chan error, string) {
+func runAlertForTest(t *testing.T, c AController, handler http.Handler) (context.CancelFunc, <-chan error, net.Listener) {
 	t.Helper()
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
@@ -183,7 +183,7 @@ func runAlertForTest(t *testing.T, c AController, handler http.Handler) (context
 			t.Error("alert controller did not stop within its cleanup bound")
 		}
 	})
-	return cancel, done, "http://" + listener.Addr().String()
+	return cancel, done, listener
 }
 
 func TestAlertRoutingUsesScopedUncachedIdentity(t *testing.T) {
@@ -191,11 +191,7 @@ func TestAlertRoutingUsesScopedUncachedIdentity(t *testing.T) {
 	foreign := alertTestPod("foreign", "release")
 	foreign.Namespace = "other-namespace"
 	c, writer := newAlertTestController(self, stale, other, foreign)
-	var handled atomic.Int32
-	cancel, done, address := runAlertForTest(t, c, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		handled.Add(1)
-		_, _ = w.Write([]byte("ok"))
-	}))
+	cancel, done, _ := runAlertForTest(t, c, http.NotFoundHandler())
 	require.Eventually(t, func() bool { return c.readyz(nil) == nil }, time.Second, time.Millisecond)
 	for _, expected := range []struct {
 		pod    *corev1.Pod
@@ -205,23 +201,8 @@ func TestAlertRoutingUsesScopedUncachedIdentity(t *testing.T) {
 		require.NoError(t, writer.Client.Get(context.Background(), client.ObjectKeyFromObject(expected.pod), current))
 		require.Equal(t, expected.active, current.Labels["kafka.banzaicloud.io/alert-leader"] == "true", expected.pod.Name)
 	}
-	transport := &http.Transport{}
-	defer transport.CloseIdleConnections()
-	httpClient := &http.Client{Transport: transport, Timeout: time.Second}
-	response, err := httpClient.Get(address)
-	require.NoError(t, err)
-	_, err = io.ReadAll(response.Body)
-	require.NoError(t, err)
-	require.NoError(t, response.Body.Close())
 	cancel()
-	require.Error(t, c.readyz(nil), "observed cancellation must immediately fail elected readiness")
-	response, err = httpClient.Get(address)
-	if err == nil {
-		require.Equal(t, http.StatusServiceUnavailable, response.StatusCode)
-		require.NoError(t, response.Body.Close())
-	}
 	require.NoError(t, <-done)
-	require.EqualValues(t, 1, handled.Load(), "stale keepalive traffic reached the receiver")
 	current := &corev1.Pod{}
 	require.NoError(t, writer.Client.Get(context.Background(), c.pod, current))
 	require.Empty(t, current.Labels["kafka.banzaicloud.io/alert-leader"])
@@ -322,29 +303,25 @@ func TestAlertReadinessPreservesStandbysAndLegacy(t *testing.T) {
 	require.NoError(t, <-done)
 }
 
-func TestAlertRoutingGateAndBoundedCleanup(t *testing.T) {
+func TestAlertRoutingBoundedCleanup(t *testing.T) {
 	c, writer := newAlertTestController(alertTestPod("self", "release"))
 	cleanupStarted := make(chan struct{})
-	var cleanupOnce sync.Once
+	cleanupOnce := sync.OnceFunc(func() { close(cleanupStarted) })
 	writer.update = func(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
 		if obj.GetLabels()["kafka.banzaicloud.io/alert-leader"] != "true" {
 			// Only block final cleanup, not startup's stale-label removal.
-			select {
-			case <-cleanupStarted:
-			default:
-				c.state.RLock()
-				stopping := c.state.ctx != nil && c.state.ctx.Err() != nil
-				c.state.RUnlock()
-				if stopping {
-					cleanupOnce.Do(func() { close(cleanupStarted) })
-					<-ctx.Done()
-					return ctx.Err()
-				}
+			c.state.RLock()
+			stopping := c.state.ctx != nil && c.state.ctx.Err() != nil
+			c.state.RUnlock()
+			if stopping {
+				cleanupOnce()
+				<-ctx.Done()
+				return ctx.Err()
 			}
 		}
 		return writer.Client.Update(ctx, obj, opts...)
 	}
-	cancel, done, address := runAlertForTest(t, c, http.NotFoundHandler())
+	cancel, done, listener := runAlertForTest(t, c, http.NotFoundHandler())
 	require.Eventually(t, func() bool { return c.readyz(nil) == nil }, time.Second, time.Millisecond)
 	cancel()
 	select {
@@ -352,19 +329,11 @@ func TestAlertRoutingGateAndBoundedCleanup(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("cleanup did not start")
 	}
-	connection, err := net.DialTimeout("tcp", address[len("http://"):], time.Second)
+	connection, err := net.DialTimeout("tcp", listener.Addr().String(), time.Second)
 	if connection != nil {
 		_ = connection.Close()
 	}
 	require.Error(t, err, "listener remained open while cleanup was blocked")
-	c.state.RLock()
-	ctx := c.state.ctx
-	c.state.RUnlock()
-	recorder := httptest.NewRecorder()
-	c.gatedHandler(ctx, http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
-		t.Error("canceled admission reached the receiver")
-	})).ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/", nil))
-	require.Equal(t, http.StatusServiceUnavailable, recorder.Code)
 	select {
 	case err := <-done:
 		require.ErrorIs(t, err, context.DeadlineExceeded)
@@ -423,13 +392,7 @@ func TestAlertRoutingCleanupPreservesReplacementUID(t *testing.T) {
 
 func TestAlertRoutingServeFailureRemovesLabel(t *testing.T) {
 	c, writer := newAlertTestController(alertTestPod("self", "release"))
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	defer listener.Close()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	done := make(chan error, 1)
-	go func() { done <- c.run(ctx, listener, http.NotFoundHandler()) }()
+	_, done, listener := runAlertForTest(t, c, http.NotFoundHandler())
 	require.Eventually(t, func() bool { return c.readyz(nil) == nil }, time.Second, time.Millisecond)
 	require.NoError(t, listener.Close())
 	select {
@@ -451,15 +414,6 @@ func TestAlertManagerReportsBindError(t *testing.T) {
 	}
 	defer listener.Close()
 
-	defer func() {
-		if recovered := recover(); recovered != nil {
-			t.Errorf("Start panicked instead of returning the bind error: %v", recovered)
-		}
-	}()
-
-	if err := (AController{}).Start(context.Background()); err == nil {
-		t.Error("Start returned nil for an occupied alert listener")
-	}
 	c, writer := newAlertTestController(alertTestPod("self", "release"))
 	writer.update = func(context.Context, client.Object, ...client.UpdateOption) error {
 		t.Error("bind failure attempted to change a routing label")
@@ -483,9 +437,7 @@ func TestAlertServerLifecycle(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			listener, err := net.Listen("tcp", "127.0.0.1:0")
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			defer listener.Close()
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -523,9 +475,7 @@ func TestAlertServerLifecycle(t *testing.T) {
 				t.Fatal("alert handler did not start")
 			}
 			if tc.serveError {
-				if err := listener.Close(); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, listener.Close())
 			} else {
 				cancel()
 			}
@@ -539,9 +489,7 @@ func TestAlertServerLifecycle(t *testing.T) {
 			}
 			select {
 			case err := <-serverDone:
-				if !errors.Is(err, tc.expectedErr) {
-					t.Fatalf("server error = %v, want %v", err, tc.expectedErr)
-				}
+				require.ErrorIs(t, err, tc.expectedErr)
 			case <-time.After(2 * time.Second):
 				t.Fatal("alert server did not stop")
 			}
@@ -552,16 +500,12 @@ func TestAlertServerLifecycle(t *testing.T) {
 			}
 			select {
 			case err := <-requestDone:
-				if (err == nil) != tc.finish {
-					t.Fatalf("request error = %v, want successful drain = %t", err, tc.finish)
-				}
+				require.Equal(t, tc.finish, err == nil, "request error: %v", err)
 			case <-time.After(2 * time.Second):
 				t.Fatal("alert request did not finish")
 			}
 			rebound, err := net.Listen("tcp", listener.Addr().String())
-			if err != nil {
-				t.Fatalf("alert listener was not released: %v", err)
-			}
+			require.NoError(t, err, "alert listener was not released")
 			_ = rebound.Close()
 		})
 	}

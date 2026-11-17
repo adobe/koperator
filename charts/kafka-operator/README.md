@@ -11,107 +11,80 @@ CI covers Kubernetes 1.35.0 and 1.37.0. The chart's `kubeVersion` constraint als
 
 ## Alert routing, readiness, and election constraints
 
-The chart enables leader election. Its alert Service selects only the Pod
-whose elected listener publishes `kafka.banzaicloud.io/alert-leader: "true"`.
-Do not set this label statically on Pod templates. Webhook and metrics Services
-retain their own selectors; webhook-serving standby replicas remain ready.
-An elected replica is ready only after its alert listener and routing
-publication are usable. Enabled webhooks also require local serving readiness.
-Liveness does not depend on Kafka or leader status.
-Upgrades from versions without the routing label have no alert endpoint until a
-label-aware replica becomes leader; plan alert retries during that handoff.
+The chart enables leader election. Only its elected listener publishes
+`kafka.banzaicloud.io/alert-leader: "true"`, which the alert Service requires.
+Never set this label on Pod templates. Webhook-serving standbys remain ready;
+elected replicas require usable alert serving/routing, and enabled webhooks
+require local serving readiness. Liveness is independent of Kafka and election.
+Upgrades from label-unaware versions have an alert endpoint gap until a new
+replica becomes leader; plan alert retries during that handoff.
 
-The chart supplies `POD_NAMESPACE`, `POD_NAME`, and `POD_UID` through the downward
-API. The operator reads its own Pod and routing peers directly from the API,
-not the namespace-filtered Kafka cache. Managed routing requires:
+The chart supplies the operator Pod's `POD_NAMESPACE`, `POD_NAME` and `POD_UID`
+through the downward API. Routing uses uncached API reads and UID-checked
+updates within that namespace and the exact installation selector:
+`control-plane=controller-manager`, `controller-tools.k8s.io=1.0`,
+`app.kubernetes.io/component=operator`, and matching
+`app.kubernetes.io/name`/`app.kubernetes.io/instance`. Existing chart RBAC grants
+Pod get/list/update; custom RBAC must include the operator namespace even when
+Kafka is watched elsewhere. Identity/read/write failures fail startup closed.
 
-- The exact namespace/name/UID of the operator Pod, not a watched Kafka namespace.
-- The chart's installation selector labels: `control-plane=controller-manager`,
-  `controller-tools.k8s.io=1.0`, `app.kubernetes.io/component=operator`, and
-  matching `app.kubernetes.io/name` and `app.kubernetes.io/instance`.
-- Pod get/list/update permissions in the operator namespace, even when watched
-  Kafka resources are restricted to other namespaces. Existing chart RBAC
-  provides these permissions; custom/restricted RBAC must provide them.
+For local/non-Helm use, absence of **both** `POD_NAME` and `POD_UID` preserves the
+legacy listener, including with `POD_NAMESPACE` alone. Partial identity is
+rejected. Opting in requires all three inputs, installation labels and matching
+Service selector above. `alertManager.enable` controls exposure, not startup.
+Observed cancellation closes admission, drains HTTP requests for up to five
+seconds and bounds self-label cleanup to two seconds; cleanup failure cannot
+keep the listener open. Endpoint updates are asynchronous; stale requests may
+fail or receive HTTP 503.
 
-Before publication, the elected process removes stale active labels only from
-that installation and namespace. Identity or label-write failures fail closed.
-Observed manager cancellation closes admission, drains in-flight HTTP requests
-for up to five seconds, and attempts bounded removal of its own label. Cleanup
-failure cannot keep its listener open. Endpoint propagation is asynchronous;
-stale connections may fail or receive HTTP 503 during failover.
+Election identity is unchanged. Replicas must enable election, use byte-identical
+raw namespace input and share the election namespace. Nonempty `--namespaces`
+wins over `WATCH_NAMESPACE`; order, whitespace and duplicates affect the lock
+ID even for equivalent watch sets. Do not normalize inputs during rolling
+upgrades. Election namespace defaults to the in-cluster service-account
+namespace, not watched namespaces or `POD_NAMESPACE`.
+Overlapping watch sets (including all-namespaces overlap), differently spelled
+equivalent sets and independent election namespaces are unsupported concurrency
+topologies. Use replicas of one installation, not separate releases with
+different Service selectors sharing a Lease.
 
-For existing local/non-Helm use, absence of **both** `POD_NAME` and `POD_UID`
-preserves the legacy listener. `POD_NAMESPACE` alone does not enable managed
-routing. Partial new identity, or complete new identity without a namespace,
-is rejected. Non-Helm installations opting in must supply the complete identity,
-installation labels and matching alert Service selector above. The existing
-`alertManager.enable` value controls Service exposure, not listener startup.
-
-Leader-election identity is unchanged. Replicas sharing a mutation domain must
-enable election, use byte-identical raw namespace input, and share the election
-namespace. A nonempty `--namespaces` argument wins over `WATCH_NAMESPACE`.
-Order, whitespace and duplicates in that raw string can change the lock ID
-even when the cache watches equivalent sets. Do not normalize these inputs
-during a rolling upgrade. The election namespace defaults to the in-cluster
-service-account namespace, not the watched Kafka namespace set; `POD_NAMESPACE`
-does not override it.
-
-Partially overlapping watch sets, differently spelled equivalent sets,
-all-namespaces overlaps, and independent election namespaces are not supported
-concurrent mutation arrangements. Use replicas of one installation behind its
-alert Service, not separate releases with different Service selectors that
-happen to share a Lease. Distinct election domains do not fence each other.
-
-Neither Lease election nor routing labels provide external-action fencing or
-exactly-once execution. A process pause/partition before observed cancellation,
-already admitted work, or an ambiguous submit-then-crash window can outlive
-routing changes. HTTP draining and conflict retries do not resolve those
-execution semantics or automatically adopt external operations.
+Election and routing labels are not external-action fencing or exactly-once
+execution. Pauses/partitions before observed cancellation, admitted work and
+ambiguous submissions can outlive routing changes; HTTP draining and conflict
+retries do not automatically adopt external operations.
 
 ## Protected metrics prerequisites
 
-When metrics and the auth proxy are enabled, the manager's raw metrics listener
-binds to loopback. The proxy exposes HTTPS on port 8443, and the managed
-PodMonitor targets its `https` port rather than bypassing it. Port/protocol
-alignment alone does not establish a working authenticated scrape.
+With metrics and the auth proxy enabled, raw metrics bind to loopback and the
+managed PodMonitor targets the proxy's `https` port (8443). This wiring alone
+does not establish authenticated scraping.
 
-All containers in the operator Pod share `operator.serviceAccount.name`
-(`default` if the name is empty).
-`prometheusMetrics.authProxy.serviceAccount.name` does not give the sidecar a
-separate identity. With `rbac.enabled=true`, the proxy review-role binding
-includes the actual Pod account and preserves the configured proxy account,
-without duplicating a shared account. This also applies when account creation
-is disabled. With `rbac.enabled=false`, the installer must grant the actual Pod
-account `create` on `authentication.k8s.io/tokenreviews` and
+All containers share `operator.serviceAccount.name` (`default` if empty), not a
+separate sidecar identity. The review-role binding includes that actual Pod
+account and the configured `prometheusMetrics.authProxy.serviceAccount.name`,
+de-duplicated when equal, including externally created accounts. With
+`rbac.enabled=false`, the installer must grant the actual Pod account `create`
+on `authentication.k8s.io/tokenreviews` and
 `authorization.k8s.io/subjectaccessreviews`.
 
-A working protected scrape separately requires a scraping identity authorized
-to `get` the non-resource URL `/metrics`, usable proxy HTTPS serving credentials,
-and scraper trust in that certificate's CA and expected DNS/server name. Review
-permissions for the proxy do not authorize the scraper. The webhook certificate
-is not automatically wired into the metrics proxy.
-
-Managed PodMonitor authentication/CA/server-name integration is **deferred**:
-the chart has no managed monitor fields for bearer-token/client-certificate
-credentials, trusted CA, or TLS server name, and does not configure proxy
-certificate arguments or mounts. Supply caller-owned external workload and
-scrape configuration for these requirements; enabling chart values or adding
-`additionalVolumes` alone does not solve them. `additionalSidecars` does not
-configure the existing proxy. Do not disable TLS verification to work around
-missing trust configuration. Validate authenticated scraping and rejection of
-unauthorized requests against the actual endpoint before relying on it.
+Managed scrape auth/TLS integration is **deferred**: there are no PodMonitor
+credential/CA/server-name fields or proxy certificate arguments/mounts.
+Caller-owned external workload/scrape configuration must supply proxy HTTPS
+credentials and a scraper identity allowed to `get` non-resource URL `/metrics`,
+with trusted CA and expected server name. Proxy review permissions do not
+authorize the scraper. Webhook certificates are not wired into the proxy;
+`additionalVolumes` alone and `additionalSidecars` do not configure it. Do not
+bypass TLS verification; validate authenticated scraping and unauthorized
+request rejection against the actual endpoint.
 
 ### Existing webhook certificate renewal limits
 
-Helm-generated webhook serving certificates last 365 days (the generated CA
-lasts 3650 days). The chart has no continuous renewal controller. A Helm upgrade
-with generation enabled regenerates CA and serving material; it is not a
-guaranteed zero-downtime rotation. Plan renewal before expiry and coordinate the
-Secret, webhook CA bundle, and serving Pod rollout. With
-`webhook.certs.generate=false`, the caller must refresh the supplied CA,
-certificate, and key through the existing certificate values and deployment
-process. No metrics certificate reuse, issuance, or automatic renewal is added
-by the proxy wiring/RBAC fixes.
+Generated webhook serving certificates last 365 days (CA: 3650 days), without
+continuous renewal. A generation-enabled Helm upgrade replaces CA and serving
+material, not necessarily without downtime. Renew before expiry and coordinate
+the Secret, webhook CA bundle and Pod rollout. With `webhook.certs.generate=false`,
+refresh supplied CA/certificate/key through existing values and deployment.
+No metrics certificate reuse, issuance or automatic renewal is added.
 
 ## Installing the chart
 
