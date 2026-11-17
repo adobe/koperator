@@ -23,6 +23,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/http/httptrace"
 	"reflect"
 	"sync"
 	"sync/atomic"
@@ -370,6 +371,38 @@ func TestAlertRoutingGateAndBoundedCleanup(t *testing.T) {
 	case <-time.After(3 * time.Second):
 		t.Fatal("blocked label cleanup exceeded its bound")
 	}
+}
+
+func TestAlertRoutingRejectsCanceledKeepalive(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	c := AController{state: &alertServingState{started: true, ready: true, ctx: ctx}}
+	var admitted atomic.Int32
+	// Keep the connection open to model stale routing during listener shutdown.
+	server := httptest.NewServer(c.gatedHandler(ctx, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		admitted.Add(1)
+		w.WriteHeader(http.StatusNoContent)
+	})))
+	defer server.Close()
+	transport := &http.Transport{}
+	defer transport.CloseIdleConnections()
+	httpClient := &http.Client{Transport: transport, Timeout: time.Second}
+	response, err := httpClient.Post(server.URL, "application/json", nil)
+	require.NoError(t, err)
+	require.NoError(t, response.Body.Close())
+	require.Equal(t, http.StatusNoContent, response.StatusCode)
+
+	cancel()
+	var reused atomic.Bool
+	trace := &httptrace.ClientTrace{GotConn: func(info httptrace.GotConnInfo) { reused.Store(info.Reused) }}
+	request, err := http.NewRequestWithContext(httptrace.WithClientTrace(context.Background(), trace), http.MethodPost, server.URL, nil)
+	require.NoError(t, err)
+	response, err = httpClient.Do(request)
+	require.NoError(t, err)
+	defer response.Body.Close()
+	require.True(t, reused.Load(), "request did not reuse the stale connection")
+	require.Equal(t, http.StatusServiceUnavailable, response.StatusCode)
+	require.Equal(t, int32(1), admitted.Load(), "canceled keepalive request reached the receiver")
 }
 
 func TestAlertRoutingCleanupPreservesReplacementUID(t *testing.T) {
