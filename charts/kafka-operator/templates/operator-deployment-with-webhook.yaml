@@ -1,5 +1,4 @@
 {{- $metricsPort := (.Values.metricEndpoint).port | default 8080 }}
-{{- $metricsProxyEnabled := and .Values.prometheusMetrics.enabled .Values.prometheusMetrics.authProxy.enabled }}
 {{- $tlsCrt := "" }}
 {{- $tlsKey := "" }}
 {{- $caCrt := "" }}
@@ -153,7 +152,7 @@ spec:
       {{ toYaml .Values.podSecurityContext | nindent 8 }}
       {{- end }}
       containers:
-      {{- if $metricsProxyEnabled }}
+      {{- if and .Values.prometheusMetrics.enabled .Values.prometheusMetrics.authProxy.enabled }}
         - name: kube-rbac-proxy
           image: "{{ .Values.prometheusMetrics.authProxy.image.repository }}:{{ .Values.prometheusMetrics.authProxy.image.tag }}"
           imagePullPolicy: {{ .Values.prometheusMetrics.authProxy.image.pullPolicy }}
@@ -194,7 +193,7 @@ spec:
           {{- if .Values.operator.developmentLogging }}
             - --development
           {{- end }}
-            - --metrics-addr={{ if $metricsProxyEnabled }}127.0.0.1{{ end }}:{{ $metricsPort }}
+            - --metrics-addr=:{{ $metricsPort }}
           {{- if .Values.healthProbes.port }}
             - --health-probes-addr=:{{ .Values.healthProbes.port }}
           {{- end }}

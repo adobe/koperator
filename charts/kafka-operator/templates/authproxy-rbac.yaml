@@ -58,9 +58,4 @@ subjects:
 - kind: ServiceAccount
   name: {{ include "operator.metricsAuthProxy.serviceAccountName" .}}
   namespace: {{ .Release.Namespace }}
-{{- if ne (include "operator.serviceAccountName" .) (include "operator.metricsAuthProxy.serviceAccountName" .) }}
-- kind: ServiceAccount
-  name: {{ include "operator.serviceAccountName" .}}
-  namespace: {{ .Release.Namespace }}
-{{- end }}
 {{- end }}

@@ -53,31 +53,19 @@ execution. Pauses/partitions before observed cancellation, admitted work and
 ambiguous submissions can outlive routing changes; HTTP draining and conflict
 retries do not automatically adopt external operations.
 
-## Protected metrics prerequisites
+## Metrics compatibility
 
-With metrics and the auth proxy enabled, raw metrics bind to loopback and the
-managed PodMonitor targets the proxy's `https` port (8443). This wiring alone
-does not establish authenticated scraping.
+Raw metrics remain bound to all interfaces over unauthenticated HTTP. The
+managed PodMonitor, when enabled, scrapes the `metrics` port directly, including
+when the existing auth proxy is enabled. The proxy does not protect this raw
+endpoint. Listener, container and proxy-upstream ports follow `metricEndpoint.port`
+(default 8080).
 
-All containers share `operator.serviceAccount.name` (`default` if empty), not a
-separate sidecar identity. The review-role binding includes that actual Pod
-account and the configured `prometheusMetrics.authProxy.serviceAccount.name`,
-de-duplicated when equal, including externally created accounts. With
-`rbac.enabled=false`, the installer must grant the actual Pod account `create`
-on `authentication.k8s.io/tokenreviews` and
-`authorization.k8s.io/subjectaccessreviews`.
+Managed TLS/authenticated scraping and its certificate/credential lifecycle are
+deferred. This preserves baseline HTTP scraping; it does not secure metrics.
+Do not treat the proxy's presence as authentication for the raw endpoint.
 
-Managed scrape auth/TLS integration is **deferred**: there are no PodMonitor
-credential/CA/server-name fields or proxy certificate arguments/mounts.
-Caller-owned external workload/scrape configuration must supply proxy HTTPS
-credentials and a scraper identity allowed to `get` non-resource URL `/metrics`,
-with trusted CA and expected server name. Proxy review permissions do not
-authorize the scraper. Webhook certificates are not wired into the proxy;
-`additionalVolumes` alone and `additionalSidecars` do not configure it. Do not
-bypass TLS verification; validate authenticated scraping and unauthorized
-request rejection against the actual endpoint.
-
-### Existing webhook certificate renewal limits
+## Existing webhook certificate renewal limits
 
 Generated webhook serving certificates last 365 days (CA: 3650 days), without
 continuous renewal. A generation-enabled Helm upgrade replaces CA and serving
