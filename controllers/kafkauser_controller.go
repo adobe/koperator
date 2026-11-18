@@ -31,6 +31,7 @@ import (
 	certv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	"github.com/go-logr/logr"
 	certsigningreqv1 "k8s.io/api/certificates/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -63,6 +64,13 @@ func SetupKafkaUserWithManager(mgr ctrl.Manager, certSigningEnabled bool, certMa
 		WithEventFilter(SkipClusterRegistryOwnedResourcePredicate{}).
 		Named("KafkaUser")
 	if certSigningEnabled {
+		// Self-generated Secret events can race the CSR annotation cache; only deletion needs recovery.
+		builder.Owns(&corev1.Secret{}, ctrlBuilder.WithPredicates(predicate.Funcs{
+			CreateFunc:  func(event.CreateEvent) bool { return false },
+			UpdateFunc:  func(event.UpdateEvent) bool { return false },
+			DeleteFunc:  func(event.DeleteEvent) bool { return true },
+			GenericFunc: func(event.GenericEvent) bool { return false },
+		}))
 		csrMapper := csrMapper{
 			client: mgr.GetClient(),
 			log:    log,
