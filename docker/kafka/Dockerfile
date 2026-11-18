@@ -68,7 +68,7 @@ RUN --mount=type=secret,id=JAVA_DOWNLOAD_APIKEY,env=JAVA_DOWNLOAD_APIKEY \
 	\
 	case "$java_download_base_url" in \
 		https://download.oracle.com/*) java_download_base_url="${java_download_base_url}/${java_version}/latest" ;; \
-		*) java_download_base_url="${java_download_base_url}/${java_version}/${java_download_version}" ;; \
+		*) java_download_base_url="${java_download_base_url}/${java_version}" ;; \
 	esac; \
 	\
 	arch="$(dpkg --print-architecture)"; \

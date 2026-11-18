@@ -16,10 +16,11 @@ This is based on [wurstmeister/kafka-docker](https://github.com/wurstmeister/kaf
 
 The Dockerfile defaults to Oracle's public download URL without authentication.
 Override `java_download_base_url` and `java_download_version` to use another source.
-The Dockerfile appends `java_version` and `latest` for Oracle, or `java_version`
-and `java_download_version` for alternate sources. Neither version belongs in the
-base URL. Alternate sources must provide the Oracle-style archive filenames and
-matching `.sha256` files for each architecture.
+The Dockerfile appends `java_version` and `latest` for Oracle, or only
+`java_version` for alternate sources. Neither version belongs in the base URL.
+`java_download_version` selects the archive filename, not a directory. Alternate
+sources must provide the Oracle-style archive filenames and matching `.sha256`
+files for each architecture.
 
 For authenticated downloads, pass an optional API key as a BuildKit secret:
 
