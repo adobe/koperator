@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1
+
 ARG scala_version=2.13
 # Renovate is pinned to the 3.x line (see the apache/kafka packageRule in renovate.json).
 # Kafka 4.x removes ZooKeeper support entirely (KRaft-only) and needs an operator-side
@@ -5,6 +7,8 @@ ARG scala_version=2.13
 # Also bump java_version to 25 (next LTS after 21) as part of that migration.
 ARG KAFKA_VERSION=3.9.2 # renovate: datasource=github-tags depName=apache/kafka
 ARG java_version=21
+ARG java_download_version=${java_version}
+ARG java_download_base_url=https://download.oracle.com/java
 
 FROM alpine:latest@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a AS kafka_dist
 
@@ -39,6 +43,8 @@ FROM debian:trixie-slim@sha256:f6b08b09a05725f9431502d3b5714f5c4576e82c1a84fa1de
 ARG scala_version
 ARG KAFKA_VERSION
 ARG java_version
+ARG java_download_version
+ARG java_download_base_url
 ARG VERSION
 ARG BUILT_AT
 ARG COMMIT
@@ -57,17 +63,23 @@ ENV PATH=$JAVA_HOME/bin:$PATH
 ENV LANG=C.UTF-8
 ENV JAVA_VERSION=${java_version}
 
-RUN set -eux; \
+RUN --mount=type=secret,id=JAVA_DOWNLOAD_APIKEY,env=JAVA_DOWNLOAD_APIKEY \
+	set -eux; \
+	\
+	case "$java_download_base_url" in \
+		https://download.oracle.com/*) java_download_base_url="${java_download_base_url}/${java_version}/latest" ;; \
+		*) java_download_base_url="${java_download_base_url}/${java_version}" ;; \
+	esac; \
 	\
 	arch="$(dpkg --print-architecture)"; \
 	case "$arch" in \
 		'amd64') \
-			downloadUrl="https://download.oracle.com/java/${java_version}/latest/jdk-${java_version}_linux-x64_bin.tar.gz"; \
-			downloadSha256="https://download.oracle.com/java/${java_version}/latest/jdk-${java_version}_linux-x64_bin.tar.gz.sha256"; \
+			downloadUrl="${java_download_base_url}/jdk-${java_download_version}_linux-x64_bin.tar.gz"; \
+			downloadSha256="${downloadUrl}.sha256"; \
 			;; \
 		'arm64') \
-			downloadUrl="https://download.oracle.com/java/${java_version}/latest/jdk-${java_version}_linux-aarch64_bin.tar.gz"; \
-			downloadSha256="https://download.oracle.com/java/${java_version}/latest/jdk-${java_version}_linux-aarch64_bin.tar.gz.sha256"; \
+			downloadUrl="${java_download_base_url}/jdk-${java_download_version}_linux-aarch64_bin.tar.gz"; \
+			downloadSha256="${downloadUrl}.sha256"; \
 			;; \
 		*) echo >&2 "error: unsupported architecture: '$arch'"; exit 1 ;; \
 	esac; \
@@ -75,12 +87,16 @@ RUN set -eux; \
 	savedAptMark="$(apt-mark showmanual)"; \
 	apt-get update; \
 	apt-get install -y --no-install-recommends \
-		wget \
+		curl \
 	; \
 	rm -rf /var/lib/apt/lists/*; \
 	\
-	wget --progress=dot:giga -O openjdk.tgz "$downloadUrl"; \
-    SHA256=$(wget -qO- $downloadSha256) ; \
+	set --; \
+	if [ -n "${JAVA_DOWNLOAD_APIKEY:+set}" ]; then \
+		set -- --variable '%JAVA_DOWNLOAD_APIKEY' --expand-header 'Authorization: Bearer {{JAVA_DOWNLOAD_APIKEY}}'; \
+	fi; \
+	curl --fail --location "$@" --output openjdk.tgz "$downloadUrl"; \
+	SHA256="$(curl --fail --silent --show-error --location "$@" "$downloadSha256")"; \
 	echo "$SHA256 *openjdk.tgz" | sha256sum --strict --check -; \
 	\
 	mkdir -p "$JAVA_HOME"; \
