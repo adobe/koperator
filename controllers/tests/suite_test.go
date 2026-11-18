@@ -69,6 +69,7 @@ import (
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
 var k8sClient client.Client
+var kafkaUserClient *laggingUserSecretClient
 var csrClient *csrclient.CertificatesV1Client
 var testEnv *envtest.Environment
 var mockKafkaClients map[types.NamespacedName]kafkaclient.KafkaClient
@@ -175,8 +176,9 @@ var _ = BeforeSuite(func(ctx SpecContext) {
 	Expect(err).NotTo(HaveOccurred())
 
 	// Create a new  kafka user reconciler
+	kafkaUserClient = &laggingUserSecretClient{Client: mgr.GetClient()}
 	kafkaUserReconciler := controllers.KafkaUserReconciler{
-		Client: mgr.GetClient(),
+		Client: kafkaUserClient,
 		Scheme: mgr.GetScheme(),
 	}
 

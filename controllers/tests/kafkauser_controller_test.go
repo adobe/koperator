@@ -16,7 +16,9 @@
 package tests
 
 import (
+	"context"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -32,11 +34,55 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/banzaicloud/koperator/api/v1alpha1"
 	"github.com/banzaicloud/koperator/api/v1beta1"
 	"github.com/banzaicloud/koperator/pkg/util"
+	pkicommon "github.com/banzaicloud/koperator/pkg/util/pki"
 )
+
+type laggingUserSecretClient struct {
+	client.Client
+	mu       sync.Mutex
+	key      types.NamespacedName
+	snapshot *corev1.Secret
+}
+
+func (c *laggingUserSecretClient) holdSecretUpdates(key types.NamespacedName) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.key = key
+	c.snapshot = nil
+}
+
+func (c *laggingUserSecretClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	if secret, ok := obj.(*corev1.Secret); ok {
+		c.mu.Lock()
+		if key == c.key && c.snapshot != nil {
+			*secret = *c.snapshot.DeepCopy()
+			c.mu.Unlock()
+			return nil
+		}
+		c.mu.Unlock()
+	}
+	return c.Client.Get(ctx, key, obj, opts...)
+}
+
+func (c *laggingUserSecretClient) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
+	if err := c.Client.Create(ctx, obj, opts...); err != nil {
+		return err
+	}
+	if secret, ok := obj.(*corev1.Secret); ok {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		if client.ObjectKeyFromObject(secret) == c.key {
+			// Model an informer that has observed creation but not the subsequent CSR annotation update.
+			c.snapshot = secret.DeepCopy()
+		}
+	}
+	return nil
+}
 
 var _ = Describe("KafkaTopic", func() {
 	var (
@@ -241,6 +287,24 @@ var _ = Describe("KafkaTopic", func() {
 				},
 			},
 		}
+		secretKey := types.NamespacedName{Name: user.Spec.SecretName, Namespace: user.Namespace}
+		kafkaUserClient.holdSecretUpdates(secretKey)
+		DeferCleanup(func() {
+			kafkaUserClient.holdSecretUpdates(types.NamespacedName{})
+		})
+		userCSRNames := func() ([]string, error) {
+			requests := &certsigningreqv1.CertificateSigningRequestList{}
+			if err := k8sClient.List(ctx, requests); err != nil {
+				return nil, err
+			}
+			var names []string
+			for _, request := range requests.Items {
+				if request.Annotations[pkicommon.KafkaUserAnnotationName] == client.ObjectKeyFromObject(&user).String() {
+					names = append(names, request.Name)
+				}
+			}
+			return names, nil
+		}
 		err := k8sClient.Create(ctx, &user)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -256,6 +320,9 @@ var _ = Describe("KafkaTopic", func() {
 		}, 5*time.Second, 100*time.Millisecond).Should(HaveKey(k8scsrpki.DependingCsrAnnotation))
 
 		csrName := secret.Annotations[k8scsrpki.DependingCsrAnnotation]
+		By("not creating duplicate CSRs from Secret self-writes while its annotation cache lags")
+		Consistently(ctx, userCSRNames, 2*time.Second, 100*time.Millisecond).Should(ConsistOf(csrName))
+		kafkaUserClient.holdSecretUpdates(types.NamespacedName{})
 		csr := &certsigningreqv1.CertificateSigningRequest{}
 		Eventually(ctx, func() error {
 			err := k8sClient.Get(ctx, types.NamespacedName{
@@ -383,6 +450,7 @@ x0eepFeUNacaeg7O1ftIrzNlYsSLi2Qm+tnu7odyxafZ65GJ9lcSLUqXuNDCrNOl
 			Name:      user.Spec.SecretName,
 		}, secret)).To(Succeed())
 		originalUID := secret.UID
+		kafkaUserClient.holdSecretUpdates(secretKey)
 		Expect(k8sClient.Delete(ctx, secret)).To(Succeed())
 		Eventually(ctx, func() (types.UID, error) {
 			recreated := &corev1.Secret{}
@@ -392,5 +460,15 @@ x0eepFeUNacaeg7O1ftIrzNlYsSLi2Qm+tnu7odyxafZ65GJ9lcSLUqXuNDCrNOl
 			}, recreated)
 			return recreated.UID, err
 		}, 5*time.Second, 100*time.Millisecond).Should(And(Not(BeEmpty()), Not(Equal(originalUID))))
+		Eventually(ctx, func() (string, error) {
+			err := k8sClient.Get(ctx, secretKey, secret)
+			return secret.Annotations[k8scsrpki.DependingCsrAnnotation], err
+		}, 5*time.Second, 100*time.Millisecond).Should(And(Not(BeEmpty()), Not(Equal(csrName))))
+		recoveredCSRName := secret.Annotations[k8scsrpki.DependingCsrAnnotation]
+		recoveredCSR := &certsigningreqv1.CertificateSigningRequest{}
+		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: recoveredCSRName}, recoveredCSR)).To(Succeed())
+		Expect(recoveredCSR.Spec.Request).NotTo(BeEmpty())
+		Consistently(ctx, userCSRNames, 2*time.Second, 100*time.Millisecond).Should(ConsistOf(csrName, recoveredCSRName))
+		kafkaUserClient.holdSecretUpdates(types.NamespacedName{})
 	})
 })
