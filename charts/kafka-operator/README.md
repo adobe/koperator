@@ -9,6 +9,71 @@ The [Koperator](https://github.com/adobe/koperator) is a Kubernetes operator to 
 
 CI covers Kubernetes 1.35.0 and 1.37.0. The chart's `kubeVersion` constraint also accepts distribution-specific version suffixes.
 
+## Alert routing, readiness, and election constraints
+
+The chart enables leader election. Only its elected listener publishes
+`kafka.banzaicloud.io/alert-leader: "true"`, which the alert Service requires.
+Never set this label on Pod templates. Webhook-serving standbys remain ready;
+elected replicas require usable alert serving/routing, and enabled webhooks
+require local serving readiness. Liveness is independent of Kafka and election.
+Upgrades from label-unaware versions have an alert endpoint gap until a new
+replica becomes leader; plan alert retries during that handoff.
+
+The chart supplies the operator Pod's `POD_NAMESPACE`, `POD_NAME` and `POD_UID`
+through the downward API. Routing uses uncached API reads and UID-checked
+updates within that namespace and the exact installation selector:
+`control-plane=controller-manager`, `controller-tools.k8s.io=1.0`,
+`app.kubernetes.io/component=operator`, and matching
+`app.kubernetes.io/name`/`app.kubernetes.io/instance`. Existing chart RBAC grants
+Pod get/list/update; custom RBAC must include the operator namespace even when
+Kafka is watched elsewhere. Identity/read/write failures fail startup closed.
+
+For local/non-Helm use, absence of **both** `POD_NAME` and `POD_UID` preserves the
+legacy listener, including with `POD_NAMESPACE` alone. Partial identity is
+rejected. Opting in requires all three inputs, installation labels and matching
+Service selector above. `alertManager.enable` controls exposure, not startup.
+Observed cancellation closes admission, drains HTTP requests for up to five
+seconds and bounds self-label cleanup to two seconds; cleanup failure cannot
+keep the listener open. Endpoint updates are asynchronous; stale requests may
+fail or receive HTTP 503.
+
+Election identity is unchanged. Replicas must enable election, use byte-identical
+raw namespace input and share the election namespace. Nonempty `--namespaces`
+wins over `WATCH_NAMESPACE`; order, whitespace and duplicates affect the lock
+ID even for equivalent watch sets. Do not normalize inputs during rolling
+upgrades. Election namespace defaults to the in-cluster service-account
+namespace, not watched namespaces or `POD_NAMESPACE`.
+Overlapping watch sets (including all-namespaces overlap), differently spelled
+equivalent sets and independent election namespaces are unsupported concurrency
+topologies. Use replicas of one installation, not separate releases with
+different Service selectors sharing a Lease.
+
+Election and routing labels are not external-action fencing or exactly-once
+execution. Pauses/partitions before observed cancellation, admitted work and
+ambiguous submissions can outlive routing changes; HTTP draining and conflict
+retries do not automatically adopt external operations.
+
+## Metrics compatibility
+
+Raw metrics remain bound to all interfaces over unauthenticated HTTP. The
+managed PodMonitor, when enabled, scrapes the `metrics` port directly, including
+when the existing auth proxy is enabled. The proxy does not protect this raw
+endpoint. Listener, container and proxy-upstream ports follow `metricEndpoint.port`
+(default 8080).
+
+Managed TLS/authenticated scraping and its certificate/credential lifecycle are
+deferred. This preserves baseline HTTP scraping; it does not secure metrics.
+Do not treat the proxy's presence as authentication for the raw endpoint.
+
+## Existing webhook certificate renewal limits
+
+Generated webhook serving certificates last 365 days (CA: 3650 days), without
+continuous renewal. A generation-enabled Helm upgrade replaces CA and serving
+material, not necessarily without downtime. Renew before expiry and coordinate
+the Secret, webhook CA bundle and Pod rollout. With `webhook.certs.generate=false`,
+refresh supplied CA/certificate/key through existing values and deployment.
+No metrics certificate reuse, issuance or automatic renewal is added.
+
 ## Installing the chart
 
 Before installing the chart, you must first install the Koperator CustomResourceDefinition resources.

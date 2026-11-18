@@ -174,6 +174,10 @@ func main() {
 		setupLog.Error(err, "unable to start /readyz endpoint")
 		os.Exit(1)
 	}
+	if err = addWebhookReadyzCheck(mgr, webhookDisabled); err != nil {
+		setupLog.Error(err, "unable to add webhook readiness check")
+		os.Exit(1)
+	}
 
 	if err := certv1.AddToScheme(mgr.GetScheme()); err != nil {
 		setupLog.Error(err, "")
@@ -287,4 +291,11 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+func addWebhookReadyzCheck(mgr ctrl.Manager, disabled bool) error {
+	if disabled {
+		return nil
+	}
+	return mgr.AddReadyzCheck("webhook", mgr.GetWebhookServer().StartedChecker())
 }

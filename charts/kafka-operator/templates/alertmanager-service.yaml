@@ -18,6 +18,7 @@ metadata:
     app.kubernetes.io/component: alertmanager
 spec:
   selector:
+    kafka.banzaicloud.io/alert-leader: "true"
     control-plane: controller-manager
     controller-tools.k8s.io: "1.0"
     app.kubernetes.io/name: {{ include "kafka-operator.name" . }}

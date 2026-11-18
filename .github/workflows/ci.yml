@@ -50,6 +50,27 @@ jobs:
             helm lint charts/kafka-operator --strict --kube-version "$version"
             helm template kafka-operator charts/kafka-operator --kube-version "$version" > /dev/null
           done
+          rendered=$(helm template kafka-operator charts/kafka-operator)
+          if grep -q '^kind: PodMonitor$' <<< "$rendered"; then exit 1; fi
+          grep -F 'kafka.banzaicloud.io/alert-leader: "true"' <<< "$rendered"
+          grep -E 'fieldPath: metadata\.name$' <<< "$rendered"
+          grep -E 'fieldPath: metadata\.uid$' <<< "$rendered"
+          for proxy in true false; do
+            for port in 8080 9090; do
+              args=()
+              if [ "$port" != 8080 ]; then args+=(--set metricEndpoint.port="$port"); fi
+              rendered=$(helm template kafka-operator charts/kafka-operator \
+                --set prometheusMetrics.podMonitor.enabled=true \
+                --set prometheusMetrics.authProxy.enabled="$proxy" "${args[@]}")
+              grep -F '    port: metrics' <<< "$rendered"
+              if grep -q '    scheme: https' <<< "$rendered"; then exit 1; fi
+              grep -F -- "--metrics-addr=:$port" <<< "$rendered"
+              grep -F "containerPort: $port" <<< "$rendered"
+              if [ "$proxy" = true ]; then
+                grep -F -- "--upstream=http://127.0.0.1:$port/" <<< "$rendered"
+              fi
+            done
+          done
           IFS=. read -r major minor _ <<< "$KUBERNETES_MIN_VERSION"
           unsupported="${major}.$((minor - 1)).99"
           if output=$(helm template kafka-operator charts/kafka-operator --kube-version "$unsupported" 2>&1); then

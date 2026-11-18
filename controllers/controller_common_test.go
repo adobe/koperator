@@ -16,15 +16,34 @@
 package controllers
 
 import (
+	"context"
 	"errors"
+	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"net/http/httptrace"
 	"reflect"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	emperrors "emperror.dev/errors"
+	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	//nolint:staticcheck
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"github.com/banzaicloud/koperator/api/v1alpha1"
 	"github.com/banzaicloud/koperator/api/v1beta1"
@@ -37,6 +56,460 @@ var log = logf.Log.WithName("controller_testing")
 const (
 	testNamespace = "test-namespace"
 )
+
+type alertTestManager struct {
+	manager.Manager
+	client   client.Client
+	reader   client.Reader
+	elected  chan struct{}
+	runnable manager.Runnable
+	check    healthz.Checker
+}
+
+func (m *alertTestManager) GetClient() client.Client     { return m.client }
+func (m *alertTestManager) GetAPIReader() client.Reader  { return m.reader }
+func (m *alertTestManager) Elected() <-chan struct{}     { return m.elected }
+func (m *alertTestManager) Add(r manager.Runnable) error { m.runnable = r; return nil }
+func (m *alertTestManager) AddReadyzCheck(_ string, check healthz.Checker) error {
+	m.check = check
+	return nil
+}
+
+func TestAlertManagerIdentityRegistration(t *testing.T) {
+	for _, tc := range []struct {
+		name, namespace, pod, uid string
+		wantErr                   bool
+	}{
+		{name: "legacy"},
+		{name: "namespace alone remains legacy", namespace: "operators"},
+		{name: "name alone rejected", namespace: "operators", pod: "operator", wantErr: true},
+		{name: "UID alone rejected", namespace: "operators", uid: "uid", wantErr: true},
+		{name: "missing namespace rejected", pod: "operator", uid: "uid", wantErr: true},
+		{name: "complete", namespace: "operators", pod: "operator", uid: "uid"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("POD_NAMESPACE", tc.namespace)
+			t.Setenv("POD_NAME", tc.pod)
+			t.Setenv("POD_UID", tc.uid)
+			mgr := &alertTestManager{elected: make(chan struct{})}
+			err := SetAlertManagerWithManager(mgr)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("registration error = %v, want error = %t", err, tc.wantErr)
+			}
+			if !tc.wantErr && mgr.check == nil {
+				t.Fatal("alert readiness was not registered")
+			}
+		})
+	}
+}
+
+type alertTestClient struct {
+	client.Client
+	update func(context.Context, client.Object, ...client.UpdateOption) error
+}
+
+func (c *alertTestClient) Get(context.Context, client.ObjectKey, client.Object, ...client.GetOption) error {
+	return errors.New("operator Pod is outside cached namespaces")
+}
+
+func (c *alertTestClient) List(context.Context, client.ObjectList, ...client.ListOption) error {
+	return errors.New("operator Pods are outside cached namespaces")
+}
+
+func (c *alertTestClient) Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+	if c.update != nil {
+		return c.update(ctx, obj, opts...)
+	}
+	return c.Client.Update(ctx, obj, opts...)
+}
+
+type alertTestReader struct {
+	client.Reader
+	getErr, listErr error
+}
+
+func (r alertTestReader) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	if r.getErr != nil {
+		return r.getErr
+	}
+	return r.Reader.Get(ctx, key, obj, opts...)
+}
+
+func (r alertTestReader) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
+	if r.listErr != nil {
+		return r.listErr
+	}
+	return r.Reader.List(ctx, list, opts...)
+}
+
+func alertTestPod(name, release string) *corev1.Pod {
+	return &corev1.Pod{ObjectMeta: metav1.ObjectMeta{
+		Name: name, Namespace: "operators", UID: types.UID(name),
+		Labels: map[string]string{
+			"control-plane": "controller-manager", "controller-tools.k8s.io": "1.0",
+			"app.kubernetes.io/name": "kafka-operator", "app.kubernetes.io/instance": release,
+			"app.kubernetes.io/component": "operator", "kafka.banzaicloud.io/alert-leader": "true",
+		},
+	}}
+}
+
+func newAlertTestController(pods ...client.Object) (AController, *alertTestClient) {
+	storage := fake.NewClientBuilder().WithObjects(pods...).Build()
+	writer := &alertTestClient{Client: storage}
+	elected := make(chan struct{})
+	close(elected)
+	return AController{
+		Client: writer, reader: storage, elected: elected, state: &alertServingState{},
+		pod: types.NamespacedName{Namespace: "operators", Name: "self"}, uid: "self",
+	}, writer
+}
+
+func runAlertForTest(t *testing.T, c AController, handler http.Handler) (context.CancelFunc, <-chan error, net.Listener) {
+	t.Helper()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	ctx, cancel := context.WithCancel(context.Background())
+	done, stopped := make(chan error, 1), make(chan struct{})
+	go func() {
+		done <- c.run(ctx, listener, handler)
+		close(stopped)
+	}()
+	t.Cleanup(func() {
+		cancel()
+		_ = listener.Close()
+		select {
+		case <-stopped:
+		case <-time.After(4 * time.Second):
+			t.Error("alert controller did not stop within its cleanup bound")
+		}
+	})
+	return cancel, done, listener
+}
+
+func TestAlertRoutingUsesScopedUncachedIdentity(t *testing.T) {
+	self, stale, other := alertTestPod("self", "release"), alertTestPod("stale", "release"), alertTestPod("other", "other-release")
+	foreign := alertTestPod("foreign", "release")
+	foreign.Namespace = "other-namespace"
+	c, writer := newAlertTestController(self, stale, other, foreign)
+	cancel, done, _ := runAlertForTest(t, c, http.NotFoundHandler())
+	require.Eventually(t, func() bool { return c.readyz(nil) == nil }, time.Second, time.Millisecond)
+	for _, expected := range []struct {
+		pod    *corev1.Pod
+		active bool
+	}{{self, true}, {stale, false}, {other, true}, {foreign, true}} {
+		current := &corev1.Pod{}
+		require.NoError(t, writer.Client.Get(context.Background(), client.ObjectKeyFromObject(expected.pod), current))
+		require.Equal(t, expected.active, current.Labels["kafka.banzaicloud.io/alert-leader"] == "true", expected.pod.Name)
+	}
+	cancel()
+	require.NoError(t, <-done)
+	current := &corev1.Pod{}
+	require.NoError(t, writer.Client.Get(context.Background(), c.pod, current))
+	require.Empty(t, current.Labels["kafka.banzaicloud.io/alert-leader"])
+}
+
+func TestAlertRoutingStartupFailures(t *testing.T) {
+	for _, failure := range []string{"UID", "labels", "get", "deleted", "list", "write", "conflicts", "ambiguous"} {
+		t.Run(failure, func(t *testing.T) {
+			self := alertTestPod("self", "release")
+			delete(self.Labels, "kafka.banzaicloud.io/alert-leader")
+			if failure == "labels" {
+				delete(self.Labels, "app.kubernetes.io/instance")
+			}
+			c, writer := newAlertTestController(self)
+			switch failure {
+			case "UID":
+				c.uid = "replacement"
+			case "get":
+				c.reader = alertTestReader{Reader: c.reader, getErr: errors.New("read denied")}
+			case "deleted":
+				c.reader = alertTestReader{Reader: c.reader, getErr: apierrors.NewNotFound(schema.GroupResource{Resource: "pods"}, "self")}
+			case "list":
+				c.reader = alertTestReader{Reader: c.reader, listErr: errors.New("list denied")}
+			case "write", "conflicts", "ambiguous":
+				writer.update = func(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+					if obj.GetLabels()["kafka.banzaicloud.io/alert-leader"] == "true" {
+						if failure == "ambiguous" {
+							if err := writer.Client.Update(ctx, obj, opts...); err != nil {
+								return err
+							}
+						}
+						if failure == "conflicts" {
+							return apierrors.NewConflict(schema.GroupResource{Resource: "pods"}, "self", errors.New("conflict"))
+						}
+						return errors.New("publication failed")
+					}
+					return writer.Client.Update(ctx, obj, opts...)
+				}
+			}
+			_, done, _ := runAlertForTest(t, c, http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+				t.Error("failed startup admitted an alert")
+			}))
+			select {
+			case err := <-done:
+				require.Error(t, err)
+			case <-time.After(time.Second):
+				t.Fatal("startup failure was not returned")
+			}
+			require.Error(t, c.readyz(nil))
+			current := &corev1.Pod{}
+			require.NoError(t, writer.Client.Get(context.Background(), c.pod, current))
+			require.Empty(t, current.Labels["kafka.banzaicloud.io/alert-leader"])
+		})
+	}
+}
+
+func TestAlertRoutingConflictPreservesMetadata(t *testing.T) {
+	self := alertTestPod("self", "release")
+	delete(self.Labels, "kafka.banzaicloud.io/alert-leader")
+	c, writer := newAlertTestController(self)
+	var updates atomic.Int32
+	writer.update = func(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+		if updates.Add(1) == 1 {
+			current := &corev1.Pod{}
+			if err := writer.Client.Get(ctx, c.pod, current); err != nil {
+				return err
+			}
+			current.Labels["concurrent-label"] = "preserved"
+			if err := writer.Client.Update(ctx, current); err != nil {
+				return err
+			}
+			return apierrors.NewConflict(schema.GroupResource{Resource: "pods"}, "self", errors.New("concurrent update"))
+		}
+		return writer.Client.Update(ctx, obj, opts...)
+	}
+	cancel, done, _ := runAlertForTest(t, c, http.NotFoundHandler())
+	require.Eventually(t, func() bool { return c.readyz(nil) == nil }, time.Second, time.Millisecond)
+	cancel()
+	require.NoError(t, <-done)
+	current := &corev1.Pod{}
+	require.NoError(t, writer.Client.Get(context.Background(), c.pod, current))
+	require.Equal(t, "preserved", current.Labels["concurrent-label"])
+	require.GreaterOrEqual(t, updates.Load(), int32(3))
+}
+
+func TestAlertReadinessPreservesStandbysAndLegacy(t *testing.T) {
+	c, _ := newAlertTestController()
+	elected := make(chan struct{})
+	c.elected = elected
+	require.NoError(t, c.readyz(nil), "standby must not require an alert listener")
+	close(elected)
+	require.Error(t, c.readyz(nil), "elected startup must not claim serving readiness")
+	c.pod, c.uid = types.NamespacedName{}, ""
+	cancel, done, _ := runAlertForTest(t, c, http.NotFoundHandler())
+	require.Eventually(t, func() bool { return c.readyz(nil) == nil }, time.Second, time.Millisecond)
+	cancel()
+	require.Error(t, c.readyz(nil))
+	require.NoError(t, <-done)
+}
+
+func TestAlertRoutingBoundedCleanup(t *testing.T) {
+	c, writer := newAlertTestController(alertTestPod("self", "release"))
+	cleanupStarted := make(chan struct{})
+	cleanupOnce := sync.OnceFunc(func() { close(cleanupStarted) })
+	writer.update = func(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+		if obj.GetLabels()["kafka.banzaicloud.io/alert-leader"] != "true" {
+			// Only block final cleanup, not startup's stale-label removal.
+			c.state.RLock()
+			stopping := c.state.ctx != nil && c.state.ctx.Err() != nil
+			c.state.RUnlock()
+			if stopping {
+				cleanupOnce()
+				<-ctx.Done()
+				return ctx.Err()
+			}
+		}
+		return writer.Client.Update(ctx, obj, opts...)
+	}
+	cancel, done, listener := runAlertForTest(t, c, http.NotFoundHandler())
+	require.Eventually(t, func() bool { return c.readyz(nil) == nil }, time.Second, time.Millisecond)
+	cancel()
+	select {
+	case <-cleanupStarted:
+	case <-time.After(time.Second):
+		t.Fatal("cleanup did not start")
+	}
+	connection, err := net.DialTimeout("tcp", listener.Addr().String(), time.Second)
+	if connection != nil {
+		_ = connection.Close()
+	}
+	require.Error(t, err, "listener remained open while cleanup was blocked")
+	select {
+	case err := <-done:
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+	case <-time.After(3 * time.Second):
+		t.Fatal("blocked label cleanup exceeded its bound")
+	}
+}
+
+func TestAlertRoutingRejectsCanceledKeepalive(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	c := AController{state: &alertServingState{started: true, ready: true, ctx: ctx}}
+	var admitted atomic.Int32
+	// Keep the connection open to model stale routing during listener shutdown.
+	server := httptest.NewServer(c.gatedHandler(ctx, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		admitted.Add(1)
+		w.WriteHeader(http.StatusNoContent)
+	})))
+	defer server.Close()
+	transport := &http.Transport{}
+	defer transport.CloseIdleConnections()
+	httpClient := &http.Client{Transport: transport, Timeout: time.Second}
+	response, err := httpClient.Post(server.URL, "application/json", nil)
+	require.NoError(t, err)
+	require.NoError(t, response.Body.Close())
+	require.Equal(t, http.StatusNoContent, response.StatusCode)
+
+	cancel()
+	var reused atomic.Bool
+	trace := &httptrace.ClientTrace{GotConn: func(info httptrace.GotConnInfo) { reused.Store(info.Reused) }}
+	request, err := http.NewRequestWithContext(httptrace.WithClientTrace(context.Background(), trace), http.MethodPost, server.URL, nil)
+	require.NoError(t, err)
+	response, err = httpClient.Do(request)
+	require.NoError(t, err)
+	defer response.Body.Close()
+	require.True(t, reused.Load(), "request did not reuse the stale connection")
+	require.Equal(t, http.StatusServiceUnavailable, response.StatusCode)
+	require.Equal(t, int32(1), admitted.Load(), "canceled keepalive request reached the receiver")
+}
+
+func TestAlertRoutingCleanupPreservesReplacementUID(t *testing.T) {
+	self := alertTestPod("self", "release")
+	c, writer := newAlertTestController(self)
+	cancel, done, _ := runAlertForTest(t, c, http.NotFoundHandler())
+	require.Eventually(t, func() bool { return c.readyz(nil) == nil }, time.Second, time.Millisecond)
+	require.NoError(t, writer.Delete(context.Background(), self))
+	replacement := alertTestPod("self", "release")
+	replacement.UID = "replacement"
+	require.NoError(t, writer.Create(context.Background(), replacement))
+	cancel()
+	require.NoError(t, <-done)
+	current := &corev1.Pod{}
+	require.NoError(t, writer.Client.Get(context.Background(), c.pod, current))
+	require.Equal(t, "true", current.Labels["kafka.banzaicloud.io/alert-leader"])
+}
+
+func TestAlertRoutingServeFailureRemovesLabel(t *testing.T) {
+	c, writer := newAlertTestController(alertTestPod("self", "release"))
+	_, done, listener := runAlertForTest(t, c, http.NotFoundHandler())
+	require.Eventually(t, func() bool { return c.readyz(nil) == nil }, time.Second, time.Millisecond)
+	require.NoError(t, listener.Close())
+	select {
+	case err := <-done:
+		require.ErrorIs(t, err, net.ErrClosed)
+	case <-time.After(3 * time.Second):
+		t.Fatal("Serve failure did not stop routing")
+	}
+	current := &corev1.Pod{}
+	require.NoError(t, writer.Client.Get(context.Background(), c.pod, current))
+	require.Empty(t, current.Labels["kafka.banzaicloud.io/alert-leader"])
+	require.Error(t, c.readyz(nil))
+}
+
+func TestAlertManagerReportsBindError(t *testing.T) {
+	listener, err := net.Listen("tcp", receiverAddr)
+	if err != nil {
+		t.Skipf("cannot reserve alert listener for bind-error regression: %v", err)
+	}
+	defer listener.Close()
+
+	c, writer := newAlertTestController(alertTestPod("self", "release"))
+	writer.update = func(context.Context, client.Object, ...client.UpdateOption) error {
+		t.Error("bind failure attempted to change a routing label")
+		return errors.New("unexpected update")
+	}
+	require.Error(t, c.Start(context.Background()))
+	require.Error(t, c.readyz(nil))
+}
+
+func TestAlertServerLifecycle(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		timeout     time.Duration
+		finish      bool
+		serveError  bool
+		expectedErr error
+	}{
+		{name: "drains in-flight request", timeout: 5 * time.Second, finish: true},
+		{name: "bounds shutdown and closes connection", timeout: 50 * time.Millisecond, expectedErr: context.DeadlineExceeded},
+		{name: "returns serve error and closes connection", serveError: true, expectedErr: net.ErrClosed},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			listener, err := net.Listen("tcp", "127.0.0.1:0")
+			require.NoError(t, err)
+			defer listener.Close()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			started, stopped, release := make(chan struct{}), make(chan struct{}), make(chan struct{})
+			finish := sync.OnceFunc(func() { close(release) })
+			defer finish()
+			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				defer close(stopped)
+				close(started)
+				select {
+				case <-release:
+					_, _ = w.Write([]byte("drained"))
+				case <-r.Context().Done():
+				}
+			})
+			serverDone := make(chan error, 1)
+			go func() { serverDone <- serveAlerts(ctx, listener, handler, tc.timeout) }()
+			requestDone := make(chan error, 1)
+			go func() {
+				httpClient := &http.Client{Timeout: 5 * time.Second}
+				response, requestErr := httpClient.Get("http://" + listener.Addr().String())
+				if requestErr == nil {
+					defer response.Body.Close()
+					body, readErr := io.ReadAll(response.Body)
+					requestErr = readErr
+					if requestErr == nil && (response.StatusCode != http.StatusOK || string(body) != "drained") {
+						requestErr = fmt.Errorf("unexpected response: status=%d body=%q", response.StatusCode, body)
+					}
+				}
+				requestDone <- requestErr
+			}()
+			select {
+			case <-started:
+			case <-time.After(2 * time.Second):
+				t.Fatal("alert handler did not start")
+			}
+			if tc.serveError {
+				require.NoError(t, listener.Close())
+			} else {
+				cancel()
+			}
+			if tc.finish {
+				select {
+				case err := <-serverDone:
+					t.Fatalf("server returned before draining the request: %v", err)
+				case <-time.After(25 * time.Millisecond):
+				}
+				finish()
+			}
+			select {
+			case err := <-serverDone:
+				require.ErrorIs(t, err, tc.expectedErr)
+			case <-time.After(2 * time.Second):
+				t.Fatal("alert server did not stop")
+			}
+			select {
+			case <-stopped:
+			case <-time.After(2 * time.Second):
+				t.Fatal("alert handler connection was not closed")
+			}
+			select {
+			case err := <-requestDone:
+				require.Equal(t, tc.finish, err == nil, "request error: %v", err)
+			case <-time.After(2 * time.Second):
+				t.Fatal("alert request did not finish")
+			}
+			rebound, err := net.Listen("tcp", listener.Addr().String())
+			require.NoError(t, err, "alert listener was not released")
+			_ = rebound.Close()
+		})
+	}
+}
 
 func TestRequeueAfter(t *testing.T) {
 	sec := 5
