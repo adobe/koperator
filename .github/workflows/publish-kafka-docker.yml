@@ -146,14 +146,15 @@ jobs:
         id: jmx_exporter_version
         run: |
           JMX_VERSION=$(grep "ARG JMX_EXPORTER_VERSION=" docker/jmx_exporter/Dockerfile | cut -d'=' -f2 | cut -d' ' -f1)
-          # Strip a leading "v" so the published image tag is always version-only,
-          # regardless of whether the upstream release tag (and thus the Dockerfile ARG) has one.
+          # Normalize the upstream version before adding the JDK rebuild suffix.
           JMX_VERSION="${JMX_VERSION#v}"
+          JAVA_VERSION=$(sed -nE 's/^ARG java_version=([0-9]+).*$/\1/p' docker/kafka/Dockerfile)
           echo "jmx_version=$JMX_VERSION" >> $GITHUB_OUTPUT
+          echo "jmx_image_tag=${JMX_VERSION}-jdk${JAVA_VERSION}" >> $GITHUB_OUTPUT
       - name: Check if JMX exporter image already exists
         id: image_exists
         run: |
-          IMAGE_NAME="${{ env.GHCR_REGISTRY }}/${{ env.GHCR_JMX_IMAGE_NAME }}:${{ steps.jmx_exporter_version.outputs.jmx_version }}"
+          IMAGE_NAME="${{ env.GHCR_REGISTRY }}/${{ env.GHCR_JMX_IMAGE_NAME }}:${{ steps.jmx_exporter_version.outputs.jmx_image_tag }}"
           echo "Checking if image exists: $IMAGE_NAME"
 
           # Try to inspect the manifest using docker
@@ -179,7 +180,7 @@ jobs:
           images: |
             ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_JMX_IMAGE_NAME }}
           tags: |
-            type=raw,value=${{ steps.jmx_exporter_version.outputs.jmx_version }}
+            type=raw,value=${{ steps.jmx_exporter_version.outputs.jmx_image_tag }}
           labels: |
             org.opencontainers.image.description=Prometheus JMX Exporter for Kafka monitoring
       - name: Build and push JMX exporter image
