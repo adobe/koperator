@@ -34,7 +34,7 @@ RUN apk add --no-cache gnupg wget && \
 
 
 # backported from https://github.com/docker-library/openjdk/blob/master/18/jdk/slim-bullseye/Dockerfile
-FROM debian:trixie-slim@sha256:f6b08b09a05725f9431502d3b5714f5c4576e82c1a84fa1debe0c24a7e0c3ec4
+FROM debian:stable-slim@sha256:13e0a2e78aa0554ad5ff66e4e260c6dbcdff807eb1f39d43b9fb0288aae88b04
 
 ARG scala_version
 ARG KAFKA_VERSION
@@ -57,7 +57,7 @@ ENV PATH=$JAVA_HOME/bin:$PATH
 ENV LANG=C.UTF-8
 ENV JAVA_VERSION=${java_version}
 
-# Match the Java 25 branch defaults before generating the CDS archive.
+# Apply Java 25 defaults before generating the CDS archive.
 ENV JDK_JAVA_OPTIONS="--enable-native-access=ALL-UNNAMED --illegal-native-access=deny -XX:+UseCompactObjectHeaders"
 
 RUN set -eux; \

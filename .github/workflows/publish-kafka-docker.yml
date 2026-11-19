@@ -53,6 +53,11 @@ jobs:
         run: |
           KAFKA_VERSION=$(echo "${{ needs.prepare.outputs.tag }}" | sed 's/kafka-//')
           echo "kafka_version=$KAFKA_VERSION" >> $GITHUB_OUTPUT
+      - name: Extract Java version from Dockerfile
+        id: java_version
+        run: |
+          JAVA_VERSION=$(sed -nE 's/^ARG java_version=([0-9]+).*$/\1/p' docker/kafka/Dockerfile)
+          echo "java_version=$JAVA_VERSION" >> $GITHUB_OUTPUT
       - name: Validate tagged Kafka distribution
         env:
           IMAGE_VERSION: ${{ steps.kafka_version.outputs.kafka_version }}
@@ -108,7 +113,7 @@ jobs:
           tags: |
             type=match,pattern=kafka-(.*),group=1
           labels: |
-            org.opencontainers.image.description=Apache Kafka with OpenJDK 21
+            org.opencontainers.image.description=Apache Kafka with Oracle JDK ${{ steps.java_version.outputs.java_version }}
       - name: Build and push kafka image
         if: startsWith(github.ref, 'refs/tags/') && steps.image_exists.outputs.exists == 'false'
         uses: docker/build-push-action@v7
