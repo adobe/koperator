@@ -119,6 +119,8 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: docker/kafka
+          secrets: |
+            JAVA_DOWNLOAD_APIKEY=${{ secrets.JAVA_DOWNLOAD_APIKEY }}
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
@@ -128,6 +130,8 @@ jobs:
             VERSION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
             BUILT_AT=${{ needs.prepare.outputs.built_at }}
             COMMIT=${{ github.sha }}
+            java_download_base_url=${{ secrets.JAVA_DOWNLOAD_BASE_URL }}/21
+            java_version=21.0.13.1
 
   build-and-push-jmx-agent-image:
     runs-on: ubuntu-latest

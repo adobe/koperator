@@ -2,6 +2,7 @@ SHELL = /bin/bash
 .SHELLFLAGS := -eu -o pipefail -c
 
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
+include $(PROJECT_DIR)/config/kubernetes-versions.env
 BIN_DIR := $(PROJECT_DIR)/bin
 BOILERPLATE_DIR := $(PROJECT_DIR)/hack/boilerplate
 
@@ -9,7 +10,7 @@ BOILERPLATE_DIR := $(PROJECT_DIR)/hack/boilerplate
 TAG ?= $(shell git describe --tags --dirty --always --abbrev=0 --match '[0-9].*[0-9].*[0-9]*' 2>/dev/null)
 IMG ?= ghcr.io/adobe/kafka-operator:$(TAG)
 
-# Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
+# Generate CRDs for the supported Kubernetes server range (no version conversion).
 CRD_OPTIONS ?= "crd"
 
 RELEASE_TYPE ?= p
@@ -21,8 +22,8 @@ REL_TAG = $(shell ./scripts/increment_version.sh -${RELEASE_TYPE} ${TAG})
 GOLANGCI_VERSION = 2.15.0 # renovate: datasource=github-releases depName=golangci/golangci-lint
 LICENSEI_VERSION = 0.9.0 # renovate: datasource=github-releases depName=goph/licensei
 CONTROLLER_GEN_VERSION = v0.22.0 # kept in sync with kubernetes-sigs/controller-tools by `make update-go-deps`
-ENVTEST_K8S_VERSION = 1.37.0 # renovate: datasource=github-releases depName=kubernetes-sigs/controller-tools extractVersion=^envtest-v(?<version>.+)$
-SETUP_ENVTEST_VERSION := latest
+ENVTEST_K8S_VERSION = $(KUBERNETES_MAX_VERSION)
+SETUP_ENVTEST_VERSION = v0.25.3 # renovate: datasource=github-releases depName=kubernetes-sigs/controller-runtime
 ADDLICENSE_VERSION = 1.2.0 # renovate: datasource=github-releases depName=google/addlicense
 GOTEMPLATE_VERSION = 3.12.1 # renovate: datasource=github-releases depName=coveooss/gotemplate
 MOCKGEN_VERSION = 0.6.0 # renovate: datasource=github-releases depName=uber-go/mock
@@ -334,6 +335,13 @@ define update-module-deps
 	fi; \
 	go mod tidy
 endef
+
+.PHONY: update-kubernetes-versions check-kubernetes-versions
+update-kubernetes-versions: ## Update supported Kubernetes pins and derived documentation.
+	go run ./scripts/update-kubernetes-versions -update
+
+check-kubernetes-versions: ## Check committed Kubernetes pins and derived documentation offline.
+	go run ./scripts/update-kubernetes-versions -check
 
 update-go-deps: ## Update Go modules dependencies.
 	@echo "Updating third_party modules first (deepest to shallowest)..."

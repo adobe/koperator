@@ -1,7 +1,11 @@
+# syntax=docker/dockerfile:1
+
 ARG scala_version=2.13
-# Kafka 4 is KRaft-only.
+#Kafka 4 is kRaft only
 ARG KAFKA_VERSION=4.2.2 # renovate: datasource=github-tags depName=apache/kafka
 ARG java_version=25
+ARG java_download_version=${java_version}
+ARG java_download_base_url=https://download.oracle.com/java
 
 FROM alpine:latest@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a AS kafka_dist
 
@@ -39,6 +43,8 @@ FROM debian:stable-slim@sha256:13e0a2e78aa0554ad5ff66e4e260c6dbcdff807eb1f39d43b
 ARG scala_version
 ARG KAFKA_VERSION
 ARG java_version
+ARG java_download_version
+ARG java_download_base_url
 ARG VERSION
 ARG BUILT_AT
 ARG COMMIT
@@ -60,17 +66,23 @@ ENV JAVA_VERSION=${java_version}
 # Apply Java 25 defaults before generating the CDS archive.
 ENV JDK_JAVA_OPTIONS="--enable-native-access=ALL-UNNAMED --illegal-native-access=deny -XX:+UseCompactObjectHeaders"
 
-RUN set -eux; \
+RUN --mount=type=secret,id=JAVA_DOWNLOAD_APIKEY,env=JAVA_DOWNLOAD_APIKEY \
+	set -eux; \
+	\
+	case "$java_download_base_url" in \
+		https://download.oracle.com/*) java_download_base_url="${java_download_base_url}/${java_version}/latest" ;; \
+		*) java_download_base_url="${java_download_base_url}/${java_version}" ;; \
+	esac; \
 	\
 	arch="$(dpkg --print-architecture)"; \
 	case "$arch" in \
 		'amd64') \
-			downloadUrl="https://download.oracle.com/java/${java_version}/latest/jdk-${java_version}_linux-x64_bin.tar.gz"; \
-			downloadSha256="https://download.oracle.com/java/${java_version}/latest/jdk-${java_version}_linux-x64_bin.tar.gz.sha256"; \
+			downloadUrl="${java_download_base_url}/jdk-${java_download_version}_linux-x64_bin.tar.gz"; \
+			downloadSha256="${downloadUrl}.sha256"; \
 			;; \
 		'arm64') \
-			downloadUrl="https://download.oracle.com/java/${java_version}/latest/jdk-${java_version}_linux-aarch64_bin.tar.gz"; \
-			downloadSha256="https://download.oracle.com/java/${java_version}/latest/jdk-${java_version}_linux-aarch64_bin.tar.gz.sha256"; \
+			downloadUrl="${java_download_base_url}/jdk-${java_download_version}_linux-aarch64_bin.tar.gz"; \
+			downloadSha256="${downloadUrl}.sha256"; \
 			;; \
 		*) echo >&2 "error: unsupported architecture: '$arch'"; exit 1 ;; \
 	esac; \
@@ -78,12 +90,16 @@ RUN set -eux; \
 	savedAptMark="$(apt-mark showmanual)"; \
 	apt-get update; \
 	apt-get install -y --no-install-recommends \
-		wget \
+		curl \
 	; \
 	rm -rf /var/lib/apt/lists/*; \
 	\
-	wget --progress=dot:giga -O openjdk.tgz "$downloadUrl"; \
-	SHA256="$(wget -qO- "$downloadSha256")"; \
+	set --; \
+	if [ -n "${JAVA_DOWNLOAD_APIKEY:+set}" ]; then \
+		set -- --variable '%JAVA_DOWNLOAD_APIKEY' --expand-header 'Authorization: Bearer {{JAVA_DOWNLOAD_APIKEY}}'; \
+	fi; \
+	curl --fail --location "$@" --output openjdk.tgz "$downloadUrl"; \
+	SHA256="$(curl --fail --silent --show-error --location "$@" "$downloadSha256")"; \
 	echo "$SHA256 *openjdk.tgz" | sha256sum --strict --check -; \
 	\
 	mkdir -p "$JAVA_HOME"; \
