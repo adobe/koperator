@@ -1,12 +1,9 @@
 # syntax=docker/dockerfile:1
 
 ARG scala_version=2.13
-# Renovate is pinned to the 3.x line (see the apache/kafka packageRule in renovate.json).
-# Kafka 4.x removes ZooKeeper support entirely (KRaft-only) and needs an operator-side
-# migration; when this repo is ready for that, drop the allowedVersions constraint too.
-# Also bump java_version to 25 (next LTS after 21) as part of that migration.
-ARG KAFKA_VERSION=3.9.2 # renovate: datasource=github-tags depName=apache/kafka
-ARG java_version=21
+#Kafka 4 is kRaft only
+ARG KAFKA_VERSION=4.2.2 # renovate: datasource=github-tags depName=apache/kafka
+ARG java_version=25
 ARG java_download_version=${java_version}
 ARG java_download_base_url=https://download.oracle.com/java
 
@@ -25,9 +22,12 @@ WORKDIR /var/tmp
 
 # Download, verify, extract and clean up Kafka in single layer
 RUN apk add --no-cache gnupg wget && \
-    wget -q $kafka_distro_base_url/$KAFKA_VERSION/$kafka_distro && \
-    wget -q $kafka_distro_base_url/$KAFKA_VERSION/$kafka_distro_asc && \
-    wget -q $kafka_distro_base_url/KEYS && \
+    wget --timeout=30 --tries=3 --progress=dot:mega \
+        "$kafka_distro_base_url/$KAFKA_VERSION/$kafka_distro" && \
+    wget --timeout=30 --tries=3 --progress=dot:mega \
+        "$kafka_distro_base_url/$KAFKA_VERSION/$kafka_distro_asc" && \
+    wget --timeout=30 --tries=3 --progress=dot:mega \
+        "$kafka_distro_base_url/KEYS" && \
     gpg --import KEYS && \
     gpg --verify $kafka_distro_asc $kafka_distro && \
     tar -xzf $kafka_distro && \
@@ -38,7 +38,7 @@ RUN apk add --no-cache gnupg wget && \
 
 
 # backported from https://github.com/docker-library/openjdk/blob/master/18/jdk/slim-bullseye/Dockerfile
-FROM debian:trixie-slim@sha256:f6b08b09a05725f9431502d3b5714f5c4576e82c1a84fa1debe0c24a7e0c3ec4
+FROM debian:stable-slim@sha256:13e0a2e78aa0554ad5ff66e4e260c6dbcdff807eb1f39d43b9fb0288aae88b04
 
 ARG scala_version
 ARG KAFKA_VERSION
@@ -62,6 +62,9 @@ ENV PATH=$JAVA_HOME/bin:$PATH
 # Default to UTF-8 file.encoding
 ENV LANG=C.UTF-8
 ENV JAVA_VERSION=${java_version}
+
+# Apply Java 25 defaults before generating the CDS archive.
+ENV JDK_JAVA_OPTIONS="--enable-native-access=ALL-UNNAMED --illegal-native-access=deny -XX:+UseCompactObjectHeaders"
 
 RUN --mount=type=secret,id=JAVA_DOWNLOAD_APIKEY,env=JAVA_DOWNLOAD_APIKEY \
 	set -eux; \
@@ -155,7 +158,9 @@ RUN apt-get update && \
     mkdir -p ${KAFKA_HOME}/libs/extensions
 
 COPY --from=kafka_dist /var/tmp/kafka_$scala_version-$KAFKA_VERSION ${KAFKA_HOME}
-COPY opt/kafka/config/log4j.properties ${KAFKA_HOME}/config/log4j.properties
+COPY opt/kafka/config/log4j2.properties ${KAFKA_HOME}/config/log4j2.properties
+
+ENV KAFKA_LOG4J_OPTS="-Dlog4j2.configurationFile=/opt/kafka/config/log4j2.properties"
 
 # Optimize Kafka installation: remove unnecessary files and set permissions
 RUN chmod a+x ${KAFKA_HOME}/bin/*.sh && \
@@ -167,7 +172,7 @@ RUN chmod a+x ${KAFKA_HOME}/bin/*.sh && \
 LABEL org.opencontainers.image.title="Apache Kafka"
 LABEL org.opencontainers.image.description="Apache Kafka with Oracle JDK ${java_version}"
 LABEL org.opencontainers.image.vendor="Adobe"
-LABEL org.opencontainers.image.licenses="Apache-2.0"
+LABEL org.opencontainers.image.licenses="Apache-2.0 AND LicenseRef-Oracle-NFTC"
 LABEL org.opencontainers.image.source="https://github.com/adobe/koperator"
 LABEL org.opencontainers.image.documentation="https://github.com/adobe/koperator/blob/main/docker/kafka/README.md"
 LABEL org.opencontainers.image.version="${VERSION}"
