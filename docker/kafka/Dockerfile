@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1
+# syntax=docker/dockerfile:1@sha256:572cebbc2b15e6f84c077742952674889cb63cd5e9b80abdffcbe587b6f19183
 
 ARG scala_version=2.13
 # Renovate is pinned to the 3.x line (see the apache/kafka packageRule in renovate.json).
