@@ -326,11 +326,13 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 	}
 
 	brokersVolumes := make(map[string][]*corev1.PersistentVolumeClaim, len(r.KafkaCluster.Spec.Brokers))
+	hasControllerNodes := false
 	for _, broker := range r.KafkaCluster.Spec.Brokers {
 		brokerConfig, err := broker.GetBrokerConfig(r.KafkaCluster.Spec)
 		if err != nil {
 			return errors.WrapIf(err, "failed to reconcile resource")
 		}
+		hasControllerNodes = hasControllerNodes || brokerConfig.IsControllerNode()
 
 		var brokerVolumes []*corev1.PersistentVolumeClaim
 		for index, storage := range brokerConfig.StorageConfigs {
@@ -398,7 +400,7 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 	// divergent single-voter quorum.
 	standaloneBootstrapControllerID := int32(-1)
 	dynamicQuorum := false
-	if !r.KafkaCluster.Spec.KRaftMode && r.KafkaCluster.Status.KRaftDynamicQuorumBootstrapped {
+	if (!r.KafkaCluster.Spec.KRaftMode || !hasControllerNodes) && r.KafkaCluster.Status.KRaftDynamicQuorumBootstrapped {
 		r.KafkaCluster.Status.KRaftDynamicQuorumBootstrapped = false
 		if updateErr := r.Client.Status().Update(ctx, r.KafkaCluster); updateErr != nil {
 			if apierrors.IsNotFound(updateErr) {
