@@ -26,12 +26,17 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/banzaicloud/koperator/api/v1alpha1"
@@ -55,6 +60,106 @@ type PvcTestCase struct {
 	expectedDeletePvc   bool
 	expectedCreatePvc   bool
 	expectedVolumeState map[string]v1beta1.CruiseControlVolumeState
+}
+
+func TestReconcileClearsKRaftBootstrapStatus(t *testing.T) {
+	brokerRoles := []string{v1beta1.BrokerNodeProcessRole}
+	controllerRoles := []string{v1beta1.ControllerNodeProcessRole}
+	combinedRoles := []string{v1beta1.BrokerNodeProcessRole, v1beta1.ControllerNodeProcessRole}
+	testCases := []struct {
+		name        string
+		kraftMode   bool
+		brokerGroup string
+		groupRoles  []string
+		inlineRoles []string
+		wantReset   bool
+		updateFails bool
+	}{
+		{name: "persists reset when KRaft is disabled", wantReset: true},
+		{name: "returns status update failure", wantReset: true, updateFails: true},
+		{name: "resets KRaft with no brokers", kraftMode: true, wantReset: true},
+		{name: "resets KRaft without controller roles", kraftMode: true, brokerGroup: "brokerGroup", groupRoles: brokerRoles, wantReset: true},
+		{name: "returns KRaft reset failure", kraftMode: true, brokerGroup: "brokerGroup", groupRoles: brokerRoles, wantReset: true, updateFails: true},
+		{name: "preserves KRaft with controller group brokers", kraftMode: true, brokerGroup: "controllerGroup", groupRoles: controllerRoles},
+		{name: "resets when KRaft is disabled despite controller roles", brokerGroup: "controllerGroup", groupRoles: controllerRoles, wantReset: true},
+		{name: "preserves KRaft with renamed controller group", kraftMode: true, brokerGroup: "metadataNodes", groupRoles: controllerRoles},
+		{name: "resets KRaft with misleading controller group name", kraftMode: true, brokerGroup: "controllerGroup", groupRoles: brokerRoles, wantReset: true},
+		{name: "preserves KRaft with inline controller", kraftMode: true, inlineRoles: controllerRoles},
+		{name: "preserves KRaft with inline combined node", kraftMode: true, inlineRoles: combinedRoles},
+		{name: "preserves KRaft with merged controller role", kraftMode: true, brokerGroup: "brokerGroup", groupRoles: brokerRoles, inlineRoles: controllerRoles},
+		{name: "resets KRaft with inline broker-only node", kraftMode: true, inlineRoles: brokerRoles, wantReset: true},
+	}
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			scheme := runtime.NewScheme()
+			require.NoError(t, corev1.AddToScheme(scheme))
+			require.NoError(t, v1beta1.AddToScheme(scheme))
+			cluster := &v1beta1.KafkaCluster{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: "kafka"},
+				Spec: v1beta1.KafkaClusterSpec{
+					KRaftMode:          tt.kraftMode,
+					BrokerConfigGroups: map[string]v1beta1.BrokerConfig{},
+				},
+				Status: v1beta1.KafkaClusterStatus{KRaftDynamicQuorumBootstrapped: true},
+			}
+			if tt.brokerGroup != "" {
+				cluster.Spec.BrokerConfigGroups[tt.brokerGroup] = v1beta1.BrokerConfig{Roles: tt.groupRoles}
+			}
+			if tt.brokerGroup != "" || tt.inlineRoles != nil {
+				broker := v1beta1.Broker{Id: 0, BrokerConfigGroup: tt.brokerGroup}
+				if tt.inlineRoles != nil {
+					broker.BrokerConfig = &v1beta1.BrokerConfig{Roles: tt.inlineRoles}
+				}
+				cluster.Spec.Brokers = []v1beta1.Broker{broker}
+			}
+			updateErr := errors.New("status update failed")
+			stopErr := errors.New("stop after status reset")
+			resetAttempted := false
+			c := fake.NewClientBuilder().WithScheme(scheme).
+				WithStatusSubresource(cluster).WithObjects(cluster).
+				WithInterceptorFuncs(interceptor.Funcs{
+					Create: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+						if _, ok := obj.(*corev1.ConfigMap); ok {
+							return stopErr
+						}
+						return c.Create(ctx, obj, opts...)
+					},
+					SubResourceUpdate: func(ctx context.Context, c client.Client, subResource string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+						if kc, ok := obj.(*v1beta1.KafkaCluster); ok && subResource == "status" && !kc.Status.KRaftDynamicQuorumBootstrapped {
+							resetAttempted = true
+							if tt.updateFails {
+								return updateErr
+							}
+						}
+						return c.SubResource(subResource).Update(ctx, obj, opts...)
+					},
+				}).Build()
+			require.NoError(t, c.Get(ctx, client.ObjectKeyFromObject(cluster), cluster))
+
+			provider := &kafkaclient.MockedProvider{}
+			if !tt.updateFails && len(cluster.Spec.Brokers) == 0 {
+				kafkaClient := mocks.NewMockKafkaClient(gomock.NewController(t))
+				provider.On("NewFromCluster", mock.Anything, cluster).Return(kafkaClient, func() {}, stopErr).Once()
+			}
+			r := New(c, c, cluster, provider)
+			err := r.Reconcile(logr.Discard())
+			require.Error(t, err)
+			require.Equal(t, tt.wantReset, resetAttempted)
+			if tt.updateFails {
+				assert.ErrorContains(t, err, "could not update KRaftDynamicQuorumBootstrapped status")
+				assert.ErrorIs(t, err, updateErr)
+				provider.AssertNotCalled(t, "NewFromCluster", mock.Anything, cluster)
+			} else {
+				assert.ErrorContains(t, err, stopErr.Error())
+				provider.AssertExpectations(t)
+			}
+
+			stored := &v1beta1.KafkaCluster{}
+			require.NoError(t, c.Get(ctx, client.ObjectKeyFromObject(cluster), stored))
+			assert.Equal(t, !tt.wantReset || tt.updateFails, stored.Status.KRaftDynamicQuorumBootstrapped)
+		})
+	}
 }
 
 func TestGetBrokersWithPendingOrRunningCCTask(t *testing.T) {
