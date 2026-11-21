@@ -83,8 +83,7 @@ func (r *CruiseControlOperationReconciler) Reconcile(ctx context.Context, reques
 	log := logr.FromContextOrDiscard(ctx)
 	log.V(1).Info("reconciling CruiseControlOperation custom resources")
 
-	ccOperationListClusterWide := banzaiv1alpha1.CruiseControlOperationList{}
-	err := r.DirectClient.List(ctx, &ccOperationListClusterWide, client.ListOption(client.InNamespace(request.Namespace)))
+	ccOperationListClusterWide, err := r.listOperations(ctx, request.NamespacedName)
 	if err != nil {
 		return requeueWithError(log, err.Error(), err)
 	}
@@ -243,22 +242,60 @@ func (r *CruiseControlOperationReconciler) Reconcile(ctx context.Context, reques
 		}
 	}
 
-	conflictRetryFunction := func() error {
-		if err = updateResult(log, cruseControlTaskResult, ccOperationExecution, true); err != nil {
-			return err
-		}
-		err = r.Status().Update(ctx, ccOperationExecution)
-		if apiErrors.IsConflict(err) {
-			err = r.Get(ctx, client.ObjectKey{Name: ccOperationExecution.GetName(), Namespace: ccOperationExecution.GetNamespace()}, ccOperationExecution)
-		}
-		return err
-	}
-	// Protection to avoid re-execution task when status update is failed
-	if err := util.RetryOnConflict(util.DefaultBackOffForConflict, conflictRetryFunction); err != nil {
+	// Retry persistence without resubmitting the external task.
+	if err := r.persistExecutionResult(ctx, log, ccOperationExecution, cruseControlTaskResult); err != nil {
 		return requeueWithError(log, "could not update the result of the Cruise Control user task execution to the CruiseControlOperation status", err)
 	}
 
 	return reconciled()
+}
+
+func (r *CruiseControlOperationReconciler) listOperations(ctx context.Context, key client.ObjectKey) (banzaiv1alpha1.CruiseControlOperationList, error) {
+	operations := banzaiv1alpha1.CruiseControlOperationList{}
+	hint := &banzaiv1alpha1.CruiseControlOperation{}
+	// The cache supplies only a selector hint; scheduling always uses the direct LIST.
+	if err := r.Get(ctx, key, hint); err == nil && hint.GetClusterRef() != "" {
+		if err := r.DirectClient.List(ctx, &operations, client.InNamespace(key.Namespace),
+			client.MatchingLabels{banzaiv1beta1.KafkaCRLabelKey: hint.GetClusterRef()}); err != nil {
+			return operations, err
+		}
+		for i := range operations.Items {
+			if client.ObjectKeyFromObject(&operations.Items[i]) == key {
+				return operations, nil
+			}
+		}
+	}
+
+	operations = banzaiv1alpha1.CruiseControlOperationList{}
+	err := r.DirectClient.List(ctx, &operations, client.InNamespace(key.Namespace))
+	return operations, err
+}
+
+func (r *CruiseControlOperationReconciler) persistExecutionResult(
+	ctx context.Context,
+	log logr.Logger,
+	operation *banzaiv1alpha1.CruiseControlOperation,
+	result *scale.Result,
+) error {
+	firstAttempt := true
+	return util.RetryOnConflict(util.DefaultBackOffForConflict, func() error {
+		latest := &banzaiv1alpha1.CruiseControlOperation{}
+		if firstAttempt {
+			latest = operation.DeepCopy()
+		} else if err := r.DirectClient.Get(ctx, client.ObjectKeyFromObject(operation), latest); err != nil {
+			return err
+		}
+		firstAttempt = false
+		if latest.UID != operation.UID || latest.CurrentTask() == nil || latest.CurrentTaskID() != operation.CurrentTaskID() {
+			return errors.New("CruiseControlOperation identity or current task changed after external task submission")
+		}
+		// Preserve the stop operation selected in memory during finalization.
+		latest.Status.CurrentTask.Operation = operation.CurrentTaskOperation()
+		if err := updateResult(log, result, latest, true); err != nil {
+			return err
+		}
+		return r.Status().Update(ctx, latest)
+	})
 }
 
 func (r *CruiseControlOperationReconciler) addFinalizer(ctx context.Context, currentCCOperation *banzaiv1alpha1.CruiseControlOperation) error {
