@@ -53,6 +53,28 @@ jobs:
         run: |
           KAFKA_VERSION=$(echo "${{ needs.prepare.outputs.tag }}" | sed 's/kafka-//')
           echo "kafka_version=$KAFKA_VERSION" >> $GITHUB_OUTPUT
+      - name: Extract Java version from Dockerfile
+        id: java_version
+        run: |
+          JAVA_VERSION=$(sed -nE 's/^ARG java_version=([0-9]+).*$/\1/p' docker/kafka/Dockerfile)
+          echo "java_version=$JAVA_VERSION" >> $GITHUB_OUTPUT
+      - name: Validate tagged Kafka distribution
+        env:
+          IMAGE_VERSION: ${{ steps.kafka_version.outputs.kafka_version }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$IMAGE_VERSION" =~ ^([0-9]+\.[0-9]+)-([0-9]+\.[0-9]+\.[0-9]+)(-rc[0-9]+)?(-jdk[0-9]+\.[0-9]+\.[0-9]+)?$ ]]; then
+            echo "::error::Expected kafka-<scala>-<kafka>[-rc<number>][-jdk<version>] release tag"
+            exit 1
+          fi
+          TAG_SCALA="${BASH_REMATCH[1]}"
+          TAG_KAFKA="${BASH_REMATCH[2]}"
+          DIST_SCALA=$(sed -nE 's/^ARG scala_version=([^[:space:]]+).*$/\1/p' docker/kafka/Dockerfile)
+          DIST_KAFKA=$(sed -nE 's/^ARG KAFKA_VERSION=([^[:space:]]+).*$/\1/p' docker/kafka/Dockerfile)
+          if [[ "$TAG_SCALA" != "$DIST_SCALA" || "$TAG_KAFKA" != "$DIST_KAFKA" ]]; then
+            echo "::error::Tag $IMAGE_VERSION does not match Dockerfile distribution $DIST_SCALA-$DIST_KAFKA"
+            exit 1
+          fi
       - name: Check if Kafka image already exists
         id: image_exists
         run: |
@@ -91,7 +113,7 @@ jobs:
           tags: |
             type=match,pattern=kafka-(.*),group=1
           labels: |
-            org.opencontainers.image.description=Apache Kafka with OpenJDK 21
+            org.opencontainers.image.description=Apache Kafka with Oracle JDK ${{ steps.java_version.outputs.java_version }}
       - name: Build and push kafka image
         if: startsWith(github.ref, 'refs/tags/') && steps.image_exists.outputs.exists == 'false'
         uses: docker/build-push-action@v7
@@ -128,14 +150,15 @@ jobs:
         id: jmx_exporter_version
         run: |
           JMX_VERSION=$(grep "ARG JMX_EXPORTER_VERSION=" docker/jmx_exporter/Dockerfile | cut -d'=' -f2 | cut -d' ' -f1)
-          # Strip a leading "v" so the published image tag is always version-only,
-          # regardless of whether the upstream release tag (and thus the Dockerfile ARG) has one.
+          # Normalize the upstream version before adding the JDK rebuild suffix.
           JMX_VERSION="${JMX_VERSION#v}"
+          JAVA_VERSION=$(sed -nE 's/^ARG java_version=([0-9]+).*$/\1/p' docker/kafka/Dockerfile)
           echo "jmx_version=$JMX_VERSION" >> $GITHUB_OUTPUT
+          echo "jmx_image_tag=${JMX_VERSION}-jdk${JAVA_VERSION}" >> $GITHUB_OUTPUT
       - name: Check if JMX exporter image already exists
         id: image_exists
         run: |
-          IMAGE_NAME="${{ env.GHCR_REGISTRY }}/${{ env.GHCR_JMX_IMAGE_NAME }}:${{ steps.jmx_exporter_version.outputs.jmx_version }}"
+          IMAGE_NAME="${{ env.GHCR_REGISTRY }}/${{ env.GHCR_JMX_IMAGE_NAME }}:${{ steps.jmx_exporter_version.outputs.jmx_image_tag }}"
           echo "Checking if image exists: $IMAGE_NAME"
 
           # Try to inspect the manifest using docker
@@ -161,7 +184,7 @@ jobs:
           images: |
             ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_JMX_IMAGE_NAME }}
           tags: |
-            type=raw,value=${{ steps.jmx_exporter_version.outputs.jmx_version }}
+            type=raw,value=${{ steps.jmx_exporter_version.outputs.jmx_image_tag }}
           labels: |
             org.opencontainers.image.description=Prometheus JMX Exporter for Kafka monitoring
       - name: Build and push JMX exporter image
