@@ -55,27 +55,9 @@ jobs:
           echo "kafka_version=$KAFKA_VERSION" >> $GITHUB_OUTPUT
       - name: Extract Java version from Dockerfile
         id: java_version
-        env:
-          KAFKA_RELEASE_TAG: ${{ steps.kafka_version.outputs.kafka_version }}
-          JAVA_DOWNLOAD_BASE_URL: ${{ secrets.JAVA_DOWNLOAD_BASE_URL }}
         run: |
           java_version=$(sed -nE 's/^ARG java_version=([0-9]+)$/\1/p' docker/kafka/Dockerfile)
-          java_download_version=$java_version
-          use_java_mirror=false
-          if [[ "$KAFKA_RELEASE_TAG" == *-jdk* ]]; then
-            java_download_version=${KAFKA_RELEASE_TAG##*-jdk}
-            if [[ "$java_download_version" != "$java_version".* || ! "$java_download_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
-              echo "The release tag must specify an archive version for JDK $java_version." >&2
-              exit 1
-            fi
-            if [[ -z "$JAVA_DOWNLOAD_BASE_URL" ]]; then
-              echo 'A versioned JDK release tag requires a configured JDK mirror.' >&2
-              exit 1
-            fi
-            use_java_mirror=true
-          fi
-          printf 'java_version=%s\njava_download_version=%s\nuse_java_mirror=%s\n' \
-            "$java_version" "$java_download_version" "$use_java_mirror" >> "$GITHUB_OUTPUT"
+          printf 'java_version=%s\n' "$java_version" >> "$GITHUB_OUTPUT"
       - name: Check if Kafka image already exists
         id: image_exists
         run: |
@@ -120,19 +102,22 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: docker/kafka
-          secrets: |
-            JAVA_DOWNLOAD_APIKEY=${{ steps.java_version.outputs.use_java_mirror == 'true' && secrets.JAVA_DOWNLOAD_APIKEY || '' }}
+          # Enable only when the mirror requires authentication.
+          # secrets: |
+          #   JAVA_DOWNLOAD_APIKEY=${{ secrets.JAVA_DOWNLOAD_APIKEY }}
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}
+          # For a mirror build, enable the two examples at the end of build-args.
+          # Use no JDK directory in the base URL and select the mirror's archive version.
           build-args: |
             VERSION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
             BUILT_AT=${{ needs.prepare.outputs.built_at }}
             COMMIT=${{ github.sha }}
-            java_download_base_url=${{ steps.java_version.outputs.use_java_mirror == 'true' && secrets.JAVA_DOWNLOAD_BASE_URL || 'https://download.oracle.com/java' }}
-            java_download_version=${{ steps.java_version.outputs.java_download_version }}
+          # java_download_base_url=${{ secrets.JAVA_DOWNLOAD_BASE_URL }}
+          # java_download_version=25.0.2
 
   build-and-push-jmx-agent-image:
     runs-on: ubuntu-latest
