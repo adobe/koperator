@@ -18,6 +18,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"maps"
 	"reflect"
 	"slices"
 	"sort"
@@ -29,6 +30,7 @@ import (
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -63,6 +65,8 @@ var (
 		banzaiv1alpha1.OperationRebalance:    0,
 	}
 	missingCCResErr = errors.New("missing Cruise Control user task result")
+	// errSubmittedTaskChanged reports that a fresh read no longer describes the submitted task.
+	errSubmittedTaskChanged = errors.New("CruiseControlOperation identity, Kafka cluster, or current task changed after external task submission")
 )
 
 // CruiseControlOperationReconciler reconciles CruiseControlOperation custom resources
@@ -84,7 +88,7 @@ func (r *CruiseControlOperationReconciler) Reconcile(ctx context.Context, reques
 	log.V(1).Info("reconciling CruiseControlOperation custom resources")
 
 	ccOperationListClusterWide := banzaiv1alpha1.CruiseControlOperationList{}
-	err := r.DirectClient.List(ctx, &ccOperationListClusterWide, client.ListOption(client.InNamespace(request.Namespace)))
+	err := r.DirectClient.List(ctx, &ccOperationListClusterWide, client.InNamespace(request.Namespace))
 	if err != nil {
 		return requeueWithError(log, err.Error(), err)
 	}
@@ -218,6 +222,11 @@ func (r *CruiseControlOperationReconciler) Reconcile(ctx context.Context, reques
 	if ccOperationExecution == nil {
 		return requeueAfter(defaultRequeueIntervalInSeconds)
 	}
+	// Snapshot the stored task before finalization replaces it with a stop request.
+	submittedTask := ccOperationExecution.CurrentTask().DeepCopy()
+	if isWaitingForFinalization(ccOperationExecution) {
+		ccOperationExecution.CurrentTask().Operation = banzaiv1alpha1.OperationStopExecution
+	}
 
 	// Check if CruiseControl is ready as we cannot perform any operation until it is in ready state unless it is a stop execution operation
 	if (status.InExecution() || len(ccOperationQueueMap[ccOperationInProgress]) > 0) && ccOperationExecution.CurrentTaskOperation() != banzaiv1alpha1.OperationStopExecution {
@@ -243,22 +252,105 @@ func (r *CruiseControlOperationReconciler) Reconcile(ctx context.Context, reques
 		}
 	}
 
-	conflictRetryFunction := func() error {
-		if err = updateResult(log, cruseControlTaskResult, ccOperationExecution, true); err != nil {
-			return err
+	// Retry persistence without resubmitting the external task.
+	if err := r.persistExecutionResult(ctx, log, ccOperationExecution, submittedTask, kafkaClusterRef, cruseControlTaskResult); err != nil {
+		details := []any{"name", ccOperationExecution.GetName(), "namespace", ccOperationExecution.GetNamespace(),
+			"operation", ccOperationExecution.CurrentTaskOperation(), "kafkaCluster", kafkaClusterRef.Name}
+		if cruseControlTaskResult != nil && cruseControlTaskResult.TaskID != "" {
+			details = append(details, "task ID", cruseControlTaskResult.TaskID)
 		}
-		err = r.Status().Update(ctx, ccOperationExecution)
-		if apiErrors.IsConflict(err) {
-			err = r.Get(ctx, client.ObjectKey{Name: ccOperationExecution.GetName(), Namespace: ccOperationExecution.GetNamespace()}, ccOperationExecution)
-		}
-		return err
+		log.Error(err, "Cruise Control task result was not recorded in the CruiseControlOperation status", details...)
+		return ctrl.Result{}, err
 	}
-	// Protection to avoid re-execution task when status update is failed
-	if err := util.RetryOnConflict(util.DefaultBackOffForConflict, conflictRetryFunction); err != nil {
-		return requeueWithError(log, "could not update the result of the Cruise Control user task execution to the CruiseControlOperation status", err)
+	// The running task is still tracked; retry the stop instead of waiting for another event.
+	if isFailedStop(ccOperationExecution, cruseControlTaskResult) {
+		return requeueAfter(defaultRequeueIntervalInSeconds)
 	}
 
 	return reconciled()
+}
+
+func (r *CruiseControlOperationReconciler) persistExecutionResult(
+	ctx context.Context,
+	log logr.Logger,
+	operation *banzaiv1alpha1.CruiseControlOperation,
+	submittedTask *banzaiv1alpha1.CruiseControlTask,
+	kafkaClusterRef client.ObjectKey,
+	result *scale.Result,
+) error {
+	latest := operation.DeepCopy()
+	var conflict error
+	err := wait.ExponentialBackoffWithContext(ctx, util.DefaultBackOffForConflict, func(ctx context.Context) (bool, error) {
+		if conflict != nil {
+			conflict = nil
+			latest = &banzaiv1alpha1.CruiseControlOperation{}
+			if err := r.DirectClient.Get(ctx, client.ObjectKeyFromObject(operation), latest); err != nil {
+				return false, err
+			}
+			if !describesSubmittedTask(latest, operation, submittedTask, kafkaClusterRef) {
+				return false, errSubmittedTaskChanged
+			}
+		}
+		if isFailedStop(operation, result) {
+			// Keep tracking the running task, whose state is still unknown, and record the failed stop separately.
+			latest.Status.CurrentTask.Operation = submittedTask.Operation
+			recordFailedStop(latest, result)
+		} else {
+			// Preserve the stop operation selected in memory during finalization.
+			latest.Status.CurrentTask.Operation = operation.CurrentTaskOperation()
+			if err := updateResult(log, result, latest, true); err != nil {
+				return false, err
+			}
+		}
+		err := r.Status().Update(ctx, latest)
+		if apiErrors.IsConflict(err) {
+			conflict = err
+			return false, nil
+		}
+		return err == nil, err
+	})
+	if conflict != nil && ctx.Err() == nil {
+		return conflict
+	}
+	return err
+}
+
+// isFailedStop reports whether Cruise Control rejected or failed a stop request for the running task.
+func isFailedStop(operation *banzaiv1alpha1.CruiseControlOperation, result *scale.Result) bool {
+	return operation.CurrentTaskOperation() == banzaiv1alpha1.OperationStopExecution && result != nil &&
+		(result.Err != nil || result.State == banzaiv1beta1.CruiseControlTaskCompletedWithError)
+}
+
+// recordFailedStop appends a failed stop request to the bounded failed-task history.
+func recordFailedStop(operation *banzaiv1alpha1.CruiseControlOperation, result *scale.Result) {
+	responseCode := result.ResponseStatusCode
+	stop := banzaiv1alpha1.CruiseControlTask{
+		ID:               result.TaskID,
+		Operation:        banzaiv1alpha1.OperationStopExecution,
+		State:            banzaiv1beta1.CruiseControlTaskCompletedWithError,
+		Finished:         &v1.Time{Time: time.Now()},
+		HTTPRequest:      result.RequestURL,
+		HTTPResponseCode: &responseCode,
+	}
+	if result.Err != nil {
+		stop.ErrorMessage = result.Err.Error()
+	}
+	if len(operation.Status.FailedTasks) >= defaultFailedTasksHistoryMaxLength {
+		operation.Status.FailedTasks = operation.Status.FailedTasks[1:]
+	}
+	operation.Status.FailedTasks = append(operation.Status.FailedTasks, stop)
+}
+
+// describesSubmittedTask reports whether a fresh read is still the submitted object, routed to the
+// submitted cluster, with the stored task that was submitted.
+func describesSubmittedTask(
+	latest, submitted *banzaiv1alpha1.CruiseControlOperation,
+	submittedTask *banzaiv1alpha1.CruiseControlTask,
+	kafkaClusterRef client.ObjectKey,
+) bool {
+	task := latest.CurrentTask()
+	return latest.UID == submitted.UID && latest.GetClusterRef() == kafkaClusterRef.Name && task != nil &&
+		task.ID == submittedTask.ID && task.Operation == submittedTask.Operation && maps.Equal(task.Parameters, submittedTask.Parameters)
 }
 
 func (r *CruiseControlOperationReconciler) addFinalizer(ctx context.Context, currentCCOperation *banzaiv1alpha1.CruiseControlOperation) error {
@@ -373,7 +465,6 @@ func sortOperations(ccOperations []*banzaiv1alpha1.CruiseControlOperation) map[s
 func (r *CruiseControlOperationReconciler) selectOperationForExecution(ccOperationQueueMap map[string][]*banzaiv1alpha1.CruiseControlOperation) (*banzaiv1alpha1.CruiseControlOperation, error) {
 	// First prio: execute the finalize task
 	if op := getFirstOperation(ccOperationQueueMap, ccOperationForStopExecution); op != nil {
-		op.CurrentTask().Operation = banzaiv1alpha1.OperationStopExecution
 		return op, nil
 	}
 

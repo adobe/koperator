@@ -38,3 +38,19 @@ Record cluster size, resource counts, workload, test duration, leader changes,
 and error rates with each measurement. These metrics establish instrumentation,
 not evidence that an optimization improves performance. This change does not
 alter metrics authentication, scraper routing, worker counts, or cache scope.
+
+## Cruise Control execution-result persistence
+
+The operator retries conflicting execution-result status writes with a fresh
+API-server read, without resubmitting the request. A failed refresh or a change
+to the submitted task or its target cluster stops the retry. This does not
+apply to `/state` health probes.
+
+When a stop request fails, the operator keeps the running task as the current
+task, appends the failed stop to `status.failedTasks`, and retries the stop
+later. The finalizer stays until the operator knows the running task's state.
+
+This is not exactly-once execution. If a submission goes unrecorded, a later
+reconciliation can resubmit it once Cruise Control is idle. Check Cruise
+Control's task history and use the task ID from the persistence error log when
+available.
