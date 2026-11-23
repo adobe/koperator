@@ -584,7 +584,7 @@ func SetupCruiseControlWithManager(mgr ctrl.Manager) *ctrl.Builder {
 			newObj := e.ObjectNew.(*banzaiv1alpha1.CruiseControlOperation)
 			if !reflect.DeepEqual(oldObj.CurrentTask(), newObj.CurrentTask()) ||
 				oldObj.IsPaused() != newObj.IsPaused() ||
-				oldObj.GetDeletionTimestamp() != newObj.GetDeletionTimestamp() ||
+				!oldObj.GetDeletionTimestamp().Equal(newObj.GetDeletionTimestamp()) ||
 				oldObj.GetGeneration() != newObj.GetGeneration() {
 				return true
 			}
