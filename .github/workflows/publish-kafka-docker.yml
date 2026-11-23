@@ -53,6 +53,11 @@ jobs:
         run: |
           KAFKA_VERSION=$(echo "${{ needs.prepare.outputs.tag }}" | sed 's/kafka-//')
           echo "kafka_version=$KAFKA_VERSION" >> $GITHUB_OUTPUT
+      - name: Extract Java version from Dockerfile
+        id: java_version
+        run: |
+          java_version=$(sed -nE 's/^ARG java_version=([0-9]+)$/\1/p' docker/kafka/Dockerfile)
+          printf 'java_version=%s\n' "$java_version" >> "$GITHUB_OUTPUT"
       - name: Check if Kafka image already exists
         id: image_exists
         run: |
@@ -91,25 +96,28 @@ jobs:
           tags: |
             type=match,pattern=kafka-(.*),group=1
           labels: |
-            org.opencontainers.image.description=Apache Kafka with OpenJDK 21
+            org.opencontainers.image.description=Apache Kafka with Oracle JDK ${{ steps.java_version.outputs.java_version }}
       - name: Build and push kafka image
         if: startsWith(github.ref, 'refs/tags/') && steps.image_exists.outputs.exists == 'false'
         uses: docker/build-push-action@v7
         with:
           context: docker/kafka
-          secrets: |
-            JAVA_DOWNLOAD_APIKEY=${{ secrets.JAVA_DOWNLOAD_APIKEY }}
+          # Enable only when the mirror requires authentication.
+          # secrets: |
+          #   JAVA_DOWNLOAD_APIKEY=${{ secrets.JAVA_DOWNLOAD_APIKEY }}
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}
+          # For a mirror build, enable the two examples at the end of build-args.
+          # Use no JDK directory in the base URL and select the mirror's archive version.
           build-args: |
             VERSION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
             BUILT_AT=${{ needs.prepare.outputs.built_at }}
             COMMIT=${{ github.sha }}
-            java_download_base_url=${{ secrets.JAVA_DOWNLOAD_BASE_URL }}/21
-            java_version=21.0.13.1
+          # java_download_base_url=${{ secrets.JAVA_DOWNLOAD_BASE_URL }}
+          # java_download_version=25.0.2
 
   build-and-push-jmx-agent-image:
     runs-on: ubuntu-latest
