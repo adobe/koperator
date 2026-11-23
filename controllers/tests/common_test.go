@@ -189,6 +189,6 @@ func resetMockKafkaClient(kafkaCluster *banzaicloudv1beta1.KafkaCluster) {
 		_ = mockKafkaClient.DeleteTopic(topicName, false)
 	}
 
-	// delete all acls
-	_ = mockKafkaClient.DeleteUserACLs("", "")
+	// delete all acls by starting the next test with a fresh mock
+	delete(mockKafkaClients, types.NamespacedName{Name: kafkaCluster.Name, Namespace: kafkaCluster.Namespace})
 }

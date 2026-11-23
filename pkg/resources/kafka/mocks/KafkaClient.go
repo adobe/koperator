@@ -172,17 +172,17 @@ func (mr *MockKafkaClientMockRecorder) DeleteTopic(arg0, arg1 any) *gomock.Call 
 }
 
 // DeleteUserACLs mocks base method.
-func (m *MockKafkaClient) DeleteUserACLs(arg0 string, arg1 v1alpha1.KafkaPatternType) error {
+func (m *MockKafkaClient) DeleteUserACLs(arg0 v1alpha1.KafkaAccessType, arg1 v1alpha1.KafkaPatternType, arg2, arg3 string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteUserACLs", arg0, arg1)
+	ret := m.ctrl.Call(m, "DeleteUserACLs", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // DeleteUserACLs indicates an expected call of DeleteUserACLs.
-func (mr *MockKafkaClientMockRecorder) DeleteUserACLs(arg0, arg1 any) *gomock.Call {
+func (mr *MockKafkaClientMockRecorder) DeleteUserACLs(arg0, arg1, arg2, arg3 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUserACLs", reflect.TypeOf((*MockKafkaClient)(nil).DeleteUserACLs), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUserACLs", reflect.TypeOf((*MockKafkaClient)(nil).DeleteUserACLs), arg0, arg1, arg2, arg3)
 }
 
 // DescribeCluster mocks base method.

@@ -209,8 +209,9 @@ func main() {
 
 	// Create a new  kafka user reconciler
 	kafkaUserReconciler := &controllers.KafkaUserReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:       mgr.GetClient(),
+		DirectClient: mgr.GetAPIReader(),
+		Scheme:       mgr.GetScheme(),
 	}
 
 	if err = controllers.SetupKafkaUserWithManager(mgr, !certSigningDisabled, certManagerEnabled).Complete(kafkaUserReconciler); err != nil {

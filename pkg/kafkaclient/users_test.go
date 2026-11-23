@@ -85,25 +85,87 @@ func TestCreateUserACLs(t *testing.T) {
 func TestDeleteUserACLs(t *testing.T) {
 	client := newOpenedMockClient()
 
-	validPatternTypes := []v1alpha1.KafkaPatternType{
-		"any",
-		"literal",
-		"match",
-		"prefixed",
-		""}
-
-	for _, patternType := range validPatternTypes {
-		if err := client.DeleteUserACLs("test-user", patternType); err != nil {
-			t.Error("Expected no error, got:", err)
-		}
-
-		if err := client.DeleteUserACLs("with-error", patternType); err == nil {
-			t.Error("Expected error, got nil")
-		}
+	if err := client.DeleteUserACLs(v1alpha1.KafkaAccessTypeRead, "", withErrorTopicName, "test-topic"); err == nil {
+		t.Error("Expected error, got nil")
+	}
+	if err := client.DeleteUserACLs("helloWorld", "", "test-user", "test-topic"); err == nil {
+		t.Error("Expected error for an unknown access type, got nil")
+	}
+	if err := client.DeleteUserACLs(v1alpha1.KafkaAccessTypeRead, "helloWorld", "test-user", "test-topic"); err == nil {
+		t.Error("Expected error for an unknown pattern type, got nil")
 	}
 
 	client.admin, _ = newMockClusterAdminFailOps([]string{}, sarama.NewConfig())
-	if err := client.DeleteUserACLs("test-userr", ""); err == nil {
+	if err := client.DeleteUserACLs(v1alpha1.KafkaAccessTypeRead, "", "test-userr", "test-topic"); err == nil {
 		t.Error("Expected error, got nil")
 	}
+}
+
+func TestDeleteUserACLsRemovesOnlyTheBindingsItCreated(t *testing.T) {
+	client := newOpenedMockClient()
+	const user, other = "CN=user,O=org", "CN=other,O=org"
+	grants := []struct {
+		access  v1alpha1.KafkaAccessType
+		pattern v1alpha1.KafkaPatternType
+		topic   string
+	}{
+		{v1alpha1.KafkaAccessTypeRead, v1alpha1.KafkaPatternTypeLiteral, "orders"},
+		{v1alpha1.KafkaAccessTypeWrite, v1alpha1.KafkaPatternTypePrefixed, "events-"},
+	}
+	for _, g := range grants {
+		if err := client.CreateUserACLs(g.access, g.pattern, user, g.topic); err != nil {
+			t.Fatal(err)
+		}
+		if err := client.CreateUserACLs(g.access, g.pattern, other, g.topic); err != nil {
+			t.Fatal(err)
+		}
+	}
+	unrelated := sarama.Resource{ResourceType: sarama.AclResourceTopic, ResourceName: "audit", ResourcePatternType: sarama.AclPatternLiteral}
+	if err := client.admin.CreateACLs([]*sarama.ResourceAcls{{Resource: unrelated, Acls: []*sarama.Acl{{
+		Principal: "User:" + user, Host: "*", Operation: sarama.AclOperationAlter, PermissionType: sarama.AclPermissionAllow,
+	}}}}); err != nil {
+		t.Fatal(err)
+	}
+	before := countBindings(t, client, "User:"+other)
+
+	for _, g := range grants {
+		if err := client.DeleteUserACLs(g.access, g.pattern, user, g.topic); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	remaining := bindingsOf(t, client, "User:"+user)
+	if len(remaining) != 1 || remaining[0].resource != unrelated || remaining[0].acl.Operation != sarama.AclOperationAlter {
+		t.Fatalf("expected only the unrelated binding to remain for the user, got %+v", remaining)
+	}
+	if after := countBindings(t, client, "User:"+other); after != before {
+		t.Fatalf("another principal's bindings changed: before %d, after %d", before, after)
+	}
+}
+
+type aclBinding struct {
+	resource sarama.Resource
+	acl      sarama.Acl
+}
+
+func bindingsOf(t *testing.T, client *kafkaClient, principal string) []aclBinding {
+	t.Helper()
+	acls, err := client.ListUserACLs()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out []aclBinding
+	for _, resourceAcls := range acls {
+		for _, acl := range resourceAcls.Acls {
+			if acl.Principal == principal {
+				out = append(out, aclBinding{resource: resourceAcls.Resource, acl: *acl})
+			}
+		}
+	}
+	return out
+}
+
+func countBindings(t *testing.T, client *kafkaClient, principal string) int {
+	t.Helper()
+	return len(bindingsOf(t, client, principal))
 }

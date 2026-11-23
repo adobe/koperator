@@ -16,6 +16,7 @@
 package kafkaclient
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/IBM/sarama"
@@ -70,7 +71,11 @@ func TestDescribeTopic(t *testing.T) {
 		t.Error("Expected error for bad topic, got nil")
 	}
 
-	if _, err := client.DescribeTopic("other"); err == nil {
+	if _, err := client.DescribeTopic("other"); !errors.Is(err, sarama.ErrUnknownTopicOrPartition) {
+		t.Error("Expected unknown topic error, got:", err)
+	}
+
+	if _, err := client.DescribeTopic("not-exists"); err == nil {
 		t.Error("Expected error got nil")
 	} else if err.Error() != "not found" {
 		t.Error("Expected error not found, got:", err.Error())

@@ -33,14 +33,84 @@ import (
 	certmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// FinalizeUserCertificate for cert-manager backend auto returns because controller references handle cleanup
-func (c *certManager) FinalizeUserCertificate(_ context.Context, _ *v1alpha1.KafkaUser) (err error) {
-	return
+// FinalizeUserCertificate stops issuance before removing generated user Secrets.
+func (c *certManager) FinalizeUserCertificate(ctx context.Context, user *v1alpha1.KafkaUser) error {
+	cert, err := c.getUserCertificate(ctx, user)
+	// When the Certificate API is no longer served, no Certificate can still issue the Secret.
+	if apierrors.IsNotFound(err) || meta.IsNoMatchError(err) {
+		return c.deleteOwnedUserSecret(ctx, user, user.Spec.SecretName)
+	}
+	if err != nil {
+		return err
+	}
+	if !metav1.IsControlledBy(cert, user) {
+		return nil
+	}
+	// The Certificate writes its own target, which can differ from a later spec.secretName.
+	if err = c.adoptIssuedSecret(ctx, user, cert); err != nil {
+		return err
+	}
+	if err = c.client.Delete(ctx, cert, client.Preconditions{UID: &cert.UID, ResourceVersion: &cert.ResourceVersion}); client.IgnoreNotFound(err) != nil {
+		return err
+	}
+	if _, err = c.getUserCertificate(ctx, user); err == nil {
+		return errorfactory.New(errorfactory.ResourceNotReady{}, errors.New("certificate is still deleting"), "waiting for user certificate deletion")
+	} else if !apierrors.IsNotFound(err) {
+		return err
+	}
+	// An issuance that was in flight can publish the Secret after the first adoption.
+	if err = c.adoptIssuedSecret(ctx, user, cert); err != nil {
+		return err
+	}
+	if err = c.deleteOwnedUserSecret(ctx, user, cert.Spec.SecretName); err != nil {
+		return err
+	}
+	if user.Spec.SecretName != cert.Spec.SecretName {
+		return c.deleteOwnedUserSecret(ctx, user, user.Spec.SecretName)
+	}
+	return nil
+}
+
+// adoptIssuedSecret makes the user own an ownerless Secret that cert-manager issued for the
+// user's own Certificate, so cleanup can delete it.
+func (c *certManager) adoptIssuedSecret(ctx context.Context, user *v1alpha1.KafkaUser, cert *certv1.Certificate) error {
+	secret, err := c.getUserSecretForCleanup(ctx, user.Namespace, cert.Spec.SecretName)
+	if err != nil || secret == nil {
+		return err
+	}
+	if len(secret.OwnerReferences) != 0 || secret.Annotations[certv1.CertificateNameKey] != cert.Name {
+		return nil
+	}
+	secret.OwnerReferences = []metav1.OwnerReference{*metav1.NewControllerRef(user, v1alpha1.GroupVersion.WithKind("KafkaUser"))}
+	return c.client.Update(ctx, secret)
+}
+
+func (c *certManager) getUserSecretForCleanup(ctx context.Context, namespace, name string) (*corev1.Secret, error) {
+	secret := &corev1.Secret{}
+	err := c.client.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, secret)
+	if apierrors.IsNotFound(err) {
+		return nil, nil
+	}
+	return secret, err
+}
+
+func (c *certManager) deleteOwnedUserSecret(ctx context.Context, user *v1alpha1.KafkaUser, name string) error {
+	secret, err := c.getUserSecretForCleanup(ctx, user.Namespace, name)
+	if err != nil || secret == nil {
+		return err
+	}
+	if !metav1.IsControlledBy(secret, user) || len(secret.OwnerReferences) != 1 {
+		return nil
+	}
+	err = c.client.Delete(ctx, secret, client.Preconditions{UID: &secret.UID, ResourceVersion: &secret.ResourceVersion})
+	return client.IgnoreNotFound(err)
 }
 
 // ReconcileUserCertificate ensures a certificate/secret combination using cert-manager
@@ -86,13 +156,16 @@ func (c *certManager) ReconcileUserCertificate(
 	}, nil
 }
 
-// injectJKSPassword ensures that a secret contains JKS password when requested
+// injectJKSPassword ensures that a secret contains JKS password when requested.
+// The Secret is owned by the user from creation, so cleanup can remove it if
+// provisioning stops before the Certificate exists.
 func (c *certManager) injectJKSPassword(ctx context.Context, user *v1alpha1.KafkaUser) error {
 	var err error
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      user.Spec.SecretName,
-			Namespace: user.Namespace,
+			Name:            user.Spec.SecretName,
+			Namespace:       user.Namespace,
+			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(user, v1alpha1.GroupVersion.WithKind("KafkaUser"))},
 		},
 		Data: map[string][]byte{},
 	}
@@ -101,6 +174,14 @@ func (c *certManager) injectJKSPassword(ctx context.Context, user *v1alpha1.Kafk
 		return errorfactory.New(errorfactory.InternalError{}, err, "could not inject secret with jks password")
 	}
 	if err = c.client.Create(ctx, secret); err != nil {
+		if apierrors.IsAlreadyExists(err) {
+			// Resume only from a password Secret this user already owns.
+			existing := &corev1.Secret{}
+			if getErr := c.client.Get(ctx, client.ObjectKeyFromObject(secret), existing); getErr == nil &&
+				metav1.IsControlledBy(existing, user) && len(existing.Data[v1alpha1.PasswordKey]) > 0 {
+				return nil
+			}
+		}
 		return errorfactory.New(errorfactory.APIFailure{}, err, "could not create secret with jks password")
 	}
 

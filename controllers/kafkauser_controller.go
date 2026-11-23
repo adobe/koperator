@@ -31,7 +31,9 @@ import (
 	certv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	"github.com/go-logr/logr"
 	certsigningreqv1 "k8s.io/api/certificates/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -149,7 +151,10 @@ type KafkaUserReconciler struct {
 	// This client, initialized using mgr.Client() above, is a split client
 	// that reads objects from the cache and writes to the apiserver
 	Client client.Client
-	Scheme *runtime.Scheme
+	// DirectClient reads from the apiserver. Use it only where a stale cache
+	// could make a lifecycle or PKI cleanup decision from a missing object.
+	DirectClient client.Reader
+	Scheme       *runtime.Scheme
 }
 
 // +kubebuilder:rbac:groups=kafka.banzaicloud.io,resources=kafkausers,verbs=get;list;watch;create;update;patch;delete;deletecollection
@@ -179,13 +184,14 @@ func (r *KafkaUserReconciler) Reconcile(ctx context.Context, request reconcile.R
 		// Error reading the object - requeue the request.
 		return requeueWithError(reqLogger, err.Error(), err)
 	}
+	instance.SetGroupVersionKind(v1alpha1.GroupVersion.WithKind("KafkaUser"))
 
 	// Get the referenced kafkacluster
 	clusterNamespace := getClusterRefNamespace(instance.Namespace, instance.Spec.ClusterRef)
 	var cluster *v1beta1.KafkaCluster
 	if cluster, err = k8sutil.LookupKafkaCluster(ctx, r.Client, instance.Spec.ClusterRef.Name, clusterNamespace); err != nil {
 		// This shouldn't trigger anymore, but leaving it here as a safetybelt
-		if k8sutil.IsMarkedForDeletion(instance.ObjectMeta) {
+		if apierrors.IsNotFound(err) && k8sutil.IsMarkedForDeletion(instance.ObjectMeta) {
 			reqLogger.Info("Cluster is gone already, there is nothing we can do")
 			if err = r.removeFinalizer(ctx, instance); err != nil {
 				return requeueWithError(reqLogger, "failed to remove finalizer from kafkauser", err)
@@ -193,6 +199,17 @@ func (r *KafkaUserReconciler) Reconcile(ctx context.Context, request reconcile.R
 			return reconciled()
 		}
 		return requeueWithError(reqLogger, "failed to lookup referenced cluster", err)
+	}
+
+	if k8sutil.IsMarkedForDeletion(instance.ObjectMeta) {
+		return r.finalizeUser(ctx, cluster, instance)
+	}
+
+	if instance, err = r.ensureClusterLabel(ctx, cluster, instance); err != nil {
+		return requeueWithError(reqLogger, "failed to ensure kafkacluster label on user", err)
+	}
+	if instance, err = r.ensureUserFinalizer(ctx, instance); err != nil {
+		return requeueWithError(reqLogger, "failed to update kafkauser with finalizer", err)
 	}
 
 	var kafkaUser string
@@ -235,13 +252,6 @@ func (r *KafkaUserReconciler) Reconcile(ctx context.Context, request reconcile.R
 					RequeueAfter: time.Duration(15) * time.Second,
 				}, nil
 			default:
-				if k8sutil.IsMarkedForDeletion(instance.ObjectMeta) {
-					reqLogger.Info("Kafka user marked for deletion before creating certificates")
-					if err = r.removeFinalizer(ctx, instance); err != nil {
-						return requeueWithError(reqLogger, "failed to remove finalizer from kafkauser", err)
-					}
-					return reconciled()
-				}
 				return requeueWithError(reqLogger, "failed to reconcile user secret", err)
 			}
 		}
@@ -250,25 +260,8 @@ func (r *KafkaUserReconciler) Reconcile(ctx context.Context, request reconcile.R
 			reqLogger.Error(err, "could not get Distinguished Name from the generated TLS certificate", "cert", string(user.Certificate))
 			return ctrl.Result{}, err
 		}
-		// check if marked for deletion and remove created certs
-		if k8sutil.IsMarkedForDeletion(instance.ObjectMeta) {
-			reqLogger.Info("Kafka user is marked for deletion, revoking certificates")
-			if err = pkiManager.FinalizeUserCertificate(ctx, instance); err != nil {
-				return requeueWithError(reqLogger, "failed to finalize user certificate", err)
-			}
-		}
 	} else {
 		kafkaUser = fmt.Sprintf("CN=%s", instance.Name)
-	}
-
-	// check if marked for deletion and remove kafka ACLs
-	if k8sutil.IsMarkedForDeletion(instance.ObjectMeta) {
-		return r.checkFinalizers(ctx, cluster, instance, kafkaUser)
-	}
-
-	// ensure a kafkaCluster label
-	if instance, err = r.ensureClusterLabel(ctx, cluster, instance); err != nil {
-		return requeueWithError(reqLogger, "failed to ensure kafkacluster label on user", err)
 	}
 
 	// If topic grants supplied, grab a broker connection and set ACLs
@@ -278,6 +271,13 @@ func (r *KafkaUserReconciler) Reconcile(ctx context.Context, request reconcile.R
 			return checkBrokerConnectionError(reqLogger, err)
 		}
 		defer close()
+		// Record the identity once Kafka is reachable and before the first ACL is created.
+		if instance.Status.ACLPrincipal == nil || *instance.Status.ACLPrincipal != kafkaUser {
+			instance.Status.ACLPrincipal = &kafkaUser
+			if instance, err = r.updateStatusAndFetchLatest(ctx, instance); err != nil {
+				return requeueWithError(reqLogger, "failed to record ACL cleanup identity", err)
+			}
+		}
 
 		// TODO (tinyzimmer): Should probably take this opportunity to see if we are removing any ACLs
 		for _, grant := range instance.Spec.TopicGrants {
@@ -289,18 +289,9 @@ func (r *KafkaUserReconciler) Reconcile(ctx context.Context, request reconcile.R
 		}
 	}
 
-	// ensure a finalizer for cleanup on deletion
-	if !apiutil.StringSliceContains(instance.GetFinalizers(), userFinalizer) {
-		r.addFinalizer(reqLogger, instance)
-		if instance, err = r.updateAndFetchLatest(ctx, instance); err != nil {
-			return requeueWithError(reqLogger, "failed to update kafkauser with finalizer", err)
-		}
-	}
-
-	// set user status
-	instance.Status = v1alpha1.KafkaUserStatus{
-		State: v1alpha1.UserStateCreated,
-	}
+	// set user status, keeping the recorded ACL cleanup identity
+	instance.Status.State = v1alpha1.UserStateCreated
+	instance.Status.ACLs = nil
 	if len(instance.Spec.TopicGrants) > 0 {
 		instance.Status.ACLs = kafkautil.GrantsToACLStrings(kafkaUser, instance.Spec.TopicGrants)
 	}
@@ -309,6 +300,131 @@ func (r *KafkaUserReconciler) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	return reconciled()
+}
+
+func (r *KafkaUserReconciler) finalizeUser(ctx context.Context, cluster *v1beta1.KafkaCluster, user *v1alpha1.KafkaUser) (reconcile.Result, error) {
+	if !apiutil.StringSliceContains(user.Finalizers, userFinalizer) {
+		return reconciled()
+	}
+	principals := []string{fmt.Sprintf("CN=%s", user.Name)}
+	if user.Spec.GetIfCertShouldBeCreated() {
+		if len(user.Spec.TopicGrants) > 0 && !k8sutil.IsMarkedForDeletion(cluster.ObjectMeta) {
+			var err error
+			principals, err = r.userACLPrincipals(ctx, user)
+			if err != nil {
+				// Never log Secret data: the error names only the Secret and the decode failure.
+				return requeueWithError(logr.FromContextOrDiscard(ctx).WithValues("secret", user.Spec.SecretName),
+					"KafkaUser deletion blocked: ACL cleanup principal is not recorded and cannot be read from the user certificate Secret",
+					errors.WrapIf(err, "resolve ACL cleanup principal from certificate Secret "+user.Spec.SecretName))
+			}
+			if user.Status.ACLPrincipal == nil && len(principals) > 0 {
+				// Checkpoint the legacy identity before PKI cleanup removes its certificate.
+				user.Status.ACLPrincipal = &principals[0]
+				if user, err = r.updateStatusAndFetchLatest(ctx, user); err != nil {
+					return ctrl.Result{}, err
+				}
+			}
+		}
+		if cluster.Spec.ListenersConfig.SSLSecrets != nil || user.Spec.PKIBackendSpec != nil {
+			backend := v1beta1.PKIBackendProvided
+			if user.Spec.PKIBackendSpec != nil {
+				backend = v1beta1.PKIBackend(user.Spec.PKIBackendSpec.PKIBackend)
+			}
+			if err := pki.GetPKIManager(freshReadClient{Client: r.Client, reader: r.DirectClient}, cluster, backend).FinalizeUserCertificate(ctx, user); err != nil {
+				if errors.As(err, &errorfactory.ResourceNotReady{}) {
+					return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+				}
+				return ctrl.Result{}, err
+			}
+		}
+	}
+	if len(principals) == 0 {
+		return ctrl.Result{}, r.removeFinalizer(ctx, user)
+	}
+	return r.checkFinalizers(ctx, cluster, user, principals)
+}
+
+// userACLPrincipals returns every principal that may still hold ACLs for the user. Both
+// sources live in the status subresource, which only the operator writes: the recorded
+// cleanup identity and the principal in the ACLs the operator last reported as created.
+// An empty result means the operator recorded that no ACLs were submitted.
+func (r *KafkaUserReconciler) userACLPrincipals(ctx context.Context, user *v1alpha1.KafkaUser) ([]string, error) {
+	var principals []string
+	if user.Status.ACLPrincipal != nil && *user.Status.ACLPrincipal != "" {
+		principals = append(principals, *user.Status.ACLPrincipal)
+	}
+	for _, principal := range kafkautil.PrincipalsFromACLStrings(user.Status.ACLs) {
+		if !apiutil.StringSliceContains(principals, principal) {
+			principals = append(principals, principal)
+		}
+	}
+	if len(principals) > 0 || user.Status.ACLPrincipal != nil {
+		return principals, nil
+	}
+	secret := &corev1.Secret{}
+	if err := r.DirectClient.Get(ctx, client.ObjectKey{Namespace: user.Namespace, Name: user.Spec.SecretName}, secret); err != nil {
+		return nil, err
+	}
+	if !metav1.IsControlledBy(secret, user) {
+		return nil, errors.New("certificate Secret is not owned by this KafkaUser")
+	}
+	certificate := &pkicommon.UserCertificate{Certificate: secret.Data[corev1.TLSCertKey]}
+	principal, err := certificate.GetDistinguishedName()
+	if err != nil {
+		return nil, err
+	}
+	return []string{principal}, nil
+}
+
+func (r *KafkaUserReconciler) ensureUserFinalizer(ctx context.Context, user *v1alpha1.KafkaUser) (*v1alpha1.KafkaUser, error) {
+	if apiutil.StringSliceContains(user.Finalizers, userFinalizer) {
+		return user, nil
+	}
+	if user.Status.ACLPrincipal == nil && user.Status.State == "" && len(user.Status.ACLs) == 0 {
+		principal, known, err := r.initialACLPrincipal(ctx, user)
+		if err != nil {
+			return nil, err
+		}
+		if known {
+			// Empty records that no ACL submission has started; absence is legacy/unknown.
+			// Record it before the finalizer, so a finalized user always has a known identity.
+			user.Status.ACLPrincipal = &principal
+			if user, err = r.updateStatusAndFetchLatest(ctx, user); err != nil {
+				return nil, err
+			}
+		}
+	}
+	r.addFinalizer(logr.FromContextOrDiscard(ctx), user)
+	return r.updateAndFetchLatest(ctx, user)
+}
+
+// initialACLPrincipal returns the ACL identity of a user that the operator sees for the
+// first time. Only a certificate in a Secret this user controls can have been used for
+// ACLs, so other Secrets are not read further. known is false when the user's own
+// certificate cannot be read: that does not prove that no ACLs exist.
+func (r *KafkaUserReconciler) initialACLPrincipal(ctx context.Context, user *v1alpha1.KafkaUser) (principal string, known bool, err error) {
+	if !user.Spec.GetIfCertShouldBeCreated() || len(user.Spec.TopicGrants) == 0 {
+		return "", true, nil
+	}
+	secret := &corev1.Secret{}
+	err = r.DirectClient.Get(ctx, client.ObjectKey{Namespace: user.Namespace, Name: user.Spec.SecretName}, secret)
+	if apierrors.IsNotFound(err) {
+		return "", true, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	if !metav1.IsControlledBy(secret, user) || len(secret.Data[corev1.TLSCertKey]) == 0 {
+		return "", true, nil
+	}
+	certificate := &pkicommon.UserCertificate{Certificate: secret.Data[corev1.TLSCertKey]}
+	if principal, err = certificate.GetDistinguishedName(); err != nil {
+		// Let the PKI backend repair the Secret; the principal is recorded before any ACL is created.
+		logr.FromContextOrDiscard(ctx).Info("user certificate is unreadable; ACL identity stays unknown until it is reissued",
+			"secret", user.Spec.SecretName)
+		return "", false, nil
+	}
+	return principal, true, nil
 }
 
 func (r *KafkaUserReconciler) ensureClusterLabel(ctx context.Context, cluster *v1beta1.KafkaCluster, user *v1alpha1.KafkaUser) (*v1alpha1.KafkaUser, error) {
@@ -330,15 +446,28 @@ func (r *KafkaUserReconciler) updateAndFetchLatest(ctx context.Context, user *v1
 	return user, nil
 }
 
-func (r *KafkaUserReconciler) checkFinalizers(ctx context.Context, cluster *v1beta1.KafkaCluster, instance *v1alpha1.KafkaUser, user string) (reconcile.Result, error) {
+// updateStatusAndFetchLatest writes the status subresource, which ordinary KafkaUser
+// edits cannot change, and keeps the TypeMeta that PKI ownership checks rely on.
+func (r *KafkaUserReconciler) updateStatusAndFetchLatest(ctx context.Context, user *v1alpha1.KafkaUser) (*v1alpha1.KafkaUser, error) {
+	typeMeta := user.TypeMeta
+	if err := r.Client.Status().Update(ctx, user); err != nil {
+		return nil, err
+	}
+	user.TypeMeta = typeMeta
+	return user, nil
+}
+
+func (r *KafkaUserReconciler) checkFinalizers(ctx context.Context, cluster *v1beta1.KafkaCluster, instance *v1alpha1.KafkaUser, principals []string) (reconcile.Result, error) {
 	reqLogger := logr.FromContextOrDiscard(ctx)
 	// run finalizers
 	var err error
 	if apiutil.StringSliceContains(instance.GetFinalizers(), userFinalizer) {
 		if len(instance.Spec.TopicGrants) > 0 {
-			for _, topicGrant := range instance.Spec.TopicGrants {
-				if err = r.finalizeKafkaUserACLs(reqLogger, cluster, user, topicGrant.PatternType); err != nil {
-					return requeueWithError(reqLogger, "failed to finalize kafkauser", err)
+			for _, principal := range principals {
+				for _, topicGrant := range instance.Spec.TopicGrants {
+					if err = r.finalizeKafkaUserACLs(reqLogger, cluster, principal, topicGrant); err != nil {
+						return requeueWithError(reqLogger, "failed to finalize kafkauser", err)
+					}
 				}
 			}
 		}
@@ -356,7 +485,7 @@ func (r *KafkaUserReconciler) removeFinalizer(ctx context.Context, user *v1alpha
 	return err
 }
 
-func (r *KafkaUserReconciler) finalizeKafkaUserACLs(reqLogger logr.Logger, cluster *v1beta1.KafkaCluster, user string, patternType v1alpha1.KafkaPatternType) error {
+func (r *KafkaUserReconciler) finalizeKafkaUserACLs(reqLogger logr.Logger, cluster *v1beta1.KafkaCluster, user string, grant v1alpha1.UserTopicGrant) error {
 	if k8sutil.IsMarkedForDeletion(cluster.ObjectMeta) {
 		reqLogger.Info("Cluster is being deleted, skipping ACL deletion")
 		return nil
@@ -368,7 +497,7 @@ func (r *KafkaUserReconciler) finalizeKafkaUserACLs(reqLogger logr.Logger, clust
 		return err
 	}
 	defer close()
-	if err = broker.DeleteUserACLs(user, patternType); err != nil {
+	if err = broker.DeleteUserACLs(grant.AccessType, grant.PatternType, user, grant.TopicName); err != nil {
 		return err
 	}
 	return nil
@@ -377,4 +506,19 @@ func (r *KafkaUserReconciler) finalizeKafkaUserACLs(reqLogger logr.Logger, clust
 func (r *KafkaUserReconciler) addFinalizer(reqLogger logr.Logger, user *v1alpha1.KafkaUser) {
 	reqLogger.Info("Adding Finalizer for the KafkaUser")
 	user.SetFinalizers(append(user.GetFinalizers(), userFinalizer))
+}
+
+// freshReadClient writes through the embedded client but reads from the apiserver,
+// so PKI cleanup does not delete a Secret because a cached Certificate is missing.
+type freshReadClient struct {
+	client.Client
+	reader client.Reader
+}
+
+func (c freshReadClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	return c.reader.Get(ctx, key, obj, opts...)
+}
+
+func (c freshReadClient) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
+	return c.reader.List(ctx, list, opts...)
 }

@@ -18,6 +18,7 @@ package webhooks
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
 
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -55,7 +56,11 @@ func (s KafkaTopicValidator) ValidateCreate(ctx context.Context, kafkaTopic *ban
 	return s.validate(ctx, kafkaTopic)
 }
 
-func (s KafkaTopicValidator) ValidateUpdate(ctx context.Context, _, kafkaTopic *banzaicloudv1alpha1.KafkaTopic) (warnings admission.Warnings, err error) {
+func (s KafkaTopicValidator) ValidateUpdate(ctx context.Context, oldTopic, kafkaTopic *banzaicloudv1alpha1.KafkaTopic) (warnings admission.Warnings, err error) {
+	// A deleting topic whose spec is unchanged only releases finalizers; Kafka is not involved.
+	if k8sutil.IsMarkedForDeletion(kafkaTopic.ObjectMeta) && oldTopic != nil && reflect.DeepEqual(oldTopic.Spec, kafkaTopic.Spec) {
+		return nil, nil
+	}
 	return s.validate(ctx, kafkaTopic)
 }
 

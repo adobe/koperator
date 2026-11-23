@@ -145,6 +145,13 @@ spec:
           status:
             description: KafkaUserStatus defines the observed state of KafkaUser
             properties:
+              aclPrincipal:
+                description: |-
+                  ACLPrincipal is the principal the operator uses for this user's ACLs. The operator
+                  records it before creating ACLs and uses it to delete them. An empty value records
+                  that no ACLs were submitted. If it is absent, the state is unknown (for example,
+                  the user was created by an older operator).
+                type: string
               acls:
                 items:
                   type: string

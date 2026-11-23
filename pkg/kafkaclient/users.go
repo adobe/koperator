@@ -43,22 +43,11 @@ func AclPatternTypeMapping(patternType v1alpha1.KafkaPatternType) sarama.AclReso
 // CreateUserACLs creates Kafka ACLs for the given access type and user
 // `literal` patternType will be used if patternType == ""
 func (k *kafkaClient) CreateUserACLs(accessType v1alpha1.KafkaAccessType, patternType v1alpha1.KafkaPatternType, dn string, topic string) (err error) {
-	userName := fmt.Sprintf("User:%s", dn)
-	if patternType == "" {
-		patternType = v1alpha1.KafkaPatternTypeDefault
+	bindings, err := userACLBindings(accessType, patternType, dn, topic)
+	if err != nil {
+		return err
 	}
-	aclPatternType := AclPatternTypeMapping(patternType)
-	if aclPatternType == sarama.AclPatternUnknown {
-		return errorfactory.New(errorfactory.InternalError{}, fmt.Errorf("unknown type: %s", patternType), "unrecognized pattern type")
-	}
-	switch accessType {
-	case v1alpha1.KafkaAccessTypeRead:
-		return k.createReadACLs(userName, topic, aclPatternType)
-	case v1alpha1.KafkaAccessTypeWrite:
-		return k.createWriteACLs(userName, topic, aclPatternType)
-	default:
-		return errorfactory.New(errorfactory.InternalError{}, fmt.Errorf("unknown type: %s", accessType), "unrecognized access type")
-	}
+	return k.admin.CreateACLs(bindings)
 }
 
 func (k *kafkaClient) ListUserACLs() ([]sarama.ResourceAcls, error) {
@@ -69,71 +58,70 @@ func (k *kafkaClient) ListUserACLs() ([]sarama.ResourceAcls, error) {
 	return acls, nil
 }
 
-// DeleteUserACLs removes all ACLs for a given user
-func (k *kafkaClient) DeleteUserACLs(dn string, patternType v1alpha1.KafkaPatternType) error {
-	if patternType == "" {
-		patternType = v1alpha1.KafkaPatternTypeDefault
-	}
-	aclPatternType := AclPatternTypeMapping(patternType)
-	matches, err := k.admin.DeleteACL(sarama.AclFilter{
-		Principal:                 &dn,
-		ResourcePatternTypeFilter: aclPatternType,
-		Operation:                 sarama.AclOperationDelete,
-		ResourceType:              sarama.AclResourceTopic,
-		PermissionType:            sarama.AclPermissionAny,
-	}, false)
+// DeleteUserACLs removes the ACL bindings that CreateUserACLs creates for the same
+// access type, pattern type, user and topic. Other bindings of the user are kept.
+func (k *kafkaClient) DeleteUserACLs(accessType v1alpha1.KafkaAccessType, patternType v1alpha1.KafkaPatternType, dn string, topic string) error {
+	bindings, err := userACLBindings(accessType, patternType, dn, topic)
 	if err != nil {
 		return err
 	}
-	for _, x := range matches {
-		if x.Err != sarama.ErrNoError {
-			return x.Err
+	for _, binding := range bindings {
+		for _, acl := range binding.Acls {
+			matches, err := k.admin.DeleteACL(sarama.AclFilter{
+				ResourceType:              binding.ResourceType,
+				ResourceName:              &binding.ResourceName,
+				ResourcePatternTypeFilter: binding.ResourcePatternType,
+				Principal:                 &acl.Principal,
+				Host:                      &acl.Host,
+				Operation:                 acl.Operation,
+				PermissionType:            acl.PermissionType,
+			}, false)
+			if err != nil {
+				return err
+			}
+			for _, x := range matches {
+				if x.Err != sarama.ErrNoError {
+					return x.Err
+				}
+			}
 		}
 	}
 	return nil
 }
 
-func (k *kafkaClient) createReadACLs(dn string, topic string, patternType sarama.AclResourcePatternType) (err error) {
-	if err = k.createCommonACLs(dn, topic, patternType); err != nil {
-		return err
+// userACLBindings returns the ACL bindings that grant a user the given access to a topic.
+func userACLBindings(accessType v1alpha1.KafkaAccessType, patternType v1alpha1.KafkaPatternType, dn string, topic string) ([]*sarama.ResourceAcls, error) {
+	principal := fmt.Sprintf("User:%s", dn)
+	if patternType == "" {
+		patternType = v1alpha1.KafkaPatternTypeDefault
 	}
-
-	return k.admin.CreateACLs([]*sarama.ResourceAcls{
-		{
-			Resource: sarama.Resource{ResourceType: sarama.AclResourceTopic, ResourceName: topic, ResourcePatternType: patternType},
-			Acls:     []*sarama.Acl{{Principal: dn, Host: "*", Operation: sarama.AclOperationRead, PermissionType: sarama.AclPermissionAllow}},
-		},
-		{
-			Resource: sarama.Resource{ResourceType: sarama.AclResourceGroup, ResourceName: "*", ResourcePatternType: sarama.AclPatternLiteral},
-			Acls:     []*sarama.Acl{{Principal: dn, Host: "*", Operation: sarama.AclOperationRead, PermissionType: sarama.AclPermissionAllow}},
-		},
-	})
-}
-
-func (k *kafkaClient) createWriteACLs(dn string, topic string, patternType sarama.AclResourcePatternType) (err error) {
-	if err = k.createCommonACLs(dn, topic, patternType); err != nil {
-		return err
+	aclPatternType := AclPatternTypeMapping(patternType)
+	if aclPatternType == sarama.AclPatternUnknown {
+		return nil, errorfactory.New(errorfactory.InternalError{}, fmt.Errorf("unknown type: %s", patternType), "unrecognized pattern type")
 	}
-
-	return k.admin.CreateACLs([]*sarama.ResourceAcls{
-		{
-			Resource: sarama.Resource{ResourceType: sarama.AclResourceTopic, ResourceName: topic, ResourcePatternType: patternType},
-			Acls: []*sarama.Acl{
-				{Principal: dn, Host: "*", Operation: sarama.AclOperationWrite, PermissionType: sarama.AclPermissionAllow},
-				{Principal: dn, Host: "*", Operation: sarama.AclOperationCreate, PermissionType: sarama.AclPermissionAllow},
-			},
-		},
-	})
-}
-
-func (k *kafkaClient) createCommonACLs(dn string, topic string, patternType sarama.AclResourcePatternType) error {
-	return k.admin.CreateACLs([]*sarama.ResourceAcls{
-		{
-			Resource: sarama.Resource{ResourceType: sarama.AclResourceTopic, ResourceName: topic, ResourcePatternType: patternType},
-			Acls: []*sarama.Acl{
-				{Principal: dn, Host: "*", Operation: sarama.AclOperationDescribe, PermissionType: sarama.AclPermissionAllow},
-				{Principal: dn, Host: "*", Operation: sarama.AclOperationDescribeConfigs, PermissionType: sarama.AclPermissionAllow},
-			},
-		},
-	})
+	allow := func(operations ...sarama.AclOperation) []*sarama.Acl {
+		acls := make([]*sarama.Acl, 0, len(operations))
+		for _, operation := range operations {
+			acls = append(acls, &sarama.Acl{Principal: principal, Host: "*", Operation: operation, PermissionType: sarama.AclPermissionAllow})
+		}
+		return acls
+	}
+	topicResource := sarama.Resource{ResourceType: sarama.AclResourceTopic, ResourceName: topic, ResourcePatternType: aclPatternType}
+	bindings := []*sarama.ResourceAcls{
+		{Resource: topicResource, Acls: allow(sarama.AclOperationDescribe, sarama.AclOperationDescribeConfigs)},
+	}
+	switch accessType {
+	case v1alpha1.KafkaAccessTypeRead:
+		bindings = append(bindings,
+			&sarama.ResourceAcls{Resource: topicResource, Acls: allow(sarama.AclOperationRead)},
+			&sarama.ResourceAcls{
+				Resource: sarama.Resource{ResourceType: sarama.AclResourceGroup, ResourceName: "*", ResourcePatternType: sarama.AclPatternLiteral},
+				Acls:     allow(sarama.AclOperationRead),
+			})
+	case v1alpha1.KafkaAccessTypeWrite:
+		bindings = append(bindings, &sarama.ResourceAcls{Resource: topicResource, Acls: allow(sarama.AclOperationWrite, sarama.AclOperationCreate)})
+	default:
+		return nil, errorfactory.New(errorfactory.InternalError{}, fmt.Errorf("unknown type: %s", accessType), "unrecognized access type")
+	}
+	return bindings, nil
 }

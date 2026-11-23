@@ -154,7 +154,18 @@ func (m *mockClusterAdmin) DescribeTopics(topics []string) ([]*sarama.TopicMetad
 			},
 		}, nil
 	default:
-		return []*sarama.TopicMetadata{}, nil
+		m.Lock()
+		defer m.Unlock()
+		detail, ok := m.mockTopics[topics[0]]
+		if !ok {
+			// Brokers answer an unknown topic with an explicit error, not an empty response.
+			return []*sarama.TopicMetadata{{Name: topics[0], Err: sarama.ErrUnknownTopicOrPartition}}, nil
+		}
+		partitions := make([]*sarama.PartitionMetadata, detail.NumPartitions)
+		for i := range partitions {
+			partitions[i] = &sarama.PartitionMetadata{ID: int32(i)}
+		}
+		return []*sarama.TopicMetadata{{Name: topics[0], Partitions: partitions, Err: sarama.ErrNoError}}, nil
 	}
 }
 
@@ -166,7 +177,7 @@ func (m *mockClusterAdmin) CreateTopic(name string, detail *sarama.TopicDetail, 
 		return errors.New("bad create topic")
 	}
 	if _, ok := m.mockTopics[name]; ok {
-		return errors.New("already exists")
+		return &sarama.TopicError{Err: sarama.ErrTopicAlreadyExists}
 	}
 	m.mockTopics[name] = *detail
 	return nil
@@ -195,6 +206,12 @@ func (m *mockClusterAdmin) AlterConfig(resource sarama.ConfigResourceType, topic
 }
 
 func (m *mockClusterAdmin) CreatePartitions(topic string, count int32, assn [][]int32, validateOnly bool) error {
+	m.Lock()
+	defer m.Unlock()
+	if detail, ok := m.mockTopics[topic]; ok && count < detail.NumPartitions {
+		// Kafka can only add partitions.
+		return sarama.ErrInvalidPartitions
+	}
 	return nil
 }
 
@@ -238,7 +255,7 @@ func (m *mockClusterAdmin) ListAcls(filter sarama.AclFilter) ([]sarama.ResourceA
 	m.Lock()
 	defer m.Unlock()
 
-	acls := make([]sarama.ResourceAcls, len(m.mockACLs))
+	acls := make([]sarama.ResourceAcls, 0, len(m.mockACLs))
 	for _, acl := range m.mockACLs {
 		acls = append(acls, *acl)
 	}
@@ -252,16 +269,46 @@ func (m *mockClusterAdmin) DeleteACL(filter sarama.AclFilter, validateOnly bool)
 	if m.failOps {
 		return []sarama.MatchingAcl{}, errors.New("bad create acl")
 	}
-	switch *filter.Principal {
-	case "test-user":
-		return []sarama.MatchingAcl{{}}, nil
-	case withErrorTopicName:
+	if filter.Principal != nil && *filter.Principal == "User:"+withErrorTopicName {
 		return []sarama.MatchingAcl{{Err: sarama.ErrUnknown}}, nil
-	default:
-		// for mock it's enough to erase the whole map
-		m.mockACLs = make(map[sarama.Resource]*sarama.ResourceAcls, 0)
-		return []sarama.MatchingAcl{{}}, nil
 	}
+	// Match bindings the way a broker applies an ACL filter.
+	matches := []sarama.MatchingAcl{}
+	for resource, resourceAcls := range m.mockACLs {
+		if !aclResourceMatches(filter, resource) {
+			continue
+		}
+		kept := make([]*sarama.Acl, 0, len(resourceAcls.Acls))
+		for _, acl := range resourceAcls.Acls {
+			if aclEntryMatches(filter, acl) {
+				matches = append(matches, sarama.MatchingAcl{Resource: resource, Acl: *acl})
+				continue
+			}
+			kept = append(kept, acl)
+		}
+		if validateOnly {
+			continue
+		}
+		if len(kept) == 0 {
+			delete(m.mockACLs, resource)
+		} else {
+			resourceAcls.Acls = kept
+		}
+	}
+	return matches, nil
+}
+
+func aclResourceMatches(filter sarama.AclFilter, resource sarama.Resource) bool {
+	return (filter.ResourceType == sarama.AclResourceAny || filter.ResourceType == resource.ResourceType) &&
+		(filter.ResourceName == nil || *filter.ResourceName == resource.ResourceName) &&
+		(filter.ResourcePatternTypeFilter == sarama.AclPatternAny || filter.ResourcePatternTypeFilter == resource.ResourcePatternType)
+}
+
+func aclEntryMatches(filter sarama.AclFilter, acl *sarama.Acl) bool {
+	return (filter.Principal == nil || *filter.Principal == acl.Principal) &&
+		(filter.Host == nil || *filter.Host == acl.Host) &&
+		(filter.Operation == sarama.AclOperationAny || filter.Operation == acl.Operation) &&
+		(filter.PermissionType == sarama.AclPermissionAny || filter.PermissionType == acl.PermissionType)
 }
 
 func (m *mockClusterAdmin) DescribeConfig(resource sarama.ConfigResource) ([]sarama.ConfigEntry, error) {

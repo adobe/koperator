@@ -74,6 +74,12 @@ type UserTopicGrant struct {
 type KafkaUserStatus struct {
 	State UserState `json:"state"`
 	ACLs  []string  `json:"acls,omitempty"`
+	// ACLPrincipal is the principal the operator uses for this user's ACLs. The operator
+	// records it before creating ACLs and uses it to delete them. An empty value records
+	// that no ACLs were submitted. If it is absent, the state is unknown (for example,
+	// the user was created by an older operator).
+	// +optional
+	ACLPrincipal *string `json:"aclPrincipal,omitempty"`
 }
 
 // KafkaUser is the Schema for the kafka users API

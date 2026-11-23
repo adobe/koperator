@@ -63,6 +63,11 @@ const (
 	KafkaPatternTypeDefault  KafkaPatternType = "literal"
 	// TopicStateCreated describes the status of a KafkaTopic as created
 	TopicStateCreated TopicState = "created"
+	// TopicStateCreating records that the operator submitted the Kafka topic creation,
+	// so the outcome may be a topic the operator owns
+	TopicStateCreating TopicState = "creating"
+	// TopicStateDeleting records that Kafka accepted the operator's topic deletion request
+	TopicStateDeleting TopicState = "deleting"
 	// UserStateCreated describes the status of a KafkaUser as created
 	UserStateCreated UserState = "created"
 	// TLSJKSKeyStore is where a JKS keystore is stored in a user secret when requested

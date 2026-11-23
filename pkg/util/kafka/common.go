@@ -91,6 +91,28 @@ func GrantsToACLStrings(dn string, grants []v1alpha1.UserTopicGrant) []string {
 	return acls
 }
 
+// aclStringFields is the number of comma-separated fields that follow the principal in an
+// ACL string: resource type, pattern type, resource name, operation, permission and host.
+const aclStringFields = 6
+
+// PrincipalsFromACLStrings returns the distinguished names in ACL strings produced by
+// GrantsToACLStrings. The DN can contain commas, so the trailing fields are split off.
+func PrincipalsFromACLStrings(acls []string) []string {
+	principals := make([]string, 0)
+	for _, acl := range acls {
+		fields := strings.Split(acl, ",")
+		if len(fields) <= aclStringFields {
+			continue
+		}
+		principal, ok := strings.CutPrefix(strings.Join(fields[:len(fields)-aclStringFields], ","), "User:")
+		if !ok || principal == "" || apiutil.StringSliceContains(principals, principal) {
+			continue
+		}
+		principals = append(principals, principal)
+	}
+	return principals
+}
+
 func ShouldRefreshOnlyPerBrokerConfigs(currentConfigs, desiredConfigs *properties.Properties, log logr.Logger) bool {
 	// Get the diff of the configuration
 	configDiff := currentConfigs.Diff(desiredConfigs)

@@ -16,12 +16,14 @@
 package kafka
 
 import (
+	"reflect"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/banzaicloud/koperator/api/v1alpha1"
 	"github.com/banzaicloud/koperator/api/v1beta1"
 	"github.com/banzaicloud/koperator/pkg/util"
 	properties "github.com/banzaicloud/koperator/properties/pkg"
@@ -349,4 +351,17 @@ func TestGetBootstrapServers(t *testing.T) {
 			t.Errorf("Mismatch in cluster service bootstrap servers string. Expected: %v, got %v", expected, bootstrapServers)
 		}
 	})
+}
+
+func TestPrincipalsFromACLStrings(t *testing.T) {
+	grants := []v1alpha1.UserTopicGrant{
+		{TopicName: "orders", AccessType: v1alpha1.KafkaAccessTypeRead},
+		{TopicName: "events-", AccessType: v1alpha1.KafkaAccessTypeWrite, PatternType: v1alpha1.KafkaPatternTypePrefixed},
+	}
+	acls := append(GrantsToACLStrings("CN=user,O=org,OU=team", grants), GrantsToACLStrings("CN=other", grants[:1])...)
+	acls = append(acls, "malformed", "Group:x,Topic,LITERAL,t,Read,Allow,*")
+	got := PrincipalsFromACLStrings(acls)
+	if !reflect.DeepEqual(got, []string{"CN=user,O=org,OU=team", "CN=other"}) {
+		t.Fatalf("unexpected principals: %v", got)
+	}
 }

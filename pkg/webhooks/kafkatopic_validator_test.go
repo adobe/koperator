@@ -17,6 +17,7 @@ package webhooks
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -358,5 +359,44 @@ func TestValidateTopic(t *testing.T) {
 		t.Error("Expected not allowed due to replication factor change, got allowed")
 	} else if !strings.Contains(fieldErrorList.ToAggregate().Error(), "kafka does not support changing the replication factor") {
 		t.Error("Expected not allowed for reason: kafka does not support changing the replication factor")
+	}
+}
+
+func TestValidateUpdateOfDeletingTopicWithoutKafka(t *testing.T) {
+	cluster := newMockCluster()
+	client, _, _ := newMockClients(cluster)
+	if err := client.Create(context.Background(), cluster); err != nil {
+		t.Fatal(err)
+	}
+	kafkaCalls := 0
+	validator := KafkaTopicValidator{
+		Client: client,
+		NewKafkaFromCluster: func(runtimeClient.Client, *v1beta1.KafkaCluster) (kafkaclient.KafkaClient, func(), error) {
+			kafkaCalls++
+			return nil, nil, errors.New("kafka is unreachable")
+		},
+		Log: logr.Discard(),
+	}
+	oldTopic := newMockTopic()
+	oldTopic.Spec.Partitions, oldTopic.Spec.ReplicationFactor = 2, 1
+	oldTopic.Finalizers = []string{"finalizer.kafkatopics.kafka.banzaicloud.io"}
+	oldTopic.DeletionTimestamp = &metav1.Time{Time: metav1.Now().Time}
+
+	released := oldTopic.DeepCopy()
+	released.Finalizers = nil
+	if _, err := validator.ValidateUpdate(context.Background(), oldTopic, released); err != nil {
+		t.Fatalf("releasing a finalizer of a deleting topic must not need Kafka, got: %v", err)
+	}
+	if kafkaCalls != 0 {
+		t.Fatalf("expected no Kafka connection, got %d", kafkaCalls)
+	}
+
+	changed := oldTopic.DeepCopy()
+	changed.Spec.Partitions = 3
+	if _, err := validator.ValidateUpdate(context.Background(), oldTopic, changed); err == nil {
+		t.Fatal("a spec change must still be validated against Kafka")
+	}
+	if kafkaCalls != 1 {
+		t.Fatalf("expected the spec change to be validated against Kafka, got %d calls", kafkaCalls)
 	}
 }

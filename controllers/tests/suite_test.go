@@ -176,8 +176,9 @@ var _ = BeforeSuite(func(ctx SpecContext) {
 
 	// Create a new  kafka user reconciler
 	kafkaUserReconciler := controllers.KafkaUserReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:       mgr.GetClient(),
+		DirectClient: mgr.GetAPIReader(),
+		Scheme:       mgr.GetScheme(),
 	}
 
 	err = controllers.SetupKafkaUserWithManager(mgr, true, true).Complete(&kafkaUserReconciler)
