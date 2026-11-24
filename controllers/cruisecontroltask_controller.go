@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 
 	"emperror.dev/errors"
@@ -217,24 +218,12 @@ func (r *CruiseControlTaskReconciler) Reconcile(ctx context.Context, request ctr
 
 			brokerID := task.BrokerID
 			volume := task.Volume
-			if _, ok := brokerLogDirsToRemove[brokerID]; !ok {
-				brokerLogDirsToRemove[brokerID] = []string{}
-			}
-
-			found := false
-			if onlineDirs, ok := logDirsByBroker[brokerID][scale.LogDirStateOnline]; ok {
-				for _, dir := range onlineDirs {
-					if strings.HasPrefix(strings.TrimSpace(dir), strings.TrimSpace(volume)) {
-						brokerLogDirsToRemove[brokerID] = append(brokerLogDirsToRemove[brokerID], dir)
-						found = true
-						break
-					}
-				}
-			}
-
-			if !found {
+			// Kafka reports a single separator even when the mount path ends in a slash.
+			logDir := util.StorageConfigKafkaMountPath(strings.TrimRight(volume, "/"))
+			if !slices.Contains(logDirsByBroker[brokerID][scale.LogDirStateOnline], logDir) {
 				return requeueWithError(log, fmt.Sprintf("volume %s not found for broker %s in CC online log dirs", volume, brokerID), errors.New("log dir not found"))
 			}
+			brokerLogDirsToRemove[brokerID] = append(brokerLogDirsToRemove[brokerID], logDir)
 		}
 
 		// create the cruise control operation
