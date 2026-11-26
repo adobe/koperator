@@ -16,8 +16,9 @@ package controllers
 
 import (
 	"context"
-	"net"
+	"fmt"
 	"net/http"
+	"time"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -44,10 +45,21 @@ func SetAlertManagerWithManager(mgr manager.Manager) error {
 
 // Start initiates the alertmanager controller
 func (c AController) Start(ctx context.Context) error {
+	return c.start(ctx, receiverAddr)
+}
+
+func (c AController) start(ctx context.Context, addr string) error {
 	logf.SetLogger(util.CreateLogger(false, false))
 	log := logf.Log.WithName("alertmanager")
 
-	ln, _ := net.Listen("tcp", receiverAddr)
-	httpServer := &http.Server{Handler: alertmanager.NewApp(log, c.Client)}
-	return httpServer.Serve(ln)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	httpServer := &http.Server{Addr: addr, Handler: alertmanager.NewApp(log, c.Client)}
+	defer httpServer.Close()
+	shutdownTimeout := 5 * time.Second
+	server := manager.Server{Name: "alertmanager", Server: httpServer, ShutdownTimeout: &shutdownTimeout}
+	if err := server.Start(ctx); err != nil {
+		return fmt.Errorf("serve alerts: %w", err)
+	}
+	return nil
 }
