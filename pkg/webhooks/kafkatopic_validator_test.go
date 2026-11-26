@@ -17,9 +17,13 @@ package webhooks
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
+	clusterregv1alpha1 "github.com/cisco-open/cluster-registry-controller/api/v1alpha1"
+	"github.com/stretchr/testify/require"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -89,6 +93,127 @@ func newMockClients(cluster *v1beta1.KafkaCluster) (runtimeClient.WithWatch, kaf
 		return kafkaClient, func() { _ = kafkaClient.Close() }, nil
 	}
 	return client, kafkaClient, returnMockedKafkaClient
+}
+
+func TestKafkaTopicValidateUpdateKafkaDependency(t *testing.T) {
+	ctx := t.Context()
+	cluster := newMockCluster()
+	client, _, _ := newMockClients(cluster)
+	require.NoError(t, client.Create(ctx, cluster))
+	kafkaUnavailable := errors.New("Kafka unavailable")
+	validator := KafkaTopicValidator{
+		Client: client,
+		Log:    logr.Discard(),
+		NewKafkaFromCluster: func(runtimeClient.Client, *v1beta1.KafkaCluster) (kafkaclient.KafkaClient, func(), error) {
+			return nil, nil, kafkaUnavailable
+		},
+	}
+	for _, tc := range []struct {
+		name          string
+		change        func(oldTopic, newTopic *v1alpha1.KafkaTopic)
+		requiresKafka bool
+	}{
+		{name: "label change", change: func(_, newTopic *v1alpha1.KafkaTopic) {
+			newTopic.Labels = map[string]string{"example.com/team": "streaming"}
+		}},
+		{name: "unrelated annotation change", change: func(_, newTopic *v1alpha1.KafkaTopic) {
+			newTopic.Annotations = map[string]string{"example.com/note": "updated"}
+		}},
+		{name: "finalizer addition", change: func(_, newTopic *v1alpha1.KafkaTopic) {
+			newTopic.Finalizers = []string{"example.com/cleanup"}
+		}},
+		{name: "finalizer removal on a terminating topic", change: func(oldTopic, newTopic *v1alpha1.KafkaTopic) {
+			deletedAt := metav1.Now()
+			oldTopic.DeletionTimestamp, newTopic.DeletionTimestamp = &deletedAt, &deletedAt
+			oldTopic.Finalizers = []string{"example.com/cleanup"}
+		}},
+		{name: "empty config omitted", change: func(oldTopic, _ *v1alpha1.KafkaTopic) {
+			oldTopic.Spec.Config = map[string]string{}
+		}},
+		{name: "partition change", requiresKafka: true, change: func(_, newTopic *v1alpha1.KafkaTopic) {
+			newTopic.Spec.Partitions++
+		}},
+		{name: "config change", requiresKafka: true, change: func(_, newTopic *v1alpha1.KafkaTopic) {
+			newTopic.Spec.Config = map[string]string{"retention.ms": "1000"}
+		}},
+		{name: "managedBy changes", requiresKafka: true, change: func(oldTopic, newTopic *v1alpha1.KafkaTopic) {
+			oldTopic.Annotations = map[string]string{TopicManagedByAnnotationKey: "external"}
+			newTopic.Annotations = map[string]string{TopicManagedByAnnotationKey: TopicManagedByKoperatorAnnotationValue}
+		}},
+		{name: "empty managedBy added", requiresKafka: true, change: func(_, newTopic *v1alpha1.KafkaTopic) {
+			newTopic.Annotations = map[string]string{TopicManagedByAnnotationKey: ""}
+		}},
+		{name: "Cluster Registry handoff on a terminating topic", requiresKafka: true, change: func(oldTopic, newTopic *v1alpha1.KafkaTopic) {
+			deletedAt := metav1.Now()
+			oldTopic.DeletionTimestamp, newTopic.DeletionTimestamp = &deletedAt, &deletedAt
+			oldTopic.Finalizers, newTopic.Finalizers = []string{"example.com/cleanup"}, []string{"example.com/cleanup"}
+			oldTopic.Annotations = map[string]string{clusterregv1alpha1.OwnershipAnnotation: "remote"}
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			oldTopic := newMockTopic()
+			oldTopic.Spec.Partitions = 2
+			oldTopic.Spec.ReplicationFactor = 1
+			newTopic := oldTopic.DeepCopy()
+			tc.change(oldTopic, newTopic)
+
+			_, err := validator.ValidateUpdate(ctx, oldTopic, newTopic)
+			if tc.requiresKafka {
+				require.True(t, apierrors.IsInternalError(err), "expected InternalError, got %v", err)
+				require.ErrorContains(t, err, kafkaUnavailable.Error())
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestKafkaTopicValidateUpdateRetainsKubernetesValidation(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		invalidField string
+	}{
+		{name: "partitions", invalidField: "spec.partitions"},
+		{name: "missing cluster", invalidField: "spec.clusterRef.name"},
+		{name: "remote cluster", invalidField: "spec.clusterRef.name"},
+		{name: "duplicate topic", invalidField: "spec.name"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := t.Context()
+			cluster := newMockCluster()
+			client, _, _ := newMockClients(cluster)
+			oldTopic := newMockTopic()
+			oldTopic.Spec.Partitions = 2
+			oldTopic.Spec.ReplicationFactor = 1
+			switch tc.name {
+			case "partitions":
+				oldTopic.Spec.Partitions = 0
+			case "remote cluster":
+				cluster.Annotations = map[string]string{clusterregv1alpha1.OwnershipAnnotation: "remote"}
+			case "duplicate topic":
+				duplicate := oldTopic.DeepCopy()
+				duplicate.Name = "duplicate"
+				require.NoError(t, client.Create(ctx, duplicate))
+			}
+			if tc.name != "missing cluster" {
+				require.NoError(t, client.Create(ctx, cluster))
+			}
+			newTopic := oldTopic.DeepCopy()
+			newTopic.Labels = map[string]string{"example.com/team": "streaming"}
+			validator := KafkaTopicValidator{
+				Client: client,
+				Log:    logr.Discard(),
+				NewKafkaFromCluster: func(runtimeClient.Client, *v1beta1.KafkaCluster) (kafkaclient.KafkaClient, func(), error) {
+					return nil, nil, errors.New("Kafka unavailable")
+				},
+			}
+			_, err := validator.ValidateUpdate(ctx, oldTopic, newTopic)
+			require.True(t, apierrors.IsInvalid(err), "expected Invalid, got %v", err)
+			status := err.(apierrors.APIStatus).Status()
+			require.Len(t, status.Details.Causes, 1)
+			require.Equal(t, tc.invalidField, status.Details.Causes[0].Field)
+		})
+	}
 }
 
 func TestCheckKafkaTopicExist(t *testing.T) {
@@ -238,7 +363,7 @@ func TestValidateTopic(t *testing.T) {
 	}
 
 	// Test non-existent kafka cluster
-	fieldErrorList, err := kafkaTopicValidator.validateKafkaTopic(context.Background(), logr.Discard(), topic)
+	fieldErrorList, err := kafkaTopicValidator.validateKafkaTopic(context.Background(), logr.Discard(), topic, true)
 	if err != nil {
 		t.Errorf("err should be nil, got: %s", err)
 	}
@@ -259,7 +384,7 @@ func TestValidateTopic(t *testing.T) {
 	topic.Spec.Partitions = 2
 
 	// Test kafka topic with invalid replication factor
-	fieldErrorList, err = kafkaTopicValidator.validateKafkaTopic(context.Background(), logr.Discard(), topic)
+	fieldErrorList, err = kafkaTopicValidator.validateKafkaTopic(context.Background(), logr.Discard(), topic, true)
 	if err != nil {
 		t.Errorf("err should be nil, got: %s", err)
 	}
@@ -273,7 +398,7 @@ func TestValidateTopic(t *testing.T) {
 	// test topic marked for deletion
 	now := metav1.Now()
 	topic.SetDeletionTimestamp(&now)
-	fieldErrorList, err = kafkaTopicValidator.validateKafkaTopic(context.Background(), logr.Discard(), topic)
+	fieldErrorList, err = kafkaTopicValidator.validateKafkaTopic(context.Background(), logr.Discard(), topic, true)
 	if err != nil {
 		t.Errorf("err should be nil, got: %s", err)
 	}
@@ -286,7 +411,7 @@ func TestValidateTopic(t *testing.T) {
 	// test cluster marked for deletion
 	cluster.SetDeletionTimestamp(&now)
 
-	fieldErrorList, err = kafkaTopicValidator.validateKafkaTopic(context.Background(), logr.Discard(), topic)
+	fieldErrorList, err = kafkaTopicValidator.validateKafkaTopic(context.Background(), logr.Discard(), topic, true)
 	if err != nil {
 		t.Errorf("err should be nil, got: %s", err)
 	}
@@ -301,7 +426,7 @@ func TestValidateTopic(t *testing.T) {
 	}
 
 	// test no rejection reasons
-	fieldErrorList, err = kafkaTopicValidator.validateKafkaTopic(context.Background(), logr.Discard(), topic)
+	fieldErrorList, err = kafkaTopicValidator.validateKafkaTopic(context.Background(), logr.Discard(), topic, true)
 	if err != nil {
 		t.Errorf("err should be nil, got: %s", err)
 	}
@@ -313,7 +438,7 @@ func TestValidateTopic(t *testing.T) {
 
 	// Replication factor larger than num brokers
 	topic.Spec.ReplicationFactor = 2
-	fieldErrorList, err = kafkaTopicValidator.validateKafkaTopic(context.Background(), logr.Discard(), topic)
+	fieldErrorList, err = kafkaTopicValidator.validateKafkaTopic(context.Background(), logr.Discard(), topic, true)
 	if err != nil {
 		t.Errorf("err should be nil, got: %s", err)
 	}
@@ -336,7 +461,7 @@ func TestValidateTopic(t *testing.T) {
 
 	// partition decrease attempt
 	topic.Spec.Partitions = 1
-	fieldErrorList, err = kafkaTopicValidator.validateKafkaTopic(context.Background(), logr.Discard(), topic)
+	fieldErrorList, err = kafkaTopicValidator.validateKafkaTopic(context.Background(), logr.Discard(), topic, true)
 	if err != nil {
 		t.Errorf("err should be nil, got: %s", err)
 	}
@@ -350,7 +475,7 @@ func TestValidateTopic(t *testing.T) {
 	// replication factor change attempt
 	topic.Spec.Partitions = 2
 	topic.Spec.ReplicationFactor = 2
-	fieldErrorList, err = kafkaTopicValidator.validateKafkaTopic(context.Background(), logr.Discard(), topic)
+	fieldErrorList, err = kafkaTopicValidator.validateKafkaTopic(context.Background(), logr.Discard(), topic, true)
 	if err != nil {
 		t.Errorf("err should be nil, got: %s", err)
 	}

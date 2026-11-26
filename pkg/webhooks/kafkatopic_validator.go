@@ -52,21 +52,30 @@ type KafkaTopicValidator struct {
 }
 
 func (s KafkaTopicValidator) ValidateCreate(ctx context.Context, kafkaTopic *banzaicloudv1alpha1.KafkaTopic) (warnings admission.Warnings, err error) {
-	return s.validate(ctx, kafkaTopic)
+	return s.validate(ctx, kafkaTopic, true)
 }
 
-func (s KafkaTopicValidator) ValidateUpdate(ctx context.Context, _, kafkaTopic *banzaicloudv1alpha1.KafkaTopic) (warnings admission.Warnings, err error) {
-	return s.validate(ctx, kafkaTopic)
+func (s KafkaTopicValidator) ValidateUpdate(ctx context.Context, oldTopic, kafkaTopic *banzaicloudv1alpha1.KafkaTopic) (warnings admission.Warnings, err error) {
+	checkKafka := true
+	if oldTopic != nil {
+		oldManager, oldHasManager := oldTopic.Annotations[TopicManagedByAnnotationKey]
+		manager, hasManager := kafkaTopic.Annotations[TopicManagedByAnnotationKey]
+		checkKafka = !cmp.Equal(oldTopic.Spec, kafkaTopic.Spec, cmpopts.EquateEmpty()) ||
+			oldHasManager != hasManager || oldManager != manager ||
+			// Leaving Cluster Registry ownership hands the topic to local reconciliation.
+			(util.ObjectManagedByClusterRegistry(oldTopic) && !util.ObjectManagedByClusterRegistry(kafkaTopic))
+	}
+	return s.validate(ctx, kafkaTopic, checkKafka)
 }
 
 func (s KafkaTopicValidator) ValidateDelete(_ context.Context, _ *banzaicloudv1alpha1.KafkaTopic) (warnings admission.Warnings, err error) {
 	return nil, nil
 }
 
-func (s *KafkaTopicValidator) validate(ctx context.Context, kafkaTopic *banzaicloudv1alpha1.KafkaTopic) (warnings admission.Warnings, err error) {
+func (s *KafkaTopicValidator) validate(ctx context.Context, kafkaTopic *banzaicloudv1alpha1.KafkaTopic, checkKafka bool) (warnings admission.Warnings, err error) {
 	log := s.Log.WithValues("name", kafkaTopic.GetName(), "namespace", kafkaTopic.GetNamespace())
 
-	fieldErrs, err := s.validateKafkaTopic(ctx, log, kafkaTopic)
+	fieldErrs, err := s.validateKafkaTopic(ctx, log, kafkaTopic, checkKafka)
 	if err != nil {
 		log.Error(err, errorDuringValidationMsg)
 		return nil, apierrors.NewInternalError(errors.WithMessage(err, errorDuringValidationMsg))
@@ -80,7 +89,7 @@ func (s *KafkaTopicValidator) validate(ctx context.Context, kafkaTopic *banzaicl
 		kafkaTopic.Name, fieldErrs)
 }
 
-func (s *KafkaTopicValidator) validateKafkaTopic(ctx context.Context, log logr.Logger, topic *banzaicloudv1alpha1.KafkaTopic) (field.ErrorList, error) {
+func (s *KafkaTopicValidator) validateKafkaTopic(ctx context.Context, log logr.Logger, topic *banzaicloudv1alpha1.KafkaTopic, checkKafka bool) (field.ErrorList, error) {
 	var allErrs field.ErrorList
 	var logMsg string
 	// First check if the kafkatopic is valid
@@ -134,6 +143,10 @@ func (s *KafkaTopicValidator) validateKafkaTopic(ctx context.Context, log logr.L
 	}
 	if fieldErr != nil {
 		allErrs = append(allErrs, fieldErr)
+	}
+
+	if !checkKafka {
+		return allErrs, nil
 	}
 
 	fieldErrList, err := s.checkKafka(ctx, topic, cluster)
