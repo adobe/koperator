@@ -93,6 +93,13 @@ func (c *certManager) injectJKSPassword(ctx context.Context, user *v1alpha1.Kafk
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      user.Spec.SecretName,
 			Namespace: user.Namespace,
+			// Garbage collection covers partial provisioning. cert-manager can still set a controller reference.
+			OwnerReferences: []metav1.OwnerReference{{
+				APIVersion: v1alpha1.GroupVersion.String(),
+				Kind:       "KafkaUser",
+				Name:       user.Name,
+				UID:        user.UID,
+			}},
 		},
 		Data: map[string][]byte{},
 	}
