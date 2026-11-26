@@ -19,7 +19,9 @@ import (
 	"testing"
 
 	"emperror.dev/errors"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -28,6 +30,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	"github.com/banzaicloud/koperator/api/v1alpha1"
 	"github.com/banzaicloud/koperator/api/v1beta1"
@@ -475,6 +478,82 @@ func TestEnsureFinalizersIdempotent(t *testing.T) {
 	if len(updated.GetFinalizers()) != 3 {
 		t.Errorf("Expected 3 finalizers, got: %d", len(updated.GetFinalizers()))
 	}
+	version := updated.ResourceVersion
+	updated, err = reconciler.ensureFinalizers(context.Background(), updated)
+	require.NoError(t, err)
+	require.Equal(t, version, updated.ResourceVersion, "unchanged finalizers must not cause an update")
+}
+
+func TestKafkaClusterFinalizersProtectInterruptedProvisioning(t *testing.T) {
+	ctx := context.Background()
+	scheme := runtime.NewScheme()
+	require.NoError(t, k8sscheme.AddToScheme(scheme))
+	require.NoError(t, v1alpha1.AddToScheme(scheme))
+	require.NoError(t, v1beta1.AddToScheme(scheme))
+
+	cluster := createTestKafkaCluster("test-cluster", "kafka")
+	key := client.ObjectKeyFromObject(cluster)
+	topic := &v1alpha1.KafkaTopic{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-topic", Namespace: cluster.Namespace,
+			Labels:     map[string]string{clusterRefLabel: clusterLabelString(cluster)},
+			Finalizers: []string{topicFinalizer},
+		},
+		Spec: v1alpha1.KafkaTopicSpec{
+			Name: "test-topic", Partitions: 1, ReplicationFactor: 1,
+			ClusterRef: v1alpha1.ClusterReference{Name: cluster.Name},
+		},
+	}
+	finalizerWriteError := errors.New("finalizer write failed")
+	provisioningError := errors.New("provisioning interrupted")
+	failFinalizerWrite := true
+	var createdService *corev1.Service
+	kube := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, topic).
+		WithStatusSubresource(cluster).WithInterceptorFuncs(interceptor.Funcs{
+		Update: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.UpdateOption) error {
+			if _, ok := obj.(*v1beta1.KafkaCluster); ok && failFinalizerWrite {
+				return finalizerWriteError
+			}
+			return c.Update(ctx, obj, opts...)
+		},
+		Create: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+			persisted := &v1beta1.KafkaCluster{}
+			require.NoError(t, c.Get(ctx, key, persisted))
+			require.ElementsMatch(t, []string{clusterFinalizer, clusterTopicsFinalizer, clusterUsersFinalizer}, persisted.Finalizers,
+				"cleanup ownership must be stored before creating resources")
+			if service, ok := obj.(*corev1.Service); ok {
+				createdService = service
+				return c.Create(ctx, obj, opts...)
+			}
+			return provisioningError
+		},
+	}).Build()
+	reconciler := &KafkaClusterReconciler{Client: kube, Namespaces: []string{cluster.Namespace}}
+	request := ctrl.Request{NamespacedName: key}
+
+	_, err := reconciler.Reconcile(ctx, request)
+	require.ErrorIs(t, err, finalizerWriteError)
+	require.Nil(t, createdService)
+
+	failFinalizerWrite = false
+	_, err = reconciler.Reconcile(ctx, request)
+	require.ErrorIs(t, err, provisioningError)
+	require.NotNil(t, createdService, "the failure must interrupt provisioning after a resource is created")
+	require.NoError(t, kube.Delete(ctx, cluster))
+
+	result, err := reconciler.Reconcile(ctx, request)
+	require.NoError(t, err)
+	require.Positive(t, result.RequeueAfter, "the cluster must wait for topic cleanup")
+	require.NoError(t, kube.Get(ctx, key, cluster))
+	require.Contains(t, cluster.Finalizers, clusterFinalizer)
+	require.NoError(t, kube.Get(ctx, client.ObjectKeyFromObject(topic), topic))
+	require.False(t, topic.DeletionTimestamp.IsZero(), "the cluster must start deleting its topics")
+
+	topic.Finalizers = nil
+	require.NoError(t, kube.Update(ctx, topic))
+	_, err = reconciler.Reconcile(ctx, request)
+	require.NoError(t, err)
+	require.True(t, apiErrors.IsNotFound(kube.Get(ctx, key, cluster)), "the cluster must finish deleting after topic cleanup")
 }
 
 // TestReconcileWithDeletionTimestamp tests the full deletion flow
