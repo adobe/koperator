@@ -21,7 +21,7 @@ REL_TAG = $(shell ./scripts/increment_version.sh -${RELEASE_TYPE} ${TAG})
 # Version constants
 GOLANGCI_VERSION = 2.15.0 # renovate: datasource=github-releases depName=golangci/golangci-lint
 LICENSEI_VERSION = 0.9.0 # renovate: datasource=github-releases depName=goph/licensei
-CONTROLLER_GEN_VERSION = v0.22.0 # kept in sync with kubernetes-sigs/controller-tools by `make update-go-deps`
+CONTROLLER_GEN_VERSION = v0.23.0 # kept in sync with kubernetes-sigs/controller-tools by `make update-go-deps`
 ENVTEST_K8S_VERSION = $(KUBERNETES_MAX_VERSION)
 SETUP_ENVTEST_VERSION = v0.25.3 # renovate: datasource=github-releases depName=kubernetes-sigs/controller-runtime
 ADDLICENSE_VERSION = 1.2.0 # renovate: datasource=github-releases depName=google/addlicense
