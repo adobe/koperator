@@ -17,8 +17,10 @@ package controllers
 import (
 	"context"
 	"testing"
+	"time"
 
 	"emperror.dev/errors"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
@@ -116,6 +118,29 @@ func createTestKafkaCluster(name, namespace string) *v1beta1.KafkaCluster {
 			RollingUpgradeConfig: v1beta1.RollingUpgradeConfig{FailureThreshold: 1, ConcurrentBrokerRestartCountPerRack: 1},
 		},
 	}
+}
+
+func TestKafkaClusterRetriesWhileBrokersStart(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, k8sscheme.AddToScheme(scheme))
+	require.NoError(t, v1beta1.AddToScheme(scheme))
+	cluster := createTestKafkaCluster("starting", "test-namespace")
+	cluster.Spec.ListenersConfig.ExternalListeners = nil
+	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster).WithStatusSubresource(cluster).Build()
+	kafkaClient, _, err := kafkaclient.NewMockFromCluster(client, cluster)
+	require.NoError(t, err)
+	provider := &kafkaclient.MockedProvider{}
+	provider.On("NewFromCluster", client, mock.Anything).Return(kafkaClient, func() {}, errors.New("connection refused"))
+	reconciler := &KafkaClusterReconciler{Client: client, DirectClient: client, KafkaClientProvider: provider}
+
+	result, err := reconciler.Reconcile(t.Context(), ctrl.Request{NamespacedName: types.NamespacedName{
+		Name: cluster.Name, Namespace: cluster.Namespace,
+	}})
+	require.NoError(t, err)
+	require.Equal(t, ctrl.Result{RequeueAfter: 15 * time.Second}, result)
+	var pods corev1.PodList
+	require.NoError(t, client.List(t.Context(), &pods))
+	require.Len(t, pods.Items, len(cluster.Spec.Brokers))
 }
 
 // TestRollingUpgradeStatePreservation tests Bug #1 fix:
