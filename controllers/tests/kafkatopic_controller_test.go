@@ -23,7 +23,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/IBM/sarama"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -119,7 +118,7 @@ var _ = Describe("KafkaTopic", func() {
 			mockKafkaClient, _ := getMockedKafkaClientForCluster(kafkaCluster)
 			detail, err := mockKafkaClient.GetTopic(topicName)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(detail).To(Equal(&sarama.TopicDetail{
+			Expect(detail).To(Equal(&kafkaclient.TopicDetail{
 				NumPartitions:     17,
 				ReplicationFactor: 19,
 				ConfigEntries: map[string]*string{
@@ -197,11 +196,12 @@ var _ = Describe("KafkaTopic", func() {
 			mockKafkaClient, _ := getMockedKafkaClientForCluster(kafkaCluster)
 			detail, err := mockKafkaClient.GetTopic(topicName)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(detail).To(Equal(&sarama.TopicDetail{
-				NumPartitions:     11,
+			Expect(detail).To(Equal(&kafkaclient.TopicDetail{
+				NumPartitions:     17,
 				ReplicationFactor: 13,
 				ConfigEntries: map[string]*string{
-					"key": util.StringPointer("value"),
+					"key1": util.StringPointer("value1"),
+					"key2": util.StringPointer("value2"),
 				},
 			}))
 

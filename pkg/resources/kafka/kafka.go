@@ -462,7 +462,7 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 
 	reorderedBrokers := reorderBrokers(runningBrokers, boundPersistentVolumeClaims, r.KafkaCluster.Spec.Brokers, r.KafkaCluster.Status.BrokersState, controllerID, log)
 
-	allBrokerDynamicConfigSucceeded := true
+	var brokerConfigErr error
 	brokerStatus := make(map[int32]*banzaiv1beta1.BrokerConfig)
 	for _, broker := range reorderedBrokers {
 		brokerConfig, err := broker.GetBrokerConfig(r.KafkaCluster.Spec)
@@ -518,13 +518,13 @@ func (r *Reconciler) Reconcile(log logr.Logger) error {
 		err = r.reconcilePerBrokerDynamicConfig(broker.Id, brokerConfig, configMap, log)
 		if err != nil {
 			log.Error(err, "setting dynamic configs has failed", banzaiv1beta1.BrokerIdLabelKey, broker.Id)
-			allBrokerDynamicConfigSucceeded = false
+			brokerConfigErr = errors.Append(brokerConfigErr, err)
 		}
 	}
 
-	if !allBrokerDynamicConfigSucceeded {
-		// re-reconcile to retry setting the dynamic configs
-		return errors.NewWithDetails("setting dynamic configs for some brokers has failed",
+	if brokerConfigErr != nil {
+		// Preserve broker readiness errors so the controller can retry at its startup interval.
+		return errors.WrapIfWithDetails(brokerConfigErr, "setting dynamic configs for some brokers has failed",
 			"component", componentName,
 			"clusterName", r.KafkaCluster.Name,
 			"clusterNamespace", r.KafkaCluster.Namespace)
@@ -1172,16 +1172,12 @@ func (r *Reconciler) handleRollingUpgrade(log logr.Logger, desiredPod, currentPo
 				return errorfactory.New(errorfactory.BrokersUnreachable{}, err, "could not connect to kafka brokers")
 			}
 			defer close()
-			allOfflineReplicas, err := kClient.AllOfflineReplicas()
+			allOfflineReplicas, outOfSyncReplicas, err := kClient.ReplicaHealth()
 			if err != nil {
 				return errors.WrapIf(err, "health check failed")
 			}
 			if len(allOfflineReplicas) > 0 {
 				log.V(1).Info("offline replicas", "IDs", allOfflineReplicas)
-			}
-			outOfSyncReplicas, err := kClient.OutOfSyncReplicas()
-			if err != nil {
-				return errors.WrapIf(err, "health check failed")
 			}
 			if len(outOfSyncReplicas) > 0 {
 				log.V(1).Info("out-of-sync replicas", "IDs", outOfSyncReplicas)

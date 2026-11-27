@@ -53,7 +53,7 @@ Uses multiple Go modules with local replacements:
 │   │   ├── istioingress/         # Istio ingress
 │   │   ├── contouringress/       # Contour ingress
 │   │   └── templates/            # Common metadata templates
-│   ├── kafkaclient/              # Kafka client (uses Sarama)
+│   ├── kafkaclient/              # Kafka client (uses franz-go)
 │   ├── scale/                    # Scaling logic
 │   ├── webhooks/                 # Admission webhooks
 │   ├── k8sutil/                  # Kubernetes utilities
@@ -424,7 +424,7 @@ GitHub Actions workflows (`.github/workflows/`):
 
 - **controller-runtime** v0.25.3 - Operator framework
 - **k8s.io/*** v0.37.1 - Kubernetes client libraries
-- **IBM/sarama** v1.61.1 - Kafka client
+- **franz-go** v1.22.3 - Kafka client
 - **Ginkgo** v2 - BDD testing framework
 - **cert-manager** v1.21.2 - Certificate management integration
 

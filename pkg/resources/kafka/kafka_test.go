@@ -1579,19 +1579,36 @@ func createPvc(name, brokerId, mountPath string) *corev1.PersistentVolumeClaim {
 	}
 }
 
+type replicaHealthStub struct {
+	kafkaclient.KafkaClient // Any other Kafka operation is unexpected in this test.
+	allOfflineReplicas      []int32
+	outOfSyncReplicas       []int32
+	healthyAfterFirstRead   bool
+	calls                   int
+}
+
+func (s *replicaHealthStub) ReplicaHealth() ([]int32, []int32, error) {
+	s.calls++
+	if s.healthyAfterFirstRead && s.calls > 1 {
+		return nil, nil, nil
+	}
+	return s.allOfflineReplicas, s.outOfSyncReplicas, nil
+}
+
 // nolint funlen
 func TestReconcileConcurrentBrokerRestartsAllowed(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
-		testName           string
-		kafkaCluster       v1beta1.KafkaCluster
-		desiredPod         *corev1.Pod
-		currentPod         *corev1.Pod
-		pods               []corev1.Pod
-		allOfflineReplicas []int32
-		outOfSyncReplicas  []int32
-		ccStatus           *scale.StatusTaskResult
-		errorExpected      bool
+		testName              string
+		kafkaCluster          v1beta1.KafkaCluster
+		desiredPod            *corev1.Pod
+		currentPod            *corev1.Pod
+		pods                  []corev1.Pod
+		allOfflineReplicas    []int32
+		outOfSyncReplicas     []int32
+		healthyAfterFirstRead bool
+		ccStatus              *scale.StatusTaskResult
+		errorExpected         bool
 	}{
 		{
 			testName: "Pod is not deleted if pod list count different from spec",
@@ -1763,6 +1780,30 @@ func TestReconcileConcurrentBrokerRestartsAllowed(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "kafka-302", Labels: map[string]string{"brokerId": "302"}}},
 			},
 			errorExpected: true,
+		},
+		{
+			testName: "Pod is not deleted when the first snapshot reports an out-of-sync replica",
+			kafkaCluster: v1beta1.KafkaCluster{
+				ObjectMeta: metav1.ObjectMeta{Name: "kafka", Namespace: "kafka"},
+				Spec: v1beta1.KafkaClusterSpec{
+					Brokers: []v1beta1.Broker{{Id: 101}, {Id: 102}},
+					RollingUpgradeConfig: v1beta1.RollingUpgradeConfig{
+						FailureThreshold:                    1,
+						ConcurrentBrokerRestartCountPerRack: 1,
+					},
+				},
+				Status: v1beta1.KafkaClusterStatus{State: v1beta1.KafkaClusterRollingUpgrading},
+			},
+			desiredPod: &corev1.Pod{},
+			currentPod: &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "kafka-102", Labels: map[string]string{"brokerId": "102"}}},
+			pods: []corev1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Name: "kafka-101", Labels: map[string]string{"brokerId": "101"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "kafka-102", Labels: map[string]string{"brokerId": "102"}}},
+			},
+			allOfflineReplicas:    []int32{},
+			outOfSyncReplicas:     []int32{101},
+			healthyAfterFirstRead: true,
+			errorExpected:         true,
 		},
 		{
 			testName: "Pod is deleted if allowed concurrent restarts is default and failure threshold is not reached",
@@ -2096,13 +2137,11 @@ func TestReconcileConcurrentBrokerRestartsAllowed(t *testing.T) {
 		},
 	}
 
-	mockCtrl := gomock.NewController(t)
-
 	for _, test := range testCases {
-		mockClient := mocks.NewMockClient(mockCtrl)
-		mockKafkaClientProvider := new(kafkaclient.MockedProvider)
-
 		t.Run(test.testName, func(t *testing.T) {
+			mockCtrl := gomock.NewController(t)
+			mockClient := mocks.NewMockClient(mockCtrl)
+			mockKafkaClientProvider := new(kafkaclient.MockedProvider)
 			r := New(mockClient, nil, &test.kafkaCluster, mockKafkaClientProvider)
 
 			// Mock client
@@ -2118,15 +2157,16 @@ func TestReconcileConcurrentBrokerRestartsAllowed(t *testing.T) {
 				mockClient.EXPECT().Delete(context.TODO(), test.currentPod).Return(nil)
 			}
 
-			// Mock kafka client
-			mockedKafkaClient := mocks.NewMockKafkaClient(mockCtrl)
-			if test.allOfflineReplicas != nil {
-				mockedKafkaClient.EXPECT().AllOfflineReplicas().Return(test.allOfflineReplicas, nil)
+			health := &replicaHealthStub{
+				allOfflineReplicas:    test.allOfflineReplicas,
+				outOfSyncReplicas:     test.outOfSyncReplicas,
+				healthyAfterFirstRead: test.healthyAfterFirstRead,
 			}
-			if test.outOfSyncReplicas != nil {
-				mockedKafkaClient.EXPECT().OutOfSyncReplicas().Return(test.outOfSyncReplicas, nil)
+			wantHealthCalls := 0
+			if test.allOfflineReplicas != nil || test.outOfSyncReplicas != nil {
+				wantHealthCalls = 1
 			}
-			mockKafkaClientProvider.On("NewFromCluster", mockClient, &test.kafkaCluster).Return(mockedKafkaClient, func() {}, nil)
+			mockKafkaClientProvider.On("NewFromCluster", mockClient, &test.kafkaCluster).Return(health, func() {}, nil)
 
 			// Mock Cruise Control client
 			mockCruiseControl := controllerMocks.NewMockCruiseControlScaler(mockCtrl)
@@ -2137,6 +2177,7 @@ func TestReconcileConcurrentBrokerRestartsAllowed(t *testing.T) {
 
 			// Call the handleRollingUpgrade function with the provided test.desiredPod and test.currentPod
 			err := r.handleRollingUpgrade(logf.Log, test.desiredPod, test.currentPod, reflect.TypeOf(test.desiredPod))
+			assert.Equal(t, wantHealthCalls, health.calls, "Kafka health reads")
 
 			// Test that the expected error is returned
 			if test.errorExpected {

@@ -26,8 +26,6 @@ import (
 	. "github.com/onsi/gomega"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
-	"github.com/IBM/sarama"
-
 	certsigningreqv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,6 +33,7 @@ import (
 
 	"github.com/banzaicloud/koperator/api/v1alpha1"
 	"github.com/banzaicloud/koperator/api/v1beta1"
+	"github.com/banzaicloud/koperator/pkg/kafkaclient"
 	"github.com/banzaicloud/koperator/pkg/util"
 )
 
@@ -98,7 +97,7 @@ var _ = Describe("KafkaTopic", func() {
 					{
 						TopicName:   "test-topic-1",
 						AccessType:  v1alpha1.KafkaAccessTypeRead,
-						PatternType: v1alpha1.KafkaPatternTypeAny,
+						PatternType: v1alpha1.KafkaPatternTypePrefixed,
 					},
 					{
 						TopicName:   "test-topic-2",
@@ -134,87 +133,23 @@ var _ = Describe("KafkaTopic", func() {
 		Expect(user.Labels).To(HaveKeyWithValue("kafkaCluster", fmt.Sprintf("%s.%s", kafkaClusterCRName, namespace)))
 
 		mockKafkaClient, _ := getMockedKafkaClientForCluster(kafkaCluster)
-		acls, _ := mockKafkaClient.ListUserACLs()
-		Expect(acls).To(ContainElements(
-			sarama.ResourceAcls{
-				Resource: sarama.Resource{
-					ResourceType:        sarama.AclResourceTopic,
-					ResourceName:        "test-topic-1",
-					ResourcePatternType: sarama.AclPatternAny,
-				},
-				Acls: []*sarama.Acl{
-					{
-						Principal:      "User:CN=kafkauser-1",
-						Host:           "*",
-						Operation:      sarama.AclOperationDescribe,
-						PermissionType: sarama.AclPermissionAllow,
-					},
-					{
-						Principal:      "User:CN=kafkauser-1",
-						Host:           "*",
-						Operation:      sarama.AclOperationDescribeConfigs,
-						PermissionType: sarama.AclPermissionAllow,
-					},
-					{
-						Principal:      "User:CN=kafkauser-1",
-						Host:           "*",
-						Operation:      sarama.AclOperationRead,
-						PermissionType: sarama.AclPermissionAllow,
-					},
-				},
-			},
-			sarama.ResourceAcls{
-				Resource: sarama.Resource{
-					ResourceType:        sarama.AclResourceTopic,
-					ResourceName:        "test-topic-2",
-					ResourcePatternType: sarama.AclPatternLiteral,
-				},
-				Acls: []*sarama.Acl{
-					{
-						Principal:      "User:CN=kafkauser-1",
-						Host:           "*",
-						Operation:      sarama.AclOperationDescribe,
-						PermissionType: sarama.AclPermissionAllow,
-					},
-					{
-						Principal:      "User:CN=kafkauser-1",
-						Host:           "*",
-						Operation:      sarama.AclOperationDescribeConfigs,
-						PermissionType: sarama.AclPermissionAllow,
-					},
-					{
-						Principal:      "User:CN=kafkauser-1",
-						Host:           "*",
-						Operation:      sarama.AclOperationWrite,
-						PermissionType: sarama.AclPermissionAllow,
-					},
-					{
-						Principal:      "User:CN=kafkauser-1",
-						Host:           "*",
-						Operation:      sarama.AclOperationCreate,
-						PermissionType: sarama.AclPermissionAllow,
-					},
-				},
-			},
-			sarama.ResourceAcls{
-				Resource: sarama.Resource{
-					ResourceType:        sarama.AclResourceGroup,
-					ResourceName:        "*",
-					ResourcePatternType: sarama.AclPatternLiteral,
-				},
-				Acls: []*sarama.Acl{
-					{
-						Principal:      "User:CN=kafkauser-1",
-						Host:           "*",
-						Operation:      sarama.AclOperationRead,
-						PermissionType: sarama.AclPermissionAllow,
-					},
-				},
-			}))
+		acls, err := mockKafkaClient.ListUserACLs()
+		Expect(err).NotTo(HaveOccurred())
+		const principal = "User:CN=kafkauser-1"
+		Expect(acls).To(ConsistOf([]kafkaclient.ACL{
+			{ResourceType: "TOPIC", ResourceName: "test-topic-1", PatternType: "PREFIXED", Principal: principal, Host: "*", Operation: "DESCRIBE", Permission: "ALLOW"},
+			{ResourceType: "TOPIC", ResourceName: "test-topic-1", PatternType: "PREFIXED", Principal: principal, Host: "*", Operation: "DESCRIBE_CONFIGS", Permission: "ALLOW"},
+			{ResourceType: "TOPIC", ResourceName: "test-topic-1", PatternType: "PREFIXED", Principal: principal, Host: "*", Operation: "READ", Permission: "ALLOW"},
+			{ResourceType: "TOPIC", ResourceName: "test-topic-2", PatternType: "LITERAL", Principal: principal, Host: "*", Operation: "DESCRIBE", Permission: "ALLOW"},
+			{ResourceType: "TOPIC", ResourceName: "test-topic-2", PatternType: "LITERAL", Principal: principal, Host: "*", Operation: "DESCRIBE_CONFIGS", Permission: "ALLOW"},
+			{ResourceType: "TOPIC", ResourceName: "test-topic-2", PatternType: "LITERAL", Principal: principal, Host: "*", Operation: "WRITE", Permission: "ALLOW"},
+			{ResourceType: "TOPIC", ResourceName: "test-topic-2", PatternType: "LITERAL", Principal: principal, Host: "*", Operation: "CREATE", Permission: "ALLOW"},
+			{ResourceType: "GROUP", ResourceName: "*", PatternType: "LITERAL", Principal: principal, Host: "*", Operation: "READ", Permission: "ALLOW"},
+		}))
 
 		Expect(user.Status.ACLs).To(ConsistOf(
-			"User:CN=kafkauser-1,Topic,ANY,test-topic-1,Describe,Allow,*",
-			"User:CN=kafkauser-1,Topic,ANY,test-topic-1,Read,Allow,*",
+			"User:CN=kafkauser-1,Topic,PREFIXED,test-topic-1,Describe,Allow,*",
+			"User:CN=kafkauser-1,Topic,PREFIXED,test-topic-1,Read,Allow,*",
 			"User:CN=kafkauser-1,Group,LITERAL,*,Read,Allow,*",
 			"User:CN=kafkauser-1,Topic,LITERAL,test-topic-2,Describe,Allow,*",
 			"User:CN=kafkauser-1,Topic,LITERAL,test-topic-2,Create,Allow,*",

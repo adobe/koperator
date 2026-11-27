@@ -19,7 +19,6 @@ import (
 	"strconv"
 
 	"emperror.dev/errors"
-	"github.com/IBM/sarama"
 	"github.com/go-logr/logr"
 
 	corev1 "k8s.io/api/core/v1"
@@ -27,6 +26,7 @@ import (
 	"github.com/banzaicloud/koperator/api/v1beta1"
 	"github.com/banzaicloud/koperator/pkg/errorfactory"
 	"github.com/banzaicloud/koperator/pkg/k8sutil"
+	"github.com/banzaicloud/koperator/pkg/kafkaclient"
 	"github.com/banzaicloud/koperator/pkg/util"
 	"github.com/banzaicloud/koperator/pkg/util/kafka"
 
@@ -131,9 +131,11 @@ func (r *Reconciler) reconcileClusterWideDynamicConfig() error {
 		return errors.WrapIf(err, "could not describe cluster wide broker config")
 	}
 
-	currentClusterWideConfig, err := util.ConvertConfigEntryListToProperties(currentConfig)
-	if err != nil {
-		return errors.WrapIf(err, "could not convert current cluster-wide config to properties")
+	currentClusterWideConfig := properties.NewProperties()
+	for _, entry := range currentConfig {
+		if err := currentClusterWideConfig.Set(entry.Name, entry.Value); err != nil {
+			return errors.WrapIf(err, "could not convert current cluster-wide config to properties")
+		}
 	}
 
 	parsedClusterWideConfig, err := properties.NewFromString(r.KafkaCluster.Spec.ClusterWideConfig)
@@ -156,7 +158,7 @@ func (r *Reconciler) reconcileClusterWideDynamicConfig() error {
 	return nil
 }
 
-func shouldUpdatePerBrokerConfig(response []*sarama.ConfigEntry, brokerConfig *properties.Properties) bool {
+func shouldUpdatePerBrokerConfig(response []kafkaclient.ConfigEntry, brokerConfig *properties.Properties) bool {
 	if brokerConfig == nil {
 		return false
 	}

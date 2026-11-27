@@ -17,8 +17,10 @@ package controllers
 import (
 	"context"
 	"testing"
+	"time"
 
 	"emperror.dev/errors"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
@@ -116,6 +118,70 @@ func createTestKafkaCluster(name, namespace string) *v1beta1.KafkaCluster {
 			RollingUpgradeConfig: v1beta1.RollingUpgradeConfig{FailureThreshold: 1, ConcurrentBrokerRestartCountPerRack: 1},
 		},
 	}
+}
+
+type brokerStartupClient struct {
+	kafkaclient.KafkaClient
+	describedBrokers []int32
+	rejection        error
+}
+
+func (c *brokerStartupClient) DescribePerBrokerConfig(brokerID int32, _ []string) ([]kafkaclient.ConfigEntry, error) {
+	c.describedBrokers = append(c.describedBrokers, brokerID)
+	if brokerID == 1 && c.rejection != nil {
+		return nil, c.rejection
+	}
+	return nil, errorfactory.New(errorfactory.BrokersNotReady{}, errors.New("broker not registered"), "broker is starting")
+}
+
+func TestKafkaClusterRetriesWhileBrokersStart(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		rejection error
+	}{
+		{name: "all brokers starting"},
+		{name: "starting and rejected", rejection: errors.New("invalid broker configuration")},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			checkKafkaClusterStartupRetry(t, tc.rejection)
+		})
+	}
+}
+
+func checkKafkaClusterStartupRetry(t *testing.T, rejection error) {
+	t.Helper()
+	scheme := runtime.NewScheme()
+	require.NoError(t, k8sscheme.AddToScheme(scheme))
+	require.NoError(t, v1beta1.AddToScheme(scheme))
+	cluster := createTestKafkaCluster("starting", "test-namespace")
+	cluster.Spec.ListenersConfig.ExternalListeners = nil
+	for i := range cluster.Spec.Brokers {
+		cluster.Spec.Brokers[i].BrokerConfig = &v1beta1.BrokerConfig{Config: "max.connections=100"}
+	}
+	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster).WithStatusSubresource(cluster).Build()
+	kafkaClient, _, err := kafkaclient.NewMockFromCluster(client, cluster)
+	require.NoError(t, err)
+	startupClient := &brokerStartupClient{KafkaClient: kafkaClient, rejection: rejection}
+	provider := &kafkaclient.MockedProvider{}
+	provider.On("NewFromCluster", client, mock.Anything).Return(startupClient, func() {}, nil)
+	reconciler := &KafkaClusterReconciler{Client: client, DirectClient: client, KafkaClientProvider: provider}
+
+	result, err := reconciler.Reconcile(t.Context(), ctrl.Request{NamespacedName: types.NamespacedName{
+		Name: cluster.Name, Namespace: cluster.Namespace,
+	}})
+	if rejection == nil {
+		require.NoError(t, err)
+		require.Equal(t, ctrl.Result{RequeueAfter: 15 * time.Second}, result)
+	} else {
+		require.ErrorIs(t, err, rejection)
+		var notReady errorfactory.BrokersNotReady
+		require.ErrorAs(t, err, &notReady)
+		require.Empty(t, result)
+	}
+	require.ElementsMatch(t, []int32{0, 1}, startupClient.describedBrokers)
+	var pods corev1.PodList
+	require.NoError(t, client.List(t.Context(), &pods))
+	require.Len(t, pods.Items, len(cluster.Spec.Brokers))
 }
 
 // TestRollingUpgradeStatePreservation tests Bug #1 fix:

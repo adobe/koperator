@@ -136,13 +136,8 @@ func (r *KafkaClusterReconciler) Reconcile(ctx context.Context, request ctrl.Req
 		err = rec.Reconcile(log)
 		if err != nil {
 			switch {
-			case errors.As(err, &errorfactory.BrokersUnreachable{}):
-				log.Info("Brokers unreachable, may still be starting up", "error", err.Error())
-				return ctrl.Result{
-					RequeueAfter: time.Duration(15) * time.Second,
-				}, nil
-			case errors.As(err, &errorfactory.BrokersNotReady{}):
-				log.Info("Brokers not ready, may still be starting up", "error", err.Error())
+			case allBrokerStartupErrors(err):
+				log.Info("Brokers may still be starting up", "error", err.Error())
 				return ctrl.Result{
 					RequeueAfter: time.Duration(15) * time.Second,
 				}, nil
@@ -199,6 +194,25 @@ func (r *KafkaClusterReconciler) Reconcile(ctx context.Context, request ctrl.Req
 	}
 
 	return reconciled()
+}
+
+func allBrokerStartupErrors(err error) bool {
+	for err != nil {
+		switch current := err.(type) {
+		case errorfactory.BrokersNotReady, errorfactory.BrokersUnreachable:
+			return true
+		case interface{ Unwrap() []error }:
+			causes := current.Unwrap()
+			for _, cause := range causes {
+				if !allBrokerStartupErrors(cause) {
+					return false
+				}
+			}
+			return len(causes) > 0
+		}
+		err = errors.Unwrap(err)
+	}
+	return false
 }
 
 func (r *KafkaClusterReconciler) checkFinalizers(ctx context.Context, cluster *v1beta1.KafkaCluster) (ctrl.Result, error) {

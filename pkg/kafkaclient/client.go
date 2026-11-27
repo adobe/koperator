@@ -16,10 +16,20 @@
 package kafkaclient
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"io"
+	"net"
+	"slices"
+	"strconv"
+	"sync/atomic"
+	"syscall"
 	"time"
 
-	"github.com/IBM/sarama"
+	"github.com/twmb/franz-go/pkg/kadm"
+	"github.com/twmb/franz-go/pkg/kgo"
+	"github.com/twmb/franz-go/pkg/kmsg"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -29,91 +39,123 @@ import (
 )
 
 var log = logf.Log.WithName("kafka_util")
-var apiVersion = sarama.V2_6_0_0
-var clientId = "koperator"
 
-// KafkaClient is the exported interface for kafka operations
+const clientID = "koperator"
+
+const (
+	kafkaStartupTimeout    = 5 * time.Second
+	kafkaTopicWriteTimeout = 3 * time.Second
+)
+
+type Broker struct {
+	ID   int32
+	Addr string
+}
+
+// KafkaClient is the interface for Kafka administration.
 type KafkaClient interface {
 	NumBrokers() int
-	ListTopics() (map[string]sarama.TopicDetail, error)
+	ListTopics() (map[string]TopicDetail, error)
 	CreateTopic(*CreateTopicOptions) error
 	EnsurePartitionCount(string, int32) (bool, error)
 	EnsureTopicConfig(string, map[string]*string) error
 	DeleteTopic(string, bool) error
-	GetTopic(string) (*sarama.TopicDetail, error)
-	DescribeTopic(string) (*sarama.TopicMetadata, error)
+	GetTopic(string) (*TopicDetail, error)
+	DescribeTopic(string) (*TopicMetadata, error)
 	CreateUserACLs(v1alpha1.KafkaAccessType, v1alpha1.KafkaPatternType, string, string) error
-	ListUserACLs() ([]sarama.ResourceAcls, error)
+	ListUserACLs() ([]ACL, error)
 	DeleteUserACLs(string, v1alpha1.KafkaPatternType) error
 
 	Brokers() map[int32]string
-	DescribeCluster() ([]*sarama.Broker, int32, error)
+	DescribeCluster() ([]Broker, int32, error)
 
-	// AllOfflineReplicas returns the list of unique offline replica (broker) ids
-	AllOfflineReplicas() ([]int32, error)
-
-	// OutOfSyncReplicas returns the list of unique out of sync replica (broker) ids
-	OutOfSyncReplicas() ([]int32, error)
+	// ReplicaHealth returns both sets of broker IDs from the same validated metadata snapshot.
+	ReplicaHealth() (offline, outOfSync []int32, err error)
 
 	AlterPerBrokerConfig(int32, map[string]*string, bool) error
-	DescribePerBrokerConfig(int32, []string) ([]*sarama.ConfigEntry, error)
+	DescribePerBrokerConfig(int32, []string) ([]ConfigEntry, error)
 
 	AlterClusterWideConfig(map[string]*string, bool) error
-	DescribeClusterWideConfig() ([]sarama.ConfigEntry, error)
-
-	TopicMetaToStatus(meta *sarama.TopicMetadata) *v1alpha1.KafkaTopicStatus
+	DescribeClusterWideConfig() ([]ConfigEntry, error)
 
 	Open() error
 	Close() error
 }
 
 type kafkaClient struct {
-	KafkaClient
-	opts    *KafkaConfig
-	admin   sarama.ClusterAdmin
-	client  sarama.Client
-	timeout time.Duration
-	brokers []*sarama.Broker
-
-	// client funcs for mocking
-	newClusterAdmin func([]string, *sarama.Config) (sarama.ClusterAdmin, error)
-	newClient       func([]string, *sarama.Config) (sarama.Client, error)
+	opts         *KafkaConfig
+	admin        *kadm.Client
+	client       *kgo.Client
+	timeout      time.Duration
+	brokers      []Broker
+	controllerID atomic.Int32
 }
 
 func New(opts *KafkaConfig) KafkaClient {
-	kclient := &kafkaClient{
-		opts:    opts,
-		timeout: time.Duration(opts.OperationTimeout) * time.Second,
+	timeout := opts.OperationTimeout
+	if timeout <= 0 {
+		timeout = kafkaDefaultTimeout
 	}
-	kclient.newClusterAdmin = sarama.NewClusterAdmin
-	kclient.newClient = sarama.NewClient
-	return kclient
+	return &kafkaClient{
+		opts:    opts,
+		timeout: time.Duration(timeout) * time.Second,
+	}
 }
 
 func (k *kafkaClient) Open() error {
-	var err error
-	config := k.getSaramaConfig()
-	if k.admin, err = k.newClusterAdmin([]string{k.opts.BrokerURI}, config); err != nil {
-		err = errorfactory.New(errorfactory.BrokersUnreachable{}, err, fmt.Sprintf("could not connect to kafka brokers: %s", k.opts.BrokerURI))
-		return err
+	return k.open()
+}
+
+func (k *kafkaClient) open(extraOpts ...kgo.Opt) error {
+	opts := []kgo.Opt{
+		kgo.SeedBrokers(k.opts.BrokerURI), kgo.ClientID(clientID),
+		kgo.RequestTimeoutOverhead(min(k.timeout, 15*time.Minute)),
+	}
+	switch {
+	case k.opts.UseSSL && k.opts.TLSConfig == nil:
+		opts = append(opts, kgo.DialTLS())
+	case k.opts.UseSSL:
+		opts = append(opts, kgo.DialTLSConfig(k.opts.TLSConfig))
+	}
+	conn, err := kgo.NewClient(append(opts, extraOpts...)...)
+	if err != nil {
+		return errorfactory.New(errorfactory.BrokersUnreachable{}, err, fmt.Sprintf("could not connect to kafka brokers: %s", k.opts.BrokerURI))
 	}
 
-	if k.brokers, _, err = k.DescribeCluster(); err != nil {
-		_ = k.admin.Close()
-		err = errorfactory.New(errorfactory.BrokersNotReady{}, err, "could not describe kafka cluster")
-		return err
+	ctx, cancel := context.WithTimeout(context.Background(), min(k.timeout, kafkaStartupTimeout))
+	defer cancel()
+	metadata, err := brokerMetadataRequest().RequestWith(ctx, conn)
+	if err != nil {
+		conn.Close()
+		return errorfactory.New(errorfactory.BrokersUnreachable{}, err, fmt.Sprintf("could not connect to kafka brokers: %s", k.opts.BrokerURI))
 	}
-
-	if k.client, err = k.newClient([]string{k.opts.BrokerURI}, config); err != nil {
-		return err
+	metadata, err = readControllerMetadata(ctx, conn, metadata)
+	if isBrokerConnectionError(err) {
+		// A controller can restart after discovery. Rediscover once in the same startup budget.
+		metadata, err = brokerMetadataRequest().RequestWith(ctx, conn)
+		if err == nil {
+			metadata, err = readControllerMetadata(ctx, conn, metadata)
+		}
 	}
-
+	if err != nil {
+		conn.Close()
+		return errorfactory.New(errorfactory.BrokersNotReady{}, err, "could not describe kafka cluster")
+	}
+	admin := kadm.NewClient(conn)
+	// Give the broker time to reply before the client deadline expires.
+	replyBudget := min(time.Second, k.timeout/2)
+	admin.SetTimeoutMillis(int32(min(kafkaTopicWriteTimeout, k.timeout-replyBudget).Milliseconds()))
+	_ = k.Close()
+	k.client, k.admin, k.brokers = conn, admin, clusterBrokers(metadata)
+	k.controllerID.Store(metadata.ControllerID)
 	return nil
 }
 
 func (k *kafkaClient) Close() error {
-	_ = k.client.Close()
-	return k.admin.Close()
+	if k.client != nil {
+		k.client.Close()
+	}
+	return nil
 }
 
 // NewFromCluster is a convenience wrapper around New() and ClusterConfig()
@@ -137,9 +179,9 @@ func NewFromCluster(k8sclient client.Client, cluster *v1beta1.KafkaCluster) (Kaf
 }
 
 func (k *kafkaClient) Brokers() map[int32]string {
-	out := make(map[int32]string, 0)
+	out := make(map[int32]string, len(k.brokers))
 	for _, broker := range k.brokers {
-		out[broker.ID()] = broker.Addr()
+		out[broker.ID] = broker.Addr
 	}
 	return out
 }
@@ -148,27 +190,62 @@ func (k *kafkaClient) NumBrokers() int {
 	return len(k.brokers)
 }
 
-func (k *kafkaClient) GetBroker(id int32) (broker *sarama.Broker) {
-	for _, x := range k.brokers {
-		if x.ID() == id {
-			broker = x
-		}
+func (k *kafkaClient) DescribeCluster() ([]Broker, int32, error) {
+	ctx, cancel := k.requestContext()
+	defer cancel()
+	meta, err := brokerMetadataRequest().RequestWith(ctx, k.client)
+	if err != nil {
+		return nil, -1, err
 	}
-	return
+	return clusterBrokers(meta), meta.ControllerID, nil
 }
 
-func (k *kafkaClient) DescribeCluster() (brokers []*sarama.Broker, controllerID int32, err error) {
-	brokers, controllerID, err = k.admin.DescribeCluster()
-	return
+func brokerMetadataRequest() *kmsg.MetadataRequest {
+	req := kmsg.NewPtrMetadataRequest()
+	req.Topics = []kmsg.MetadataRequestTopic{}
+	return req
 }
 
-func (k *kafkaClient) getSaramaConfig() (config *sarama.Config) {
-	config = sarama.NewConfig()
-	if k.opts.UseSSL {
-		config.Net.TLS.Enable = true
-		config.Net.TLS.Config = k.opts.TLSConfig
+func isBrokerConnectionError(err error) bool {
+	return errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, net.ErrClosed) ||
+		errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.EPIPE) || isBrokerDialError(err)
+}
+
+func isBrokerDialError(err error) bool {
+	var opErr *net.OpError
+	return errors.As(err, &opErr) && opErr.Op == "dial"
+}
+
+func readControllerMetadata(ctx context.Context, conn *kgo.Client, metadata *kmsg.MetadataResponse) (*kmsg.MetadataResponse, error) {
+	id, err := metadataController(metadata)
+	if err != nil {
+		return nil, err
 	}
-	config.Version = apiVersion
-	config.ClientID = clientId
-	return
+	metadata, err = brokerMetadataRequest().RequestWith(ctx, conn.Broker(int(id)))
+	if err != nil {
+		return nil, err
+	}
+	_, err = metadataController(metadata)
+	return metadata, err
+}
+
+func metadataController(meta *kmsg.MetadataResponse) (int32, error) {
+	// In KRaft, Kafka advertises a broker that can forward admin requests.
+	id := meta.ControllerID
+	if id < 0 || !slices.ContainsFunc(meta.Brokers, func(broker kmsg.MetadataResponseBroker) bool { return broker.NodeID == id }) {
+		return -1, fmt.Errorf("kafka metadata has no broker for controller ID %d", id)
+	}
+	return id, nil
+}
+
+func clusterBrokers(meta *kmsg.MetadataResponse) []Broker {
+	brokers := make([]Broker, 0, len(meta.Brokers))
+	for _, broker := range meta.Brokers {
+		brokers = append(brokers, Broker{ID: broker.NodeID, Addr: net.JoinHostPort(broker.Host, strconv.Itoa(int(broker.Port)))})
+	}
+	return brokers
+}
+
+func (k *kafkaClient) requestContext() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), k.timeout)
 }

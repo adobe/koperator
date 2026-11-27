@@ -16,18 +16,23 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	"github.com/IBM/sarama"
+	"github.com/twmb/franz-go/pkg/kadm"
+	"github.com/twmb/franz-go/pkg/kgo"
 )
 
 const kafkaTopic = "test-topic"
+const kafkaPartition = 0
 
 const certFile = "/etc/secrets/certs/tls.crt"
 const keyFile = "/etc/secrets/certs/tls.key"
@@ -40,24 +45,34 @@ const caEnvVar = "KAFKA_TLS_CA"
 var brokerAddrs = []string{"kafka-headless.kafka.svc.cluster.local:29092"}
 
 func main() {
-	// Create an SSL configuration for connecting to Kafka
-	config := sarama.NewConfig()
-	config.Net.TLS.Enable = true
-	config.Net.TLS.Config = getTLSConfig()
-
-	// Trap SIGINT and SIGTERM to trigger a shutdown.
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
-
-	// Consume or produce depending on the value of the environment variable
-	switch os.Getenv("KAFKA_MODE") {
-	case "consumer":
-		consume(config, signals)
-	case "producer":
-		produce(config, signals)
-	default:
-		log.Fatal("Invalid test mode:", os.Getenv("KAFKA_MODE"))
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	err := run(ctx, os.Getenv("KAFKA_MODE"), kgo.SeedBrokers(brokerAddrs...), kgo.DialTLSConfig(getTLSConfig()))
+	cancel()
+	if err != nil {
+		log.Fatal(err)
 	}
+	log.Println("Shutting down")
+}
+
+func run(ctx context.Context, mode string, opts ...kgo.Opt) error {
+	switch mode {
+	case "consumer":
+	case "producer":
+		opts = append(opts, kgo.RecordPartitioner(kgo.ManualPartitioner()), kgo.DisableIdempotentWrite(),
+			kgo.RequiredAcks(kgo.NoAck()), kgo.RecordDeliveryTimeout(30*time.Second))
+	default:
+		return fmt.Errorf("invalid test mode: %q", mode)
+	}
+
+	client, err := kgo.NewClient(opts...)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+	if mode == "consumer" {
+		return consume(ctx, client)
+	}
+	return produce(ctx, client)
 }
 
 func getEnvTLSConfig() (config *tls.Config, err error) {
@@ -98,65 +113,60 @@ func getTLSConfig() *tls.Config {
 	}
 }
 
-//nolint:gocritic
-func consume(config *sarama.Config, signals chan os.Signal) {
-	// Get a consumer
-	consumer, err := sarama.NewConsumer(brokerAddrs, config)
-	if err != nil {
-		log.Fatal(err)
+func consume(ctx context.Context, client *kgo.Client) error {
+	startupCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	offsets, err := kadm.NewClient(client).ListEndOffsets(startupCtx, kafkaTopic)
+	cancel()
+	if ctx.Err() != nil {
+		return nil
 	}
-	defer func() { _ = consumer.Close() }()
-
-	// Setup a channel for messages from our topic
-	partitionConsumer, err := consumer.ConsumePartition(kafkaTopic, 0, sarama.OffsetNewest)
 	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("could not resolve starting offset for %s/%d: %w", kafkaTopic, kafkaPartition, err)
 	}
-	defer func() { _ = partitionConsumer.Close() }()
+	offset, ok := offsets.Lookup(kafkaTopic, kafkaPartition)
+	if !ok {
+		return fmt.Errorf("no starting offset returned for %s/%d", kafkaTopic, kafkaPartition)
+	}
+	if offset.Err != nil {
+		return fmt.Errorf("could not resolve starting offset for %s/%d: %w", kafkaTopic, kafkaPartition, offset.Err)
+	}
+	client.AddConsumePartitions(map[string]map[int32]kgo.Offset{
+		kafkaTopic: {kafkaPartition: kgo.NewOffset().At(offset.Offset)},
+	})
 
-	consumed := 0
-ConsumerLoop:
-	// Consume the topic
-	for {
-		select {
-		case msg := <-partitionConsumer.Messages():
-			log.Printf("Consumed message offset %d - %s\n", msg.Offset, string(msg.Value))
-			consumed++
-		case <-signals:
-			log.Println("Shutting down")
-			break ConsumerLoop
+	for ctx.Err() == nil {
+		fetches := client.PollFetches(ctx)
+		for _, fetchErr := range fetches.Errors() {
+			if ctx.Err() != nil {
+				break
+			}
+			var dataLoss *kgo.ErrDataLoss
+			if !errors.As(fetchErr.Err, &dataLoss) {
+				return fetchErr.Err
+			}
+			log.Printf("Consumer resumed from a reset offset: %v", dataLoss)
 		}
+		fetches.EachRecord(func(msg *kgo.Record) {
+			log.Printf("Consumed message offset %d - %s\n", msg.Offset, msg.Value)
+		})
 	}
+	return nil
 }
 
-//nolint:gocritic
-func produce(config *sarama.Config, signals chan os.Signal) {
-	// Get a broker connection
-	broker := sarama.NewBroker(brokerAddrs[0])
-	if err := broker.Open(config); err != nil {
-		log.Fatal(err)
-	}
-	defer func() { _ = broker.Close() }()
+func produce(ctx context.Context, client *kgo.Client) error {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
 
-	// Create a time ticker to trigger a message every 5 seconds
-	ticker := time.NewTicker(time.Duration(5) * time.Second)
-
-ProducerLoop:
-	// Send a message everytime the ticker is triggered
 	for {
 		select {
 		case <-ticker.C:
 			log.Println("Sending message to topic")
-			msg := &sarama.ProduceRequest{}
-			msg.AddMessage(kafkaTopic, 0, &sarama.Message{
-				Value: []byte("hello world"),
-			})
-			if _, err := broker.Produce(msg); err != nil {
-				log.Fatal(err)
+			msg := &kgo.Record{Topic: kafkaTopic, Partition: kafkaPartition, Value: []byte("hello world")}
+			if err := client.ProduceSync(ctx, msg).FirstErr(); err != nil && ctx.Err() == nil {
+				return err
 			}
-		case <-signals:
-			log.Println("Shutting down")
-			break ProducerLoop
+		case <-ctx.Done():
+			return nil
 		}
 	}
 }

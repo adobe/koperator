@@ -16,73 +16,132 @@
 package kafkaclient
 
 import (
+	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 
-	"emperror.dev/errors"
-	"github.com/IBM/sarama"
+	"github.com/twmb/franz-go/pkg/kerr"
+	"github.com/twmb/franz-go/pkg/kgo"
+	"github.com/twmb/franz-go/pkg/kmsg"
 
 	"github.com/banzaicloud/koperator/pkg/errorfactory"
 )
 
-func (k *kafkaClient) AlterClusterWideConfig(configChange map[string]*string, validateOnly bool) error {
-	return k.admin.AlterConfig(sarama.BrokerResource, "", configChange, validateOnly)
+type ConfigEntry struct {
+	Name  string
+	Value string
 }
 
-func (k *kafkaClient) DescribeClusterWideConfig() ([]sarama.ConfigEntry, error) {
-	results, err := k.admin.DescribeConfigs([]*sarama.ConfigResource{{Type: sarama.BrokerResource, Name: "", ConfigNames: []string{}}}, sarama.DescribeConfigsOptions{})
+func (k *kafkaClient) AlterClusterWideConfig(configChange map[string]*string, validateOnly bool) error {
+	return k.alterConfig(nil, kmsg.ConfigResourceTypeBroker, "", configChange, validateOnly)
+}
+
+func (k *kafkaClient) DescribeClusterWideConfig() ([]ConfigEntry, error) {
+	return k.describeBrokerConfig("", nil)
+}
+
+func (k *kafkaClient) AlterPerBrokerConfig(brokerID int32, configChange map[string]*string, validateOnly bool) error {
+	if err := k.requireBroker(brokerID); err != nil {
+		return err
+	}
+	return k.alterConfig(k.client.Broker(int(brokerID)), kmsg.ConfigResourceTypeBroker, strconv.Itoa(int(brokerID)), configChange, validateOnly)
+}
+
+func (k *kafkaClient) DescribePerBrokerConfig(brokerID int32, keys []string) ([]ConfigEntry, error) {
+	if err := k.requireBroker(brokerID); err != nil {
+		return nil, err
+	}
+	return k.describeBrokerConfig(strconv.Itoa(int(brokerID)), keys)
+}
+
+func (k *kafkaClient) requireBroker(brokerID int32) error {
+	if !slices.ContainsFunc(k.brokers, func(broker Broker) bool { return broker.ID == brokerID }) {
+		return errorfactory.New(errorfactory.BrokersNotReady{}, errors.New("brokerNotReady"), fmt.Sprintf("could not get %d broker", brokerID))
+	}
+	return nil
+}
+
+func (k *kafkaClient) alterConfig(broker *kgo.Broker, kind kmsg.ConfigResourceType, name string, changes map[string]*string, validateOnly bool) error {
+	ctx, cancel := k.requestContext()
+	defer cancel()
+	var requestor kmsg.Requestor = k.client
+	if !validateOnly {
+		// Select a responding broker with a read before sending an unpinned write.
+		// Send the replacement once, as a lost reply does not tell us if it took effect.
+		if broker == nil {
+			shard := k.client.RequestSharded(ctx, brokerMetadataRequest())[0]
+			if shard.Err != nil {
+				return shard.Err
+			}
+			broker = k.client.Broker(int(shard.Meta.NodeID))
+		}
+		requestor = broker
+	}
+	resource := kmsg.NewAlterConfigsRequestResource()
+	resource.ResourceType = kind
+	resource.ResourceName = name
+	for key, value := range changes {
+		resource.Configs = append(resource.Configs, kmsg.AlterConfigsRequestResourceConfig{Name: key, Value: value})
+	}
+	req := kmsg.NewPtrAlterConfigsRequest()
+	req.Resources = []kmsg.AlterConfigsRequestResource{resource}
+	req.ValidateOnly = validateOnly
+	response, err := req.RequestWith(ctx, requestor)
+	if err != nil {
+		return err
+	}
+	for _, result := range response.Resources {
+		if result.ResourceType == kind && result.ResourceName == name {
+			return brokerResponseError(result.ErrorCode, result.ErrorMessage)
+		}
+	}
+	return fmt.Errorf("missing alter config response for %s %q", kind, name)
+}
+
+func (k *kafkaClient) describeBrokerConfig(name string, keys []string) ([]ConfigEntry, error) {
+	if len(keys) == 0 {
+		keys = nil // Kafka uses a null filter to return all keys.
+	}
+	ctx, cancel := k.requestContext()
+	defer cancel()
+	req := kmsg.NewPtrDescribeConfigsRequest()
+	req.Resources = []kmsg.DescribeConfigsRequestResource{{
+		ResourceType: kmsg.ConfigResourceTypeBroker,
+		ResourceName: name,
+		ConfigNames:  keys,
+	}}
+	response, err := req.RequestWith(ctx, k.client)
 	if err != nil {
 		return nil, err
 	}
-	if len(results) == 0 {
+	for _, result := range response.Resources {
+		if result.ResourceType != kmsg.ConfigResourceTypeBroker || result.ResourceName != name {
+			continue
+		}
+		if err := brokerResponseError(result.ErrorCode, result.ErrorMessage); err != nil {
+			return nil, err
+		}
+		entries := make([]ConfigEntry, 0, len(result.Configs))
+		for _, config := range result.Configs {
+			entry := ConfigEntry{Name: config.Name}
+			if config.Value != nil {
+				entry.Value = *config.Value
+			}
+			entries = append(entries, entry)
+		}
+		return entries, nil
+	}
+	if name == "" {
 		return nil, nil
 	}
-	if results[0].ErrorCode != 0 {
-		return nil, &sarama.DescribeConfigError{Err: results[0].ErrorCode, ErrMsg: results[0].ErrorMsg}
-	}
-	return results[0].Configs, nil
+	return nil, fmt.Errorf("missing describe config response for broker %s", name)
 }
 
-func (k *kafkaClient) AlterPerBrokerConfig(brokerId int32, configChange map[string]*string, validateOnly bool) error {
-	broker := k.GetBroker(brokerId)
-	if broker == nil {
-		return errorfactory.New(errorfactory.BrokersNotReady{}, errors.New("brokerNotReady"), fmt.Sprintf("could not get %d broker", brokerId))
+func brokerResponseError(code int16, message *string) error {
+	err := kerr.ErrorForCode(code)
+	if err != nil && message != nil && *message != "" {
+		return fmt.Errorf("%s: %w", *message, err)
 	}
-	err := broker.Open(k.getSaramaConfig())
-	if err != nil {
-		return errors.WrapIf(err, "could not open connection to broker")
-	}
-	defer func() { _ = broker.Close() }()
-
-	_, err = broker.AlterConfigs(&sarama.AlterConfigsRequest{
-		ValidateOnly: validateOnly,
-		Resources: []*sarama.AlterConfigsResource{
-			{
-				Type:          sarama.BrokerResource,
-				Name:          strconv.Itoa(int(brokerId)),
-				ConfigEntries: configChange,
-			},
-		},
-	})
 	return err
-}
-
-func (k *kafkaClient) DescribePerBrokerConfig(brokerId int32, config []string) ([]*sarama.ConfigEntry, error) {
-	broker := k.GetBroker(brokerId)
-	if broker == nil {
-		return nil, errorfactory.New(errorfactory.BrokersNotReady{}, errors.New("brokerNotReady"), fmt.Sprintf("could not get %d broker", brokerId))
-	}
-	err := broker.Open(k.getSaramaConfig())
-	if err != nil {
-		return nil, errors.WrapIf(err, "could not open connection to broker")
-	}
-	defer func() { _ = broker.Close() }()
-
-	currentConfig, err := broker.DescribeConfigs(&sarama.DescribeConfigsRequest{
-		Resources: []*sarama.ConfigResource{{Type: sarama.BrokerResource, Name: strconv.Itoa(int(brokerId)), ConfigNames: config}},
-	})
-	if err != nil {
-		return nil, err
-	}
-	return currentConfig.Resources[0].Configs, nil
 }
