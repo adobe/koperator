@@ -1579,6 +1579,23 @@ func createPvc(name, brokerId, mountPath string) *corev1.PersistentVolumeClaim {
 	}
 }
 
+type replicaHealthStub struct {
+	kafkaclient.KafkaClient // Any other Kafka operation is unexpected in this test.
+	allOfflineReplicas      []int32
+	outOfSyncReplicas       []int32
+	calls                   []string
+}
+
+func (s *replicaHealthStub) AllOfflineReplicas() ([]int32, error) {
+	s.calls = append(s.calls, "AllOfflineReplicas")
+	return s.allOfflineReplicas, nil
+}
+
+func (s *replicaHealthStub) OutOfSyncReplicas() ([]int32, error) {
+	s.calls = append(s.calls, "OutOfSyncReplicas")
+	return s.outOfSyncReplicas, nil
+}
+
 // nolint funlen
 func TestReconcileConcurrentBrokerRestartsAllowed(t *testing.T) {
 	t.Parallel()
@@ -2118,15 +2135,18 @@ func TestReconcileConcurrentBrokerRestartsAllowed(t *testing.T) {
 				mockClient.EXPECT().Delete(context.TODO(), test.currentPod).Return(nil)
 			}
 
-			// Mock kafka client
-			mockedKafkaClient := mocks.NewMockKafkaClient(mockCtrl)
+			health := &replicaHealthStub{
+				allOfflineReplicas: test.allOfflineReplicas,
+				outOfSyncReplicas:  test.outOfSyncReplicas,
+			}
+			var wantHealthCalls []string
 			if test.allOfflineReplicas != nil {
-				mockedKafkaClient.EXPECT().AllOfflineReplicas().Return(test.allOfflineReplicas, nil)
+				wantHealthCalls = append(wantHealthCalls, "AllOfflineReplicas")
 			}
 			if test.outOfSyncReplicas != nil {
-				mockedKafkaClient.EXPECT().OutOfSyncReplicas().Return(test.outOfSyncReplicas, nil)
+				wantHealthCalls = append(wantHealthCalls, "OutOfSyncReplicas")
 			}
-			mockKafkaClientProvider.On("NewFromCluster", mockClient, &test.kafkaCluster).Return(mockedKafkaClient, func() {}, nil)
+			mockKafkaClientProvider.On("NewFromCluster", mockClient, &test.kafkaCluster).Return(health, func() {}, nil)
 
 			// Mock Cruise Control client
 			mockCruiseControl := controllerMocks.NewMockCruiseControlScaler(mockCtrl)
@@ -2137,6 +2157,7 @@ func TestReconcileConcurrentBrokerRestartsAllowed(t *testing.T) {
 
 			// Call the handleRollingUpgrade function with the provided test.desiredPod and test.currentPod
 			err := r.handleRollingUpgrade(logf.Log, test.desiredPod, test.currentPod, reflect.TypeOf(test.desiredPod))
+			assert.ElementsMatch(t, wantHealthCalls, health.calls, "Kafka health checks")
 
 			// Test that the expected error is returned
 			if test.errorExpected {
