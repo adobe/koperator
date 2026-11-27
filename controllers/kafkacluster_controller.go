@@ -112,6 +112,10 @@ func (r *KafkaClusterReconciler) Reconcile(ctx context.Context, request ctrl.Req
 		return r.checkFinalizers(ctx, instance)
 	}
 
+	if instance, err = r.ensureFinalizers(ctx, instance); err != nil {
+		return requeueWithError(log, "failed to ensure finalizers on kafkacluster instance", err)
+	}
+
 	if instance.Status.State != v1beta1.KafkaClusterRollingUpgrading {
 		if err := k8sutil.UpdateCRStatus(r.Client, instance, v1beta1.KafkaClusterReconciling, log); err != nil {
 			return requeueWithError(log, err.Error(), err)
@@ -181,11 +185,6 @@ func (r *KafkaClusterReconciler) Reconcile(ctx context.Context, request ctrl.Req
 				return requeueWithError(log, err.Error(), err)
 			}
 		}
-	}
-
-	log.Info("ensuring finalizers on kafkacluster")
-	if instance, err = r.ensureFinalizers(ctx, instance); err != nil {
-		return requeueWithError(log, "failed to ensure finalizers on kafkacluster instance", err)
 	}
 
 	// Update rolling upgrade last successful state
@@ -331,12 +330,16 @@ func topicListToStrSlice(list v1alpha1.KafkaTopicList) []string {
 }
 
 func (r *KafkaClusterReconciler) ensureFinalizers(ctx context.Context, cluster *v1beta1.KafkaCluster) (updated *v1beta1.KafkaCluster, err error) {
+	originalCount := len(cluster.Finalizers)
 	finalizers := []string{clusterFinalizer, clusterTopicsFinalizer, clusterUsersFinalizer}
 	for _, finalizer := range finalizers {
 		if apiutil.StringSliceContains(cluster.GetFinalizers(), finalizer) {
 			continue
 		}
 		cluster.SetFinalizers(append(cluster.GetFinalizers(), finalizer))
+	}
+	if len(cluster.Finalizers) == originalCount {
+		return cluster, nil
 	}
 	return r.updateAndFetchLatest(ctx, cluster)
 }
