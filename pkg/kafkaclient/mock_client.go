@@ -17,273 +17,163 @@ package kafkaclient
 
 import (
 	"errors"
+	"maps"
+	"slices"
 	"sync"
-	"time"
 
-	"github.com/IBM/sarama"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/banzaicloud/koperator/api/v1alpha1"
 	"github.com/banzaicloud/koperator/api/v1beta1"
 )
 
-const (
-	testTopicName = "test-topic"
-	// withErrorTopicName is a mock topic name that triggers error responses.
-	withErrorTopicName = "with-error"
-)
-
-type mockClusterAdmin struct {
-	sarama.ClusterAdmin
-	sarama.Client
-	sync.Mutex
-	failOps    bool
-	mockTopics map[string]sarama.TopicDetail
-	mockACLs   map[sarama.Resource]*sarama.ResourceAcls
+type mockKafkaClient struct {
+	mu     sync.Mutex
+	topics map[string]TopicDetail
+	acls   map[ACL]struct{}
 }
 
-// Coordinator resolves the ambiguity between sarama.ClusterAdmin.Coordinator and sarama.Client.Coordinator
-func (m *mockClusterAdmin) Coordinator(coordinatorType string) (*sarama.Broker, error) {
-	// Return a default mock coordinator
-	return &sarama.Broker{}, nil
+func NewMockFromCluster(_ client.Client, _ *v1beta1.KafkaCluster) (KafkaClient, func(), error) {
+	return &mockKafkaClient{topics: make(map[string]TopicDetail), acls: make(map[ACL]struct{})}, func() {}, nil
 }
 
-func NewMockFromCluster(client client.Client, cluster *v1beta1.KafkaCluster) (KafkaClient, func(), error) {
-	cl := newOpenedMockClient()
-	return cl, func() { _ = cl.Close() }, nil
+func (m *mockKafkaClient) Open() error  { return nil }
+func (m *mockKafkaClient) Close() error { return nil }
+
+func (m *mockKafkaClient) NumBrokers() int           { return 1 }
+func (m *mockKafkaClient) Brokers() map[int32]string { return map[int32]string{0: ""} }
+
+func (m *mockKafkaClient) DescribeCluster() ([]Broker, int32, error) {
+	return []Broker{{ID: 0}}, 0, nil
 }
 
-func newEmptyMockClusterAdmin(failOps bool) *mockClusterAdmin {
-	return &mockClusterAdmin{
-		mockTopics: make(map[string]sarama.TopicDetail, 0),
-		mockACLs:   make(map[sarama.Resource]*sarama.ResourceAcls, 0),
-		failOps:    failOps,
+func (m *mockKafkaClient) ListTopics() (map[string]TopicDetail, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return maps.Clone(m.topics), nil
+}
+
+func (m *mockKafkaClient) GetTopic(name string) (*TopicDetail, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if topic, ok := m.topics[name]; ok {
+		return &topic, nil
 	}
+	return nil, nil
 }
 
-func newMockClusterAdmin([]string, *sarama.Config) (sarama.ClusterAdmin, error) {
-	return newEmptyMockClusterAdmin(false), nil
-}
-
-func newMockKafkaClient([]string, *sarama.Config) (sarama.Client, error) {
-	return newEmptyMockClusterAdmin(false), nil
-}
-
-func newMockClusterAdminError([]string, *sarama.Config) (sarama.ClusterAdmin, error) {
-	return newEmptyMockClusterAdmin(false), errors.New("bad client")
-}
-
-func newMockClusterAdminFailOps([]string, *sarama.Config) (sarama.ClusterAdmin, error) {
-	return newEmptyMockClusterAdmin(true), nil
-}
-
-func newMockOpts() *KafkaConfig {
-	return &KafkaConfig{
-		OperationTimeout: kafkaDefaultTimeout,
+func (m *mockKafkaClient) DescribeTopic(name string) (*TopicMetadata, error) {
+	topic, err := m.GetTopic(name)
+	if err != nil {
+		return nil, err
 	}
+	if topic == nil {
+		return nil, errors.New("not found")
+	}
+	metadata := &TopicMetadata{Name: name}
+	for id := range topic.NumPartitions {
+		metadata.Partitions = append(metadata.Partitions, PartitionMetadata{ID: id})
+	}
+	return metadata, nil
 }
 
-func newMockClient() *kafkaClient {
-	return &kafkaClient{
-		opts:            newMockOpts(),
-		timeout:         time.Duration(kafkaDefaultTimeout) * time.Second,
-		newClusterAdmin: newMockClusterAdmin,
-		newClient:       newMockKafkaClient,
-	}
-}
-
-func newOpenedMockClient() *kafkaClient {
-	client := newMockClient()
-	_ = client.Open()
-	return client
-}
-
-func (m *mockClusterAdmin) Close() error { return nil }
-
-func (m *mockClusterAdmin) DescribeCluster() ([]*sarama.Broker, int32, error) {
-	if m.failOps {
-		return []*sarama.Broker{}, 0, errors.New("bad describe cluster")
-	}
-	return []*sarama.Broker{{}}, 0, nil
-}
-
-func (m *mockClusterAdmin) ListTopics() (map[string]sarama.TopicDetail, error) {
-	m.Lock()
-	defer m.Unlock()
-
-	if m.failOps {
-		return map[string]sarama.TopicDetail{}, errors.New("bad list topics")
-	}
-	return shallowCopy(m.mockTopics), nil
-}
-
-func (m *mockClusterAdmin) Topics() ([]string, error) {
-	m.Lock()
-	defer m.Unlock()
-
-	if m.failOps {
-		return nil, errors.New("bad list topics")
-	}
-	topics := make([]string, 0, len(m.mockTopics))
-	for topicName := range m.mockTopics {
-		topics = append(topics, topicName)
-	}
-	return topics, nil
-}
-
-func (m *mockClusterAdmin) DescribeTopics(topics []string) ([]*sarama.TopicMetadata, error) {
-	if m.failOps {
-		return []*sarama.TopicMetadata{}, errors.New("bad describe topics")
-	}
-	switch topics[0] {
-	case testTopicName, "already-created-topic":
-		return []*sarama.TopicMetadata{
-			{
-				Name:       topics[0],
-				Partitions: []*sarama.PartitionMetadata{{}},
-				Err:        sarama.ErrNoError,
-			},
-		}, nil
-	case "not-exists":
-		return []*sarama.TopicMetadata{}, nil
-	case withErrorTopicName:
-		return []*sarama.TopicMetadata{
-			{
-				Name:       withErrorTopicName,
-				Partitions: []*sarama.PartitionMetadata{{}},
-				Err:        sarama.ErrUnknown,
-			},
-		}, nil
-	default:
-		return []*sarama.TopicMetadata{}, nil
-	}
-}
-
-func (m *mockClusterAdmin) CreateTopic(name string, detail *sarama.TopicDetail, validateOnly bool) error {
-	m.Lock()
-	defer m.Unlock()
-
-	if m.failOps {
-		return errors.New("bad create topic")
-	}
-	if _, ok := m.mockTopics[name]; ok {
+func (m *mockKafkaClient) CreateTopic(opts *CreateTopicOptions) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, exists := m.topics[opts.Name]; exists {
 		return errors.New("already exists")
 	}
-	m.mockTopics[name] = *detail
+	m.topics[opts.Name] = TopicDetail{
+		NumPartitions: opts.Partitions, ReplicationFactor: opts.ReplicationFactor, ConfigEntries: opts.Config,
+	}
 	return nil
 }
 
-func (m *mockClusterAdmin) DeleteTopic(name string) error {
-	m.Lock()
-	defer m.Unlock()
-
-	if m.failOps {
-		return errors.New("bad delete topic")
-	}
-	if _, ok := m.mockTopics[name]; ok {
-		delete(m.mockTopics, name)
-		return nil
-	} else {
+func (m *mockKafkaClient) DeleteTopic(name string, _ bool) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, exists := m.topics[name]; !exists {
 		return errors.New("does not exist")
 	}
+	delete(m.topics, name)
+	return nil
 }
 
-func (m *mockClusterAdmin) AlterConfig(resource sarama.ConfigResourceType, topic string, conf map[string]*string, validateOnly bool) error {
-	if m.failOps {
-		return errors.New("bad alter config")
+func (m *mockKafkaClient) EnsurePartitionCount(name string, count int32) (bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	topic, exists := m.topics[name]
+	if !exists {
+		return false, errors.New("not found")
+	}
+	if topic.NumPartitions == count {
+		return false, nil
+	}
+	if topic.NumPartitions > count {
+		return true, errors.New("cannot decrease partition count")
+	}
+	topic.NumPartitions = count
+	m.topics[name] = topic
+	return true, nil
+}
+
+func (m *mockKafkaClient) EnsureTopicConfig(name string, config map[string]*string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	topic, exists := m.topics[name]
+	if !exists {
+		return errors.New("not found")
+	}
+	topic.ConfigEntries = config
+	m.topics[name] = topic
+	return nil
+}
+
+func (m *mockKafkaClient) CreateUserACLs(access v1alpha1.KafkaAccessType, pattern v1alpha1.KafkaPatternType, dn, topic string) error {
+	common, specific, err := userACLs(access, pattern, dn, topic)
+	if err != nil {
+		return err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, binding := range append(common, specific...) {
+		m.acls[ACL{
+			ResourceType: binding.ResourceType.String(), ResourceName: binding.ResourceName, PatternType: binding.ResourcePatternType.String(),
+			Principal: binding.Principal, Host: binding.Host, Operation: binding.Operation.String(), Permission: binding.PermissionType.String(),
+		}] = struct{}{}
 	}
 	return nil
 }
 
-func (m *mockClusterAdmin) CreatePartitions(topic string, count int32, assn [][]int32, validateOnly bool) error {
+func (m *mockKafkaClient) ListUserACLs() ([]ACL, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return slices.Collect(maps.Keys(m.acls)), nil
+}
+
+func (m *mockKafkaClient) DeleteUserACLs(_ string, _ v1alpha1.KafkaPatternType) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	// The controller test fixture calls this method to reset the mock.
+	clear(m.acls)
 	return nil
 }
 
-func (m *mockClusterAdmin) CreateACL(resource sarama.Resource, acl sarama.Acl) error {
-	m.Lock()
-	defer m.Unlock()
+func (m *mockKafkaClient) AllOfflineReplicas() ([]int32, error) { return nil, nil }
+func (m *mockKafkaClient) OutOfSyncReplicas() ([]int32, error)  { return nil, nil }
 
-	if m.failOps {
-		return errors.New("bad create acl")
-	}
-	var resourceAcls *sarama.ResourceAcls
-	if val, ok := m.mockACLs[resource]; ok {
-		resourceAcls = val
-	} else {
-		resourceAcls = &sarama.ResourceAcls{
-			Resource: resource,
-		}
-	}
-	for _, v := range resourceAcls.Acls {
-		if *v == acl {
-			return nil
-		}
-	}
-	resourceAcls.Acls = append(resourceAcls.Acls, &acl)
-	m.mockACLs[resource] = resourceAcls
+func (m *mockKafkaClient) AlterPerBrokerConfig(_ int32, _ map[string]*string, _ bool) error {
 	return nil
 }
 
-func (m *mockClusterAdmin) CreateACLs(resourceACLs []*sarama.ResourceAcls) error {
-	for _, ra := range resourceACLs {
-		for _, acl := range ra.Acls {
-			if err := m.CreateACL(ra.Resource, *acl); err != nil {
-				return err
-			}
-		}
-	}
+func (m *mockKafkaClient) DescribePerBrokerConfig(_ int32, _ []string) ([]ConfigEntry, error) {
+	return nil, nil
+}
+
+func (m *mockKafkaClient) AlterClusterWideConfig(_ map[string]*string, _ bool) error {
 	return nil
 }
 
-func (m *mockClusterAdmin) ListAcls(filter sarama.AclFilter) ([]sarama.ResourceAcls, error) {
-	m.Lock()
-	defer m.Unlock()
-
-	acls := make([]sarama.ResourceAcls, len(m.mockACLs))
-	for _, acl := range m.mockACLs {
-		acls = append(acls, *acl)
-	}
-	return acls, nil
-}
-
-func (m *mockClusterAdmin) DeleteACL(filter sarama.AclFilter, validateOnly bool) ([]sarama.MatchingAcl, error) {
-	m.Lock()
-	defer m.Unlock()
-
-	if m.failOps {
-		return []sarama.MatchingAcl{}, errors.New("bad create acl")
-	}
-	switch *filter.Principal {
-	case "test-user":
-		return []sarama.MatchingAcl{{}}, nil
-	case withErrorTopicName:
-		return []sarama.MatchingAcl{{Err: sarama.ErrUnknown}}, nil
-	default:
-		// for mock it's enough to erase the whole map
-		m.mockACLs = make(map[sarama.Resource]*sarama.ResourceAcls, 0)
-		return []sarama.MatchingAcl{{}}, nil
-	}
-}
-
-func (m *mockClusterAdmin) DescribeConfig(resource sarama.ConfigResource) ([]sarama.ConfigEntry, error) {
-	return []sarama.ConfigEntry{}, nil
-}
-
-func (m *mockClusterAdmin) DescribeConfigs(resources []*sarama.ConfigResource, _ sarama.DescribeConfigsOptions) ([]*sarama.ConfigResourceResult, error) {
-	results := make([]*sarama.ConfigResourceResult, len(resources))
-	for i := range resources {
-		results[i] = &sarama.ConfigResourceResult{}
-	}
-	return results, nil
-}
-
-func (m *mockClusterAdmin) Controller() (*sarama.Broker, error) {
-	return &sarama.Broker{}, nil
-}
-
-func shallowCopy(original map[string]sarama.TopicDetail) map[string]sarama.TopicDetail {
-	returnMap := make(map[string]sarama.TopicDetail, len(original))
-	for k, v := range original {
-		returnMap[k] = v
-	}
-	return returnMap
+func (m *mockKafkaClient) DescribeClusterWideConfig() ([]ConfigEntry, error) {
+	return nil, nil
 }

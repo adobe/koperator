@@ -18,21 +18,20 @@ package kafka
 import (
 	"testing"
 
-	"github.com/IBM/sarama"
-
+	"github.com/banzaicloud/koperator/pkg/kafkaclient"
 	properties "github.com/banzaicloud/koperator/properties/pkg"
 )
 
 func TestCollectNonIdenticalConfigsFromResponse(t *testing.T) {
 	testCases := []struct {
 		Description  string
-		Response     []*sarama.ConfigEntry
+		Response     []kafkaclient.ConfigEntry
 		BrokerConfig string
 		Result       bool
 	}{
 		{
 			Description: "matching configs",
-			Response: []*sarama.ConfigEntry{
+			Response: []kafkaclient.ConfigEntry{
 				{
 					Name:  "config1",
 					Value: "value1",
@@ -49,7 +48,7 @@ config2=value2
 		},
 		{
 			Description: "if a config is deleted, do not update the broker",
-			Response: []*sarama.ConfigEntry{
+			Response: []kafkaclient.ConfigEntry{
 				{
 					Name:  "config1",
 					Value: "value1",
@@ -70,7 +69,7 @@ config2=value2
 		},
 		{
 			Description: "config value updated",
-			Response: []*sarama.ConfigEntry{
+			Response: []kafkaclient.ConfigEntry{
 				{
 					Name:  "config1",
 					Value: "value1",

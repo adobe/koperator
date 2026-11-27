@@ -36,7 +36,6 @@ import (
 
 	"dario.cat/mergo"
 	"emperror.dev/errors"
-	"github.com/IBM/sarama"
 	clusterregv1alpha1 "github.com/cisco-open/cluster-registry-controller/api/v1alpha1"
 	"github.com/go-logr/logr"
 	"go.uber.org/zap"
@@ -448,20 +447,6 @@ func CreateLogger(debug bool, development bool) logr.Logger {
 	}
 
 	return k8s_zap.New(k8s_zap.UseDevMode(development), k8s_zap.Encoder(encoder), k8s_zap.Level(level))
-}
-
-// ConvertConfigEntryListToProperties function takes []sarama.ConfigEntry and coverts it to Properties object
-func ConvertConfigEntryListToProperties(config []sarama.ConfigEntry) (*properties.Properties, error) {
-	p := properties.NewProperties()
-
-	for _, c := range config {
-		err := p.Set(c.Name, c.Value)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return p, nil
 }
 
 func GenerateEnvoyResourceName(resourceNameFormat string, resourceNameWithScopeFormat string, extListener v1beta1.ExternalListenerConfig, ingressConfig v1beta1.IngressConfig,

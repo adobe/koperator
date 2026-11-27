@@ -15,79 +15,55 @@
 package kafkaclient
 
 import (
-	"emperror.dev/errors"
+	"fmt"
+	"maps"
+	"slices"
+
+	"github.com/twmb/franz-go/pkg/kerr"
 )
 
 func (k *kafkaClient) AllOfflineReplicas() ([]int32, error) {
-	availableTopics, err := k.client.Topics()
-	if err != nil {
-		return nil, errors.WrapIf(err, "could not fetch topics")
-	}
-	allOfflineReplicas := make(map[int32]struct{})
-	for _, topic := range availableTopics {
-		partitions, err := k.client.Partitions(topic)
-		if err != nil {
-			return nil, errors.WrapIfWithDetails(err, "could not fetch partition", "topic", topic)
-		}
-		for _, partition := range partitions {
-			offlineReplicas, err := k.client.OfflineReplicas(topic, partition)
-			if err != nil {
-				return nil, errors.WrapIfWithDetails(err, "could not fetch offline replicas", "topic", topic, "partition", partition)
-			}
-			for _, brokerID := range offlineReplicas {
-				allOfflineReplicas[brokerID] = struct{}{}
-			}
-		}
-	}
-
-	brokerIDs := make([]int32, 0, len(allOfflineReplicas))
-	for brokerID := range allOfflineReplicas {
-		brokerIDs = append(brokerIDs, brokerID)
-	}
-
-	return brokerIDs, nil
+	offline, _, err := k.replicaHealth()
+	return offline, err
 }
 
 func (k *kafkaClient) OutOfSyncReplicas() ([]int32, error) {
-	availableTopics, err := k.client.Topics()
+	_, outOfSync, err := k.replicaHealth()
+	return outOfSync, err
+}
+
+func (k *kafkaClient) replicaHealth() (offline, outOfSync []int32, err error) {
+	ctx, cancel := k.requestContext()
+	defer cancel()
+	metadata, err := topicMetadataRequest().RequestWith(ctx, k.client)
 	if err != nil {
-		return nil, errors.WrapIf(err, "could not fetch topics")
+		return nil, nil, fmt.Errorf("could not fetch topics: %w", err)
 	}
-	outOfSyncReplicas := make(map[int32]struct{})
-	for _, topic := range availableTopics {
-		partitions, err := k.client.Partitions(topic)
-		if err != nil {
-			return nil, errors.WrapIfWithDetails(err, "could not fetch partition", "topic", topic)
+	offlineIDs := make(map[int32]struct{})
+	outOfSyncIDs := make(map[int32]struct{})
+	for _, topic := range metadata.Topics {
+		if topic.Topic == nil {
+			continue
 		}
-		for _, partition := range partitions {
-			replicas, err := k.client.Replicas(topic, partition)
-			if err != nil {
-				return nil, errors.WrapIfWithDetails(err, "could not fetch replicas", "topic", topic, "partition", partition)
+		name := *topic.Topic
+		// Leader elections can still return replica health in the metadata.
+		if err := kerr.ErrorForCode(topic.ErrorCode); err != nil && err != kerr.LeaderNotAvailable {
+			return nil, nil, fmt.Errorf("could not fetch partitions for topic %q: %w", name, err)
+		}
+		for _, partition := range topic.Partitions {
+			if partition.ErrorCode == kerr.ReplicaNotAvailable.Code {
+				return nil, nil, fmt.Errorf("could not fetch replicas for topic %q partition %d: %w", name, partition.Partition, kerr.ReplicaNotAvailable)
 			}
-			isrReplicas, err := k.client.InSyncReplicas(topic, partition)
-			if err != nil {
-				return nil, errors.WrapIfWithDetails(err, "could not fetch isr replicas", "topic", topic, "partition", partition)
+			for _, brokerID := range partition.OfflineReplicas {
+				offlineIDs[brokerID] = struct{}{}
 			}
-			if len(replicas) != len(isrReplicas) {
-				for i := range replicas {
-					found := false
-					for j := range isrReplicas {
-						if replicas[i] == isrReplicas[j] {
-							found = true
-							break
-						}
-					}
-					if !found {
-						outOfSyncReplicas[replicas[i]] = struct{}{}
-					}
+			for _, brokerID := range partition.Replicas {
+				if !slices.Contains(partition.ISR, brokerID) {
+					outOfSyncIDs[brokerID] = struct{}{}
 				}
 			}
 		}
 	}
 
-	brokerIDs := make([]int32, 0, len(outOfSyncReplicas))
-	for brokerID := range outOfSyncReplicas {
-		brokerIDs = append(brokerIDs, brokerID)
-	}
-	return brokerIDs, nil
+	return slices.Sorted(maps.Keys(offlineIDs)), slices.Sorted(maps.Keys(outOfSyncIDs)), nil
 }

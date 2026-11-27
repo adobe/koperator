@@ -18,137 +18,60 @@ package kafkaclient
 import (
 	"testing"
 
-	"github.com/IBM/sarama"
+	"github.com/stretchr/testify/require"
+	"github.com/twmb/franz-go/pkg/kerr"
+	"github.com/twmb/franz-go/pkg/kfake"
+	"github.com/twmb/franz-go/pkg/kmsg"
+
+	"github.com/banzaicloud/koperator/pkg/errorfactory"
 )
 
-func TestListTopics(t *testing.T) {
-	client := newOpenedMockClient()
-	if topics, err := client.ListTopics(); err != nil {
-		t.Error("Expected no error, got:", err)
-	} else {
-		for topic := range topics {
-			if topic != "test-topic" {
-				t.Error("Expected test-topic from mock, got:", topic)
-			}
-		}
-	}
-}
+func TestTopicAdministration(t *testing.T) {
+	cluster := kfake.MustCluster(kfake.NumBrokers(1))
+	t.Cleanup(cluster.Close)
+	client := openTestClient(t, cluster)
 
-func TestGetTopic(t *testing.T) {
-	client := newOpenedMockClient()
+	const topic = "test-topic"
+	detail, err := client.GetTopic(topic)
+	require.NoError(t, err)
+	require.Nil(t, detail)
+	_, err = client.DescribeTopic(topic)
+	require.ErrorIs(t, err, kerr.UnknownTopicOrPartition)
+	var notFound errorfactory.TopicNotFound
+	_, err = client.EnsurePartitionCount(topic, 2)
+	require.ErrorAs(t, err, &notFound)
 
-	if topic, err := client.GetTopic("test-topic"); err != nil {
-		t.Error("Expected nil, got:", err)
-	} else if topic != nil {
-		t.Error("Expected nil got:", topic)
+	opts := &CreateTopicOptions{
+		Name: topic, Partitions: 1, ReplicationFactor: 1,
+		Config: map[string]*string{"retention.ms": kmsg.StringPtr("60000")},
 	}
+	require.NoError(t, client.CreateTopic(opts))
+	var createErr errorfactory.CreateTopicError
+	require.ErrorAs(t, client.CreateTopic(opts), &createErr)
 
-	_ = client.admin.CreateTopic("test-topic", &sarama.TopicDetail{}, false)
+	detail, err = client.GetTopic(topic)
+	require.NoError(t, err)
+	require.NotNil(t, detail)
+	require.Equal(t, int32(1), detail.NumPartitions)
+	require.Equal(t, int16(1), detail.ReplicationFactor)
+	require.Equal(t, map[string]*string{"retention.ms": kmsg.StringPtr("60000")}, detail.ConfigEntries)
 
-	if topic, err := client.GetTopic("test-topic"); err != nil {
-		t.Error("Expected to get test-topic without error, got:", err)
-	} else if topic == nil {
-		t.Error("Expected to get empty details, got nil")
-	}
+	changed, err := client.EnsurePartitionCount(topic, 1)
+	require.NoError(t, err)
+	require.False(t, changed)
+	changed, err = client.EnsurePartitionCount(topic, 2)
+	require.NoError(t, err)
+	require.True(t, changed)
+	require.NoError(t, client.EnsureTopicConfig(topic, map[string]*string{"cleanup.policy": kmsg.StringPtr("compact")}))
 
-	client.admin, _ = newMockClusterAdminFailOps([]string{}, sarama.NewConfig())
-	if _, err := client.GetTopic("test-topic"); err == nil {
-		t.Error("Expected error on GetTopic, got nil")
-	}
-}
+	detail, err = client.GetTopic(topic)
+	require.NoError(t, err)
+	require.NotNil(t, detail)
+	require.Equal(t, int32(2), detail.NumPartitions)
+	require.Equal(t, map[string]*string{"cleanup.policy": kmsg.StringPtr("compact")}, detail.ConfigEntries)
 
-func TestDescribeTopic(t *testing.T) {
-	client := newOpenedMockClient()
-
-	if meta, err := client.DescribeTopic("test-topic"); err != nil {
-		t.Error("Expected no error on DescribeTopic, got:", err)
-	} else if meta.Name != "test-topic" {
-		t.Error("Expected topic named 'test-topic', got:", meta.Name)
-	}
-
-	if _, err := client.DescribeTopic("with-error"); err == nil {
-		t.Error("Expected error for bad topic, got nil")
-	}
-
-	if _, err := client.DescribeTopic("other"); err == nil {
-		t.Error("Expected error got nil")
-	} else if err.Error() != "not found" {
-		t.Error("Expected error not found, got:", err.Error())
-	}
-
-	client.admin, _ = newMockClusterAdminFailOps([]string{}, sarama.NewConfig())
-	if _, err := client.DescribeTopic("test-topic"); err == nil {
-		t.Error("Expected error on DescribeTopic, got nil")
-	}
-}
-
-func TestCreateTopic(t *testing.T) {
-	client := newOpenedMockClient()
-	if err := client.CreateTopic(&CreateTopicOptions{
-		Name:              "new-topic",
-		Partitions:        1,
-		ReplicationFactor: 1,
-	}); err != nil {
-		t.Error("Expected no error, got:", err)
-	}
-
-	client.admin, _ = newMockClusterAdminFailOps([]string{}, sarama.NewConfig())
-	if err := client.CreateTopic(&CreateTopicOptions{
-		Name:              "new-topic",
-		Partitions:        1,
-		ReplicationFactor: 1,
-	}); err == nil {
-		t.Error("Expected error, got nil")
-	}
-}
-
-func TestDeleteTopic(t *testing.T) {
-	client := newOpenedMockClient()
-	if err := client.CreateTopic(&CreateTopicOptions{
-		Name:              "test-topic",
-		Partitions:        1,
-		ReplicationFactor: 1,
-	}); err != nil {
-		t.Error("Expected no error during creation, got:", err)
-	}
-
-	if err := client.DeleteTopic("test-topic", false); err != nil {
-		t.Error("Expected no error, got:", err)
-	}
-
-	client.admin, _ = newMockClusterAdminFailOps([]string{}, sarama.NewConfig())
-	if err := client.DeleteTopic("test-topic", false); err == nil {
-		t.Error("Expected error, got nil")
-	}
-}
-
-func TestEnsureTopicConfig(t *testing.T) {
-	client := newOpenedMockClient()
-	if err := client.EnsureTopicConfig("test-topic", map[string]*string{}); err != nil {
-		t.Error("Expected no error, got:", err)
-	}
-	client.admin, _ = newMockClusterAdminFailOps([]string{}, sarama.NewConfig())
-	if err := client.EnsureTopicConfig("test-topic", map[string]*string{}); err == nil {
-		t.Error("Expected error, got nil")
-	}
-}
-
-func TestEnsurePartitionCount(t *testing.T) {
-	client := newOpenedMockClient()
-	if changed, err := client.EnsurePartitionCount("test-topic", 1); err != nil {
-		t.Error("Expected no error, got:", err)
-	} else if changed {
-		t.Error("Expected no changed to be false, got true")
-	}
-	if changed, _ := client.EnsurePartitionCount("test-topic", 2); !changed {
-		t.Error("Expected to attempt partition increase, got no change")
-	}
-	if _, err := client.EnsurePartitionCount("not-exists", 9000); err == nil {
-		t.Error("Expected error for non-existent topic, got nil")
-	}
-
-	client.admin, _ = newMockClusterAdminFailOps([]string{}, sarama.NewConfig())
-	if _, err := client.EnsurePartitionCount("test-topic", 1); err == nil {
-		t.Error("Expected error, got nil")
-	}
+	require.NoError(t, client.DeleteTopic(topic, true))
+	detail, err = client.GetTopic(topic)
+	require.NoError(t, err)
+	require.Nil(t, detail)
 }

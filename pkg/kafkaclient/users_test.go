@@ -1,5 +1,4 @@
 // Copyright © 2019 Cisco Systems, Inc. and/or its affiliates
-// Copyright 2025 Adobe. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,94 +15,75 @@
 package kafkaclient
 
 import (
+	"context"
 	"testing"
 
-	"github.com/IBM/sarama"
+	"github.com/stretchr/testify/require"
+	"github.com/twmb/franz-go/pkg/kerr"
+	"github.com/twmb/franz-go/pkg/kfake"
+	"github.com/twmb/franz-go/pkg/kgo"
+	"github.com/twmb/franz-go/pkg/kmsg"
 
-	"github.com/banzaicloud/koperator/api/v1alpha1"
+	"github.com/banzaicloud/koperator/pkg/errorfactory"
 )
 
 func TestCreateUserACLs(t *testing.T) {
-	client := newOpenedMockClient()
+	// kfake uses the empty username for an unauthenticated connection.
+	cluster := kfake.MustCluster(kfake.NumBrokers(1), kfake.EnableACLs(), kfake.Superuser("PLAIN", "", ""))
+	t.Cleanup(cluster.Close)
+	client := openTestClient(t, cluster)
+	var invalid errorfactory.InternalError
+	require.ErrorAs(t, client.CreateUserACLs("invalid", "literal", "CN=reader", "test-topic"), &invalid)
+	require.ErrorAs(t, client.CreateUserACLs("read", "invalid", "CN=reader", "test-topic"), &invalid)
+	require.ErrorIs(t, client.CreateUserACLs("read", "any", "CN=reader", "test-topic"), kerr.InvalidRequest)
+	require.ErrorIs(t, client.CreateUserACLs("read", "match", "CN=reader", "test-topic"), kerr.InvalidRequest)
+	require.NoError(t, client.CreateUserACLs("read", "", "CN=reader", "test-topic"))
+	require.NoError(t, client.CreateUserACLs("write", "prefixed", "CN=writer", "test-"))
 
-	validAccessTypes := []v1alpha1.KafkaAccessType{
-		"read",
-		"write"}
-	invalidAccessTypes := []v1alpha1.KafkaAccessType{
-		"",
-		"helloWorld"}
-	allAccessTypes := append([]v1alpha1.KafkaAccessType{}, validAccessTypes...)
-	allAccessTypes = append(allAccessTypes, invalidAccessTypes...)
-
-	validPatternTypes := []v1alpha1.KafkaPatternType{
-		"any",
-		"literal",
-		"match",
-		"prefixed",
-		""}
-	invalidPatternTypes := []v1alpha1.KafkaPatternType{
-		"helloWorld"}
-	allPatternTypes := append([]v1alpha1.KafkaPatternType{}, validPatternTypes...)
-	allPatternTypes = append(allPatternTypes, invalidPatternTypes...)
-
-	// Test all valid combinations of accessType and patternType
-	for _, accessType := range validAccessTypes {
-		for _, patternType := range validPatternTypes {
-			if err := client.CreateUserACLs(accessType, patternType, "test-user", "test-topic"); err != nil {
-				t.Error("Expected no error, got:", err)
-			}
+	observer, err := kgo.NewClient(kgo.SeedBrokers(cluster.ListenAddrs()...))
+	require.NoError(t, err)
+	t.Cleanup(observer.Close)
+	req := kmsg.NewPtrDescribeACLsRequest()
+	req.ResourceType = kmsg.ACLResourceTypeAny
+	req.ResourcePatternType = kmsg.ACLResourcePatternTypeAny
+	req.Operation = kmsg.ACLOperationAny
+	req.PermissionType = kmsg.ACLPermissionTypeAny
+	resp, err := req.RequestWith(context.Background(), observer)
+	require.NoError(t, err)
+	require.Zero(t, resp.ErrorCode)
+	var grants []string
+	for _, resource := range resp.Resources {
+		for _, binding := range resource.ACLs {
+			grants = append(grants, resource.ResourceType.String()+"/"+resource.ResourceName+"/"+resource.ResourcePatternType.String()+"/"+
+				binding.Principal+"/"+binding.Host+"/"+binding.PermissionType.String()+"/"+binding.Operation.String())
 		}
 	}
-	// Test invalid accessTypes against all patternTypes
-	for _, accessType := range invalidAccessTypes {
-		for _, patternType := range allPatternTypes {
-			if err := client.CreateUserACLs(accessType, patternType, "test-user", "test-topic"); err == nil {
-				t.Error("Expected error, got nil")
-			}
-		}
-	}
-	// Test invalid patternTypes against all accessTypes
-	for _, patternType := range invalidPatternTypes {
-		for _, accessType := range allAccessTypes {
-			if err := client.CreateUserACLs(accessType, patternType, "test-user", "test-topic"); err == nil {
-				t.Error("Expected error, got nil")
-			}
-		}
-	}
-
-	client.admin, _ = newMockClusterAdminFailOps([]string{}, sarama.NewConfig())
-	// Test all combinations of accessType and patternType
-	for _, accessType := range allAccessTypes {
-		for _, patternType := range allPatternTypes {
-			if err := client.CreateUserACLs(accessType, patternType, "test-user", "test-topic"); err == nil {
-				t.Error("Expected error, got nil")
-			}
-		}
-	}
+	require.ElementsMatch(t, []string{
+		"TOPIC/test-topic/LITERAL/User:CN=reader/*/ALLOW/DESCRIBE",
+		"TOPIC/test-topic/LITERAL/User:CN=reader/*/ALLOW/DESCRIBE_CONFIGS",
+		"TOPIC/test-topic/LITERAL/User:CN=reader/*/ALLOW/READ",
+		"GROUP/*/LITERAL/User:CN=reader/*/ALLOW/READ",
+		"TOPIC/test-/PREFIXED/User:CN=writer/*/ALLOW/DESCRIBE",
+		"TOPIC/test-/PREFIXED/User:CN=writer/*/ALLOW/DESCRIBE_CONFIGS",
+		"TOPIC/test-/PREFIXED/User:CN=writer/*/ALLOW/WRITE",
+		"TOPIC/test-/PREFIXED/User:CN=writer/*/ALLOW/CREATE",
+	}, grants)
 }
 
-func TestDeleteUserACLs(t *testing.T) {
-	client := newOpenedMockClient()
-
-	validPatternTypes := []v1alpha1.KafkaPatternType{
-		"any",
-		"literal",
-		"match",
-		"prefixed",
-		""}
-
-	for _, patternType := range validPatternTypes {
-		if err := client.DeleteUserACLs("test-user", patternType); err != nil {
-			t.Error("Expected no error, got:", err)
-		}
-
-		if err := client.DeleteUserACLs("with-error", patternType); err == nil {
-			t.Error("Expected error, got nil")
-		}
-	}
-
-	client.admin, _ = newMockClusterAdminFailOps([]string{}, sarama.NewConfig())
-	if err := client.DeleteUserACLs("test-userr", ""); err == nil {
-		t.Error("Expected error, got nil")
-	}
+func TestDeleteUserACLsKeepsLegacyFilter(t *testing.T) {
+	cluster := kfake.MustCluster(kfake.NumBrokers(1))
+	t.Cleanup(cluster.Close)
+	client := openTestClient(t, cluster)
+	filters := make(chan []kmsg.DeleteACLsRequestFilter, 1)
+	cluster.ControlKey(int16(kmsg.DeleteACLs), func(req kmsg.Request) (kmsg.Response, error, bool) {
+		filters <- req.(*kmsg.DeleteACLsRequest).Filters
+		resp := req.ResponseKind().(*kmsg.DeleteACLsResponse)
+		resp.Results = []kmsg.DeleteACLsResponseResult{{}}
+		return resp, nil, true
+	})
+	require.NoError(t, client.DeleteUserACLs("CN=reader", "prefixed"))
+	require.Equal(t, []kmsg.DeleteACLsRequestFilter{{
+		ResourceType: kmsg.ACLResourceTypeTopic, ResourcePatternType: kmsg.ACLResourcePatternTypePrefixed,
+		Principal: kmsg.StringPtr("CN=reader"), Operation: kmsg.ACLOperationDelete, PermissionType: kmsg.ACLPermissionTypeAny,
+	}}, <-filters)
 }
