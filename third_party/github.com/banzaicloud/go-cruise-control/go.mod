@@ -1,6 +1,6 @@
 module github.com/banzaicloud/go-cruise-control
 
-go 1.27.3
+go 1.27.4
 
 require (
 	github.com/go-logr/logr v1.4.4
