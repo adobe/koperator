@@ -201,7 +201,8 @@ func (o *CruiseControlOperation) IsErrorPolicyRetry() bool {
 
 func (o *CruiseControlOperation) IsWaitingForRetryExecution() bool {
 	if (!o.IsPaused() && o.IsErrorPolicyRetry()) &&
-		o.CurrentTaskState() == v1beta1.CruiseControlTaskCompletedWithError && o.CurrentTaskID() != "" {
+		o.CurrentTaskState() == v1beta1.CruiseControlTaskCompletedWithError &&
+		(o.CurrentTaskID() != "" || o.CurrentTaskOperation() == OperationStopExecution) {
 		return true
 	}
 	return false
