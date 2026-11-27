@@ -9,7 +9,7 @@ ARG java_version=25
 ARG java_download_version=${java_version}
 ARG java_download_base_url=https://download.oracle.com/java
 
-FROM alpine:latest@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a AS kafka_dist
+FROM alpine:latest@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf AS kafka_dist
 
 ARG scala_version
 ARG KAFKA_VERSION
@@ -37,7 +37,7 @@ RUN apk add --no-cache gnupg wget && \
 
 
 # backported from https://github.com/docker-library/openjdk/blob/master/18/jdk/slim-bullseye/Dockerfile
-FROM debian:stable-slim@sha256:13e0a2e78aa0554ad5ff66e4e260c6dbcdff807eb1f39d43b9fb0288aae88b04
+FROM debian:stable-slim@sha256:a64d9dbf633e2a2503afac76be521dc25d9b5765150b30d31a3914d4ae969cab
 
 ARG scala_version
 ARG KAFKA_VERSION
