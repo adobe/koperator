@@ -102,11 +102,11 @@ func createNewDefaultCruiseControlScaler(ctx context.Context, serverURL string) 
 }
 
 type cruiseControlScaler struct {
-	CruiseControlScaler
-
 	log    logr.Logger
 	client *client.Client
 }
+
+var _ CruiseControlScaler = (*cruiseControlScaler)(nil)
 
 // Status returns a StatusTaskResult describing the internal state of Cruise Control.
 func (cc *cruiseControlScaler) Status(ctx context.Context) (StatusTaskResult, error) {
@@ -792,7 +792,13 @@ func (cc *cruiseControlScaler) KafkaClusterState(ctx context.Context) (*types.Ka
 	return clusterStateResp.Result, nil
 }
 
-// PartitionLeadersReplicasByBroker returns the number of partition replicas for every broker in the Kafka cluster.
+// PartitionReplicasByBroker returns the number of partition replicas for every broker in the Kafka cluster.
+func (cc *cruiseControlScaler) PartitionReplicasByBroker(ctx context.Context) (map[string]int32, error) {
+	replicas, _, err := cc.PartitionLeadersReplicasByBroker(ctx)
+	return replicas, err
+}
+
+// PartitionLeadersReplicasByBroker returns the partition replica and leader counts for every broker in the Kafka cluster.
 func (cc *cruiseControlScaler) PartitionLeadersReplicasByBroker(ctx context.Context) (brokerIDReplicaCounts map[string]int32, brokerIDLeaderCounts map[string]int32, err error) {
 	clusterStateReq := api.KafkaClusterStateRequestWithDefaults()
 	clusterStateResp, err := cc.client.KafkaClusterState(ctx, clusterStateReq)
@@ -810,6 +816,9 @@ func (cc *cruiseControlScaler) BrokerWithLeastPartitionReplicas(ctx context.Cont
 	if err != nil {
 		cc.log.Error(err, "could not retrieve partition map for brokers")
 		return brokerWithLeastPartitionReplicas, err
+	}
+	if len(brokerPartitions) == 0 {
+		return "", errors.New("no broker replica counts available for downscale selection")
 	}
 
 	replicaCount := int32(math.MaxInt32)

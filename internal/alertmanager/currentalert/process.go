@@ -322,27 +322,49 @@ func downScale(ctx context.Context, log logr.Logger, labels model.LabelSet, clie
 		return nil
 	}
 
-	var brokerID string
 	if broker, ok := labels[v1beta1.BrokerIdLabelKey]; ok {
-		brokerID = string(broker)
-	} else {
-		cruiseControlURL := scale.CruiseControlURLFromKafkaCluster(cr)
-		cc, err := scale.NewCruiseControlScaler(ctx, cruiseControlURL)
-		if err != nil {
-			return errors.WrapIfWithDetails(err, "failed to initialize Cruise Control Scaler",
-				"cruise control url", cruiseControlURL)
-		}
-		brokerID, err = cc.BrokerWithLeastPartitionReplicas(ctx)
-		if err != nil {
-			return err
-		}
+		return k8sutil.RemoveBrokerFromCr(string(broker), cr.Name, cr.Namespace, client)
 	}
 
-	err = k8sutil.RemoveBrokerFromCr(brokerID, string(labels[v1beta1.KafkaCRLabelKey]), string(labels["namespace"]), client)
+	cruiseControlURL := scale.CruiseControlURLFromKafkaCluster(cr)
+	cc, err := scale.NewCruiseControlScaler(ctx, cruiseControlURL)
 	if err != nil {
-		return err
+		return errors.WrapIfWithDetails(err, "failed to initialize Cruise Control Scaler",
+			"cruise control url", cruiseControlURL)
 	}
-	return nil
+	replicaCounts, err := cc.PartitionReplicasByBroker(ctx)
+	if err != nil {
+		return errors.WrapIf(err, "could not retrieve partition replica counts for downscale")
+	}
+
+	selected := -1
+	var fewestReplicas int32
+	for i, broker := range cr.Spec.Brokers {
+		replicas, reported := replicaCounts[strconv.Itoa(int(broker.Id))]
+		if !reported || (selected >= 0 && replicas >= fewestReplicas) {
+			continue
+		}
+		if cr.Spec.KRaftMode {
+			config, err := broker.GetBrokerConfig(cr.Spec)
+			if err != nil {
+				return errors.WrapIfWithDetails(err, "failed to determine broker role for downscale", "brokerId", broker.Id)
+			}
+			if config == nil || !config.IsBrokerNode() {
+				continue
+			}
+		}
+		selected, fewestReplicas = i, replicas
+	}
+	if selected < 0 {
+		return errors.New("no desired data broker has a reported replica count for downscale")
+	}
+
+	// Retain the original resource version so the update fails if the cluster changed during lookup.
+	brokerID := cr.Spec.Brokers[selected].Id
+	cr.Spec.Brokers = slices.DeleteFunc(cr.Spec.Brokers, func(broker v1beta1.Broker) bool {
+		return broker.Id == brokerID
+	})
+	return k8sutil.UpdateCr(cr, client)
 }
 
 func upScale(log logr.Logger, labels model.LabelSet, annotations model.LabelSet, client client.Client) error {

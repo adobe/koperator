@@ -18,14 +18,21 @@ package currentalert
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/go-logr/logr"
 	"github.com/onsi/gomega"
 	"github.com/prometheus/common/model"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -36,6 +43,176 @@ import (
 	//nolint:staticcheck
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
+
+func TestDownScaleWithoutBrokerID(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		statusCode  int
+		body        string
+		kraft       bool
+		duplicate   bool
+		wantErr     bool
+		wantBrokers []int32
+	}{
+		{
+			name:        "removes only the least replicated broker",
+			statusCode:  http.StatusOK,
+			body:        `{"KafkaBrokerState":{"ReplicaCountByBrokerId":{"101":18,"102":9,"303":0},"LeaderCountByBrokerId":{"101":0,"102":3,"303":6}}}`,
+			wantBrokers: []int32{101, 102},
+		},
+		{
+			name:        "removes all spec entries for the selected broker ID",
+			statusCode:  http.StatusOK,
+			body:        `{"KafkaBrokerState":{"ReplicaCountByBrokerId":{"101":18,"102":9,"303":0}}}`,
+			duplicate:   true,
+			wantBrokers: []int32{101, 102},
+		},
+		{
+			name:        "ignores stale IDs and brokers with no reported count",
+			statusCode:  http.StatusOK,
+			body:        `{"KafkaBrokerState":{"ReplicaCountByBrokerId":{"102":9,"999":0}}}`,
+			wantBrokers: []int32{101, 303},
+		},
+		{
+			name:        "stale-only replica map leaves brokers unchanged",
+			statusCode:  http.StatusOK,
+			body:        `{"KafkaBrokerState":{"ReplicaCountByBrokerId":{"999":0}}}`,
+			wantErr:     true,
+			wantBrokers: []int32{101, 102, 303},
+		},
+		{
+			name:        "chooses a combined broker over a controller-only node",
+			statusCode:  http.StatusOK,
+			body:        `{"KafkaBrokerState":{"ReplicaCountByBrokerId":{"101":9,"102":18,"303":0}}}`,
+			kraft:       true,
+			wantBrokers: []int32{102, 303},
+		},
+		{
+			name:        "accepts the largest replica count",
+			statusCode:  http.StatusOK,
+			body:        `{"KafkaBrokerState":{"ReplicaCountByBrokerId":{"102":2147483647}}}`,
+			wantBrokers: []int32{101, 303},
+		},
+		{
+			name:        "lookup failure leaves brokers unchanged",
+			statusCode:  http.StatusInternalServerError,
+			body:        `{"errorMessage":"cluster state unavailable"}`,
+			wantErr:     true,
+			wantBrokers: []int32{101, 102, 303},
+		},
+		{
+			name:        "empty replica map leaves brokers unchanged",
+			statusCode:  http.StatusOK,
+			body:        `{"KafkaBrokerState":{"ReplicaCountByBrokerId":{}}}`,
+			wantErr:     true,
+			wantBrokers: []int32{101, 102, 303},
+		},
+		{
+			name:        "missing replica map leaves brokers unchanged",
+			statusCode:  http.StatusOK,
+			body:        `{"KafkaBrokerState":{}}`,
+			wantErr:     true,
+			wantBrokers: []int32{101, 102, 303},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var requests atomic.Int32
+			mux := http.NewServeMux()
+			mux.HandleFunc("GET /kafkacruisecontrol/kafka_cluster_state", func(w http.ResponseWriter, _ *http.Request) {
+				requests.Add(1)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(tc.statusCode)
+				_, _ = w.Write([]byte(tc.body))
+			})
+			server := httptest.NewServer(mux)
+			defer server.Close()
+
+			cluster := newDownScaleTestCluster()
+			cluster.Spec.CruiseControlConfig.CruiseControlEndpoint = strings.TrimPrefix(server.URL, "http://")
+			if tc.duplicate {
+				cluster.Spec.Brokers = append(cluster.Spec.Brokers, v1beta1.Broker{Id: 303})
+			}
+			if tc.kraft {
+				cluster.Spec.KRaftMode = true
+				cluster.Spec.Brokers[0].BrokerConfig = &v1beta1.BrokerConfig{Roles: []string{v1beta1.BrokerNodeProcessRole, v1beta1.ControllerNodeProcessRole}}
+				cluster.Spec.Brokers[1].BrokerConfig = &v1beta1.BrokerConfig{Roles: []string{v1beta1.BrokerNodeProcessRole}}
+				cluster.Spec.BrokerConfigGroups = map[string]v1beta1.BrokerConfig{"controller": {Roles: []string{v1beta1.ControllerNodeProcessRole}}}
+				cluster.Spec.Brokers[2].BrokerConfigGroup = "controller"
+			}
+			kubeClient := newDownScaleTestClient(t, cluster)
+
+			err := downScale(context.Background(), logr.Discard(), model.LabelSet{
+				"namespace":             "kafka",
+				v1beta1.KafkaCRLabelKey: "kafka",
+			}, kubeClient)
+			if tc.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			require.Equal(t, int32(1), requests.Load())
+			assertDownScaleBrokers(t, kubeClient, tc.wantBrokers)
+		})
+	}
+}
+
+func TestDownScaleWithoutBrokerIDRejectsConcurrentSpecChange(t *testing.T) {
+	server := httptest.NewUnstartedServer(nil)
+	defer server.Close()
+	cluster := newDownScaleTestCluster()
+	cluster.Spec.CruiseControlConfig.CruiseControlEndpoint = server.Listener.Addr().String()
+	kubeClient := newDownScaleTestClient(t, cluster)
+	server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		latest := &v1beta1.KafkaCluster{}
+		if err := kubeClient.Get(r.Context(), client.ObjectKeyFromObject(cluster), latest); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		latest.Spec.Brokers = latest.Spec.Brokers[:2]
+		if err := kubeClient.Update(r.Context(), latest); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"KafkaBrokerState":{"ReplicaCountByBrokerId":{"101":18,"102":9,"303":0}}}`))
+	})
+	server.Start()
+
+	err := downScale(t.Context(), logr.Discard(), model.LabelSet{
+		"namespace":             "kafka",
+		v1beta1.KafkaCRLabelKey: "kafka",
+	}, kubeClient)
+	require.True(t, apierrors.IsConflict(err), "expected a conflict, got %v", err)
+	assertDownScaleBrokers(t, kubeClient, []int32{101, 102})
+}
+
+func newDownScaleTestCluster() *v1beta1.KafkaCluster {
+	return &v1beta1.KafkaCluster{
+		ObjectMeta: v1.ObjectMeta{Name: "kafka", Namespace: "kafka"},
+		Spec: v1beta1.KafkaClusterSpec{
+			Brokers: []v1beta1.Broker{{Id: 101}, {Id: 102}, {Id: 303}},
+		},
+	}
+}
+
+func newDownScaleTestClient(t *testing.T, cluster *v1beta1.KafkaCluster) client.Client {
+	t.Helper()
+	testScheme := runtime.NewScheme()
+	require.NoError(t, v1beta1.AddToScheme(testScheme))
+	return fake.NewClientBuilder().WithScheme(testScheme).
+		WithStatusSubresource(&v1beta1.KafkaCluster{}).WithObjects(cluster).Build()
+}
+
+func assertDownScaleBrokers(t *testing.T, kubeClient client.Client, want []int32) {
+	t.Helper()
+	cluster := &v1beta1.KafkaCluster{}
+	require.NoError(t, kubeClient.Get(context.Background(), types.NamespacedName{Name: "kafka", Namespace: "kafka"}, cluster))
+	var ids []int32
+	for _, broker := range cluster.Spec.Brokers {
+		ids = append(ids, broker.Id)
+	}
+	require.Equal(t, want, ids)
+}
 
 func Test_resizePvc(t *testing.T) {
 	testClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
