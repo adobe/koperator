@@ -16,11 +16,18 @@ package certmanagerpki
 
 import (
 	"context"
+	"errors"
 	"reflect"
 	"testing"
 
+	certv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 
@@ -62,6 +69,59 @@ func TestFinalizeUserCertificate(t *testing.T) {
 	if err := manager.FinalizeUserCertificate(context.Background(), &v1alpha1.KafkaUser{}); err != nil {
 		t.Error("Expected no error, got:", err)
 	}
+}
+
+func TestJKSPasswordSecretHasOwnerWhenCertificateCreateFails(t *testing.T) {
+	ctx := context.Background()
+	manager, err := newMock(newMockCluster())
+	require.NoError(t, err)
+	user := newMockUser()
+	user.UID = "kafka-user-uid"
+	writeError := errors.New("certificate create failed")
+	manager.client = interceptor.NewClient(manager.client.(client.WithWatch), interceptor.Funcs{
+		Create: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+			if _, ok := obj.(*certv1.Certificate); ok {
+				return writeError
+			}
+			return c.Create(ctx, obj, opts...)
+		},
+	})
+
+	_, err = manager.ReconcileUserCertificate(ctx, user, scheme.Scheme, "cluster.local")
+	require.ErrorIs(t, err, writeError)
+	secret := &corev1.Secret{}
+	require.NoError(t, manager.client.Get(ctx, client.ObjectKey{Namespace: user.Namespace, Name: user.Spec.SecretName}, secret))
+	require.Equal(t, []metav1.OwnerReference{{
+		APIVersion: v1alpha1.GroupVersion.String(), Kind: "KafkaUser", Name: user.Name, UID: user.UID,
+	}}, secret.OwnerReferences)
+	require.Nil(t, metav1.GetControllerOf(secret), "cert-manager can still set its Certificate as the controller")
+}
+
+func TestJKSPasswordProvisioningKeepsExistingSharedSecret(t *testing.T) {
+	ctx := context.Background()
+	manager, err := newMock(newMockCluster())
+	require.NoError(t, err)
+	user := newMockUser()
+	user.UID = "kafka-user-uid"
+	shared := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: user.Spec.SecretName, Namespace: user.Namespace, UID: "shared-secret-uid",
+			OwnerReferences: []metav1.OwnerReference{
+				*metav1.NewControllerRef(user, v1alpha1.GroupVersion.WithKind("KafkaUser")),
+				{APIVersion: "v1", Kind: "ConfigMap", Name: "other-owner", UID: "other-owner-uid"},
+			},
+		},
+		Data: map[string][]byte{v1alpha1.PasswordKey: []byte("test-password")},
+	}
+	require.NoError(t, manager.client.Create(ctx, shared))
+
+	_, err = manager.ReconcileUserCertificate(ctx, user, scheme.Scheme, "cluster.local")
+	require.True(t, apierrors.IsAlreadyExists(err), "expected the Secret collision, got %v", err)
+	current := &corev1.Secret{}
+	require.NoError(t, manager.client.Get(ctx, client.ObjectKeyFromObject(shared), current))
+	require.Equal(t, shared.UID, current.UID)
+	require.Equal(t, shared.ResourceVersion, current.ResourceVersion, "the shared Secret must not change")
+	require.True(t, apierrors.IsNotFound(manager.client.Get(ctx, client.ObjectKeyFromObject(user), &certv1.Certificate{})))
 }
 
 func TestReconcileUserCertificate(t *testing.T) {
