@@ -34,8 +34,10 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
@@ -44,6 +46,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	certv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	"golang.org/x/sync/singleflight"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -170,7 +173,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+	if err = addReadinessChecks(mgr, webhookDisabled); err != nil {
 		setupLog.Error(err, "unable to start /readyz endpoint")
 		os.Exit(1)
 	}
@@ -286,5 +289,34 @@ func main() {
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
+	}
+}
+
+func addReadinessChecks(mgr ctrl.Manager, webhookDisabled bool) error {
+	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+		return err
+	}
+	if webhookDisabled {
+		return nil
+	}
+	return mgr.AddReadyzCheck("webhook", webhookReadiness(mgr.GetWebhookServer().StartedChecker()))
+}
+
+func webhookReadiness(check healthz.Checker) healthz.Checker {
+	// StartedChecker holds a lock through its TLS dial. Share the dial and bound each caller's wait.
+	var checks singleflight.Group
+	return func(req *http.Request) error {
+		ctx, cancel := context.WithTimeout(req.Context(), 500*time.Millisecond)
+		defer cancel()
+		result := checks.DoChan("webhook", func() (any, error) {
+			// StartedChecker does not use the HTTP request.
+			return nil, check(nil)
+		})
+		select {
+		case outcome := <-result:
+			return outcome.Err
+		case <-ctx.Done():
+			return fmt.Errorf("wait for webhook readiness: %w", ctx.Err())
+		}
 	}
 }
