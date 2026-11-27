@@ -424,7 +424,7 @@ GitHub Actions workflows (`.github/workflows/`):
 
 - **controller-runtime** v0.25.3 - Operator framework
 - **k8s.io/*** v0.37.1 - Kubernetes client libraries
-- **franz-go** v1.22.1 - Kafka client
+- **franz-go** v1.22.3 - Kafka client
 - **Ginkgo** v2 - BDD testing framework
 - **cert-manager** v1.21.2 - Certificate management integration
 

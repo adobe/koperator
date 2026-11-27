@@ -97,7 +97,7 @@ var _ = Describe("KafkaTopic", func() {
 					{
 						TopicName:   "test-topic-1",
 						AccessType:  v1alpha1.KafkaAccessTypeRead,
-						PatternType: v1alpha1.KafkaPatternTypeAny,
+						PatternType: v1alpha1.KafkaPatternTypePrefixed,
 					},
 					{
 						TopicName:   "test-topic-2",
@@ -137,9 +137,9 @@ var _ = Describe("KafkaTopic", func() {
 		Expect(err).NotTo(HaveOccurred())
 		const principal = "User:CN=kafkauser-1"
 		Expect(acls).To(ConsistOf([]kafkaclient.ACL{
-			{ResourceType: "TOPIC", ResourceName: "test-topic-1", PatternType: "ANY", Principal: principal, Host: "*", Operation: "DESCRIBE", Permission: "ALLOW"},
-			{ResourceType: "TOPIC", ResourceName: "test-topic-1", PatternType: "ANY", Principal: principal, Host: "*", Operation: "DESCRIBE_CONFIGS", Permission: "ALLOW"},
-			{ResourceType: "TOPIC", ResourceName: "test-topic-1", PatternType: "ANY", Principal: principal, Host: "*", Operation: "READ", Permission: "ALLOW"},
+			{ResourceType: "TOPIC", ResourceName: "test-topic-1", PatternType: "PREFIXED", Principal: principal, Host: "*", Operation: "DESCRIBE", Permission: "ALLOW"},
+			{ResourceType: "TOPIC", ResourceName: "test-topic-1", PatternType: "PREFIXED", Principal: principal, Host: "*", Operation: "DESCRIBE_CONFIGS", Permission: "ALLOW"},
+			{ResourceType: "TOPIC", ResourceName: "test-topic-1", PatternType: "PREFIXED", Principal: principal, Host: "*", Operation: "READ", Permission: "ALLOW"},
 			{ResourceType: "TOPIC", ResourceName: "test-topic-2", PatternType: "LITERAL", Principal: principal, Host: "*", Operation: "DESCRIBE", Permission: "ALLOW"},
 			{ResourceType: "TOPIC", ResourceName: "test-topic-2", PatternType: "LITERAL", Principal: principal, Host: "*", Operation: "DESCRIBE_CONFIGS", Permission: "ALLOW"},
 			{ResourceType: "TOPIC", ResourceName: "test-topic-2", PatternType: "LITERAL", Principal: principal, Host: "*", Operation: "WRITE", Permission: "ALLOW"},
@@ -148,8 +148,8 @@ var _ = Describe("KafkaTopic", func() {
 		}))
 
 		Expect(user.Status.ACLs).To(ConsistOf(
-			"User:CN=kafkauser-1,Topic,ANY,test-topic-1,Describe,Allow,*",
-			"User:CN=kafkauser-1,Topic,ANY,test-topic-1,Read,Allow,*",
+			"User:CN=kafkauser-1,Topic,PREFIXED,test-topic-1,Describe,Allow,*",
+			"User:CN=kafkauser-1,Topic,PREFIXED,test-topic-1,Read,Allow,*",
 			"User:CN=kafkauser-1,Group,LITERAL,*,Read,Allow,*",
 			"User:CN=kafkauser-1,Topic,LITERAL,test-topic-2,Describe,Allow,*",
 			"User:CN=kafkauser-1,Topic,LITERAL,test-topic-2,Create,Allow,*",

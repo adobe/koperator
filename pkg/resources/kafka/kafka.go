@@ -1172,16 +1172,12 @@ func (r *Reconciler) handleRollingUpgrade(log logr.Logger, desiredPod, currentPo
 				return errorfactory.New(errorfactory.BrokersUnreachable{}, err, "could not connect to kafka brokers")
 			}
 			defer close()
-			allOfflineReplicas, err := kClient.AllOfflineReplicas()
+			allOfflineReplicas, outOfSyncReplicas, err := kClient.ReplicaHealth()
 			if err != nil {
 				return errors.WrapIf(err, "health check failed")
 			}
 			if len(allOfflineReplicas) > 0 {
 				log.V(1).Info("offline replicas", "IDs", allOfflineReplicas)
-			}
-			outOfSyncReplicas, err := kClient.OutOfSyncReplicas()
-			if err != nil {
-				return errors.WrapIf(err, "health check failed")
 			}
 			if len(outOfSyncReplicas) > 0 {
 				log.V(1).Info("out-of-sync replicas", "IDs", outOfSyncReplicas)

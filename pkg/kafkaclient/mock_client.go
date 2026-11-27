@@ -159,8 +159,7 @@ func (m *mockKafkaClient) DeleteUserACLs(_ string, _ v1alpha1.KafkaPatternType) 
 	return nil
 }
 
-func (m *mockKafkaClient) AllOfflineReplicas() ([]int32, error) { return nil, nil }
-func (m *mockKafkaClient) OutOfSyncReplicas() ([]int32, error)  { return nil, nil }
+func (m *mockKafkaClient) ReplicaHealth() ([]int32, []int32, error) { return nil, nil, nil }
 
 func (m *mockKafkaClient) AlterPerBrokerConfig(_ int32, _ map[string]*string, _ bool) error {
 	return nil

@@ -28,7 +28,7 @@ import (
 	clientutil "github.com/banzaicloud/koperator/pkg/util/client"
 )
 
-const kafkaDefaultTimeout = int64(5)
+const kafkaDefaultTimeout = int64(30)
 
 // KafkaConfig are the options to creating a new ClusterAdmin client
 type KafkaConfig struct {
@@ -36,6 +36,13 @@ type KafkaConfig struct {
 	UseSSL    bool
 	TLSConfig *tls.Config
 
+	// OperationTimeout sets the timeout in seconds for each admin request.
+	// A value of zero or less uses 30 seconds. Open shares one deadline
+	// across startup requests and caps it at five seconds.
+	// A topic lookup uses separate deadlines for metadata and configuration.
+	// If it retries, it uses the time left in the configuration deadline.
+	// Replica health checks share one deadline for the initial metadata
+	// request and any refresh.
 	OperationTimeout int64
 }
 

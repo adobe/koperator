@@ -22,6 +22,7 @@ import (
 	"strconv"
 
 	"github.com/twmb/franz-go/pkg/kerr"
+	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/kmsg"
 
 	"github.com/banzaicloud/koperator/pkg/errorfactory"
@@ -33,7 +34,7 @@ type ConfigEntry struct {
 }
 
 func (k *kafkaClient) AlterClusterWideConfig(configChange map[string]*string, validateOnly bool) error {
-	return k.alterConfig(kmsg.ConfigResourceTypeBroker, "", configChange, validateOnly)
+	return k.alterConfig(nil, kmsg.ConfigResourceTypeBroker, "", configChange, validateOnly)
 }
 
 func (k *kafkaClient) DescribeClusterWideConfig() ([]ConfigEntry, error) {
@@ -44,7 +45,7 @@ func (k *kafkaClient) AlterPerBrokerConfig(brokerID int32, configChange map[stri
 	if err := k.requireBroker(brokerID); err != nil {
 		return err
 	}
-	return k.alterConfig(kmsg.ConfigResourceTypeBroker, strconv.Itoa(int(brokerID)), configChange, validateOnly)
+	return k.alterConfig(k.client.Broker(int(brokerID)), kmsg.ConfigResourceTypeBroker, strconv.Itoa(int(brokerID)), configChange, validateOnly)
 }
 
 func (k *kafkaClient) DescribePerBrokerConfig(brokerID int32, keys []string) ([]ConfigEntry, error) {
@@ -61,9 +62,22 @@ func (k *kafkaClient) requireBroker(brokerID int32) error {
 	return nil
 }
 
-func (k *kafkaClient) alterConfig(kind kmsg.ConfigResourceType, name string, changes map[string]*string, validateOnly bool) error {
+func (k *kafkaClient) alterConfig(broker *kgo.Broker, kind kmsg.ConfigResourceType, name string, changes map[string]*string, validateOnly bool) error {
 	ctx, cancel := k.requestContext()
 	defer cancel()
+	var requestor kmsg.Requestor = k.client
+	if !validateOnly {
+		// Select a responding broker with a read before sending an unpinned write.
+		// Send the replacement once, as a lost reply does not tell us if it took effect.
+		if broker == nil {
+			shard := k.client.RequestSharded(ctx, brokerMetadataRequest())[0]
+			if shard.Err != nil {
+				return shard.Err
+			}
+			broker = k.client.Broker(int(shard.Meta.NodeID))
+		}
+		requestor = broker
+	}
 	resource := kmsg.NewAlterConfigsRequestResource()
 	resource.ResourceType = kind
 	resource.ResourceName = name
@@ -73,8 +87,7 @@ func (k *kafkaClient) alterConfig(kind kmsg.ConfigResourceType, name string, cha
 	req := kmsg.NewPtrAlterConfigsRequest()
 	req.Resources = []kmsg.AlterConfigsRequestResource{resource}
 	req.ValidateOnly = validateOnly
-	// franz-go routes broker resources with an ID to that broker.
-	response, err := req.RequestWith(ctx, k.client)
+	response, err := req.RequestWith(ctx, requestor)
 	if err != nil {
 		return err
 	}
@@ -87,6 +100,9 @@ func (k *kafkaClient) alterConfig(kind kmsg.ConfigResourceType, name string, cha
 }
 
 func (k *kafkaClient) describeBrokerConfig(name string, keys []string) ([]ConfigEntry, error) {
+	if len(keys) == 0 {
+		keys = nil // Kafka uses a null filter to return all keys.
+	}
 	ctx, cancel := k.requestContext()
 	defer cancel()
 	req := kmsg.NewPtrDescribeConfigsRequest()

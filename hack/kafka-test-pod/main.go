@@ -19,6 +19,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -26,6 +27,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/twmb/franz-go/pkg/kadm"
 	"github.com/twmb/franz-go/pkg/kgo"
 )
 
@@ -44,7 +46,7 @@ var brokerAddrs = []string{"kafka-headless.kafka.svc.cluster.local:29092"}
 
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	err := run(ctx, os.Getenv("KAFKA_MODE"))
+	err := run(ctx, os.Getenv("KAFKA_MODE"), kgo.SeedBrokers(brokerAddrs...), kgo.DialTLSConfig(getTLSConfig()))
 	cancel()
 	if err != nil {
 		log.Fatal(err)
@@ -52,15 +54,12 @@ func main() {
 	log.Println("Shutting down")
 }
 
-func run(ctx context.Context, mode string) error {
-	opts := []kgo.Opt{kgo.SeedBrokers(brokerAddrs...), kgo.DialTLSConfig(getTLSConfig())}
+func run(ctx context.Context, mode string, opts ...kgo.Opt) error {
 	switch mode {
 	case "consumer":
-		opts = append(opts, kgo.ConsumePartitions(map[string]map[int32]kgo.Offset{
-			kafkaTopic: {kafkaPartition: kgo.NewOffset().AtEnd()},
-		}))
 	case "producer":
-		opts = append(opts, kgo.RecordPartitioner(kgo.ManualPartitioner()), kgo.DisableIdempotentWrite(), kgo.RequiredAcks(kgo.NoAck()))
+		opts = append(opts, kgo.RecordPartitioner(kgo.ManualPartitioner()), kgo.DisableIdempotentWrite(),
+			kgo.RequiredAcks(kgo.NoAck()), kgo.RecordDeliveryTimeout(30*time.Second))
 	default:
 		return fmt.Errorf("invalid test mode: %q", mode)
 	}
@@ -115,10 +114,37 @@ func getTLSConfig() *tls.Config {
 }
 
 func consume(ctx context.Context, client *kgo.Client) error {
+	startupCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	offsets, err := kadm.NewClient(client).ListEndOffsets(startupCtx, kafkaTopic)
+	cancel()
+	if ctx.Err() != nil {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("could not resolve starting offset for %s/%d: %w", kafkaTopic, kafkaPartition, err)
+	}
+	offset, ok := offsets.Lookup(kafkaTopic, kafkaPartition)
+	if !ok {
+		return fmt.Errorf("no starting offset returned for %s/%d", kafkaTopic, kafkaPartition)
+	}
+	if offset.Err != nil {
+		return fmt.Errorf("could not resolve starting offset for %s/%d: %w", kafkaTopic, kafkaPartition, offset.Err)
+	}
+	client.AddConsumePartitions(map[string]map[int32]kgo.Offset{
+		kafkaTopic: {kafkaPartition: kgo.NewOffset().At(offset.Offset)},
+	})
+
 	for ctx.Err() == nil {
 		fetches := client.PollFetches(ctx)
-		if err := fetches.Err(); err != nil && ctx.Err() == nil {
-			return err
+		for _, fetchErr := range fetches.Errors() {
+			if ctx.Err() != nil {
+				break
+			}
+			var dataLoss *kgo.ErrDataLoss
+			if !errors.As(fetchErr.Err, &dataLoss) {
+				return fetchErr.Err
+			}
+			log.Printf("Consumer resumed from a reset offset: %v", dataLoss)
 		}
 		fetches.EachRecord(func(msg *kgo.Record) {
 			log.Printf("Consumed message offset %d - %s\n", msg.Offset, msg.Value)

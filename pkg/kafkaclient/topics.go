@@ -16,12 +16,14 @@
 package kafkaclient
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math"
 	"time"
 
 	"github.com/twmb/franz-go/pkg/kerr"
+	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/kmsg"
 
 	"github.com/banzaicloud/koperator/pkg/errorfactory"
@@ -64,12 +66,41 @@ func topicMetadataRequest(names ...string) *kmsg.MetadataRequest {
 	return req
 }
 
-// ListTopics is used primarily for checking the existence of topics
+// ListTopics returns the details for all visible topics.
 func (k *kafkaClient) ListTopics() (map[string]TopicDetail, error) {
+	return k.readTopicDetails("")
+}
+
+// readTopicDetails reads all topics when topicName is empty.
+func (k *kafkaClient) readTopicDetails(topicName string) (map[string]TopicDetail, error) {
+	metadataRequest := topicMetadataRequest()
+	if topicName != "" {
+		metadataRequest = topicMetadataRequest(topicName)
+	}
 	ctx, cancel := k.requestContext()
-	defer cancel()
 	// Read fresh topic metadata and describe configs on the same broker.
-	shard := k.client.RequestSharded(ctx, topicMetadataRequest())[0]
+	shard := k.client.RequestSharded(ctx, metadataRequest)[0]
+	cancel()
+	if shard.Err != nil {
+		return nil, shard.Err
+	}
+	ctx, cancel = k.requestContext()
+	defer cancel()
+	topics, err := k.readTopicConfigs(ctx, topicName, shard)
+	if !isBrokerConnectionError(err) {
+		return topics, err
+	}
+
+	// Repeat both reads under the original configuration deadline. Another
+	// broker's older metadata must not turn a known topic into a missing one.
+	refreshed, retryErr := k.readTopicConfigs(ctx, topicName, k.client.RequestSharded(ctx, metadataRequest)[0])
+	if retryErr == nil && topicName != "" && len(refreshed) == 0 {
+		return nil, fmt.Errorf("could not confirm config for previously observed topic %q: %w", topicName, err)
+	}
+	return refreshed, retryErr
+}
+
+func (k *kafkaClient) readTopicConfigs(ctx context.Context, topicName string, shard kgo.ResponseShard) (map[string]TopicDetail, error) {
 	if shard.Err != nil {
 		return nil, shard.Err
 	}
@@ -81,6 +112,14 @@ func (k *kafkaClient) ListTopics() (map[string]TopicDetail, error) {
 			continue
 		}
 		name := *meta.Topic
+		if topicName != "" {
+			if name != topicName || meta.ErrorCode == kerr.UnknownTopicOrPartition.Code {
+				continue
+			}
+			if err := kerr.ErrorForCode(meta.ErrorCode); err != nil {
+				return nil, err
+			}
+		}
 		partitions, replicas := len(meta.Partitions), 0
 		if partitions > 0 {
 			replicas = len(meta.Partitions[0].Replicas)
@@ -137,7 +176,10 @@ func (k *kafkaClient) ListTopics() (map[string]TopicDetail, error) {
 
 // GetTopic is used to check the existence, and retrieve details for a topic
 func (k *kafkaClient) GetTopic(topicName string) (*TopicDetail, error) {
-	topics, err := k.ListTopics()
+	if topicName == "" {
+		return nil, nil
+	}
+	topics, err := k.readTopicDetails(topicName)
 	if err != nil {
 		return nil, err
 	}
@@ -177,8 +219,11 @@ func (k *kafkaClient) DescribeTopic(topic string) (*TopicMetadata, error) {
 func (k *kafkaClient) CreateTopic(opts *CreateTopicOptions) error {
 	ctx, cancel := k.requestContext()
 	defer cancel()
-	_, err := k.admin.CreateTopic(ctx, opts.Partitions, opts.ReplicationFactor, opts.Config, opts.Name)
+	result, err := k.admin.CreateTopic(ctx, opts.Partitions, opts.ReplicationFactor, opts.Config, opts.Name)
 	if err != nil {
+		if result.ErrMessage != "" {
+			err = fmt.Errorf("%s: %w", result.ErrMessage, err)
+		}
 		return errorfactory.New(errorfactory.CreateTopicError{}, err, "failed to create topic")
 	}
 	return nil
@@ -198,13 +243,14 @@ func (k *kafkaClient) DeleteTopic(topicName string, wait bool) error {
 		ticker := time.NewTicker(1 * time.Second)
 		defer ticker.Stop()
 		for range ticker.C {
-			if topic, err := k.GetTopic(topicName); err != nil {
-				return err
-			} else if topic == nil {
+			_, err := k.DescribeTopic(topicName)
+			if errors.Is(err, kerr.UnknownTopicOrPartition) {
 				return nil
-			} else {
-				log.Info(fmt.Sprintf("Topic %s still going down for deletion", topicName))
 			}
+			if err != nil {
+				return err
+			}
+			log.Info(fmt.Sprintf("Topic %s still going down for deletion", topicName))
 		}
 	}
 	return nil
@@ -234,10 +280,13 @@ func (k *kafkaClient) EnsurePartitionCount(topic string, desired int32) (bool, e
 	if !ok {
 		return true, fmt.Errorf("missing create partitions response for topic %q", topic)
 	}
+	if result.Err != nil && result.ErrMessage != "" {
+		return true, fmt.Errorf("%s: %w", result.ErrMessage, result.Err)
+	}
 	return true, result.Err
 }
 
 // EnsureTopicConfig is an idempotent call to ensure topic configuration overrides
 func (k *kafkaClient) EnsureTopicConfig(topic string, desiredConf map[string]*string) error {
-	return k.alterConfig(kmsg.ConfigResourceTypeTopic, topic, desiredConf, false)
+	return k.alterConfig(nil, kmsg.ConfigResourceTypeTopic, topic, desiredConf, false)
 }

@@ -16,8 +16,13 @@
 package kafkaclient
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"time"
 
+	"github.com/twmb/franz-go/pkg/kerr"
+	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/kmsg"
 
 	"github.com/banzaicloud/koperator/api/v1alpha1"
@@ -63,36 +68,47 @@ func (k *kafkaClient) CreateUserACLs(accessType v1alpha1.KafkaAccessType, patter
 }
 
 func (k *kafkaClient) createACLs(bindings []kmsg.CreateACLsRequestCreation) error {
-	ctx, cancel := k.requestContext()
-	defer cancel()
 	req := kmsg.NewPtrCreateACLsRequest()
 	req.Creations = bindings
-	resp, err := req.RequestWith(ctx, k.client)
-	if err != nil {
-		return err
-	}
-	if len(resp.Results) != len(bindings) {
-		return fmt.Errorf("received %d results for %d ACL creations", len(resp.Results), len(bindings))
-	}
-	for _, result := range resp.Results {
-		if err := brokerResponseError(result.ErrorCode, result.ErrorMessage); err != nil {
+	return k.retryACLControllerChange(func(ctx context.Context, broker *kgo.Broker) error {
+		resp, err := req.RequestWith(ctx, broker)
+		if err != nil {
 			return err
 		}
-	}
-	return nil
+		if len(resp.Results) != len(req.Creations) {
+			return fmt.Errorf("received %d results for %d ACL creations", len(resp.Results), len(req.Creations))
+		}
+		var rejected []kmsg.CreateACLsRequestCreation
+		for i, result := range resp.Results {
+			switch err := brokerResponseError(result.ErrorCode, result.ErrorMessage); {
+			case err == nil:
+			case errors.Is(err, kerr.NotController):
+				rejected = append(rejected, req.Creations[i])
+			default:
+				return err
+			}
+		}
+		if len(rejected) > 0 {
+			req.Creations = rejected
+			return kerr.NotController
+		}
+		return nil
+	})
 }
 
 func (k *kafkaClient) ListUserACLs() ([]ACL, error) {
-	ctx, cancel := k.requestContext()
-	defer cancel()
 	// Preserve the legacy empty filter (UNKNOWN fields).
 	req := kmsg.NewPtrDescribeACLsRequest()
 	req.ResourcePatternType = kmsg.ACLResourcePatternTypeUnknown
-	resp, err := req.RequestWith(ctx, k.client)
-	if err != nil {
-		return nil, err
-	}
-	if err := brokerResponseError(resp.ErrorCode, resp.ErrorMessage); err != nil {
+	var resp *kmsg.DescribeACLsResponse
+	if err := k.retryACLControllerChange(func(ctx context.Context, broker *kgo.Broker) error {
+		response, err := req.RequestWith(ctx, broker)
+		if err != nil {
+			return err
+		}
+		resp = response
+		return brokerResponseError(resp.ErrorCode, resp.ErrorMessage)
+	}); err != nil {
 		return nil, err
 	}
 	var acls []ACL
@@ -109,8 +125,6 @@ func (k *kafkaClient) ListUserACLs() ([]ACL, error) {
 
 // DeleteUserACLs sends the existing topic DELETE filter for the given principal.
 func (k *kafkaClient) DeleteUserACLs(dn string, patternType v1alpha1.KafkaPatternType) error {
-	ctx, cancel := k.requestContext()
-	defer cancel()
 	req := kmsg.NewPtrDeleteACLsRequest()
 	req.Filters = []kmsg.DeleteACLsRequestFilter{{
 		Principal:           &dn,
@@ -119,15 +133,18 @@ func (k *kafkaClient) DeleteUserACLs(dn string, patternType v1alpha1.KafkaPatter
 		ResourceType:        kmsg.ACLResourceTypeTopic,
 		PermissionType:      kmsg.ACLPermissionTypeAny,
 	}}
-	resp, err := req.RequestWith(ctx, k.client)
-	if err != nil {
-		return err
-	}
-	if len(resp.Results) != 1 {
-		return fmt.Errorf("received %d results for one ACL delete filter", len(resp.Results))
-	}
-	result := resp.Results[0]
-	if err := brokerResponseError(result.ErrorCode, result.ErrorMessage); err != nil {
+	var result kmsg.DeleteACLsResponseResult
+	if err := k.retryACLControllerChange(func(ctx context.Context, broker *kgo.Broker) error {
+		resp, err := req.RequestWith(ctx, broker)
+		if err != nil {
+			return err
+		}
+		if len(resp.Results) != 1 {
+			return fmt.Errorf("received %d results for one ACL delete filter", len(resp.Results))
+		}
+		result = resp.Results[0]
+		return brokerResponseError(result.ErrorCode, result.ErrorMessage)
+	}); err != nil {
 		return err
 	}
 	for _, match := range result.MatchingACLs {
@@ -135,6 +152,41 @@ func (k *kafkaClient) DeleteUserACLs(dn string, patternType v1alpha1.KafkaPatter
 			return err
 		}
 	}
+	return nil
+}
+
+func (k *kafkaClient) retryACLControllerChange(request func(context.Context, *kgo.Broker) error) error {
+	const maxRetries = 5
+	for attempt := 0; ; attempt++ {
+		var err error
+		if attempt > 0 {
+			err = k.refreshACLController()
+		}
+		if err == nil {
+			ctx, cancel := k.requestContext()
+			err = request(ctx, k.client.Broker(int(k.controllerID.Load())))
+			cancel()
+		}
+		// A dial failure happens before the write. A lost reply does not permit replay.
+		if attempt == maxRetries || (!errors.Is(err, kerr.NotController) && !isBrokerDialError(err)) {
+			return err
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
+func (k *kafkaClient) refreshACLController() error {
+	ctx, cancel := k.requestContext()
+	defer cancel()
+	meta, err := brokerMetadataRequest().RequestWith(ctx, k.client)
+	if err != nil {
+		return err
+	}
+	id, err := metadataController(meta)
+	if err != nil {
+		return kerr.NotController
+	}
+	k.controllerID.Store(id)
 	return nil
 }
 
